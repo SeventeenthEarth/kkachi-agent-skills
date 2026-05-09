@@ -1,0 +1,21 @@
+---
+name: kkachi-docs-update
+description: Check and update durable project documentation after a Kkachi task changes behavior, tests, architecture, backend support, or process expectations.
+version: 0.1.0
+---
+
+# Kkachi Docs Update
+
+Use this skill during the docs-update phase.
+
+Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an explicit master request has selected KHS/Kkachi for the work. Do not trigger it for ordinary direct Hermes edits, quick one-file fixes, typo/config patches, or read-only explanations unless the master explicitly asks for KHS/Kkachi or delegates the work to a KHS-using commander such as 조운 or 마초.
+
+## Core rule
+
+Git commits, chat memory, and implementation notes are not durable project docs. Update canonical docs or record why no docs update is needed. Docs-only KHS runs still use KAB by default unless the master explicitly forbids KAB; if direct docs editing is used, record the non-KAB rationale in `phase-plan.yaml`, `docs-update.md`, and final report.
+
+## Outputs
+
+- `docs-update.md`
+- updated docs diff, when needed
+- KAH phase/gate events, when supported

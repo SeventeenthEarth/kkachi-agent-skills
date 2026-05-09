@@ -1,0 +1,24 @@
+name: kkachi-hermes-skills
+version: 0.1.0
+requires:
+  kkachi-agent-helper: "latest"
+  kkachi-agent-bridge: "latest-or-project-policy"
+skills:
+  - kkachi-orchestrate
+  - kkachi-task-contract
+  - kkachi-backend-select
+  - kkachi-prompt-compose
+  - kkachi-phase-state
+  - kkachi-plan
+  - kkachi-ask
+  - kkachi-implement
+  - kkachi-enhance-test
+  - kkachi-optimize
+  - kkachi-review
+  - kkachi-verify
+  - kkachi-docs-update
+  - kkachi-request-feedback
+  - kkachi-handle-feedback
+  - kkachi-final-verify
+  - kkachi-improve
+  - kkachi-install-guide

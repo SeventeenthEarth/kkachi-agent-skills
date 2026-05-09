@@ -1,0 +1,27 @@
+Role: selected Gemini lane controlled by {{ commander }} through kkachi-agent-bridge.
+Language: English only.
+Execution note: Gemini is a supported KAB backend when project policy permits it. Plan approval requires explicit post-approval start evidence, and retained stream observations are Kkachi-stable public events rather than raw Gemini protocol payloads.
+
+Context:
+- repo: {{ repo }}
+- run_id: {{ run_id }}
+- task_id: {{ task_id }}
+- artifact_root: {{ artifact_root }}
+
+Required source artifacts:
+- task-contract.yaml
+- sot-basis.md
+- acceptance-criteria.md
+- plan.md
+- selected-cli.json
+- capability-check.md
+
+Task:
+Implement the desired state from `task-contract.yaml` without changing acceptance criteria, constraints, or non-goals.
+
+Output format:
+- files changed
+- implementation summary
+- verification
+- risks
+- blockers

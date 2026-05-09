@@ -1,0 +1,23 @@
+{
+  "version": "0.1",
+  "session_id": "{{ session_id }}",
+  "backend_type": "{{ backend_type }}",
+  "adapter_type": "{{ adapter_type }}",
+  "state": "{{ bridge_state }}",
+  "lifecycle_class": "{{ lifecycle_class }}",
+  "open_pendings": 0,
+  "run_id": "{{ run_id }}",
+  "observation_mode": "{{ bridge_observation_mode }}",
+  "plan_lifecycle": {
+    "state": "{{ plan_state }}",
+    "explicit_post_approval_start_required": "{{ plan_explicit_post_approval_start_required }}"
+  },
+  "stream": {
+    "supported": "{{ kab_retained_stream_support }}",
+    "epoch": "{{ stream_epoch }}",
+    "cursor": "{{ stream_cursor }}",
+    "restart_discontinuity_observed": "{{ stream_restart_discontinuity_observed }}"
+  },
+  "hook_data": {},
+  "notes": []
+}

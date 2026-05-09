@@ -1,0 +1,82 @@
+version: 0.1.0
+purpose: "Backend-specific prompt style profiles used to render KAB prompts from the same AI-neutral task contract."
+
+profiles:
+  claude-stepwise-directive:
+    backend_type: claude
+    style: "explicit stepwise directions, structured sections, clear checkpoints"
+    use_when:
+      - planning
+      - careful implementation
+      - review
+      - ambiguity-sensitive work
+    preserve:
+      - acceptance_criteria
+      - constraints
+      - non_goals
+      - verification_contract
+    avoid:
+      - hiding critical constraints in prose
+      - letting detailed steps override the task contract
+  codex-desired-state:
+    backend_type: codex
+    style: "desired state, constraints, autonomy boundary, evidence and verification contract"
+    use_when:
+      - autonomous implementation
+      - codebase gap filling
+      - verification-heavy work
+    preserve:
+      - acceptance_criteria
+      - constraints
+      - non_goals
+      - verification_contract
+    avoid:
+      - over-prescribing mechanical steps when the desired state is clearer
+    kab_caveats:
+      - wrapper_api_driven_not_hook_native
+      - raw_codex_app_server_events_are_not_public_stream_payloads
+      - request_user_input_requires_default_mode_request_user_input
+  gemini-structured-context:
+    backend_type: gemini
+    style: "structured context, task, constraints, output format, and explicit boundaries"
+    default_lane: production_write_when_project_policy_allows
+    preserve:
+      - acceptance_criteria
+      - constraints
+      - non_goals
+      - verification_contract
+    require_when_relevant:
+      - explicit_post_approval_start_after_plan_approval
+      - direct_shell_bypass_disabled_evidence
+      - retained_event_or_read_status_completion_evidence
+    avoid:
+      - treating_plan_approval_as_tool_or_file_approval
+      - assuming_terminal_capture_is_the_control_plane
+  glm-agentic-coding:
+    backend_type: glm
+    style: "concise agentic coding directive with explicit artifacts and verification"
+    preserve:
+      - acceptance_criteria
+      - constraints
+      - non_goals
+      - verification_contract
+    require_when_relevant:
+      - response_fidelity_warning_after_reject
+  opencode-control-plane-aware:
+    backend_type: opencode
+    style: "prompt includes approval/session/control-plane caveats and exact artifact return requirements"
+    preserve:
+      - acceptance_criteria
+      - constraints
+      - non_goals
+      - verification_contract
+    require_when_relevant:
+      - approval_evidence
+      - session_identity
+      - bridge_event_summary
+      - opencode_permission_mode_ask_for_supervised_approval
+      - explicit_post_approval_start_after_plan_approval
+      - retained_api_sse_authority
+    avoid:
+      - treating_rendered_tool_call_question_text_as_needs_input
+      - treating_limited_tools_observability_as_audit_grade

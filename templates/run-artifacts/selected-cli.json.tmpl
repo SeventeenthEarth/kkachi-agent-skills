@@ -1,0 +1,50 @@
+{
+  "version": "0.1",
+  "status": "{{ backend_status }}",
+  "backend_type": "{{ backend_type }}",
+  "adapter_type": "{{ adapter_type }}",
+  "source_ledger_ref": "{{ source_ledger_ref }}",
+  "caveats": [],
+  "tested_cli": "{{ tested_cli }}",
+  "minimum_cli": "{{ minimum_cli }}",
+  "last_verified": "{{ last_verified }}",
+  "run_id": "{{ run_id }}",
+  "execution_mode": "{{ execution_mode }}",
+  "prompt_profile": "{{ prompt_profile }}",
+  "prompt_profile_version": "{{ prompt_profile_version }}",
+  "selection_reason": "{{ selection_reason }}",
+  "user_preference": {
+    "provided": "{{ user_preference_provided }}",
+    "value": "{{ user_preference }}",
+    "applied": "{{ user_preference_applied }}",
+    "notes": "{{ user_preference_notes }}"
+  },
+  "capability_snapshot": {
+    "write": "{{ capability_write }}",
+    "approval_control": "{{ capability_approval_control }}",
+    "question_flow": "{{ capability_question_flow }}",
+    "retained_events": "{{ capability_retained_events }}",
+    "observability": "{{ capability_observability }}",
+    "restart_recovery": "{{ capability_restart_recovery }}",
+    "plan_lifecycle": "{{ capability_plan_lifecycle }}",
+    "retained_stream": "{{ capability_retained_stream }}"
+  },
+  "kab_observation_modes": {
+    "cli_loop": "{{ kab_cli_loop_support }}",
+    "retained_stream": "{{ kab_retained_stream_support }}"
+  },
+  "plan_lifecycle": {
+    "idle_only": "{{ plan_idle_only }}",
+    "approval_starts_execution": "{{ plan_approval_starts_execution }}",
+    "explicit_post_approval_start_required": "{{ plan_explicit_post_approval_start_required }}"
+  },
+  "permission_preconditions": [],
+  "accepted_caveats": [],
+  "unsupported_capabilities_ruled_out": [],
+  "rejected_backends": [],
+  "source_ledgers": [
+    "{{ compatibility_matrix_path }}",
+    "{{ cli_capabilities_registry_path }}",
+    "{{ project_backend_policy_path }}"
+  ]
+}

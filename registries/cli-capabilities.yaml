@@ -1,0 +1,149 @@
+version: 0.1.0
+purpose: "Machine-readable KHS summary of KAB public backend support. Keep synchronized with kkachi-agent-bridge/docs/public/compatibility-matrix.md."
+source_ledgers:
+  summary: kkachi-agent-bridge/README.md
+  canonical_support: kkachi-agent-bridge/docs/public/compatibility-matrix.md
+  deeper_contract: kkachi-agent-bridge/docs/dev/spec/requirements.md
+last_synced_from_public_docs: "2026-05-08"
+
+capability_states:
+  native: "Backend provides the capability directly and KAB passes it through."
+  synthetic: "KAB synthesizes the capability."
+  degraded: "Partial support; not baseline-equivalent."
+  unsupported: "Not provided by backend or KAB."
+  api_sse_only: "Supported only through API/SSE events, not verified through live CLI question producer."
+
+backends:
+  claude:
+    adapter_type: claude_compat
+    shipping_status: supported
+    selected_cli_status: supported
+    tested_cli: "2.1.112"
+    last_verified: "2026-05-02"
+    session_lifecycle: supported
+    approval_control: supported
+    question_flow: supported
+    plan_lifecycle:
+      support: supported
+      idle_only: true
+      approval_starts_execution: true
+      explicit_post_approval_start_required: false
+    retained_events: unsupported
+    observation_modes:
+      cli_loop: supported
+      retained_stream: unsupported
+      recommended: cli_loop
+    tools_observability: full
+    permission_preconditions:
+      - "Use Claude default permission mode; auto/acceptEdits/plan can resolve tools without bridge-visible needs_approval."
+    caveats: []
+
+  glm:
+    adapter_type: claude_compat
+    shipping_status: supported
+    selected_cli_status: supported
+    tested_cli: "1.2.1"
+    last_verified: "2026-05-02"
+    session_lifecycle: supported
+    approval_control: supported
+    question_flow: supported
+    plan_lifecycle:
+      support: supported
+      idle_only: true
+      approval_starts_execution: true
+      explicit_post_approval_start_required: false
+    retained_events: unsupported
+    observation_modes:
+      cli_loop: supported
+      retained_stream: unsupported
+      recommended: cli_loop
+    tools_observability: full
+    permission_preconditions:
+      - "Do not pass --yolo when supervised approval is required."
+    caveats:
+      - "After a bridge-tracked reject, GLM may produce natural-language output that reads as if the denied action succeeded; inspect response_fidelity_warning."
+
+  codex:
+    adapter_type: native_codex
+    shipping_status: supported
+    selected_cli_status: supported
+    tested_cli: "codex-cli 0.128.0"
+    minimum_cli: "0.128.0"
+    last_verified: "2026-05-05"
+    session_lifecycle: supported
+    approval_control: supported
+    question_flow: supported
+    plan_lifecycle:
+      support: supported
+      idle_only: true
+      approval_starts_execution: true
+      explicit_post_approval_start_required: false
+    retained_events: native
+    observation_modes:
+      cli_loop: supported
+      retained_stream: supported
+      recommended: retained_stream
+    tools_observability: retained_events
+    permission_preconditions:
+      - "Managed Codex args must include --enable default_mode_request_user_input, --ask-for-approval untrusted, and --sandbox read-only when approval/input control is required."
+    caveats:
+      - "Codex is wrapper/API-driven through native_codex; raw Codex app-server events are not public KAB stream payloads."
+      - "Protocol drift must fail closed through wrapper validation, not terminal scraping."
+
+  gemini:
+    adapter_type: gemini_compat
+    shipping_status: supported
+    selected_cli_status: supported
+    tested_cli: "0.41.2"
+    minimum_cli: "0.41.2"
+    last_verified: "2026-05-06"
+    session_lifecycle: supported
+    approval_control: supported
+    question_flow: supported
+    plan_lifecycle:
+      support: supported
+      idle_only: true
+      approval_starts_execution: false
+      explicit_post_approval_start_required: true
+    retained_events: native
+    observation_modes:
+      cli_loop: supported
+      retained_stream: supported
+      recommended: retained_stream
+    tools_observability: full
+    permission_preconditions:
+      - "Bridge-managed Gemini settings must disable direct TUI shell mode; readiness fails closed if it cannot be disabled."
+      - "Plan approval leaves state at plan_approved_waiting_for_start and requires explicit approved-plan start."
+    caveats:
+      - "Question answers use BeforeTool ask_user deny+reason JSON injection."
+      - "Reject recovery can complete a turn with hook_data.last_stop_outcome=gemini_reject_recovery."
+      - "For first-class clients, open GET /api/stream/{session_id} early and reconcile with /api/events plus read/status/wait/read?tui=true."
+
+  opencode:
+    adapter_type: opencode_api
+    shipping_status: supported
+    selected_cli_status: supported
+    tested_cli: "1.14.39"
+    minimum_cli: "1.14.39"
+    last_verified: "2026-05-05"
+    session_lifecycle: supported
+    approval_control: supported
+    question_flow: api_sse_only
+    plan_lifecycle:
+      support: supported
+      idle_only: true
+      approval_starts_execution: false
+      explicit_post_approval_start_required: true
+    retained_events: native
+    observation_modes:
+      cli_loop: supported
+      retained_stream: supported
+      recommended: retained_stream
+    tools_observability: limited
+    permission_preconditions:
+      - "Use opencode_permission_mode: ask for supervised approval QA."
+      - "allow mode must not synthesize bridge approvals; unmanaged mode preserves upstream behavior."
+    caveats:
+      - "OpenCode question support is API/SSE-routed only for real upstream question.asked events; rendered <tool_call>question text is not proof of needs_input support."
+      - "Tools observability is limited and not audit-grade."
+      - "Plugin assist is experimental/default-off and tools-only; API/SSE remains authority for startup, permission, question, lifecycle, recovery, and stream."

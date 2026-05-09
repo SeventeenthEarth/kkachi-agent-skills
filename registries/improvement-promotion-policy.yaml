@@ -1,0 +1,25 @@
+version: 0.1.0
+purpose: "Decide where Kkachi self-improvement should land."
+
+destinations:
+  run_artifact:
+    use_when: "one-off observation, insufficient evidence, or task-local workaround"
+  project_overlay:
+    use_when: "project-specific convention, recurring project failure, stack-specific gate, or local backend preference"
+  backend_prompt_profile:
+    use_when: "same backend repeatedly needs a prompt adaptation across phases or projects"
+  phase_skill_reference:
+    use_when: "phase-specific conditional guidance is reusable but too long for SKILL.md"
+  script:
+    use_when: "deterministic check is repeated by agents or graders"
+  shared_khs:
+    use_when: "generalized across projects or backends, supported by repeated evidence, and passes skill QA"
+
+promotion_gates:
+  require_improvement_note: true
+  require_generalized_lesson: true
+  require_evidence_artifacts: true
+  require_trigger_eval_when_description_changes: true
+  require_with_skill_vs_baseline_for_material_behavior_change: true
+  require_assertion_grading_when_objective_outputs_exist: true
+  require_master_approval_for_shared_khs_patch: true

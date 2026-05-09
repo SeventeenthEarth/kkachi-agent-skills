@@ -1,0 +1,53 @@
+# Bridge events
+
+Status: complete
+
+Run: `{{ run_id }}`
+Session: `{{ session_id }}`
+Backend: `{{ backend_type }}/{{ adapter_type }}`
+Observation mode: `{{ bridge_observation_mode }}`
+
+## Dispatch
+
+- prompt artifact: `prompt.md`
+- dispatch command:
+- dispatch accepted: `<yes|no>`
+
+## Plan capture evidence
+
+- plan command: `kkachi-agent-bridge plan read --session {{ session_id }}` or `GET /api/plan/{{ session_id }}`
+- captured before implementation start: `<yes|no>`
+- `plan.plan_state` at capture:
+- `plan.plan_ref`:
+- `plan.source_evidence` summary:
+- `plan.plan_text` saved to: `plan.md`
+- backend timing note:
+  - Claude/GLM/Codex: capture must be before approve because approve starts implementation.
+  - Gemini/OpenCode: capture may be before approve or before `plan start-approved`.
+- ambiguity/error notes, including `PLAN_AMBIGUOUS` if applicable:
+
+## Observation evidence
+
+- mode: `<cli_loop|retained_stream|hybrid>`
+- CLI wait/read/status evidence:
+- retained stream/events evidence:
+- stream epoch/cursor, when available:
+- daemon restart discontinuity observed: `<yes|no>`
+
+## Pending handling
+
+- approvals:
+- rejections:
+- answers:
+- late pending resolution errors:
+
+## Completion evidence
+
+- final public state:
+- lifecycle class:
+- open pendings:
+- final read/status summary:
+- stop command/result:
+
+## Notes
+

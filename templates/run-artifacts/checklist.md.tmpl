@@ -1,0 +1,67 @@
+Status: draft
+
+# Run Checklist
+
+## Purpose
+
+This checklist is the operator-facing progress tracker for the run. It is created by KHS/Hermes during the `plan` phase, after KAB `plan read` has produced `plan.plan_text`, and is updated after `ask` and every later phase. Do not treat it as optional notes.
+
+KAB does not own this file. KAB supplies the backend-authored plan text and source evidence. KHS should ask KAB's planner backend to include a parse-friendly `KHS Checklist Seed` in `plan.plan_text`; KHS/Hermes then converts that seed plus the KHS phase contract into this normalized progress checklist and stores it as a KAH artifact.
+
+## Checklist Rules
+
+- Every canonical KHS phase must have a row.
+- Required phases must not be removed.
+- Skipped or not-applicable phases must keep a row with an explicit reason.
+- Each row must name the expected artifact or evidence used to prove completion.
+- Hermes updates `State` after each phase and uses this file during `final_verify`.
+
+## State Values
+
+- `pending`
+- `in_progress`
+- `done`
+- `skipped`
+- `blocked`
+
+## Phase Progress
+
+| Phase | Required | State | Owner role | Backend/session | Evidence artifact | Gate/check | Notes or skip reason |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| plan | yes | pending | planner | TBD | `plan.md`, `checklist.md`, `acceptance-criteria.md` | `kkachi-agent-helper gate check <run_id> plan --json` | Final plan and this checklist must both exist before implementation. |
+| ask | yes | pending | planner + Hermes | TBD | `ask.md` or `plan.md#Decision Clarifications` | decision review | Record no open questions if none remain. |
+| implement | conditional | pending | implementer | TBD | `diff.patch`, `impl-log.md`, `cli-output.md` | implementation evidence | Required for code/docs changes that execute work. |
+| enhance_test | conditional | pending | implementer | TBD | `test-log.md`, test changes if any | test evidence | Add/improve regression coverage when risk warrants; otherwise record skip reason. |
+| optimize | conditional | pending | implementer | TBD | `optimize-log.md`, `diff.patch` update if changed | regression check | Strongly recommended when code changed; remove AI slop, duplication, and small structural waste. |
+| update_docs | conditional | pending | implementer | TBD | `docs-update.md` | docs decision | Either update docs or record no-change reason. |
+| request_feedback_1 | yes | pending | feedback | TBD | `feedback-request.md`, `feedback-1.md` | feedback evidence | Minimum one feedback request for every KHS run. |
+| handle_feedback_1 | yes | pending | implementer + Hermes | TBD | `feedback-triage-1.md`, `handle-feedback-1.md` | feedback handling | Record no actionable feedback if applicable. |
+| request_feedback_2 | conditional | skipped | feedback | TBD | `feedback-2.md` | feedback evidence | Use only when Hermes judges another round necessary. |
+| handle_feedback_2 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-2.md`, `handle-feedback-2.md` | feedback handling | Required only if round 2 is requested. |
+| request_feedback_3 | conditional | skipped | feedback | TBD | `feedback-3.md` | feedback evidence | Maximum feedback round. |
+| handle_feedback_3 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-3.md`, `handle-feedback-3.md` | feedback handling | Required only if round 3 is requested. |
+| final_verify | yes | pending | Hermes | local + KAH/KAB evidence | `verification.md`, `final-report.md` | `kkachi-agent-helper gate final <run_id> --json` | Hermes verifies artifacts, gates, repo state, and final user report. |
+| improve | conditional | pending | Hermes | local | `improvement-note.md` | improvement review | Record reusable lessons or explicit no-promotion decision. |
+
+## Micro-Task Progress
+
+Break the approved plan into small, observable work items. Keep each item tied to a phase and evidence artifact.
+
+| ID | Phase | Work item | State | Evidence | Notes |
+| --- | --- | --- | --- | --- | --- |
+| C-001 | plan | Finalize task scope, non-goals, and acceptance criteria | pending | `plan.md`, `acceptance-criteria.md` |  |
+
+## Blockers
+
+| ID | Phase | Blocker | Owner | Decision needed | State |
+| --- | --- | --- | --- | --- | --- |
+
+## Final Checklist Review
+
+- [ ] Every required phase is `done`.
+- [ ] Every skipped phase has a reason.
+- [ ] Every conditional phase has an applicability decision.
+- [ ] Every completed phase links to evidence.
+- [ ] Feedback rounds are between 1 and 3.
+- [ ] Code-change runs include an optimize decision and evidence or skip reason.
+- [ ] Final verification checked KAH gates and KAB evidence.

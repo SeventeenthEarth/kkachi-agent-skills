@@ -1,0 +1,324 @@
+version: 0.2.0
+purpose: "Canonical KHS phase contracts. KHS phase_plan is the workflow SOT; KAH metadata remains deterministic helper classification and must not decide which KHS phases execute."
+
+workflow_authority:
+  sot: phase_plan
+  kah_metadata_role: helper_classification
+  kah_metadata_fields:
+    - work_path
+    - work_mode
+    - execution_mode
+    - urgency
+    - sot_policy
+  rule: "KHS decides phase applicability; KAH records artifacts/gates/events deterministically."
+
+canonical_spine:
+  - plan
+  - ask
+  - implement
+  - enhance_test
+  - optimize
+  - update_docs
+  - request_feedback
+  - handle_feedback
+  - final_verify
+  - improve
+
+role_model:
+  hermes:
+    responsibility:
+      - manager_orchestrator
+      - risk_approval_router
+      - final_verifier
+      - user_facing_korean_reporter
+    default_code_author: false
+    simple_direct_exception: "Only outside KHS, or when the master explicitly converts the work to a direct Hermes task."
+  planner_backend:
+    phases:
+      - plan
+      - ask
+  implementer_backend:
+    phases:
+      - implement
+      - enhance_test
+      - optimize
+      - update_docs
+      - handle_feedback
+  feedback_backend:
+    phases:
+      - request_feedback
+    write_permission: read_only_by_default
+  mapping_rule: "Logical roles may share one physical KAB backend/session or use separate backends according to project policy, user preference, Hermes judgment, and capability gates."
+
+task_basis:
+  user_selects_task_each_run: true
+  no_auto_next_task_default: true
+  expected_docs_surfaces:
+    - roadmap
+    - architecture
+    - adr
+    - specs
+    - implementation_notes
+    - todo
+
+kab_usage_policy:
+  khs_code_change: required
+  khs_dev_run: required
+  khs_docs_only: default_required
+  docs_only_no_kab_exception: "Allowed only when the master explicitly forbids KAB; record rationale in phase_plan and final report."
+  code_change_no_kab_request: "Convert to a normal direct Hermes task, not a KHS run."
+
+feedback_loop_policy:
+  minimum_rounds: 1
+  maximum_rounds: 3
+  round_1_required: true
+  additional_rounds: "Hermes decides when another request-feedback/handle-feedback pair is useful."
+  no_actionable_feedback: "Still run handle-feedback and record 'no actionable feedback'."
+
+implementation_approval_policy:
+  low_risk_default: auto_approve_after_plan_and_ask
+  user_notice_required_before_auto_start: true
+  explicit_user_approval_required_when:
+    - api_change
+    - db_or_schema_or_migration_change
+    - security_auth_or_secret_handling_change
+    - dependency_change
+    - architecture_change
+    - sot_change
+    - large_diff_or_broad_file_fanout
+    - low_confidence
+    - unresolved_ask_phase_ambiguity
+
+paths:
+  A_development_execution:
+    description: "Existing SOT, roadmap trace, and acceptance basis exists before implementation."
+    code_write_default: allowed_through_kab_for_khs
+    required_before_write:
+      - sot_basis
+      - roadmap_trace_or_not_applicable_reason
+      - acceptance_criteria
+      - task_contract
+      - phase_plan
+      - plan_md_captured_from_kab_when_kab_planner_is_used
+      - checklist_md_normalized_by_khs
+      - backend_selection_when_kab_lane_is_used
+      - capability_check_when_kab_lane_is_used
+      - prompt_md_when_kab_lane_is_used
+      - ask_phase_completed
+  B_discovery_shaping:
+    description: "SOT, roadmap trace, acceptance criteria, or implementation handoff is missing or weak."
+    code_write_default: forbidden
+    output_goal: "Durable SOT/roadmap/acceptance/handoff artifacts that can enter Path A."
+    required_outputs:
+      - problem_framing
+      - sot_update_or_minimal_sot
+      - roadmap_trace
+      - acceptance_criteria
+      - non_goals
+      - implementation_handoff
+
+phase_plan_contract:
+  artifact: phase-plan.yaml
+  ownership: khs_hermes
+  status_values:
+    - pending
+    - in_progress
+    - done
+    - skipped
+    - blocked
+    - not_applicable
+  applicability_values:
+    - required
+    - conditional
+    - optional
+    - not_applicable
+  rules:
+    - "Every canonical phase must have a phase_plan entry."
+    - "KAH work_path/work_mode/execution_mode may inform initial defaults but must not override phase_plan applicability."
+    - "Skipped or not_applicable entries require a reason."
+    - "request_feedback_1 and handle_feedback_1 are required for every KHS run."
+    - "request_feedback_2/3 and handle_feedback_2/3 are conditional and must not exceed round 3."
+    - "Code-change runs include optimize as conditional_recommended; skipping requires a reason."
+    - "final_verify checks phase_plan and checklist.md before final report."
+
+phases:
+  plan:
+    intent: "Define the path-appropriate plan before backend execution and create the mandatory run progress checklist."
+    owner_role: planner_backend
+    required_inputs:
+      - task_contract
+      - phase_plan
+      - sot_basis
+      - project_overlay
+    expected_outputs:
+      - plan.md
+      - checklist.md
+    kab_plan_capture_contract:
+      when_kab_planner_lane_is_used: true
+      source_commands:
+        - "kkachi-agent-bridge plan read --session <session_id>"
+        - "GET /api/plan/<session_id>"
+      required_response_fields:
+        - plan.plan_state
+        - plan.plan_text
+        - plan.plan_ref
+        - plan.source_evidence
+      prompt_requirements:
+        - "Ask the planner backend to include a clearly delimited 'KHS Checklist Seed' section in plan.plan_text."
+        - "The seed should use unchecked markdown tasks and include phase, evidence artifact, and verification/check condition."
+        - "The seed is input for KHS normalization, not the final KAH checklist.md by itself."
+      storage_rules:
+        - "Copy plan.plan_text into plan.md before implementation starts."
+        - "Preserve plan.plan_state, plan.plan_ref, and plan.source_evidence in plan.md and/or bridge-events.md."
+      backend_timing:
+        claude: "capture in plan_pending_approval before approve; approve starts implementation"
+        glm: "capture in plan_pending_approval before approve; approve starts implementation"
+        codex: "capture in plan_pending_approval before approve; approve starts implementation"
+        gemini: "capture in plan_pending_approval or plan_approved_waiting_for_start; implementation starts only after start-approved"
+        opencode: "capture in plan_pending_approval or plan_approved_waiting_for_start; fail closed on PLAN_AMBIGUOUS"
+      safe_order:
+        - plan_start
+        - plan_read
+        - save_plan_text_to_plan_md
+        - derive_checklist_md_from_plan_and_phase_contract
+        - approve_or_start_according_to_backend
+    checklist_contract:
+      owner: khs_hermes
+      source_inputs:
+        - plan.plan_text_from_kab
+        - khs_checklist_seed_when_present
+        - phase_contracts_yaml
+        - task_contract
+        - acceptance_criteria
+        - expected_evidence_artifacts
+      output_artifact: checklist.md
+      note: "KAB may include task checkboxes inside plan.plan_text, especially for OpenCode, but KHS/Hermes owns the normalized KHS progress checklist stored in KAH."
+      mandatory: true
+      timing:
+        create: "during plan, after plan.plan_text capture and before implementation approval/start"
+        update: "after ask and after every later phase"
+      required_rows:
+        - every_canonical_phase
+        - feedback_round_1
+        - conditional_feedback_rounds_2_to_3
+      required_fields:
+        - phase
+        - required_or_conditional
+        - state
+        - owner_role
+        - backend_or_session
+        - evidence_artifact
+        - gate_or_check
+        - notes_or_skip_reason
+      state_values:
+        - pending
+        - in_progress
+        - done
+        - skipped
+        - blocked
+      rules:
+        - "Skipped or not-applicable phases must keep a row with an explicit reason."
+        - "Code-change runs include optimize by default; skipping optimize requires a reason."
+        - "Feedback must run at least once and at most three times."
+        - "Final verification must use checklist.md to prove every required phase has evidence."
+    gate: plan_gate
+  ask:
+    intent: "Always ask after plan whether ambiguity, missing decisions, or user choices remain before implementation."
+    owner_role: planner_backend_plus_hermes
+    applicability: required
+    expected_outputs:
+      - ask.md
+      - answered-decisions.md
+      - updated_plan_or_phase_plan_when_decisions_change
+    rules:
+      - "Ask the planner backend to surface ambiguity or decision needs."
+      - "Hermes answers from SOT/project context when safe."
+      - "Ask the master only when Hermes cannot decide safely or user intent must be confirmed."
+      - "If no open questions remain, record that explicitly instead of skipping the phase."
+    gate: decision_gate
+  implement:
+    intent: "Reach the approved desired state in Path A, or produce handoff artifacts only in Path B."
+    owner_role: implementer_backend
+    required_inputs:
+      - phase_plan
+      - plan.md
+      - checklist.md
+      - selected-cli.json
+      - prompt.md
+      - ask_phase_completion
+    approval_before_start:
+      low_risk: "Hermes may approve/start automatically after notifying the master with intended direction."
+      high_risk: "Require explicit master approval."
+    expected_outputs:
+      - diff.patch
+      - impl-log.md
+      - cli-output.md
+    gate: implementation_gate
+  enhance_test:
+    intent: "Add or improve regression coverage where risk warrants it."
+    owner_role: implementer_backend
+    applicability: conditional
+    skip_rule: "Allowed only when phase_plan and checklist.md record why no test enhancement is useful."
+    expected_outputs:
+      - test-plan.md
+      - test-log.md
+    gate: test_gate
+  optimize:
+    intent: "Perform bounded cleanup after behavior is protected: remove AI slop, duplication, and small structural waste without broad rewrites."
+    owner_role: implementer_backend
+    applicability: conditional_recommended_for_code_change
+    skip_rule: "Code-change runs should run optimize when practical; skipping requires explicit reason in phase_plan and checklist.md."
+    expected_outputs:
+      - optimize-log.md
+      - updated_diff_when_cleanup_is_applied
+      - verification_after_cleanup
+    gate: regression_gate
+  update_docs:
+    intent: "Update durable project docs or record why no update is needed."
+    owner_role: implementer_backend
+    applicability: conditional
+    expected_outputs:
+      - docs-update.md
+    rules:
+      - "A no-docs-change decision is still an artifact, not an omitted phase."
+    gate: docs_gate
+  request_feedback:
+    intent: "Request independent read-only feedback for every KHS run, with optional extra rounds up to three."
+    owner_role: feedback_backend
+    applicability: required_round_1_conditional_rounds_2_to_3
+    expected_outputs:
+      - feedback-request.md
+      - feedback-1.md
+      - feedback-2.md_when_round_2_runs
+      - feedback-3.md_when_round_3_runs
+    gate: feedback_request_gate
+  handle_feedback:
+    intent: "Triage every requested feedback round, apply valid items, and reject invalid items with evidence."
+    owner_role: implementer_backend_plus_hermes
+    applicability: required_for_each_requested_feedback_round
+    expected_outputs:
+      - feedback-triage-1.md
+      - handle-feedback-1.md
+      - feedback-triage-2.md_when_round_2_runs
+      - handle-feedback-2.md_when_round_2_runs
+      - feedback-triage-3.md_when_round_3_runs
+      - handle-feedback-3.md_when_round_3_runs
+    rules:
+      - "If feedback has no actionable items, record 'no actionable feedback'."
+      - "When feedback changes code/docs, rerun affected verification."
+    gate: feedback_handling_gate
+  final_verify:
+    intent: "Hermes proves the run is complete from phase_plan, checklist.md, artifacts, KAH gates, KAB evidence, repo state, and user-facing report readiness."
+    owner_role: hermes
+    applicability: required
+    expected_outputs:
+      - verification.md
+      - final-report.md
+    gate: final_gate
+  improve:
+    intent: "Capture project-local improvement candidates and decide whether shared KHS promotion is warranted."
+    owner_role: hermes
+    applicability: conditional
+    expected_outputs:
+      - improvement-note.md
+    gate: improvement_gate

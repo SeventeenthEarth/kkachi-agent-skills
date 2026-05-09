@@ -1,0 +1,44 @@
+version: 0.1.0
+purpose: "Backend selection order for KHS prompt/process skills."
+
+selection_order:
+  - eliminate_backends_missing_required_capabilities
+  - apply_project_backend_policy
+  - apply_execution_mode_restrictions
+  - apply_user_preference_or_priority
+  - apply_project_local_performance_history
+  - select_backend_prompt_profile
+  - record_selected_cli_artifact
+
+rules:
+  capability_gate_precedes_preference: true
+  planned_backend_production_write_default: forbidden
+  one_active_write_lane_per_project_default: true
+  preference_use: "ranking_input_after_capability_and_policy"
+  production_write_default_backends:
+    - claude
+    - glm
+    - codex
+    - gemini
+    - opencode
+  evidence_required:
+    - selected-cli.json
+    - capability-check.md
+    - backend_prompt_profile
+    - compatibility_source_ledger
+    - cli_capabilities_registry
+
+source_of_truth:
+  human_readable: kkachi-agent-bridge/docs/public/compatibility-matrix.md
+  machine_readable: registries/cli-capabilities.yaml
+  summary: kkachi-agent-bridge/README.md
+
+selection_guards:
+  send_success_is_not_completion_evidence: true
+  retained_stream_requires_final_read_or_status: true
+  plan_approval_is_separate_from_tool_file_command_approval: true
+  explicit_post_approval_start_backends:
+    - gemini
+    - opencode
+  question_flow_caveat_backends:
+    opencode: "Use only for real upstream API/SSE question.asked events; do not synthesize from rendered text."

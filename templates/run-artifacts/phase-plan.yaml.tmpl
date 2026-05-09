@@ -1,0 +1,208 @@
+run_id: "{{ run_id }}"
+task_id: "{{ task_id }}"
+project: "{{ project }}"
+workflow_sot: phase_plan
+status: draft
+
+authority:
+  rule: "KHS phase_plan is the workflow SOT. KAH work_path/work_mode/execution_mode are helper classification metadata only."
+  user_selected_task: true
+  roadmap_task_id: "{{ roadmap_task_id }}"
+  source_docs:
+    - path: "{{ source_doc_path }}"
+      purpose: "{{ source_doc_purpose }}"
+
+roles:
+  hermes:
+    responsibility:
+      - manager_orchestrator
+      - risk_approval_router
+      - final_verifier
+  planner_backend:
+    backend: "{{ planner_backend }}"
+    session_id: "{{ planner_session_id }}"
+    phases:
+      - plan
+      - ask
+  implementer_backend:
+    backend: "{{ implementer_backend }}"
+    session_id: "{{ implementer_session_id }}"
+    phases:
+      - implement
+      - enhance_test
+      - optimize
+      - update_docs
+      - handle_feedback
+  feedback_backend:
+    backend: "{{ feedback_backend }}"
+    session_id: "{{ feedback_session_id }}"
+    phases:
+      - request_feedback
+
+kah_classification:
+  work_path: "{{ work_path }}"
+  work_mode: "{{ work_mode }}"
+  execution_mode: "{{ execution_mode }}"
+  urgency: "{{ urgency }}"
+  sot_policy: "{{ sot_policy }}"
+  note: "Informational helper metadata; it does not override phase applicability below."
+
+kab_usage:
+  required: "{{ kab_required }}"
+  rationale: "{{ kab_usage_rationale }}"
+  no_kab_exception: "{{ no_kab_exception_reason }}"
+
+implementation_approval:
+  risk_level: "{{ low_or_high }}"
+  auto_start_allowed: "{{ auto_start_allowed }}"
+  explicit_master_approval_required: "{{ explicit_master_approval_required }}"
+  high_risk_triggers:
+    - "{{ high_risk_trigger }}"
+  master_notice_before_auto_start: "{{ master_notice_summary }}"
+
+feedback_loop:
+  min_rounds: 1
+  max_rounds: 3
+  planned_rounds: "{{ planned_feedback_rounds }}"
+  round_decision_reason: "{{ feedback_round_decision_reason }}"
+
+phases:
+  - phase: plan
+    applicability: required
+    state: pending
+    owner_role: planner_backend
+    backend_or_session: "{{ planner_session_id }}"
+    evidence:
+      - plan.md
+      - checklist.md
+      - acceptance-criteria.md
+    check: "kkachi-agent-helper gate check {{ run_id }} plan --json"
+    skip_reason: ""
+  - phase: ask
+    applicability: required
+    state: pending
+    owner_role: planner_backend_plus_hermes
+    backend_or_session: "{{ planner_session_id }}"
+    evidence:
+      - ask.md
+      - answered-decisions.md
+    check: "No unresolved decision blocker before implement."
+    skip_reason: ""
+  - phase: implement
+    applicability: "{{ implement_applicability }}"
+    state: pending
+    owner_role: implementer_backend
+    backend_or_session: "{{ implementer_session_id }}"
+    evidence:
+      - diff.patch
+      - impl-log.md
+      - cli-output.md
+    check: "Implementation matches approved plan and acceptance criteria."
+    skip_reason: "{{ implement_skip_reason }}"
+  - phase: enhance_test
+    applicability: conditional
+    state: pending
+    owner_role: implementer_backend
+    backend_or_session: "{{ implementer_session_id }}"
+    evidence:
+      - test-plan.md
+      - test-log.md
+    check: "Focused regression coverage added or no-change reason recorded."
+    skip_reason: "{{ enhance_test_skip_reason }}"
+  - phase: optimize
+    applicability: conditional_recommended_for_code_change
+    state: pending
+    owner_role: implementer_backend
+    backend_or_session: "{{ implementer_session_id }}"
+    evidence:
+      - optimize-log.md
+      - verification_after_cleanup
+    check: "AI slop, duplication, and small structural waste considered; regression checked after cleanup."
+    skip_reason: "{{ optimize_skip_reason }}"
+  - phase: update_docs
+    applicability: conditional
+    state: pending
+    owner_role: implementer_backend
+    backend_or_session: "{{ implementer_session_id }}"
+    evidence:
+      - docs-update.md
+    check: "Docs updated or no-change reason recorded."
+    skip_reason: "{{ update_docs_skip_reason }}"
+  - phase: request_feedback_1
+    applicability: required
+    state: pending
+    owner_role: feedback_backend
+    backend_or_session: "{{ feedback_session_id }}"
+    evidence:
+      - feedback-request.md
+      - feedback-1.md
+    check: "Independent feedback requested and captured."
+    skip_reason: ""
+  - phase: handle_feedback_1
+    applicability: required
+    state: pending
+    owner_role: implementer_backend_plus_hermes
+    backend_or_session: "{{ implementer_session_id }}"
+    evidence:
+      - feedback-triage-1.md
+      - handle-feedback-1.md
+    check: "Valid feedback handled; no actionable feedback recorded when applicable."
+    skip_reason: ""
+  - phase: request_feedback_2
+    applicability: conditional
+    state: skipped
+    owner_role: feedback_backend
+    backend_or_session: "{{ feedback_session_id }}"
+    evidence:
+      - feedback-2.md
+    check: "Run only if Hermes requests a second feedback round."
+    skip_reason: "{{ feedback_2_skip_reason }}"
+  - phase: handle_feedback_2
+    applicability: conditional
+    state: skipped
+    owner_role: implementer_backend_plus_hermes
+    backend_or_session: "{{ implementer_session_id }}"
+    evidence:
+      - feedback-triage-2.md
+      - handle-feedback-2.md
+    check: "Required only if request_feedback_2 runs."
+    skip_reason: "{{ feedback_2_skip_reason }}"
+  - phase: request_feedback_3
+    applicability: conditional
+    state: skipped
+    owner_role: feedback_backend
+    backend_or_session: "{{ feedback_session_id }}"
+    evidence:
+      - feedback-3.md
+    check: "Maximum feedback round."
+    skip_reason: "{{ feedback_3_skip_reason }}"
+  - phase: handle_feedback_3
+    applicability: conditional
+    state: skipped
+    owner_role: implementer_backend_plus_hermes
+    backend_or_session: "{{ implementer_session_id }}"
+    evidence:
+      - feedback-triage-3.md
+      - handle-feedback-3.md
+    check: "Required only if request_feedback_3 runs."
+    skip_reason: "{{ feedback_3_skip_reason }}"
+  - phase: final_verify
+    applicability: required
+    state: pending
+    owner_role: hermes
+    backend_or_session: local
+    evidence:
+      - verification.md
+      - final-report.md
+      - checklist.md
+    check: "kkachi-agent-helper gate final {{ run_id }} --json"
+    skip_reason: ""
+  - phase: improve
+    applicability: conditional
+    state: pending
+    owner_role: hermes
+    backend_or_session: local
+    evidence:
+      - improvement-note.md
+    check: "Reusable lesson recorded or no-promotion decision noted."
+    skip_reason: "{{ improve_skip_reason }}"

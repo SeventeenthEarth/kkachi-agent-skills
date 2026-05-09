@@ -1,0 +1,49 @@
+version: 0.1.0
+purpose: "AI-neutral task taxonomy used before backend prompt rendering."
+
+task_types:
+  implementation:
+    description: "Change production code or tests to satisfy an existing SOT-backed task."
+    default_path: A_development_execution
+    default_execution_mode: production_write
+  review:
+    description: "Read-only review, feedback triage, or risk analysis."
+    default_execution_mode: verification
+  planning:
+    description: "Create or refine implementation plan, acceptance criteria, and task breakdown."
+    default_execution_mode: docs_only
+  shaping:
+    description: "Create or update SOT, roadmap trace, acceptance criteria, and handoff before implementation."
+    default_path: B_discovery_shaping
+    default_execution_mode: docs_only
+  enhance_test:
+    description: "Add targeted regression coverage or test strategy."
+    default_path: A_development_execution
+  optimize:
+    description: "Bounded cleanup/refactor after behavior is understood and protected."
+    default_path: A_development_execution
+  docs_update:
+    description: "Durable documentation synchronization."
+    default_execution_mode: docs_only
+  adapter_qa:
+    description: "Bridge/backend readiness, compatibility, or adapter validation work."
+    default_execution_mode: adapter_qa
+
+task_contract_fields:
+  required:
+    - task_id
+    - project
+    - work_path
+    - phase
+    - desired_state
+    - acceptance_criteria
+    - constraints
+    - non_goals
+    - context_sources
+    - required_capabilities
+    - verification
+  optional:
+    - user_backend_preference
+    - risk_notes
+    - project_overlay
+    - related_artifacts

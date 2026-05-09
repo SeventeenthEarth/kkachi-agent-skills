@@ -1,0 +1,71 @@
+Status: draft
+
+# Plan
+
+Run: `{{ run_id }}`
+Task: `{{ task_id }}`
+Planner backend: `{{ backend_type }}/{{ adapter_type }}`
+Session: `{{ session_id }}`
+Plan state at capture: `{{ plan_state }}`
+Plan ref: `{{ plan_ref }}`
+Captured from: `kkachi-agent-bridge plan read --session {{ session_id }}` or `GET /api/plan/{{ session_id }}`
+Captured before approval: `<yes|no>`
+Approved after capture: `<yes|no>`
+
+## Capture Rule
+
+KHS must copy `plan.plan_text` from KAB into this artifact before implementation starts.
+
+For Claude, GLM, and Codex, `plan approve` starts implementation immediately, so capture must happen while the session is in `plan_pending_approval` and before approval.
+
+For Gemini and OpenCode, capture is valid in `plan_pending_approval` or `plan_approved_waiting_for_start`; implementation must not start until the plan is preserved here and checklist.md is created/updated.
+
+If OpenCode reports `PLAN_AMBIGUOUS`, stop and resolve the `.sisyphus/plans/*.md` ambiguity before approval or start.
+
+## Source Evidence
+
+```json
+{{ source_evidence_json }}
+```
+
+## Approved Plan Text
+
+<!-- Paste KAB response field `plan.plan_text` here. Do not summarize away actionable steps. The plan should include a parse-friendly `KHS Checklist Seed` section when KHS requested one. -->
+
+{{ plan_text }}
+
+## KHS Checklist Seed Capture
+
+KHS should request this section from the planner backend, then use it as input for `checklist.md`. This seed is not itself the normalized KHS checklist; KHS/Hermes must validate and normalize it against `registries/phase-contracts.yaml`.
+
+Expected seed shape inside `plan.plan_text`:
+
+```markdown
+## KHS Checklist Seed
+
+- [ ] phase: plan | evidence: plan.md, checklist.md, acceptance-criteria.md | check: KAH plan gate
+- [ ] phase: ask | evidence: ask.md or plan.md#Decision Clarifications | check: no unresolved blocker
+- [ ] phase: implement | evidence: diff.patch, impl-log.md, cli-output.md | check: implementation matches approved scope
+```
+
+## Decision Clarifications
+
+Record ask-phase clarification here or link to `ask.md` / `answered-decisions.md` if present.
+
+- Open questions:
+- Hermes answers:
+- Master decisions:
+
+## Acceptance Criteria
+
+Link or summarize `acceptance-criteria.md`.
+
+## Verification Strategy
+
+List exact checks expected before final verification.
+
+## Implementation Boundary
+
+- In scope:
+- Out of scope:
+- Risk / approval notes:

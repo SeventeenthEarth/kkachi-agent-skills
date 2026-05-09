@@ -1,0 +1,37 @@
+---
+name: kkachi-verify
+description: Run or record verification for a Kkachi task, including exact commands, results, failure classification, integration coherence checks, and final test verdict.
+version: 0.1.0
+---
+
+# Kkachi Verify
+
+Use this skill when tests, static checks, manual QA, or integration coherence evidence must be recorded.
+
+Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an explicit master request has selected KHS/Kkachi for the work. Do not trigger it for ordinary direct Hermes edits, quick one-file fixes, typo/config patches, or read-only explanations unless the master explicitly asks for KHS/Kkachi or delegates the work to a KHS-using commander such as 조운 or 마초.
+
+## Core rule
+
+Verify before claiming completion. If verification fails, classify the failure and continue recovery when safe. Verification must update `phase-plan.yaml` and `checklist.md` with the current phase state and evidence links before final verification.
+
+For KAB-backed work, do not treat `send` success as completion. Completion evidence must include one of:
+
+- CLI evidence: `wait` returned a real state or pending change, followed by `read` or `status` showing the expected assistant result, terminal state, or actionable pending state.
+- Stream evidence: retained `/api/stream/<session_id>` or `/api/events/<session_id>` observations show the relevant session/turn/pending/completion events, followed by `read` or `status` confirming the current public session state.
+
+If stream evidence is used, record that retained events are bridge-owned public events and may not be durable across daemon restart.
+
+Backend-specific verification requirements:
+
+- Codex stream evidence must use Kkachi-stable wrapper-derived public event kinds, not raw Codex app-server messages.
+- Gemini plan-mode verification must prove explicit approved-plan start when implementation followed plan approval.
+- OpenCode readiness must not count rendered `<tool_call>question` assistant text as question-flow evidence; only real upstream API/SSE question events count.
+- GLM verification after reject must inspect `response_fidelity_warning` before trusting the assistant text.
+
+## Outputs
+
+- `verification.md`
+- `test-log.md`
+- updated `phase-plan.yaml` and `checklist.md` rows
+- integration coherence notes
+- KAH gate event, when supported

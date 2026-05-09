@@ -1,0 +1,39 @@
+# KAB prompt
+
+Status: complete
+Run: `{{ run_id }}`
+Phase: `{{ phase }}`
+Backend: `{{ backend_type }}/{{ adapter_type }}`
+Prompt profile: `{{ prompt_profile }}@{{ prompt_profile_version }}`
+
+## Source artifacts
+
+- `task-contract.yaml` (KHS supplemental artifact; KAH gate status depends on the installed `@latest` command surface)
+- `phase-plan.yaml` (KHS workflow SOT; KAH metadata is helper classification only)
+- `selected-cli.json`
+- `capability-check.md`
+- `context-pack.md`
+- project overlay: `{{ project_overlay_path }}`
+
+## Prompt body
+
+```text
+{{ prompt_body }}
+```
+
+## Planner prompt addendum
+
+When `Phase: plan`, the rendered prompt must include this requirement:
+
+```text
+Include a section titled "KHS Checklist Seed" with unchecked markdown tasks. Each task must include phase, expected evidence artifact, and verification/check condition. Do not start implementation.
+```
+
+KHS will parse and normalize that seed into `checklist.md`; the backend's seed is not the final checklist.
+
+## Integrity check
+
+- acceptance criteria preserved from task contract: `<yes|no>`
+- constraints preserved from task contract: `<yes|no>`
+- non-goals preserved from task contract: `<yes|no>`
+- verification contract preserved from task contract: `<yes|no>`

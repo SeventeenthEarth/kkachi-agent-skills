@@ -1,0 +1,62 @@
+run_id: "{{ run_id }}"
+task_id: "{{ task_id }}"
+project: "{{ project }}"
+work_path: "{{ work_path }}"
+work_mode: "{{ work_mode }}"
+phase: "{{ phase }}"
+execution_mode: "{{ execution_mode }}"
+
+workflow_authority:
+  phase_plan_artifact: "phase-plan.yaml"
+  rule: "KHS phase_plan is the workflow SOT; KAH metadata is helper classification only."
+
+selected_task:
+  user_selected: true
+  roadmap_task_id: "{{ roadmap_task_id }}"
+  task_source: "{{ task_source }}"
+  auto_selected_by_khs: false
+
+desired_state: |
+  {{ desired_state }}
+
+acceptance_criteria:
+  - "{{ acceptance_criterion }}"
+
+constraints:
+  - "{{ constraint }}"
+
+non_goals:
+  - "{{ non_goal }}"
+
+context_sources:
+  - path: "{{ context_path }}"
+    purpose: "{{ context_purpose }}"
+
+required_capabilities:
+  write: "{{ required_write }}"
+  approval_control: "{{ required_approval_control }}"
+  question_flow: "{{ required_question_flow }}"
+  retained_events: "{{ required_retained_events }}"
+  observability: "{{ required_observability }}"
+  restart_recovery: "{{ restart_recovery_sensitivity }}"
+
+user_backend_preference:
+  provided: "{{ user_backend_preference_provided }}"
+  value: "{{ user_backend_preference }}"
+  rule: "Apply only after capability and project-policy gates pass."
+
+verification:
+  commands:
+    - "{{ verification_command }}"
+  evidence_required:
+    - "{{ evidence_required }}"
+
+khs_operating_policy:
+  kab_required_for_code_change: true
+  docs_only_uses_kab_by_default: true
+  no_kab_code_change_means_direct_hermes_not_khs: true
+  ask_phase_required: true
+  feedback_rounds:
+    min: 1
+    max: 3
+  optimize_for_code_change: conditional_recommended
