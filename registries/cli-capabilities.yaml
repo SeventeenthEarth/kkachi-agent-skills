@@ -1,10 +1,10 @@
-version: 0.1.0
+version: 0.1.1
 purpose: "Machine-readable KHS summary of KAB public backend support. Keep synchronized with kkachi-agent-bridge/docs/public/compatibility-matrix.md."
 source_ledgers:
   summary: kkachi-agent-bridge/README.md
   canonical_support: kkachi-agent-bridge/docs/public/compatibility-matrix.md
   deeper_contract: kkachi-agent-bridge/docs/dev/spec/requirements.md
-last_synced_from_public_docs: "2026-05-08"
+last_synced_from_public_docs: "2026-05-10"
 
 capability_states:
   native: "Backend provides the capability directly and KAB passes it through."
@@ -12,14 +12,16 @@ capability_states:
   degraded: "Partial support; not baseline-equivalent."
   unsupported: "Not provided by backend or KAB."
   api_sse_only: "Supported only through API/SSE events, not verified through live CLI question producer."
+  planned: "Not implemented yet; intended behavior only."
+  unknown: "Investigation or validation is incomplete."
 
 backends:
   claude:
     adapter_type: claude_compat
     shipping_status: supported
     selected_cli_status: supported
-    tested_cli: "2.1.112"
-    last_verified: "2026-05-02"
+    tested_cli: "2.1.138"
+    last_verified: "2026-05-10"
     session_lifecycle: supported
     approval_control: supported
     question_flow: supported
@@ -123,9 +125,9 @@ backends:
     adapter_type: opencode_api
     shipping_status: supported
     selected_cli_status: supported
-    tested_cli: "1.14.39"
-    minimum_cli: "1.14.39"
-    last_verified: "2026-05-05"
+    tested_cli: "1.14.46"
+    minimum_cli: "1.14.46"
+    last_verified: "2026-05-10"
     session_lifecycle: supported
     approval_control: supported
     question_flow: api_sse_only

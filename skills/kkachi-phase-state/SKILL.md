@@ -1,6 +1,6 @@
 ---
 name: kkachi-phase-state
-description: Define and enforce the current KAH run, artifact, event, gate, schema, diagnostics, and lock command sequence for Kkachi phases.
+description: Define and enforce the current KAH run, artifact, event, gate, schema, diagnostics, lock, phase-plan, and approval command sequence for Kkachi phases.
 version: 0.1.0
 ---
 
@@ -12,9 +12,9 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 ## Core rule
 
-KAH owns deterministic state. KHS must use the installed KAH command surface instead of inventing parallel KAH state. Install or update KAH with `go install github.com/SeventeenthEarth/kkachi-agent-helper@latest`. KAH has no dedicated `phase start` command and currently no first-class `phase_plan` command surface; phase evidence is represented through run lifecycle commands, canonical artifact files, KHS supplemental artifacts such as `phase-plan.yaml`, `event append`, and `gate check`.
+KAH owns deterministic state. KHS must use the installed KAH command surface instead of inventing parallel KAH state. Install or update KAH with `go install github.com/SeventeenthEarth/kkachi-agent-helper@latest`. KAH has no dedicated `phase start` command, but KAH does provide the managed `phase-plan init/show/set/validate` surface for KHS-declared phase state. Phase evidence is represented through run lifecycle commands, KAH-managed phase-plan state, canonical artifact files, `event append`, approval records when required, and gate checks.
 
-`phase-plan.yaml` is a KHS workflow artifact, not KAH metadata. KHS may store it under `.kkachi/runs/<run_id>/` and update it directly until KAH grows managed phase-plan support.
+`phase-plan.yaml` is KHS-declared workflow state stored at `.kkachi/runs/<run_id>/phase-plan.yaml` through `phase-plan init/show/set/validate`. KAH validates structure, skipped/not-applicable reasons, final evidence links, feedback bounds, and approval records for rows marked `approval_required: true`; KHS still owns phase applicability, phase order, and workflow policy decisions.
 
 ## Implemented KAH commands
 
@@ -23,7 +23,8 @@ kkachi-agent-helper project init ... [--force] [--json]
 kkachi-agent-helper project status [--json]
 kkachi-agent-helper project doctor [--json]
 
-kkachi-agent-helper run create --title <title> --work-path <A_development_execution|B_discovery_shaping> --work-mode <standard|light> --urgency <normal|urgent|critical> --sot-policy <existing_sot_basis|minimal_sot_before_code|full_sot_before_code> --execution-mode <production_write|adapter_qa|readiness_hardening|research|verification|docs_only> --commander <profile> [--task-id <id>] [--redteam <profile>] [--json]
+kkachi-agent-helper run create --title <title> --work-path <A_development_execution|B_discovery_shaping> --work-mode <standard|light> --urgency <normal|urgent|critical> --sot-policy <existing_sot_basis|minimal_sot_before_code|full_sot_before_code> --execution-mode <production_write|adapter_qa|readiness_hardening|research|verification|docs_only> --commander <profile> [--backend-evidence <auto|required|not_applicable>] [--task-id <id>] [--redteam <profile>] [--json]
+kkachi-agent-helper run list [--json]
 kkachi-agent-helper run activate <run_id-or-prefix> [--json]
 kkachi-agent-helper run close <run_id-or-prefix> [--json]
 kkachi-agent-helper run abort <run_id-or-prefix> [--json]
@@ -32,16 +33,33 @@ kkachi-agent-helper run show <run_id-or-prefix> [--json]
 kkachi-agent-helper artifact init <run_id-or-prefix> [--json]
 kkachi-agent-helper artifact list <run_id-or-prefix> [--json]
 kkachi-agent-helper artifact validate <run_id-or-prefix> [--gate intake] [--json]
+kkachi-agent-helper artifact write <run_id-or-prefix> <artifact_path> --from <repo-relative-file> [--json]
+kkachi-agent-helper artifact append <run_id-or-prefix> <artifact_path> --from <repo-relative-file> [--json]
+kkachi-agent-helper artifact set-status <run_id-or-prefix> <artifact_path> --status <pending|complete|not_applicable> [--reason <text>] [--json]
 
 kkachi-agent-helper gate check <run_id-or-prefix> <intake|sot|roadmap|plan|backend|implementation|review|verification|docs|final> [--json]
 kkachi-agent-helper gate final <run_id-or-prefix> [--json]
 
 kkachi-agent-helper event append <event_type> --run <run_id-or-prefix> --payload '<json-object>' [--json]
 kkachi-agent-helper schema validate <file> --schema <config|status|event|run-metadata|selected-cli|bridge-session-snapshot> [--json]
+kkachi-agent-helper schema export [--schema <name>|--all] [--dry-run] [--json]
+kkachi-agent-helper schema migrate --from <version> --to <version> [--dry-run] [--json]
+kkachi-agent-helper lock recover <active-run|project-write|all> --reason <text> [--run <run_id-or-prefix>] [--json]
 kkachi-agent-helper diagnostics export [--run <run_id-or-prefix>] [--output <repo-relative-path>] [--json]
+
+kkachi-agent-helper phase-plan init <run_id-or-prefix> [--json]
+kkachi-agent-helper phase-plan show <run_id-or-prefix> [--json]
+kkachi-agent-helper phase-plan set <run_id-or-prefix> <phase-id> --status <pending|in_progress|complete|skipped|not_applicable|blocked> [--evidence <path>] [--reason <text>] [--approval-required true|false] [--json]
+kkachi-agent-helper phase-plan validate <run_id-or-prefix> [--final] [--json]
+
+kkachi-agent-helper approval request <run_id-or-prefix> --phase <phase-id> --reason <reason> [--evidence <ref>] [--json]
+kkachi-agent-helper approval record <run_id-or-prefix> --phase <phase-id> --decision <approved|rejected> --by <approver> --evidence <ref> [--reason <reason>] [--json]
+kkachi-agent-helper approval show <run_id-or-prefix> [--phase <phase-id>] [--json]
 ```
 
 KAH mutating commands fail closed when `.kkachi/status.json.last_event_id` disagrees with the tail of `.kkachi/events.jsonl`.
+
+`artifact set-status` is only for lifecycle/status artifacts whose status field uses KAH artifact lifecycle values (`pending`, `complete`, `not_applicable`), such as markdown checklist-style artifacts. Do not apply `artifact set-status complete` blindly across canonical artifacts. Schema-owned backend JSON artifacts keep their own status vocabularies; for example, `selected-cli.json.status=supported|degraded` and is validated by the `selected-cli` schema plus the backend gate. Temporary compatibility note: until KAH releases a guard for schema-owned backend JSON status updates, KHS operators must avoid `artifact set-status` on `selected-cli.json` and similar schema-owned backend JSON evidence.
 
 ## Inputs
 
@@ -56,16 +74,19 @@ KAH mutating commands fail closed when `.kkachi/status.json.last_event_id` disag
 ## Flow
 
 1. Initialize or reconfigure the project with `project init`; use `--force` only for non-destructive reconfiguration.
-2. Create the run with `run create`, then activate it with `run activate`.
+2. Create the run with `run create`; set `--backend-evidence required` only when KHS has selected backend evidence as required, then activate it with `run activate`.
 3. Create canonical baseline artifacts with `artifact init <run_id>`.
-4. Create or update KHS supplemental `phase-plan.yaml` from `templates/run-artifacts/phase-plan.yaml.tmpl`; treat it as workflow SOT.
-5. Populate the canonical artifact files in `.kkachi/runs/<run_id>/`.
-6. Use `event append <type> --run <run_id> --payload '<json-object>'` for compact phase milestones such as `phase.started`, `phase.completed`, `artifact.updated`, or `kab.prompt.sent`.
-7. Use `schema validate` for `selected-cli.json` and `bridge-session-snapshot.json` when those artifacts are present.
-8. Use `artifact validate <run_id> --gate intake` for intake validation.
-9. Use `gate check <run_id> <gate>` after the evidence for each implemented gate is complete.
-10. Use `gate final <run_id>` before the final report.
-11. Close successful runs with `run close`; abort failed or abandoned runs with `run abort`.
+4. Initialize or inspect KHS-declared phase state with `phase-plan init <run_id>` or `phase-plan show <run_id>`.
+5. Update declared phase rows with `phase-plan set <run_id> <phase-id> ...`; use `phase-plan validate <run_id>` during the run and `phase-plan validate <run_id> --final` before final reporting.
+6. Populate canonical artifact files in `.kkachi/runs/<run_id>/`; prefer `artifact write` and `artifact append` when available so KAH records path-safety checks, atomic mutation, and audit events. Use `artifact set-status` only for artifacts whose status field is KAH lifecycle-owned; never use it as a blanket completion step for schema-owned backend JSON artifacts such as `selected-cli.json`.
+7. Use `event append <type> --run <run_id> --payload '<json-object>'` for compact phase milestones such as `phase.started`, `phase.completed`, `artifact.updated`, or `kab.prompt.sent`.
+8. Use `approval request`, `approval record`, and `approval show` when KHS has declared that a high-risk phase needs approval; KAH records the approval state but KHS decides when approval is required.
+9. Use `schema validate` for `selected-cli.json` and `bridge-session-snapshot.json` when those artifacts are present; use `schema export` or `schema migrate` only for explicit schema maintenance work.
+10. Use `artifact validate <run_id> --gate intake` for intake validation.
+11. Use `gate check <run_id> <gate>` after the evidence for each implemented gate is complete.
+12. Use `gate final <run_id>` before the final report.
+13. Use `lock recover` only for explicit stale-lock recovery with a durable reason.
+14. Close successful runs with `run close`; abort failed or abandoned runs with `run abort`.
 
 ## Outputs
 
@@ -75,4 +96,4 @@ KAH mutating commands fail closed when `.kkachi/status.json.last_event_id` disag
 
 ## Gate
 
-PASS when KAH state, gate reports, and run artifacts agree. FAIL when artifacts claim completion but `gate check` or `gate final` fails. BLOCKED when KAH fails closed due to status/event mismatch, lock conflict, unsafe path, or missing repository root.
+PASS when KAH state, phase-plan validation, approval records when declared, gate reports, and run artifacts agree. FAIL when artifacts claim completion but `phase-plan validate --final`, `gate check`, or `gate final` fails. BLOCKED when KAH fails closed due to status/event mismatch, lock conflict, unsafe path, stale schema state, or missing repository root.

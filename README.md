@@ -188,7 +188,7 @@ kkachi-agent-helper run create ... --json
 kkachi-agent-helper run activate <run_id> --json
 kkachi-agent-helper artifact init <run_id> --json
 kkachi-agent-helper gate check <run_id> <gate> --json
-kkachi-agent-helper gate final <run_id> --json
+kkachi-agent-helper gate check <run_id> final --json
 ```
 
 ## Phase Orchestration Policy

@@ -108,7 +108,7 @@ kkachi-agent-helper event append artifact.updated --run <run_id> --payload '<jso
 kkachi-agent-helper schema validate <file> --schema <selected-cli|bridge-session-snapshot> --json
 kkachi-agent-helper artifact validate <run_id> --gate intake --json
 kkachi-agent-helper gate check <run_id> <gate> --json
-kkachi-agent-helper gate final <run_id> --json
+kkachi-agent-helper gate check <run_id> final --json
 kkachi-agent-helper event append phase.completed --run <run_id> --payload '<json-object>' --json
 kkachi-agent-helper run close <run_id> --json
 ```
@@ -123,7 +123,7 @@ Each phase should follow the same operating shape:
 5. Hermes observes KAB through either CLI wait/read/status or retained `/api/stream`/`/api/events`.
 6. Hermes records compact KAH events for phase/artifact milestones.
 7. KAH `gate check` records deterministic pass/fail/blocked gate status.
-8. KAH `gate final` and `run close` record final completion, or `run abort` records abandoned work.
+8. KAH final `gate check <run_id> final` and `run close` record final completion, or `run abort` records abandoned work.
 ```
 
 KAB `send` success is dispatch evidence only. Completion requires public session evidence: either `wait` plus `read/status`, or retained stream/event observations plus final `read/status`. `bridge-events.md` should record the observation mode as `cli_loop`, `retained_stream`, or `hybrid`.
@@ -581,12 +581,13 @@ repo_path: /Users/draccoon/Workspace/SeventeenthEarth/kkachi/kkachi-agent-bridge
 canonical_docs:
   readme: README.md
   compatibility_matrix: docs/public/compatibility-matrix.md
-  requirements: docs/spec/requirements.md
+  requirements: docs/dev/spec/requirements.md
 
-backend_sot_docs:
-  gemini: docs/todo/gemini-tui-native-adapter.md
-  codex: docs/todo/codex-*.md
-  opencode: docs/todo/opencode-*.md
+backend_support_docs:
+  roadmap: docs/dev/roadmap.md
+  adr: docs/dev/adr.md
+  e2e_version_baselines: docs/dev/e2e/version-baselines.md
+  failure_triage: docs/dev/e2e/failure-triage.md
 
 test_commands:
   unit:
@@ -956,7 +957,7 @@ For `kkachi-agent-bridge` runs, documentation update checks must also include:
 
 - `README.md` summary support table
 - `docs/public/compatibility-matrix.md` tested-support ledger
-- `docs/spec/requirements.md` when bridge contract changes
+- `docs/dev/spec/requirements.md` when bridge contract changes
 - backend-specific SOT or todo documents
 - project overlay and CLI capability registry when supported/caveat states change
 

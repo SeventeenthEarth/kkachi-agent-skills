@@ -40,7 +40,7 @@ KAB does not own this file. KAB supplies the backend-authored plan text and sour
 | handle_feedback_2 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-2.md`, `handle-feedback-2.md` | feedback handling | Required only if round 2 is requested. |
 | request_feedback_3 | conditional | skipped | feedback | TBD | `feedback-3.md` | feedback evidence | Maximum feedback round. |
 | handle_feedback_3 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-3.md`, `handle-feedback-3.md` | feedback handling | Required only if round 3 is requested. |
-| final_verify | yes | pending | Hermes | local + KAH/KAB evidence | `verification.md`, `final-report.md` | `kkachi-agent-helper gate final <run_id> --json` | Hermes verifies artifacts, gates, repo state, and final user report. |
+| final_verify | yes | pending | Hermes | local + KAH/KAB evidence | `verification.md`, `final-report.md` | `kkachi-agent-helper gate check <run_id> final --json` | Hermes verifies artifacts, gates, repo state, and final user report. |
 | improve | conditional | pending | Hermes | local | `improvement-note.md` | improvement review | Record reusable lessons or explicit no-promotion decision. |
 
 ## Micro-Task Progress

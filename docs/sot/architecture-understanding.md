@@ -793,7 +793,7 @@ Before Kkachi grows into many skills, define these standards first:
    - prompt profiles belong in `registries/backend-prompt-profiles.yaml`; repeated prompt bodies belong in `templates/prompts/<backend>/`
 
 5. **KAH phase state standard**
-   - phase skills call KAH through the implemented `run`, `artifact`, `event append`, `schema validate`, `gate check`, `gate final`, and `diagnostics export` commands
+   - phase skills call KAH through the implemented `run`, `artifact`, `event append`, `schema validate`, `gate check`, `gate check <run_id> final`, and `diagnostics export` commands
    - phase milestones are KHS-defined event types such as `phase.started`, `artifact.updated`, and `phase.completed`; gate truth comes from `gate check`
    - KAH owns `status.json`, `events.jsonl`, locks, artifact directories, gate reports, and schema validation
    - KHS may describe the required KAH command sequence but must not write parallel state files or silently bypass helper state transitions

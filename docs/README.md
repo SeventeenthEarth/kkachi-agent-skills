@@ -11,6 +11,7 @@ These documents should be updated deliberately because they define the shared op
 - `sot/architecture-understanding.md`
 - `sot/skill-template.md`
 - `sot/phase-orchestration-policy.md`
+- `sot/interface-contract.md`
 
 ## `discussions/`
 

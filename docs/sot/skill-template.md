@@ -143,7 +143,7 @@ kkachi-agent-helper event append <event_type> --run <run_id> --payload '<json-ob
 kkachi-agent-helper schema validate <file> --schema <config|status|event|run-metadata|selected-cli|bridge-session-snapshot> [--json]
 kkachi-agent-helper artifact validate <run_id> [--gate intake] [--json]
 kkachi-agent-helper gate check <run_id> <intake|sot|roadmap|plan|backend|implementation|review|verification|docs|final> [--json]
-kkachi-agent-helper gate final <run_id> [--json]
+kkachi-agent-helper gate check <run_id> final [--json]
 kkachi-agent-helper run close <run_id> [--json]
 kkachi-agent-helper run abort <run_id> [--json]
 ```
