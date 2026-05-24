@@ -36,5 +36,5 @@ Final verification must also confirm selected backend caveats were handled:
 - `checklist.md` final state check
 - final gate verdict
 - Korean report source summary
-- `kkachi-agent-helper gate check <run_id> final --json` result
+- `kkachi-agent-helper gate final <run_id> --json` result; use `gate check <run_id> final --json` only as an older-helper compatibility fallback
 - `kkachi-agent-helper run close <run_id> --json` for successful completion, or `run abort` for abandoned work

@@ -57,7 +57,9 @@ KAH may:
 - expose command-surface capabilities for KHS `@latest` compatibility checks;
 - include phase-plan, approvals, backend evidence, and artifact status in diagnostics.
 
-## Current live observations
+## Historical live observations
+
+Historical note: this section records the 2026-05-12 KAH v0.1.1 observation that motivated later KAH work. It is retained as discussion evidence only and is not current KHS operator guidance; the current KHS baseline is KAH v0.1.2.
 
 Rechecked against the local helper binary on 2026-05-12:
 
@@ -189,7 +191,7 @@ Add a machine-readable command such as:
 kkachi-agent-helper capabilities --json
 ```
 
-Suggested output shape:
+Historical suggested output shape from the request:
 
 ```json
 {

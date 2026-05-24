@@ -1,15 +1,22 @@
 # KHS Phase Orchestration Policy
 
-Status: user-confirmed operating policy
+Date: 2026-05-21
+Owner: KHS workflow/policy layer
+Confirming role: Responsible approver / governance evidence record
+Status: user-confirmed operating policy; workflow graph additions are planning-confirmed and `kkachi-agent-helper graph` implementation evidence is present
+Authority level: KHS phase/run orchestration SOT
+Evidence/source path: governance evidence record in kanban task `t_2fb00394`
 
 This document records the current user-confirmed KHS behavior for software-development runs. The executable contract lives in `registries/phase-contracts.yaml`; this file explains the decisions for humans.
 
 ## Authority
 
-- `phase-plan.yaml` is the KHS workflow source of truth for a run.
+- `phase-plan.yaml` is the run-local KHS workflow/execution state source of truth for one run. It is not the project-level workflow graph and is not deprecated by capability-checked graph support.
+- Project graph: `.kkachi-workflow.yaml` is the project-level workflow graph instance when initialized, validated, or applied through capability-checked `kkachi-agent-helper graph`; see `workflow-graph-integration.md`. The `kah graph` alias remains unproven unless separately advertised.
 - KAH `work_path`, `work_mode`, `execution_mode`, `urgency`, and `sot_policy` are deterministic helper metadata. They may seed defaults, but they do not decide which KHS phases execute.
 - KAH owns run IDs, artifacts, events, locks, schemas, diagnostics, and gates.
 - KAB owns backend runtime sessions and public bridge evidence.
+- If project graph, KHS phase policy, and run-local `phase-plan.yaml` conflict, KHS must fail closed and seek responsible role confirmation instead of guessing.
 
 ## Task selection
 
@@ -93,6 +100,14 @@ Hermes may auto-start low-risk work after notifying the master. Explicit master 
 - Each requested feedback round must have matching handling.
 - If feedback has no actionable items, record `no actionable feedback`.
 
+## Project graph relationship
+
+Status: planning-confirmed KHS relationship; KAH `kkachi-agent-helper graph` support is implemented when effective-binary capabilities/help prove it. `.kkachi-workflow.yaml` is the project-level workflow graph instance for graph-managed runs. It may constrain or seed run-local `phase-plan.yaml`, but it does not replace the run artifact.
+
+Fail-closed rule: if `.kkachi-workflow.yaml`, `registries/phase-contracts.yaml`, and `.kkachi/runs/<run_id>/phase-plan.yaml` disagree about phase applicability, dependencies, gates, or approvals, KHS must stop and ask the responsible role to confirm the intended authority. Do not silently prefer KHS defaults, `.kkachi/config.yaml`, generated diagrams, Kkachi v2 `.kkachi/config/workflows/`, or stale run state.
+
+Stale marker: older wording that says `phase-plan.yaml` is the KHS workflow source of truth must be read as run-local source of truth for a run, not project graph authority.
+
 ## Final verification
 
 Hermes owns final verification. Before reporting completion, Hermes checks:
@@ -106,3 +121,18 @@ Hermes owns final verification. Before reporting completion, Hermes checks:
 - docs-update decision
 - feedback rounds between one and three
 - optimize evidence or skip reason for code-change runs
+
+## Candidate graph record appendix
+
+Date: 2026-05-21
+Owner: KHS workflow/policy layer
+Confirming role: Responsible approver / governance evidence record
+Status: graph relationship addition to current phase orchestration policy; `kkachi-agent-helper graph` implemented, `kah graph` alias candidate
+Authority level: KHS phase/run orchestration SOT; graph relationship remains capability-checked and KHS-policy-owned
+Scope: KHS phase orchestration docs only
+Related docs: `workflow-graph-integration.md`, `interface-contract.md`, `../roadmap.md`
+Decision summary: `phase-plan.yaml` is run-local workflow/execution state for one run; `.kkachi-workflow.yaml` is project-level graph state when backed by KAH graph evidence.
+Evidence/source paths: governance evidence records in kanban tasks `t_2fb00394`, `t_38cfc496`, and `t_2b460665`
+Stale/conflict markers: older broad wording that `phase-plan.yaml` is the workflow SOT is narrowed to run-local scope.
+Open questions: exact derivation/check behavior between project graph and run phase state remains future implementation work.
+Next record action: implement remaining KHS graph relationship behavior through separately assigned capability-checked guidance/template tasks.

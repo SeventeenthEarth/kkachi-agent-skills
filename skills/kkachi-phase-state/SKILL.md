@@ -59,7 +59,7 @@ kkachi-agent-helper approval show <run_id-or-prefix> [--phase <phase-id>] [--jso
 
 KAH mutating commands fail closed when `.kkachi/status.json.last_event_id` disagrees with the tail of `.kkachi/events.jsonl`.
 
-`artifact set-status` is only for lifecycle/status artifacts whose status field uses KAH artifact lifecycle values (`pending`, `complete`, `not_applicable`), such as markdown checklist-style artifacts. Do not apply `artifact set-status complete` blindly across canonical artifacts. Schema-owned backend JSON artifacts keep their own status vocabularies; for example, `selected-cli.json.status=supported|degraded` and is validated by the `selected-cli` schema plus the backend gate. Temporary compatibility note: until KAH releases a guard for schema-owned backend JSON status updates, KHS operators must avoid `artifact set-status` on `selected-cli.json` and similar schema-owned backend JSON evidence.
+`artifact set-status` is only for lifecycle/status artifacts whose status field uses KAH artifact lifecycle values (`pending`, `complete`, `not_applicable`), such as markdown checklist-style artifacts. Do not apply `artifact set-status complete` blindly across canonical artifacts. Schema-owned backend JSON artifacts keep their own status vocabularies; for example, `selected-cli.json.status=supported|degraded` and is validated by the `selected-cli` schema plus the backend gate. KAH v0.1.2 guards schema-owned backend JSON status updates fail-closed; KHS operators must still avoid `artifact set-status` on `selected-cli.json` and similar schema-owned backend JSON evidence.
 
 ## Inputs
 

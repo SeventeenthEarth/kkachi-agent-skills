@@ -12,7 +12,10 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 ## Core rule
 
-Improve from evidence, not speculation. Project-local improvement comes before shared KHS promotion unless the lesson is already general.
+Improve from evidence, not speculation. KHS starts as a pre-template / seed
+skill system; real Hermes/Kkachi runs mature it by routing observed lessons to
+the smallest durable surface that fits. Project-local improvement comes before
+shared KHS promotion unless the lesson is already general.
 
 ## Inputs
 

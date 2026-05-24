@@ -195,7 +195,7 @@ phases:
       - verification.md
       - final-report.md
       - checklist.md
-    check: "kkachi-agent-helper gate check {{ run_id }} final --json"
+    check: "kkachi-agent-helper gate final {{ run_id }} --json"
     skip_reason: ""
   - phase: improve
     applicability: conditional

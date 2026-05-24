@@ -1,12 +1,12 @@
 # Kkachi Multi-Skill Architecture Understanding
 
 Date: 2026-04-27
-Owner: Gongmyeong
+Owner: KHS maintainers
 Status: understanding memo, not an implementation plan
 
 ## Purpose
 
-Record the master's intended direction before designing or creating any skills, so Gongmyeong does not drift into making a single monolithic skill or acting before confirming the plan.
+Record the master's intended direction before designing or creating any skills, so the responsible coordinator does not drift into making a single monolithic skill or acting before confirming the plan.
 
 ## Big picture
 
@@ -107,7 +107,7 @@ Kkachi remains a multi-backend, evidence-first software delivery harness with on
 
 The master does not want one giant skill that tells every general to do all development work. KHS also must not become the default path for every small Hermes coding edit.
 
-KHS activation should be explicit or context-bound: use it when the master names KHS/Kkachi/KAH/KAB, asks to apply KHS to a project, requests a Kkachi run, assigns software development to a KHS-using commander such as 조운 or 마초, or needs bridge evidence, gates, red-team review, or durable KAH run artifacts. Simple direct Hermes edits, small one-file fixes, typo/config patches, and read-only explanations should stay outside KHS unless explicitly delegated into it.
+KHS activation should be explicit or context-bound: use it when the master names KHS/Kkachi/KAH/KAB, asks to apply KHS to a project, requests a Kkachi run, assigns software development to a KHS-using execution owner, or needs bridge evidence, gates, red-team review, or durable KAH run artifacts. Simple direct Hermes edits, small one-file fixes, typo/config patches, and read-only explanations should stay outside KHS unless explicitly delegated into it.
 
 Once KHS is activated, KAH is mandatory for deterministic state and gates; KHS should use KAH `@latest` rather than pinning a single helper patch version.
 
@@ -262,9 +262,9 @@ backend_policy:
 
 ## Important correction
 
-Gongmyeong must not design or create the skills alone before confirming the master's intended structure.
+The responsible coordinator must not design or create the skills alone before confirming the master's intended structure.
 
-Before creating, editing, or installing actual skills, Gongmyeong must ask the master and wait for confirmation.
+Before creating, editing, or installing actual skills, the responsible coordinator must ask the master and wait for confirmation.
 
 ## Current agreed direction
 
@@ -314,8 +314,8 @@ The current backend lane model is:
 Kkachi's intended responsibility split:
 
 ```text
-Gongmyeong / orchestrator:
-  receive the master's command, identify the target project and real commander general, delegate with source references, monitor gates, preserve process integrity, and report to the master in Korean; do not author the commander's substantive plan/checklist unless Gongmyeong is explicitly the commander
+Responsible coordinator / orchestrator:
+  receive the master's command, identify the target project and assigned execution owner, delegate with source references, monitor gates, preserve process integrity, and report to the master in Korean; do not author the execution owner's substantive plan/checklist unless explicitly assigned as that execution owner
 
 Hermes commander general and skills:
   read the roadmap/SOT/docs/code, understand task, match task requirements against backend capabilities, select CLI lane, record selected-cli/capability/bridge evidence, generate precise English prompts, author plan.md and checklist, enforce gates, review, run e2e, manage project docs, and submit evidence
@@ -565,8 +565,8 @@ kkachi-agent-helper project init \
   --project-name kkachi-agent-bridge \
   --stack go \
   --repo-path /path/to/project \
-  --commander Kwanwoo \
-  --redteam Macho \
+  --commander responsible-approver \
+  --redteam required-reviewer \
   --docs-map-roadmap docs/ROADMAP.md \
   --docs-map-spec docs/SPEC.md \
   --docs-map-architecture docs/ARCHITECTURE.md \
@@ -623,8 +623,8 @@ Path A is used when existing SOT basis exists. Default mode: Standard. Light Mod
 
 Expected flow:
 
-1. Gongmyeong identifies the target project, roadmap file, and real commander general.
-2. Gongmyeong delegates the work to that commander with the roadmap task reference, not with a pre-authored implementation plan.
+1. The responsible coordinator identifies the target project, roadmap file, and assigned execution owner.
+2. The responsible coordinator delegates the work to that execution owner with the roadmap task reference, not with a pre-authored implementation plan.
 3. The commander reads:
    - the roadmap entry for the task
    - the SOT documents linked from that roadmap entry
@@ -638,7 +638,7 @@ Expected flow:
 Important boundary:
 
 ```text
-The KAB planner backend authors the plan surface when a planner lane is used. KHS/Hermes, through Gongmyeong or the assigned commander, captures that surface into `plan.md`, normalizes `checklist.md`, and maintains `phase-plan.yaml`/`checklist.md` as workflow evidence.
+The KAB planner backend authors the plan surface when a planner lane is used. KHS/Hermes, through the responsible coordinator or assigned execution owner, captures that surface into `plan.md`, normalizes `checklist.md`, and maintains `phase-plan.yaml`/`checklist.md` as workflow evidence.
 ```
 
 ### Path B: Discovery / Shaping / SOT / Roadmap
@@ -649,7 +649,7 @@ Path B is used when the SOT basis does not yet exist or is insufficient. Default
 
 Expected flow:
 
-1. Gongmyeong identifies the target project and real commander general.
+1. The responsible coordinator identifies the target project and assigned execution owner.
 2. The commander records request classification in `intake-classification.md`.
 3. The commander reads existing project docs, roadmap, related SOT files, and relevant code.
 4. The commander records existing-docs review, problem framing, research notes if needed, strategy options, and selected strategy.
@@ -793,7 +793,7 @@ Before Kkachi grows into many skills, define these standards first:
    - prompt profiles belong in `registries/backend-prompt-profiles.yaml`; repeated prompt bodies belong in `templates/prompts/<backend>/`
 
 5. **KAH phase state standard**
-   - phase skills call KAH through the implemented `run`, `artifact`, `event append`, `schema validate`, `gate check`, `gate check <run_id> final`, and `diagnostics export` commands
+   - phase skills call KAH through the implemented `run`, `artifact`, `event append`, `schema validate`, `gate check`, canonical `gate final <run_id>`, and `diagnostics export` commands
    - phase milestones are KHS-defined event types such as `phase.started`, `artifact.updated`, and `phase.completed`; gate truth comes from `gate check`
    - KAH owns `status.json`, `events.jsonl`, locks, artifact directories, gate reports, and schema validation
    - KHS may describe the required KAH command sequence but must not write parallel state files or silently bypass helper state transitions

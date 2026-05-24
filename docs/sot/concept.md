@@ -1,7 +1,7 @@
 # Kkachi Harness Concept
 
 Date: 2026-04-27
-Owner: Gongmyeong
+Owner: KHS maintainers
 Status: concept document for readers who do not know Hermes Agent
 
 ## 1. What is Kkachi?
@@ -47,7 +47,7 @@ KHS is intentionally a starting point. Project-local overlays and run evidence i
 
 KHS should trigger for a Kkachi-governed software run, not for every Hermes coding interaction.
 
-Trigger KHS when the master explicitly asks for KHS/Kkachi/KAH/KAB, asks to apply KHS to a project, requests a Kkachi run, delegates development to a KHS-using commander such as 조운 or 마초, or asks for bridge-backed implementation with durable artifacts, gates, red-team review, or backend evidence.
+Trigger KHS when the master explicitly asks for KHS/Kkachi/KAH/KAB, asks to apply KHS to a project, requests a Kkachi run, delegates development to a KHS-using execution owner, or asks for bridge-backed implementation with durable artifacts, gates, red-team review, or backend evidence.
 
 Do not trigger KHS by default for simple direct Hermes edits such as typo fixes, small one-file changes, quick config patches, or read-only explanations/reviews. Those can proceed without KAH unless the master explicitly requests KHS/Kkachi or assigns the work to a KHS-using commander.
 
@@ -108,7 +108,7 @@ kkachi-agent-helper event append artifact.updated --run <run_id> --payload '<jso
 kkachi-agent-helper schema validate <file> --schema <selected-cli|bridge-session-snapshot> --json
 kkachi-agent-helper artifact validate <run_id> --gate intake --json
 kkachi-agent-helper gate check <run_id> <gate> --json
-kkachi-agent-helper gate check <run_id> final --json
+kkachi-agent-helper gate final <run_id> --json
 kkachi-agent-helper event append phase.completed --run <run_id> --payload '<json-object>' --json
 kkachi-agent-helper run close <run_id> --json
 ```
@@ -123,7 +123,7 @@ Each phase should follow the same operating shape:
 5. Hermes observes KAB through either CLI wait/read/status or retained `/api/stream`/`/api/events`.
 6. Hermes records compact KAH events for phase/artifact milestones.
 7. KAH `gate check` records deterministic pass/fail/blocked gate status.
-8. KAH final `gate check <run_id> final` and `run close` record final completion, or `run abort` records abandoned work.
+8. KAH final `gate final <run_id>` and `run close` record final completion, or `run abort` records abandoned work. Use `gate check <run_id> final` only as an older-helper compatibility fallback.
 ```
 
 KAB `send` success is dispatch evidence only. Completion requires public session evidence: either `wait` plus `read/status`, or retained stream/event observations plus final `read/status`. `bridge-events.md` should record the observation mode as `cli_loop`, `retained_stream`, or `hybrid`.
@@ -160,9 +160,9 @@ A skill is reusable procedural knowledge for a class of work. In Kkachi, skills 
 
 A general is a named Hermes team-member profile. A general has a role, model/provider configuration, workspace, memory, and operating style.
 
-### Gongmyeong
+### Responsible coordinator
 
-Gongmyeong is the orchestrator. Gongmyeong receives the master's request, identifies the target project and commander general, delegates work, monitors gates, and reports to the master. In KHS runs, the planner backend authors the substantive plan surface when KAB is used; Gongmyeong or the assigned commander captures it into `plan.md`, normalizes `checklist.md`, and keeps `phase-plan.yaml`/`checklist.md` current as workflow evidence.
+The responsible coordinator orchestrates KHS work. The responsible coordinator receives the master's request, identifies the target project and assigned execution owner, delegates work, monitors gates, and reports to the master. In KHS runs, the planner backend authors the substantive plan surface when KAB is used; the responsible coordinator or assigned execution owner captures it into `plan.md`, normalizes `checklist.md`, and keeps `phase-plan.yaml`/`checklist.md` current as workflow evidence.
 
 ### Master
 
@@ -170,7 +170,7 @@ The master is the human owner and final decision maker.
 
 ### Commander general
 
-The commander general is the real team-member profile assigned to own a specific development run. The commander reads roadmap/SOT/docs/code, ensures `phase-plan.yaml` is the workflow SOT, asks the KAB planner backend for the plan surface when KAB is used, captures `plan.md`, normalizes `checklist.md`, chooses the external CLI lane from project needs and the backend capability registry, drives implementation through the bridge, and submits evidence. The commander must preserve the selected backend identity, capability snapshot, caveats, unsupported cases, and selection reason in run artifacts.
+The commander general is the real team-member profile assigned to own a specific development run. The commander reads roadmap/SOT/docs/code, ensures `phase-plan.yaml` is the workflow SOT, asks the KAB planner backend for the plan surface when KAB is used, captures `plan.md`, normalizes `checklist.md`, chooses the external CLI lane from project needs, the KHS guidance registry, and raw KAB snapshot evidence when required, drives implementation through the bridge, and submits evidence. The commander must preserve the selected backend identity, raw snapshot/static evidence refs, caveats, unsupported cases, and selection reason in run artifacts.
 
 ### Red-team general
 
@@ -230,7 +230,7 @@ Assertion-based grading checks objective pass/fail conditions, such as required 
 
 ### Integration coherence verification
 
-Integration coherence verification checks whether connected surfaces agree with each other. In Kkachi this includes SOT basis ↔ acceptance criteria ↔ plan ↔ diff, compatibility matrix ↔ capability registry ↔ selected-cli.json, bridge events ↔ bridge session snapshot, and API ↔ client/hook/type boundaries in application projects.
+Integration coherence verification checks whether connected surfaces agree with each other. In Kkachi this includes SOT basis ↔ acceptance criteria ↔ plan ↔ diff, compatibility matrix ↔ KHS guidance registry/raw KAB snapshot refs ↔ selected-cli.json, bridge events ↔ bridge session snapshot, and API ↔ client/hook/type boundaries in application projects.
 
 ### Orchestration skill
 
@@ -248,15 +248,15 @@ Kkachi-agent-helper does not install Hermes skills. Hermes skill installation is
 
 ### Backend capability registry
 
-A machine-readable registry, such as `registries/cli-capabilities.yaml`, that records each bridge backend's supported capabilities, caveats, unsupported cases, verified versions, and recommended usage constraints. It should be derived from or kept consistent with `kkachi-agent-bridge/docs/public/compatibility-matrix.md`, the human-readable canonical tested-support ledger.
+A machine-readable KHS guidance registry, such as `registries/cli-capabilities.yaml`, that records each bridge backend's supported capabilities, caveats, unsupported cases, verified versions, and recommended usage constraints for orchestration. It should be derived from or kept consistent with `kkachi-agent-bridge/docs/public/compatibility-matrix.md`, the human-readable canonical tested-support ledger. This registry is not backend-native inventory truth and does not prove command/skill/app callability; raw callability for dynamic command/reference support must come from KAB capability snapshots produced from bounded backend-native discovery and stored by KAH under `.kkachi/`.
 
 ### Bridge session identity
 
-The backend identity attached to each bridge session. At minimum this includes `backend_type` and `adapter_type`; run evidence may also include bridge version, backend CLI version, config identity, runtime mode, capability snapshot, caveats, and open pendings.
+The backend identity attached to each bridge session. At minimum this includes `backend_type` and `adapter_type`; run evidence may also include bridge version, backend CLI version, config identity, runtime mode, raw capability snapshot reference, caveats, and open pendings.
 
 ### Selected CLI artifact
 
-`selected-cli.json` is the run-local evidence artifact that records which backend lane the commander selected, why it was selected, what capability snapshot was used, which caveats were accepted, and which unsupported cases were ruled out.
+`selected-cli.json` is the run-local evidence artifact that records which backend lane the commander selected, why it was selected, what raw KAB capability snapshot or static compatibility evidence was used, which caveats were accepted, and which unsupported cases were ruled out. It may reference `.kkachi/capabilities/...` cache/evidence records, but it does not itself create backend callability.
 
 ### Work path
 
@@ -288,10 +288,10 @@ Kkachi has five main layers:
 
 ```text
 Human master
-  -> Gongmyeong orchestrator
-    -> real commander general + Hermes phase skills
+  -> responsible coordinator / orchestrator
+    -> assigned execution owner + Hermes phase skills
       -> project overlay + docs map
-      -> CLI capability registry
+      -> KHS guidance registry + raw KAB snapshot refs when required
       -> selected-cli.json + capability-check.md
       -> task-contract.yaml + prompt.md + context-pack.md
       -> bridge-session-snapshot.json + bridge-events.md
@@ -301,7 +301,7 @@ Human master
         -> external AI coding CLI
 ```
 
-Kkachi does not select a backend by vague preference. The commander must select a lane using project needs, the backend capability registry, the bridge compatibility matrix, and the project overlay's backend policy. The selected backend identity and caveats must be preserved in run artifacts so later review, red-team, verification, docs-update, and improvement steps can reconstruct why that lane was used.
+Kkachi does not select a backend by vague preference. The commander must select a lane using project needs, the KHS guidance registry, the bridge compatibility matrix, raw KAB capability snapshot evidence when dynamic command/reference capability matters, and the project overlay's backend policy. The selected backend identity, raw evidence refs, semantic guidance labels, and caveats must be preserved in run artifacts so later review, red-team, verification, docs-update, and improvement steps can reconstruct why that lane was used.
 
 Supporting layers:
 
@@ -636,8 +636,8 @@ Standard Mode is the canonical Kkachi operating mode. The following flow defines
 
 Expected flow:
 
-1. Gongmyeong identifies the target project, roadmap file, and real commander general.
-2. Gongmyeong delegates the task reference to the commander.
+1. The responsible coordinator identifies the target project, roadmap file, and assigned execution owner.
+2. The responsible coordinator delegates the task reference to the execution owner.
 3. The commander reads the roadmap entry.
 4. The commander reads SOT documents linked from the task.
 5. The commander reads architecture, ADR, spec, todo/task docs, coding rules, related code, and tests.
@@ -646,8 +646,8 @@ Expected flow:
 8. The commander derives acceptance criteria from the SOT basis before implementation.
 9. The commander creates `plan.md`.
 10. The commander creates the execution checklist.
-11. The commander chooses an external CLI lane using the CLI capability registry, the bridge compatibility matrix, and the project overlay's backend policy.
-12. The commander records the selected lane in `selected-cli.json`, including `backend_type`, `adapter_type`, capability snapshot, caveats, unsupported cases, and selection reason.
+11. The commander chooses an external CLI lane using the KHS guidance registry, the bridge compatibility matrix, raw KAB capability snapshot evidence when required, and the project overlay's backend policy.
+12. The commander records the selected lane in `selected-cli.json`, including `backend_type`, `adapter_type`, raw snapshot/static evidence refs, accepted semantic guidance labels, caveats, unsupported cases, and selection reason.
 13. The commander records `capability-check.md` before implementation starts when a bridge backend lane is used.
 14. The commander generates a precise English prompt and sends it through `kkachi-agent-bridge`.
 15. The external CLI edits the repository.
@@ -657,7 +657,7 @@ Expected flow:
 19. The commander runs tests/e2e verification.
 20. The commander updates required docs or records why no docs update is needed.
 21. The commander records improvement candidates from real evidence.
-22. Gongmyeong reports the result to the master in Korean.
+22. The responsible coordinator reports the result to the master in Korean.
 
 If the task requires capabilities that the selected backend does not support, the commander must either choose another backend or record why the task is safe despite that unsupported capability. Backends or features marked planned, unsupported, degraded, or API/SSE-only must not be used for incompatible production work unless the run is explicitly scoped to adapter QA, readiness, research, verification, or docs.
 
@@ -728,7 +728,7 @@ The master may report a new bug, improvement, or feature idea that does not yet 
 
 Expected flow:
 
-1. Gongmyeong identifies the target project and commander general.
+1. The responsible coordinator identifies the target project and assigned execution owner.
 2. The commander records request classification in `intake-classification.md`.
 3. The commander reads existing docs, roadmap, related SOT documents, and relevant code.
 4. The commander records existing documentation review in `discovery/existing-docs-review.md`.
@@ -742,7 +742,7 @@ Expected flow:
 12. The commander records task breakdown and implementation readiness.
 13. The commander records `discovery/handoff-to-development.md` if implementation will follow.
 14. If implementation is approved or included, the run must pass the SOT basis and roadmap trace gates before entering Path A.
-15. Gongmyeong reports the shaping result to the master in Korean.
+15. The responsible coordinator reports the shaping result to the master in Korean.
 
 Path B may hand off to Path A either in the same run or in a follow-up run, but implementation must not start until the Path B artifacts have passed the SOT basis and roadmap trace gates.
 
@@ -926,7 +926,7 @@ Standard Mode defines the canonical artifact set. Light Mode may use the same ar
 
 `selected-cli.json` records the commander's backend lane decision.
 
-`capability-check.md` records which task requirements were matched against which backend capabilities before implementation started.
+`capability-check.md` records which task requirements were matched against which backend capabilities before implementation started. When command/reference capability snapshots are used, it must cite the raw KAB snapshot/report refs under `.kkachi/capabilities/...` and label any KHS semantic guidance separately from callability evidence.
 
 `bridge-session-snapshot.json` records the bridge session identity and current public session fields, including `session_id`, `backend_type`, `adapter_type`, state, lifecycle class, open pendings, bridge version/config identity when available, and backend-specific hook data when available.
 
@@ -959,7 +959,7 @@ For `kkachi-agent-bridge` runs, documentation update checks must also include:
 - `docs/public/compatibility-matrix.md` tested-support ledger
 - `docs/dev/spec/requirements.md` when bridge contract changes
 - backend-specific SOT or todo documents
-- project overlay and CLI capability registry when supported/caveat states change
+- project overlay and KHS guidance registry when supported/caveat states change
 
 If code behavior changes, relevant docs must be updated or the commander must explicitly record why no docs update was needed.
 
@@ -1146,7 +1146,7 @@ Before implementing the full system, decide KHS extensions around the current KA
 - backend lane policy for production-supported, degraded, planned, and unsupported states
 - policy for when a planned/degraded/backend-specific feature may be used for adapter QA or readiness runs
 - backend support-promotion/demotion policy
-- policy for synchronizing README summary support view, compatibility matrix, Kkachi capability registry, and project overlay
+- policy for synchronizing README summary support view, compatibility matrix, KHS guidance registry, raw KAB snapshot refs, and project overlay
 - exact phase skill list for MVP
 - red-team gate minimum for MVP
 - KHS version-gating policy for future helper CLI command changes
@@ -1185,7 +1185,7 @@ Document roles:
 |---|---|
 | `kkachi-agent-bridge/README.md` | User-facing summary support view and usage overview. |
 | `kkachi-agent-bridge/docs/public/compatibility-matrix.md` | Canonical tested-support ledger, tested versions, capability details, and caveats. |
-| `kkachi-hermes-skills/registries/cli-capabilities.yaml` | Machine-readable backend capability registry for orchestration and commander use. |
+| `kkachi-hermes-skills/registries/cli-capabilities.yaml` | Machine-readable KHS backend capability guidance registry for orchestration and commander use; not backend-native inventory truth. |
 | `kkachi-hermes-skills/docs/sot/concept.md` | Kkachi product definition and operating philosophy. |
 | `kkachi-hermes-skills/docs/sot/architecture-understanding.md` | Phase skill, project overlay, and orchestration structure agreement. |
 | `kkachi-hermes-skills/docs/sot/skill-template.md` | Reusable KHS skill authoring and execution template guidance. |
@@ -1196,10 +1196,10 @@ Synchronization rules:
 
 1. `docs/public/compatibility-matrix.md` is the canonical source for backend tested support.
 2. `README.md` must remain a summary view of `docs/public/compatibility-matrix.md`.
-3. `cli-capabilities.yaml` must be derived from or manually synchronized with `docs/public/compatibility-matrix.md`.
-4. `docs/sot/concept.md` and `docs/sot/architecture-understanding.md` should describe capability-aware operation and link to the support ledger rather than copying every backend detail.
+3. `cli-capabilities.yaml` must be derived from or manually synchronized with `docs/public/compatibility-matrix.md` and must not claim backend-native dynamic inventory authority.
+4. `docs/sot/concept.md` and `docs/sot/architecture-understanding.md` should describe capability-aware operation and link to the support ledger rather than copying every backend detail; dynamic command/reference callability belongs to raw KAB snapshots persisted by KAH under `.kkachi/`.
 5. Discussion notes under `docs/discussions/` should be promoted into SOT/registry/template/skill surfaces before they are treated as final policy.
-6. When a backend status changes, check README, compatibility matrix, capability registry, and the relevant project overlay together.
+6. When a backend status changes, check README, compatibility matrix, KHS guidance registry, raw KAB snapshot implications when applicable, and the relevant project overlay together.
 
 ## 19. Gemini lane policy
 

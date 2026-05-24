@@ -1,7 +1,7 @@
 # Kkachi Team Development Skill Template
 
 Date: 2026-04-27
-Owner: Gongmyeong
+Owner: KHS maintainers
 Status: draft
 Purpose: reusable SKILL.md template for software development by a Hermes field commander, red-team partner, and kkachi-agent-bridge backend agents.
 
@@ -16,7 +16,7 @@ version: 0.1.0
 
 # <Project> Kkachi Team Development
 
-Use this skill when the master asks a named field commander such as 조운, 마초, 관우, or another Hermes team member to develop, fix, review, or QA software using KHS/Kkachi, or when the request explicitly says to use KHS, Kkachi, KAH, KAB, a Kkachi run, bridge evidence, or gate-backed artifacts. Do not trigger KHS for simple direct Hermes edits unless the master explicitly asks for KHS/Kkachi or delegates the task to a KHS-using commander.
+Use this skill when the master asks an assigned KHS-using execution owner to develop, fix, review, or QA software using KHS/Kkachi, or when the request explicitly says to use KHS, Kkachi, KAH, KAB, a Kkachi run, bridge evidence, or gate-backed artifacts. Do not trigger KHS for simple direct Hermes edits unless the master explicitly asks for KHS/Kkachi or delegates the task to a KHS-using execution owner.
 
 ## Skill structure and Progressive Disclosure
 
@@ -143,7 +143,7 @@ kkachi-agent-helper event append <event_type> --run <run_id> --payload '<json-ob
 kkachi-agent-helper schema validate <file> --schema <config|status|event|run-metadata|selected-cli|bridge-session-snapshot> [--json]
 kkachi-agent-helper artifact validate <run_id> [--gate intake] [--json]
 kkachi-agent-helper gate check <run_id> <intake|sot|roadmap|plan|backend|implementation|review|verification|docs|final> [--json]
-kkachi-agent-helper gate check <run_id> final [--json]
+kkachi-agent-helper gate final <run_id> [--json]
 kkachi-agent-helper run close <run_id> [--json]
 kkachi-agent-helper run abort <run_id> [--json]
 ```
@@ -222,9 +222,9 @@ Backend prompt profile rules:
 ## Role map
 
 ```text
-Gongmyeong / orchestrator
+Responsible coordinator / orchestrator
   - scopes the job
-  - delegates to the real field commander
+  - delegates to the assigned execution owner
   - classifies path, mode, urgency, SOT policy, and execution mode
   - supervises reports and sends Korean user-facing summary
 
@@ -875,7 +875,7 @@ If there is no skill/template improvement candidate or Skill QA result, write:
 
 ## Notes for adapting this template
 
-- For Doksuri, default commander is Kwanwoo and default red-team partner is Hahuyeon.
-- For sudal-app mobile work, default commander is Macho and default red-team partner is Seohwang.
-- For strategic cross-domain review, include Samaui as an additional red-team advisor.
-- For kkachi-agent-bridge QA itself, Gongmyeong handles QA directly except OpenCode/Codex exclusions previously set by the master.
+- Project overlays supply project-specific default commander and required-review partner assignments; this KHS product template does not name concrete people.
+- Mobile project overlays supply their own commander and required-review partner assignments.
+- Strategic cross-domain review may add an extra required-review advisor through the project overlay.
+- Bridge QA ownership is supplied by the project overlay, including any backend exclusions previously set by the operator.

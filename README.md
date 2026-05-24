@@ -9,6 +9,30 @@ contract, select a KAB backend lane, render the backend-specific prompt, call
 KAH for deterministic run state, call KAB for backend execution, and preserve
 evidence for review, verification, documentation, and self-improvement.
 
+Maturity note: KHS is currently a pre-template / seed skill system, not a
+final polished product skill pack. After installation, real Hermes/Kkachi runs
+are expected to mature it through captured evidence, project overlays,
+prompt/phase skill references, reusable scripts, and the existing
+`kkachi-improve` / improvement-promotion rules.
+
+## Current Lane Split
+
+KHS now keeps two lanes distinct:
+
+1. KHS+KAH minimum/pilot harness lane
+   - Scope: profile-scoped KHS skill-pack install/list/doctor/sync/proposal
+     support through a future thin `kkachi-hermes-skills` CLI.
+   - Purpose: let users pilot KHS skill injection and KAH evidence/proposal
+     workflows without requiring KAB runtime readiness.
+   - Non-goals: no `run` verb, backend session control, bridge control, KHC
+     command/control, Doksuri integration, or KAB replacement.
+   - Candidate record: `docs/sot/minimum-pilot-cli-lane.md`.
+
+2. Full execution-runtime lane
+   - Scope: KHS-governed code-change or backend-executed runs.
+   - Authority: existing KHS+KAH+KAB path remains the required execution path
+     for KAB-backed KHS runs.
+
 ## Components
 
 ```text
@@ -50,14 +74,21 @@ to a KHS-using commander.
 
 ## When Hermes Agent Reads This README
 
-If the master gives Hermes Agent this repository URL and says "install this",
-Hermes should install and verify the whole Kkachi stack:
+If the master gives Hermes Agent this repository URL and says "install this"
+for the full execution-runtime path, Hermes should install and verify the whole
+Kkachi stack:
 
-1. Install KHS through the Hermes native skill system.
+1. Install KHS through the Hermes native skill system or the KHS-supported
+   profile install path once implemented.
 2. Install or verify the latest KAH (`kkachi-agent-helper@latest`).
 3. Clone/build or verify KAB (`kkachi-agent-bridge`) and its plugin/wrapper artifacts.
 4. Verify core commands are available.
 5. Report the installed status in Korean.
+
+If the master asks only for the scoped KHS+KAH minimum/pilot harness, KAB
+verification is not mandatory for profile-scoped skill install/injection,
+`list`, `doctor`, `sync`, or `proposal` planning. That scoped lane must still
+report that KAB is required before any KAB-backed KHS code-change run.
 
 If the master says "apply KHS to this project directory", Hermes should not
 manually create ad hoc state files. Hermes should run KAH `project init` in the
@@ -85,14 +116,16 @@ The user selects the target roadmap task for each run. Hermes manages, approves 
 
 ### 1. Install KHS
 
-Use the Hermes native skill installer or place the skill directories where
-Hermes expects skills.
+Use the Hermes native skill installer only for behavior that has been verified,
+or place the skill directories where Hermes expects skills.
 
-Example:
-
-```bash
-hermes skills install <this-repo-git-url> --category kkachi --yes
-```
+Verified constraint: current live Hermes evidence proves a single hub identifier
+or direct `SKILL.md` URL install path, not repo-root multi-skill-pack install.
+Do not claim that installing this repository root installs every KHS skill until
+that behavior is separately evidenced. For the minimum/pilot lane, the future
+`kkachi-hermes-skills install <profile> <skill-or-category>` path must default
+to copy mode with dry-run, manifest/checksum, changed-path report, and recovery
+instruction.
 
 If Hermes installs skills one directory at a time, install every directory under
 `skills/`.
@@ -188,7 +221,7 @@ kkachi-agent-helper run create ... --json
 kkachi-agent-helper run activate <run_id> --json
 kkachi-agent-helper artifact init <run_id> --json
 kkachi-agent-helper gate check <run_id> <gate> --json
-kkachi-agent-helper gate check <run_id> final --json
+kkachi-agent-helper gate final <run_id> --json
 ```
 
 ## Phase Orchestration Policy

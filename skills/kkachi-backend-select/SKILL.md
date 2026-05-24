@@ -32,14 +32,14 @@ Capability and project-policy gates run before user preference. Preference ranks
 3. Apply user preference among remaining eligible backends.
 4. Select the matching backend prompt profile.
 5. Record rejected backends and reasons.
-6. Copy KAB capability evidence from `registries/cli-capabilities.yaml`, including adapter type, tested CLI, last verified date, plan lifecycle, retained stream support, permission preconditions, and caveats.
+6. Copy KAB capability evidence from `registries/cli-capabilities.yaml`, including adapter type, tested CLI, last verified date, plan lifecycle, retained stream support, reasoning-effort policy when relevant, permission preconditions, and caveats.
 7. Render `selected-cli.json` with KAH schema `0.1` required fields: `version`, `status`, `backend_type`, `adapter_type`, `source_ledger_ref`, and `caveats`, plus KHS extension fields from the KAB capability registry. The schema-owned value is `selected-cli.json.status=supported|degraded`; do not write lifecycle values such as `complete` into this JSON artifact.
 8. Render `capability-check.md` with `Status: complete` and explicit selected `backend_type`, `adapter_type`, tested CLI, observation modes, plan lifecycle, and accepted caveats.
 9. Validate selected CLI shape with `kkachi-agent-helper schema validate .kkachi/runs/<run_id>/selected-cli.json --schema selected-cli --json`.
 10. Record a compact event with `kkachi-agent-helper event append artifact.updated --run <run_id> --payload '{"path":"selected-cli.json","phase":"backend-select"}' --json` when useful.
 11. Run `kkachi-agent-helper gate check <run_id> backend --json` only after all backend evidence artifacts required by the run manifest exist; rely on the schema and backend gate to verify backend evidence completion.
 
-Backend JSON status safety: KHS owns orchestration guidance and backend selection policy, KAB owns bridge runtime evidence, and KAH owns deterministic artifact/gate behavior. Until KAH releases a guard for schema-owned backend JSON status updates, KHS operators must not run `kkachi-agent-helper artifact set-status <run_id> selected-cli.json --status complete`; that would overwrite the selected CLI schema status and can make `gate check backend` fail.
+Backend JSON status safety: KHS owns orchestration guidance and backend selection policy, KAB owns bridge runtime evidence, and KAH owns deterministic artifact/gate behavior. KAH v0.1.2 fails closed on schema-owned backend JSON status updates, but KHS operators must still not run `kkachi-agent-helper artifact set-status <run_id> selected-cli.json --status complete`; that would attempt to overwrite the selected CLI schema status and should be treated as an operator error.
 
 ## KAB-specific guards
 

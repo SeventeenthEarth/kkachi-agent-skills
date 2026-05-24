@@ -1,10 +1,10 @@
-version: 0.1.1
+version: 0.1.2
 purpose: "Machine-readable KHS summary of KAB public backend support. Keep synchronized with kkachi-agent-bridge/docs/public/compatibility-matrix.md."
 source_ledgers:
   summary: kkachi-agent-bridge/README.md
   canonical_support: kkachi-agent-bridge/docs/public/compatibility-matrix.md
   deeper_contract: kkachi-agent-bridge/docs/dev/spec/requirements.md
-last_synced_from_public_docs: "2026-05-10"
+last_synced_from_public_docs: "2026-05-16"
 
 capability_states:
   native: "Backend provides the capability directly and KAB passes it through."
@@ -12,6 +12,8 @@ capability_states:
   degraded: "Partial support; not baseline-equivalent."
   unsupported: "Not provided by backend or KAB."
   api_sse_only: "Supported only through API/SSE events, not verified through live CLI question producer."
+  fixed: "Bridge reports a fixed backend policy/value; runtime control is not variable."
+  semantic_mapping: "KAB maps KHS canonical values onto backend-native startup settings rather than a direct one-to-one native flag."
   planned: "Not implemented yet; intended behavior only."
   unknown: "Investigation or validation is incomplete."
 
@@ -35,6 +37,11 @@ backends:
       cli_loop: supported
       retained_stream: unsupported
       recommended: cli_loop
+    reasoning_effort:
+      policy: supported
+      supported_values: [low, medium, high, xhigh, max]
+      runtime_change: idle_only
+      native_mapping: "Startup --effort; idle runtime /effort command."
     tools_observability: full
     permission_preconditions:
       - "Use Claude default permission mode; auto/acceptEdits/plan can resolve tools without bridge-visible needs_approval."
@@ -59,6 +66,11 @@ backends:
       cli_loop: supported
       retained_stream: unsupported
       recommended: cli_loop
+    reasoning_effort:
+      policy: fixed
+      supported_values: [high]
+      runtime_change: fixed
+      native_mapping: "Shares Claude-compatible transport but exposes fixed bridge metadata only."
     tools_observability: full
     permission_preconditions:
       - "Do not pass --yolo when supervised approval is required."
@@ -85,6 +97,11 @@ backends:
       cli_loop: supported
       retained_stream: supported
       recommended: retained_stream
+    reasoning_effort:
+      policy: supported
+      supported_values: [low, medium, high, xhigh]
+      runtime_change: startup_only
+      native_mapping: "Wrapper-owned model_reasoning_effort; runtime mutation returns REASONING_RUNTIME_AMBIGUOUS."
     tools_observability: retained_events
     permission_preconditions:
       - "Managed Codex args must include --enable default_mode_request_user_input, --ask-for-approval untrusted, and --sandbox read-only when approval/input control is required."
@@ -96,9 +113,9 @@ backends:
     adapter_type: gemini_compat
     shipping_status: supported
     selected_cli_status: supported
-    tested_cli: "0.41.2"
-    minimum_cli: "0.41.2"
-    last_verified: "2026-05-06"
+    tested_cli: "0.42.0"
+    minimum_cli: "0.42.0"
+    last_verified: "2026-05-16"
     session_lifecycle: supported
     approval_control: supported
     question_flow: supported
@@ -112,6 +129,11 @@ backends:
       cli_loop: supported
       retained_stream: supported
       recommended: retained_stream
+    reasoning_effort:
+      policy: semantic_mapping
+      supported_values: [medium, high]
+      runtime_change: startup_only
+      native_mapping: "Gemini 3 project settings only: medium maps to thinkingLevel LOW; high maps to thinkingLevel HIGH through modelConfigs.customOverrides."
     tools_observability: full
     permission_preconditions:
       - "Bridge-managed Gemini settings must disable direct TUI shell mode; readiness fails closed if it cannot be disabled."
@@ -125,9 +147,9 @@ backends:
     adapter_type: opencode_api
     shipping_status: supported
     selected_cli_status: supported
-    tested_cli: "1.14.46"
+    tested_cli: "1.14.48"
     minimum_cli: "1.14.46"
-    last_verified: "2026-05-10"
+    last_verified: "2026-05-12"
     session_lifecycle: supported
     approval_control: supported
     question_flow: api_sse_only
@@ -141,6 +163,11 @@ backends:
       cli_loop: supported
       retained_stream: supported
       recommended: retained_stream
+    reasoning_effort:
+      policy: unsupported
+      supported_values: []
+      runtime_change: unsupported
+      native_mapping: "No bridge-controlled upstream API/SSE reasoning-effort control is currently exposed."
     tools_observability: limited
     permission_preconditions:
       - "Use opencode_permission_mode: ask for supervised approval QA."
