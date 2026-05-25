@@ -6,7 +6,7 @@ Confirming role: Responsible approver / governance evidence record
 Status: planning-confirmed KHS roadmap; KAH `kkachi-agent-helper graph` implementation evidence present; KHS integration work remains separately gated
 Authority level: KHS workflow-graph integration roadmap; not implementation authorization by itself
 Scope: KHS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/initdoc-post-kah-reset.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -27,6 +27,17 @@ This roadmap records KHS integration work for a KAH-managed project workflow gra
 `Planned`, `In Progress`, `Blocked`, `Completed`, `Deferred`.
 
 ## Active roadmap
+
+### EPIC: INITDOC — post-KAH KAS authority reset and MVP roadmap completion
+
+> Goal: remove stale pre-KAH blockers from active KAS documentation and complete an implementation-ready MVP roadmap so KAS work can proceed immediately after the reset. INITDOC is a temporary transition epic; its transition SOT must be deleted after its decisions are absorbed into permanent docs.
+
+| Task ID | Title | Status | Work guide | Notes |
+|---|---|---|---|---|
+| INITDOC-001 | Create temporary INITDOC transition SOT and roadmap epic | Completed | Create `docs/sot/initdoc-post-kah-reset.md`, define INITDOC scope/exit criteria, and register this epic plus four tasks in `docs/roadmap.md`. | Temporary transition SOT only; it must be removed by INITDOC-004 after absorption into active docs. |
+| INITDOC-002 | Reset active docs/SOTs to post-KAH authority | Planned | Update active docs so KAH 0.1.4-evidenced graph/configurable-feedback surfaces are not blocked by stale pre-KAH wording; keep KAB-later, alias, approval, and mutation gates explicit. | Minimum targets: docs index, interface contract, workflow graph SOT, external-feedback policy, minimum/pilot CLI lane, pre-KAH readiness audit, and delegation/report contract where status labels overstate KAH blockage. |
+| INITDOC-003 | Complete implementation-ready MVP roadmap | Planned | Rework this roadmap into executable post-INITDOC epics/tasks for BOOTSTRAP, CLIMVP, GRAPHMVP, and STALECLEAN with acceptance criteria, deferrals, and evidence requirements. | The roadmap must lead directly into MVP feature development, not another planning loop. |
+| INITDOC-004 | Absorb INITDOC decisions and remove transition SOT | Planned | Verify INITDOC decisions are absorbed into permanent docs, delete `docs/sot/initdoc-post-kah-reset.md`, and leave absorbed-target/completion history in this roadmap or PR summary. | Keeping the transition SOT after completion is a failure because it would become new legacy. |
 
 ### EPIC: cli — KHS+KAH minimum/pilot CLI lane
 
