@@ -16,7 +16,7 @@ This directory separates durable KAS/KHS sources of truth from working discussio
 |---|---|---|
 | `sot/interface-contract.md` | Current KAS/KAH/KAB interface SOT | Authoritative for reality-first interface guidance; KAH 0.1.4 `kkachi-agent-helper graph` and configurable-feedback support are capability-evidenced, remaining KAS adoption is integration-pending, `kah graph` alias remains candidate, and KAB runtime claims remain later |
 | `sot/khs-architecture-and-integration.md` | Broad KHS architecture/usage/KAH-integration SOT | Blue-reviewed candidate development base accepted in `t_f29b6ee9`; distinguishes target architecture from operational support claims |
-| `sot/khs-pre-kah-readiness-audit-2026-05.md` | Historical pre-KAH readiness audit | Superseded audit input from `t_2e9d918a`; no longer blocks post-KAH KAS MVP work after INITDOC, but still preserves overclaim and lineage warnings |
+| `sot/khs-pre-kah-readiness-audit-2026-05.md` | Historical pre-KAH readiness audit | Superseded audit input from `t_2e9d918a`; no longer blocks post-KAH KAS MVP work after INITDOC closure, but still preserves overclaim and lineage warnings |
 | `sot/khs-delegation-packet-and-report-contract.md` | Candidate Delegation Packet and operator report contract | Candidate docs-only contract; records packet/report fields and status labels without claiming KAH artifact or KAB runtime support |
 | `sot/external-feedback-intake-policy.md` | KAH-evidenced policy SOT for configurable `EXTERNAL_FEEDBACK_INTAKE` bounds | KAH 0.1.4 advertises configurable feedback intake capability; KAS registry/template/skill adoption remains integration-pending; current MVP still uses user-supplied `feedback.md`; automated review-by-different-tool remains `kab_later` |
 | `sot/phase-orchestration-policy.md` | Current KHS phase/run orchestration policy | Authoritative for run-local phase behavior |
@@ -25,7 +25,7 @@ This directory separates durable KAS/KHS sources of truth from working discussio
 | `sot/concept.md` | KHS concept SOT | Durable background; not changed by this graph docs pass |
 | `sot/architecture-understanding.md` | KHS architecture understanding | Durable background; not changed by this graph docs pass |
 | `sot/skill-template.md` | Skill template guidance | Durable background; not changed by this graph docs pass |
-| `roadmap.md` | KHS graph integration roadmap | Candidate active roadmap for graph integration tasks |
+| `roadmap.md` | KAS post-KAH MVP roadmap | Active roadmap for INITDOC completion history and BOOTSTRAP / CLIMVP / GRAPHMVP / STALECLEAN PR-candidate tasks |
 | `discussions/*` | Temporary or evolving discussion material | Historical/non-authoritative unless promoted into `sot/`, registries, templates, or skills |
 
 ## `sot/`
@@ -100,4 +100,4 @@ Older wording that calls `phase-plan.yaml` the whole workflow SOT must be read n
 
 ## Next record action
 
-INITDOC controls the post-KAH reset. Future KAS implementation tasks should update only the docs/skills/templates/registries affected by the implemented surface and preserve evidence paths.
+INITDOC is closed and its temporary transition SOT has been deleted after absorption into active records. Future KAS implementation tasks should follow `docs/roadmap.md`, update only the docs/skills/templates/registries affected by the implemented surface, and preserve evidence paths.

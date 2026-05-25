@@ -4,7 +4,7 @@ Date: 2026-05-23
 Owner: KHS documentation archive
 Confirming role: Kanban `t_2e9d918a` Codex app-server soldier draft; Blue-inspected candidate with same-card Red/Gray/Orange ACCEPT gates before final synthesis
 Status: historical/superseded pre-KAH readiness audit; preserved for lineage and overclaim prevention
-Authority level: historical pre-KAH status record; superseded for post-KAH KAS MVP planning by `docs/sot/initdoc-post-kah-reset.md` and active SOT updates
+Authority level: historical pre-KAH status record; superseded for post-KAH KAS MVP planning by INITDOC closure in `docs/roadmap.md` and active SOT updates
 Scope: `kkachi-hermes-skills` docs-only readiness synthesis before KAH 0.1.4 completion; no longer a blocker for post-KAH KAS MVP work
 Runtime note: this draft was requested with `openai_runtime=codex_app_server`; it is not KAB runtime evidence
 

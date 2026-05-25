@@ -146,7 +146,7 @@ KHS readiness, and operational/runtime support readiness.
 | KAH can persist/validate supporting project artifacts | `kah-evidenced, kas-integration-pending` | KAH 0.1.4 command/capability output plus future KAS packet/report schema and artifact examples. |
 | KAB can produce backend execution evidence for packet phases | `kab_later` | KAB send/wait/read/status/event evidence and backend-specific caveat handling. |
 | External-feedback policy is KAH-evidenced | `kah-evidenced, kas-integration-pending` | `docs/sot/external-feedback-intake-policy.md`, KAH 0.1.4 capability evidence, and future KAS adoption evidence. |
-| Post-KAH KAS readiness is complete | `ready-for-implementation` only after INITDOC reset closes | INITDOC, packet/report contract, stale/overclaim coverage, graph/CLI/self-improvement status, and review closure. |
+| Post-KAH KAS readiness is complete | `ready-for-implementation` after INITDOC closure | Roadmap INITDOC completion record, packet/report contract, stale/overclaim coverage, graph/CLI/self-improvement status, and review closure. |
 | Operational runtime support is ready | `not_runtime_support` from docs alone | KAH/KAB implementation evidence plus KAS registry/template/skill updates and verification. |
 
 ## 6. Fail-closed rules
@@ -196,7 +196,7 @@ external_feedback_policy:
 post_kah_kas_readiness:
   status: ready_for_implementation_after_review
   evidence:
-    - docs/sot/initdoc-post-kah-reset.md
+    - docs/roadmap.md#initdoc-completion-record
     - docs/sot/khs-delegation-packet-and-report-contract.md
 operational_runtime_support_readiness:
   status: not_runtime_support

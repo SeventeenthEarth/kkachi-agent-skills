@@ -165,4 +165,4 @@ Mermaid and PlantUML outputs are generated visualization artifacts only. They do
 
 ## Next record action
 
-Under INITDOC, implement remaining KAS graph integration one PR-candidate task at a time from `docs/roadmap.md`, starting with template registry and capability-checked command guidance for the evidenced KAH 0.1.4 `kkachi-agent-helper graph` surface.
+After INITDOC closure, implement remaining KAS graph integration one PR-candidate task at a time from `docs/roadmap.md`, starting with template registry and capability-checked command guidance for the evidenced KAH 0.1.4 `kkachi-agent-helper graph` surface.

@@ -6,11 +6,12 @@ Confirming role: Responsible approver / governance evidence record; INITDOC post
 Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced; KAS integration work remains separately gated
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/initdoc-post-kah-reset.md`, `sot/khs-architecture-and-integration.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
 - INITDOC-002 Red acceptance in kanban task `t_b805ce76`
+- INITDOC-003 Red acceptance in kanban task `t_81453049`
 - Effective KAH check on 2026-05-25: `kkachi-agent-helper --version` => `kkachi-agent-helper 0.1.4`; `kkachi-agent-helper graph --help` reports supported `init`, `validate`, `explain`, `diff`, `propose`, `apply`, and `export`
 
 ## Purpose
@@ -47,20 +48,20 @@ INITDOC-003
   -> STALECLEAN-001..004
 ```
 
-`INITDOC-004` should close the temporary transition SOT before implementation begins so INITDOC does not become new legacy. After that, `BOOTSTRAP` should happen first because it gives later KAS work a deterministic KAH project state and doctor evidence. `STALECLEAN` may run in parallel with late CLIMVP/GRAPHMVP tasks only when the touched surfaces do not overlap.
+INITDOC is closed before implementation begins so the temporary transition SOT does not become new legacy. `BOOTSTRAP` should happen first because it gives later KAS work a deterministic KAH project state and doctor evidence. `STALECLEAN` may run in parallel with late CLIMVP/GRAPHMVP tasks only when the touched surfaces do not overlap.
 
 ## Active roadmap
 
 ### EPIC: INITDOC — post-KAH KAS authority reset and MVP roadmap completion
 
-> Goal: remove stale pre-KAH blockers from active KAS documentation and complete an implementation-ready MVP roadmap so KAS work can proceed immediately after the reset. INITDOC is a temporary transition epic; its transition SOT must be deleted after its decisions are absorbed into permanent docs.
+> Goal: remove stale pre-KAH blockers from active KAS documentation and complete an implementation-ready MVP roadmap so KAS work can proceed immediately after the reset. INITDOC was a temporary transition epic; its transition SOT was deleted after its decisions were absorbed into permanent docs.
 
 | Task ID | Title | Status | Work guide | Notes |
 |---|---|---|---|---|
-| INITDOC-001 | Create temporary INITDOC transition SOT and roadmap epic | Completed | Create `docs/sot/initdoc-post-kah-reset.md`, define INITDOC scope/exit criteria, and register this epic plus four tasks in `docs/roadmap.md`. | Temporary transition SOT only; it must be removed by INITDOC-004 after absorption into active docs. |
+| INITDOC-001 | Create temporary INITDOC transition SOT and roadmap epic | Completed | Created `docs/sot/initdoc-post-kah-reset.md`, defined INITDOC scope/exit criteria, and registered this epic plus four tasks in `docs/roadmap.md`. | Temporary transition SOT only; deleted by INITDOC-004 after absorption into active docs. |
 | INITDOC-002 | Reset active docs/SOTs to post-KAH authority | Completed | Update active docs so KAH 0.1.4-evidenced graph/configurable-feedback surfaces are not blocked by stale pre-KAH wording; keep KAB-later, alias, approval, and mutation gates explicit. | Minimum targets updated; Blue verification passed and Red review accepted in `t_b805ce76`. |
 | INITDOC-003 | Complete implementation-ready MVP roadmap | Completed | Rework this roadmap into executable post-INITDOC epics/tasks for BOOTSTRAP, CLIMVP, GRAPHMVP, and STALECLEAN with acceptance criteria, deferrals, and evidence requirements. | This roadmap now leads directly into MVP feature development instead of another planning loop. |
-| INITDOC-004 | Absorb INITDOC decisions and remove transition SOT | Planned | Verify INITDOC decisions are absorbed into permanent docs, delete `docs/sot/initdoc-post-kah-reset.md`, and leave absorbed-target/completion history in this roadmap or PR summary. | Keeping the transition SOT after completion is a failure because it would become new legacy. |
+| INITDOC-004 | Absorb INITDOC decisions and remove transition SOT | Completed | Verified INITDOC decisions are absorbed into permanent docs, deleted `docs/sot/initdoc-post-kah-reset.md`, and left absorbed-target/completion history below. | INITDOC is closed; implementation can proceed one PR-candidate task at a time after responsible approver authorization. |
 
 ### EPIC: BOOTSTRAP — KAS repo KAH project bootstrap
 
@@ -120,6 +121,23 @@ Deferred from GRAPHMVP unless separately approved: graph `apply` automation, dec
 - Repo-root Hermes multi-skill-pack install claims until Hermes behavior is verified.
 - `kah graph` alias support unless effective alias capability/help evidence exists.
 
+## INITDOC completion record
+
+INITDOC is closed. The temporary transition SOT `docs/sot/initdoc-post-kah-reset.md` was deleted after its decisions were absorbed into the active records below:
+
+- `docs/roadmap.md` — post-KAH MVP delivery order, INITDOC completion history, BOOTSTRAP / CLIMVP / GRAPHMVP / STALECLEAN task boundaries, deferrals, evidence requirements, and next action.
+- `README.md` — current KAS/KAH/KAB lane split, KAH 0.1.4 maturity note, profile-scoped minimum/pilot lane, graph/configurable-feedback posture, and KAB-later runtime boundary.
+- `docs/README.md` — authority ladder, status vocabulary, and post-INITDOC next-record guidance.
+- `docs/sot/interface-contract.md` — KAS/KAH/KAB reality-first interface boundary, KAH 0.1.4 capability evidence, graph alias boundary, and minimum/pilot lane boundary.
+- `docs/sot/khs-architecture-and-integration.md` — broad current KAS architecture SOT, self-improvement governance, layer boundaries, and active stale-surface inventory.
+- `docs/sot/workflow-graph-integration.md` — KAS/KAH graph integration SOT, capability-checked `kkachi-agent-helper graph` use, no direct YAML fallback, and graph evidence preservation requirements.
+- `docs/sot/minimum-pilot-cli-lane.md` — profile-scoped KAS skill-pack list/install/doctor lane and safety constraints.
+- `docs/sot/external-feedback-intake-policy.md` — KAH-evidenced configurable feedback-intake policy, KAS adoption dependencies, and stale-surface manifest.
+- `docs/sot/khs-pre-kah-readiness-audit-2026-05.md` — historical/superseded pre-KAH audit narrowed so it no longer blocks post-KAH KAS MVP work.
+- `docs/sot/khs-delegation-packet-and-report-contract.md` — packet/report status labels, fail-closed rules, and readiness example updated to reference active SOTs instead of the deleted transition file.
+
+Implementation remains gated by each later task's responsible approver authorization, capability/help evidence, and review requirements.
+
 ## Stale/conflict markers
 
 - Older wording that treats `phase-plan.yaml` as the whole workflow SOT is narrowed to run-local execution state/evidence for one run.
@@ -139,4 +157,4 @@ Deferred from GRAPHMVP unless separately approved: graph `apply` automation, dec
 
 ## Next record action
 
-After INITDOC-003, the next work item is INITDOC-004: confirm the transition decisions are absorbed, delete `docs/sot/initdoc-post-kah-reset.md`, and leave an absorbed-target completion record. After INITDOC closes, start `BOOTSTRAP-001` unless 주군 chooses a different first implementation slice.
+INITDOC is closed. The next work item is `BOOTSTRAP-001`: obtain responsible approver confirmation for the exact KAH `project init` values, run the approved bootstrap, and preserve command/output/changed-path evidence unless 주군 chooses a different first implementation slice.
