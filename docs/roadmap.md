@@ -69,7 +69,7 @@ INITDOC is closed before implementation begins so the temporary transition SOT d
 
 | Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
 |---|---|---|---|---|
-| BOOTSTRAP-001 | Approve and run KAH `project init` for this repo | Planned | A responsible approver authorizes the exact project init values; `kkachi-agent-helper project init ... --json` creates only KAH-managed `.kkachi/` bootstrap files; no source docs/skills/templates/registries are mutated by the init command. | Preserve the approval reference, command, JSON output, changed paths, and refusal/overwrite behavior if any `.kkachi/` state already exists. |
+| BOOTSTRAP-001 | Approve and run KAH `project init` for this repo | Completed | A responsible approver authorizes the exact project init values; `kkachi-agent-helper project init ... --json` creates KAH-managed project bootstrap state; `.kkachi/` is ignored as local operator state, and the generated `docs/kkachi-docs-map.yaml` is preserved as the repo-visible KAH docs map. | Preserved KAH event/run evidence, `project status --json`, `project doctor --json`, changed paths, and the amended BOOTSTRAP-001 commit with the docs map plus `.gitignore` policy update. |
 | BOOTSTRAP-002 | Make `project doctor` pass and record evidence | Planned | `kkachi-agent-helper project doctor --json` exits successfully in this repo after bootstrap; docs-map, schema, status, events, and path checks are all explained or fixed inside KAH-owned state. | Preserve doctor JSON, human summary, and any remediation commands. If doctor fails for a policy decision, block for responsible approver instead of guessing. |
 | BOOTSTRAP-003 | Decide `.kkachi/` repository policy | Planned | The repo records whether generated `.kkachi/` files are committed, ignored, or kept as local operator state; `.gitignore` or docs are updated only if the chosen policy requires it. | Requires responsible approver decision because it affects repo hygiene and evidence portability. Verification includes `git status --short`, docs/readback if changed, and `git diff --check`. |
 
@@ -157,4 +157,4 @@ Implementation remains gated by each later task's responsible approver authoriza
 
 ## Next record action
 
-INITDOC is closed. The next work item is `BOOTSTRAP-001`: obtain responsible approver confirmation for the exact KAH `project init` values, run the approved bootstrap, and preserve command/output/changed-path evidence unless 주군 chooses a different first implementation slice.
+INITDOC is closed and `BOOTSTRAP-001` is completed. The next work item is `BOOTSTRAP-002`: make `project doctor` pass and record evidence unless 주군 chooses a different first implementation slice.
