@@ -6,7 +6,7 @@ Confirming role: Responsible approver / governance evidence record; INITDOC post
 Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced; KAS integration work remains separately gated
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -79,7 +79,7 @@ INITDOC is closed before implementation begins so the temporary transition SOT d
 
 | Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
 |---|---|---|---|---|
-| CLIMVP-001 | Specify command surface and manifest/checksum contract | Planned | A CLI spec defines `list`, `install --dry-run`, approved copy install, and `doctor`; it defines manifest fields, checksum algorithm, source pack identity, target profile identity, changed-path report, backup/recovery instructions, and failure modes. | Docs/spec-only task. Requires operator-workflow review before implementation. Must state that KAH has `install_command=false` and that KAS owns this surface. |
+| CLIMVP-001 | Specify command surface and manifest/checksum contract | Completed | `docs/sot/kas-cli-contract.md` defines `list`, `install --dry-run`, approved copy install, and `doctor`; it defines manifest fields, SHA-256 checksum and dry-run plan-hash rules, source pack identity, target profile identity, changed-path report, backup/recovery instructions, status vocabulary, and failure modes. | Docs/spec-only task completed with KAH run `run-20260525T161641Z-4160f06cf1be`. Reviews resolved: 하후연 `t_2fd07174` ACCEPT, 여몽 `t_e04116b6` then `t_abc30909` ACCEPT, 진궁 `t_b8db3ead` then `t_e652a24c` ACCEPT, 주유 `t_6cc40c59` HARNESS_ACCEPT, 사마의 `t_e479171c` STRATEGIC_RED_ACCEPT. KAH `install_command=false` and KAS ownership are stated. |
 | CLIMVP-002 | Implement skill-pack discovery and `list` | Planned | `kkachi-hermes-skills list [--profile <profile>] [--category <name>] [--json]` or the approved equivalent lists available KAS skill packs/categories without mutating files; output distinguishes source repo packs from installed profile copies. | Verification includes unit/CLI tests, JSON/human output examples, and docs update. No profile writes. |
 | CLIMVP-003 | Implement dry-run install with changed-path report | Planned | `install --dry-run` resolves source packs and target profile paths, reports creates/updates/conflicts/skips, validates manifest/checksum input, and performs no writes. | Verification includes tests for missing profile, missing skill, existing install, conflict, path safety, and no-write behavior. Red/operator review required before enabling write mode. |
 | CLIMVP-004 | Implement approved copy install with manifest/checksum and recovery | Planned | Approved install copies selected KAS skill packs into `~/.hermes/profiles/<profile>/skills/...`, records manifest/checksum evidence, reports actual changed paths, and prints recovery/rollback instructions. | Requires explicit approval flag or approval evidence. Verification includes copy behavior, checksum mismatch, partial failure recovery, path safety, and docs. No `skills.external_dirs` or symlink default. |
@@ -148,13 +148,13 @@ Implementation remains gated by each later task's responsible approver authoriza
 
 ## Open questions
 
-- Exact `.kkachi/` repo policy for this repository remains BOOTSTRAP-003 work and requires responsible approver decision.
-- Exact CLIMVP manifest/checksum file format remains CLIMVP-001 work.
-- Exact backup/rollback implementation for approved profile install remains CLIMVP-001/004 work.
+- `.kkachi/` repo policy is closed by BOOTSTRAP-003: generated `.kkachi/` files are ignored local KAH/operator state; `docs/kkachi-docs-map.yaml` is committed repo-visible KAH metadata.
+- CLIMVP manifest/checksum file format is specified by `docs/sot/kas-cli-contract.md`; implementation remains CLIMVP-002 through CLIMVP-005 work.
+- Exact backup/rollback implementation for approved profile install remains CLIMVP-004 work.
 - Exact KAS graph template registry schema remains GRAPHMVP-001 work.
 - Exact KAS artifact mapping for KAH proposal, audit, checksum, and event evidence remains GRAPHMVP-004 work.
 - KAB alignment requires a separately assigned KAB docs/update task.
 
 ## Next record action
 
-INITDOC and BOOTSTRAP are closed. The next work item is `CLIMVP-001`: specify command surface and manifest/checksum contract unless 주군 chooses a different first implementation slice.
+INITDOC and BOOTSTRAP are closed. `CLIMVP-001` is completed. The next work item is `CLIMVP-002`: implement skill-pack discovery and `list` unless 주군 chooses a different implementation slice.

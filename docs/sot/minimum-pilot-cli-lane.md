@@ -6,7 +6,7 @@ Confirming role: Blue-confirmed project authority in kanban task `t_caee9433` fo
 Status: Blue-confirmed SOT / roadmap record for the scoped KHS+KAH minimum/pilot harness lane
 Authority level: confirmed lane split and safety constraints; does not replace the current KHS+KAH+KAB execution-runtime SOT
 Scope: KHS docs and future `kkachi-hermes-skills` CLI planning only; no KAH code, KAB docs, runtime configs, profiles, registries, gateway settings, KHC CLI, or Doksuri integration changes
-Related docs: `interface-contract.md`, `../roadmap.md`, `../README.md`, repository `README.md`
+Related docs: `interface-contract.md`, `kas-cli-contract.md`, `../roadmap.md`, `../README.md`, repository `README.md`
 Evidence/source paths: kanban task `t_caee9433` Blue confirmation, kanban task `t_3e6d8b89` Blue final synthesis, and child task `t_1af0dc98`
 
 ## Current state
@@ -27,7 +27,7 @@ Two lanes must be kept distinct:
 
 1. KHS+KAH minimum/pilot harness lane
    - Purpose: let users pilot KHS skill-pack installation and KAH-backed proposal/evidence workflows without requiring KAB runtime readiness.
-   - Allowed CLI surface: `list`, `install`, `doctor`, `sync`, and `proposal`.
+   - Allowed CLI surface: `list`, `install`, `doctor`, `sync`, and `proposal`. `docs/sot/kas-cli-contract.md` is the accepted CLIMVP-001 command-surface contract for the first MVP slice: `list`, `install --dry-run`, approved copy install, and `doctor`; `sync` and broad `proposal` remain gated future surfaces.
    - Allowed authority: profile-scoped KHS skill-pack support, install/sync reporting, KAH availability checks, project-overlay/proposal evidence preparation, and self-improvement proposal validation.
    - Explicitly not allowed: `run` verbs, backend session control, bridge control, KHC command/control, Doksuri integration, or KAB replacement.
 
@@ -44,9 +44,11 @@ Two lanes must be kept distinct:
 
 ## CLI safety constraints
 
-`kkachi-hermes-skills install <profile> <skill-or-category>`:
+`kkachi-hermes-skills install`:
 
 - Default MVP mode is copy mode into `~/.hermes/profiles/<profile>/skills/<category>/<skill>/`.
+- The canonical CLIMVP-001 forms are `kkachi-hermes-skills install --profile <profile> <pack-id>... --dry-run` and `kkachi-hermes-skills install --profile <profile> <pack-id>... --approve <evidence-ref>`, as defined in `docs/sot/kas-cli-contract.md`.
+- The older positional form `kkachi-hermes-skills install <profile> <skill-or-category> --dry-run` may remain a human convenience alias only if it resolves to the same internal contract and JSON shape.
 - A write-capable install must support dry-run before mutation.
 - Mutation reports must name target profile, source pack/version, planned files, actual changed paths, manifest/checksum results, and recovery or rollback instructions.
 - Native `hermes -p <profile> skills install ...` may be referenced only for the single-skill identifier or direct `SKILL.md` URL behavior that has been verified; repo-root multi-skill-pack install must not be claimed until separately evidenced.
@@ -78,10 +80,10 @@ Symlink mode:
 The safe minimum user path is:
 
 1. `kkachi-hermes-skills list [--profile <profile>] [--category <name>]`
-2. `kkachi-hermes-skills install <profile> <skill-or-category> --dry-run`
+2. `kkachi-hermes-skills install --profile <profile> <pack-id>... --dry-run`
 3. operator approval for the reported changed paths
-4. approved install with manifest/checksum and recovery report
-5. `kkachi-hermes-skills doctor <profile> [--project <path>]`
+4. `kkachi-hermes-skills install --profile <profile> <pack-id>... --approve <evidence-ref>` with manifest/checksum and recovery report
+5. `kkachi-hermes-skills doctor --profile <profile> [--project <path>]`
 6. next-action report that clearly says whether the user is in the minimum/pilot lane or must use the full KHS+KAH+KAB execution-runtime lane
 
 ## Self-improvement ledger split
@@ -105,12 +107,12 @@ The safe minimum user path is:
 - Existing KHS code-change run language remains authoritative for code-changing KHS execution: KHS+KAH+KAB is still required for KAB-backed runs.
 - Any future wording that presents the minimum/pilot lane as Kkachi/KHC/Doksuri/KAB run/control scope is conflicting and must be corrected before implementation.
 
-## Open questions
+## Resolved decisions and open questions
 
-- Exact manifest/checksum file format for profile installs remains future implementation design.
-- Exact backup/rollback mechanism for `install` and `sync` remains future implementation design.
+- CLIMVP-001 resolved the minimum manifest/checksum contract for profile installs in `docs/sot/kas-cli-contract.md`, including SHA-256 file and pack checksums, dry-run plan hashes, approved-plan matching, changed-path categories, and the recommended profile metadata path.
+- Exact backup/rollback implementation details for approved `install` remain CLIMVP-004 work under the CLIMVP-001 contract; exact backup/rollback behavior for future `sync` remains separately gated.
 - Exact `proposal` CLI arguments and mapping to KAH proposal/evidence paths remain future implementation design.
 
 ## Next record action
 
-Update implementation tasks one at a time. The first implementation planning task should cover only `list`, `install --dry-run`, approved copy install, and `doctor`; `sync` and `proposal` should remain gated until their fail-closed behavior is specified and reviewed.
+Update implementation tasks one at a time. CLIMVP-001 is accepted in `docs/sot/kas-cli-contract.md`; the next implementation task is CLIMVP-002 `list`. `install --dry-run`, approved copy install, and `doctor` follow as CLIMVP-003 through CLIMVP-005. `sync` and broad `proposal` remain gated until their fail-closed behavior is specified and reviewed.
