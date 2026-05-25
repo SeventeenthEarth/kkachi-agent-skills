@@ -56,7 +56,7 @@ Once KHS is triggered, KAH is mandatory for deterministic state, artifacts, even
 User-confirmed orchestration policy:
 
 - The master selects the target roadmap task id or task item for each KHS run.
-- KHS creates `phase-plan.yaml` as the workflow SOT; KAH `work_path`, `work_mode`, and `execution_mode` are helper classification metadata only.
+- KAS/KHS treats `.kkachi-workflow.yaml` as project workflow graph only when backed by KAH graph evidence; `phase-plan.yaml` is run-local execution state/evidence. KAH `work_path`, `work_mode`, and `execution_mode` are helper classification metadata only.
 - Hermes is manager, risk approval router, and final verifier; KAB backend roles do substantive plan/code/docs/feedback work.
 - KHS code-change runs use KAB. If the master forbids KAB for code changes, treat the request as a normal direct Hermes task rather than a KHS run.
 - Docs-only KHS runs use KAB by default; direct docs edits require explicit no-KAB instruction and recorded rationale.

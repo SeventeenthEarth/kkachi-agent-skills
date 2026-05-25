@@ -1,6 +1,6 @@
 # Kkachi Hermes Skills
 
-Kkachi Hermes Skills (KHS) is the Hermes Agent skill/process pack for running
+Kkachi Agent Skills (KAS; repository historically named `kkachi-hermes-skills` / KHS) is the Hermes Agent skill/process pack for running
 Kkachi software-development workflows.
 
 KHS does not execute external AI CLIs directly and does not own project state.
@@ -9,11 +9,12 @@ contract, select a KAB backend lane, render the backend-specific prompt, call
 KAH for deterministic run state, call KAB for backend execution, and preserve
 evidence for review, verification, documentation, and self-improvement.
 
-Maturity note: KHS is currently a pre-template / seed skill system, not a
-final polished product skill pack. After installation, real Hermes/Kkachi runs
-are expected to mature it through captured evidence, project overlays,
-prompt/phase skill references, reusable scripts, and the existing
-`kkachi-improve` / improvement-promotion rules.
+Maturity note: KAS is now in the post-KAH 0.1.4 enablement lane. It is still an
+early skill/process pack rather than a final polished product, but KAH graph and
+configurable-feedback substrates are capability-evidenced. Real Hermes/Kkachi
+runs should mature KAS through captured evidence, project overlays, prompt/phase
+skill references, reusable scripts, and the existing `kkachi-improve` /
+improvement-promotion rules.
 
 ## Current Lane Split
 
@@ -44,8 +45,9 @@ KAH: kkachi-agent-helper
   diagnostics, and project-local `.kkachi/` state.
 
 KAB: kkachi-agent-bridge
-  Runtime bridge for Claude Code, GLM, Codex CLI, Gemini CLI, and OpenCode
-  backend sessions.
+  Runtime bridge for Claude Code, GLM, Codex CLI, Kimi CLI, OpenCode, and other
+  backend sessions when supported by current KAB evidence. Gemini CLI is legacy
+  context unless 주군 explicitly re-enables it for new KAB work.
 ```
 
 KHS is the prompt/process layer. KAH is the deterministic state layer. KAB is the
@@ -95,7 +97,7 @@ manually create ad hoc state files. Hermes should run KAH `project init` in the
 target project, using the project's docs map, backend policy, commander,
 red-team partner, SOT policy, execution mode, and test commands.
 
-After project init, Hermes should use KHS skills for all Kkachi runs. KHS creates `phase-plan.yaml` as the workflow SOT; KAH `work_path`, `work_mode`, and `execution_mode` remain deterministic helper metadata only.
+After project init, Hermes should use KAS/KHS skills for Kkachi-governed runs. `.kkachi-workflow.yaml` is the project workflow graph only when backed by KAH graph validation/proposal/apply evidence; `phase-plan.yaml` remains run-local execution state/evidence. KAH `work_path`, `work_mode`, and `execution_mode` remain deterministic helper metadata only.
 
 ```text
 orchestrate
@@ -105,7 +107,7 @@ orchestrate
   -> prompt-compose
   -> plan / ask
   -> implement / enhance-test / optimize
-  -> docs-update / request-feedback(1..3) / handle-feedback(1..3)
+  -> docs-update / request-feedback(1..5, round 1 required, rounds 2-5 optional) / handle-feedback(1..5)
   -> verify / final-verify
   -> improve
 ```

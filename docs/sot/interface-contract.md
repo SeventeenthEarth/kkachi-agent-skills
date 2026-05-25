@@ -3,8 +3,8 @@
 Date: 2026-05-21
 Owner: KHS maintainers
 Confirming role: Responsible approver / governance evidence record
-Status: source of truth for the current usable KHS/KAH/KAB interface; `kkachi-agent-helper graph` support is implemented when effective-binary capability/help evidence exists; `kah graph` alias remains candidate/unimplemented
-Authority level: KHS/KAH/KAB interface SOT
+Status: post-KAH source of truth for the current usable KAS/KAH/KAB interface; KAH 0.1.4 graph and configurable-feedback support are evidenced when effective-binary capability/help evidence exists; `kah graph` alias remains candidate/unimplemented
+Authority level: KAS/KAH/KAB interface SOT
 Graph evidence: governance evidence records in kanban tasks `t_2fb00394`, `t_38cfc496`, and `t_2b460665`
 
 ## Purpose
@@ -39,19 +39,21 @@ KAB:
 
 KAH and KAB validate or execute KHS decisions. They do not choose the KHS workflow, commander, backend lane, phase applicability, or project policy. Capability-checked graph support preserves this boundary: KHS chooses templates/policy/proposals, KAH validates/writes/applies graph state, and KAB remains backend/session/plan evidence rather than graph policy authority.
 
-KHS currently provides the pre-template / seed orchestration system: baseline
-skills, phase contracts, prompt profiles, artifact templates, project-overlay
-shape, and shared improvement-promotion rules. Concrete project runs mature
-those seeds through KAH/KAB evidence capture and `kkachi-improve` decisions
-that route lessons to run artifacts, project overlays, prompt/phase skill
-references, scripts, or shared KHS promotion.
+KAS/KHS provides the early orchestration system: baseline skills, phase
+contracts, prompt profiles, artifact templates, project-overlay shape, and
+shared improvement-promotion rules. After KAH 0.1.4, graph and
+configurable-feedback substrates are capability-evidenced, but active KAS
+adoption still matures through KAH/KAB evidence capture and `kkachi-improve`
+decisions that route lessons to run artifacts, project overlays, prompt/phase
+skill references, scripts, or shared KAS proposals.
 
 ## Reality baseline checked
 
-- KAH installed PATH binary checked: `/Users/draccoon/go/bin/kkachi-agent-helper`
-- KAH installed PATH version checked: `kkachi-agent-helper 0.1.2`
-- KAH installed PATH capability surface checked: `capabilities --json` reports supported `project`, `run`, `artifact`, `gate`, `event`, `schema`, `lock`, `diagnostics`, `phase-plan`, and `approval` command groups.
-- KAH installed PATH final-gate surface checked: `gate --help` lists both `gate check <run_id> <gate> [--json]` and canonical `gate final <run_id> [--json]`.
+- KAH installed PATH binary checked: `kkachi-agent-helper` from the effective PATH.
+- KAH installed PATH version checked on 2026-05-25: `kkachi-agent-helper 0.1.4`.
+- KAH installed PATH capability surface checked on 2026-05-25: `capabilities --json` reports supported `project`, `run`, `artifact`, `gate`, `event`, `schema`, `lock`, `diagnostics`, `phase-plan`, `approval`, and `graph` command groups.
+- KAH graph surface checked on 2026-05-25: `graph --help` lists `init`, `validate`, `explain`, `diff`, `propose`, `apply`, and `export` and reports status supported.
+- KAH compatibility flags checked on 2026-05-25 include `workflow_graph_configurable_feedback_intake=true` and `install_command=false`.
 - KAB repo binary checked: `/Users/draccoon/Workspace/SeventeenthEarth/kkachi/kkachi-agent-bridge/bin/kkachi-agent-bridge`
 - KAB installed PATH binary checked: `/usr/local/bin/kkachi-agent-bridge`
 - Important PATH note: the installed `/usr/local/bin/kkachi-agent-bridge` did not expose `plan` in the observed help output, while the repo `bin/kkachi-agent-bridge` did. KHS runs that require plan lifecycle must verify the effective KAB binary before use.
@@ -129,7 +131,7 @@ kkachi-agent-helper project status --json
 kkachi-agent-helper project doctor --json
 ```
 
-Reality note: the KAH v0.1.2 PATH baseline exposes conventional top-level `--help`, `help`, `gate --help`, and `capabilities --json` surfaces. KHS must still use capability discovery and observed command exits from the effective binary as the machine activation source; help output is supplemental documentation, not a version-guess substitute.
+Reality note: the KAH 0.1.4 PATH baseline exposes conventional top-level `--help`, `help`, command-specific help, and `capabilities --json` surfaces. KAS must still use capability discovery and observed command exits from the effective binary as the machine activation source; help output is supplemental documentation, not a version-guess substitute.
 
 ### Run lifecycle
 
@@ -179,11 +181,11 @@ Current KAH gate names include:
 intake, sot, roadmap, plan, backend, implementation, review, verification, docs, final
 ```
 
-Reality correction: the KAH v0.1.2 PATH baseline supports both `gate check <run_id> final --json` and the dedicated final gate shortcut `gate final <run_id> --json`. KHS operator-facing guidance should use `gate final <run_id> --json` as the canonical final gate. `gate check <run_id> final --json` is a compatibility fallback for older effective helpers that lack the shortcut; fallbacks must be based on capabilities and command-exit evidence, not guessed from a version string.
+Reality correction: the KAH 0.1.4 PATH baseline supports both `gate check <run_id> final --json` and the dedicated final gate shortcut `gate final <run_id> --json`. KAS operator-facing guidance should use `gate final <run_id> --json` as the canonical final gate. `gate check <run_id> final --json` is a compatibility fallback for older effective helpers that lack the shortcut; fallbacks must be based on capabilities and command-exit evidence, not guessed from a version string.
 
 ### KAH schema boundary
 
-KAH v0.1.2 validates core fields for the bridge-selection artifacts:
+KAH 0.1.4 validates core fields for the bridge-selection artifacts:
 
 `selected-cli.json` required core:
 
@@ -344,8 +346,8 @@ Selection order is:
 
 ## Known reality gaps to keep visible
 
-- KHS must verify the effective KAH binary before each controlled run; the current PATH baseline is KAH v0.1.2 with top-level help, capability discovery, `gate final`, `phase-plan`, and `approval` support.
-- KHS still treats `capabilities --json` plus observed command exits from the effective binary as the activation source; help output remains supplemental documentation.
+- KAS must verify the effective KAH binary before each controlled run; the current PATH baseline is KAH 0.1.4 with top-level help, capability discovery, `gate final`, `phase-plan`, `approval`, `graph`, and configurable-feedback support.
+- KAS still treats `capabilities --json` plus observed command exits from the effective binary as the activation source; help output remains supplemental documentation.
 - Final gate guidance is canonicalized on `gate final <run_id> --json`; `gate check <run_id> final --json` remains only a compatibility fallback for older helpers that lack the dedicated shortcut.
 - KAH does not decide KHS phase applicability; KHS must keep `phase-plan.yaml` and `checklist.md` current.
 - Installed KAB on PATH may lag the repo binary; KHS must verify that required commands such as `plan` exist before use.

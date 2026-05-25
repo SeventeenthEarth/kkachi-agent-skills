@@ -3,8 +3,8 @@
 Date: 2026-05-23
 Owner: KHS documentation archive
 Confirming role: Kanban `t_2e9d918a` Codex app-server soldier draft; Blue-inspected candidate with same-card Red/Gray/Orange ACCEPT gates before final synthesis
-Status: candidate contract; not_operational_support
-Authority level: candidate SOT for packet/report shape; does not implement KAH artifacts or KAB execution
+Status: current packet/report contract; KAH substrate evidenced, KAS schema/report integration pending; not KAB runtime support
+Authority level: SOT for packet/report shape and status labels; does not by itself implement KAS emission or KAB execution
 Scope: KHS docs-only contract for delegation packets, evidence expectations, and operator reports
 Runtime note: this draft was requested with `openai_runtime=codex_app_server`; it is not KAB runtime evidence
 
@@ -28,11 +28,13 @@ Evidence/source paths:
 
 ## 1. Decision summary
 
-KHS should describe a Delegation Packet and report contract before KAH and KAB
-runtime support exists, but this document is not itself runtime support.
+KAS should describe a Delegation Packet and report contract while keeping KAH
+deterministic evidence and KAB runtime evidence separate. KAH 0.1.4 provides the
+project/graph/artifact substrate, but this document is not itself runtime
+support and does not prove KAS packet/report emission.
 
-The contract is safe pre-KAH because it records the desired packet/report shape,
-status labels, evidence fields, and fail-closed rules without changing
+The contract is safe post-KAH because it records the desired packet/report
+shape, status labels, evidence fields, and fail-closed rules without changing
 registries, templates, phase skills, KAH state, KAB runtime behavior, or
 `.kkachi-workflow.yaml`.
 
@@ -40,10 +42,10 @@ Current labels:
 
 | Area | Label |
 |---|---|
-| This document | `candidate`, `not_operational_support` |
-| KAH artifact persistence/validation | `blocked_by_kah` |
+| This document | `current SOT`, `not_runtime_support` |
+| KAH artifact persistence/validation substrate | `kah-evidenced, kas-integration-pending` |
 | KAB backend/session evidence | `kab_later` |
-| Future packet/report generation | `planned` |
+| Future KAS packet/report generation | `ready-for-implementation` after INITDOC |
 
 ## 2. Layer boundaries
 
@@ -62,7 +64,7 @@ to reconstruct decisions without hidden conversation state.
 ```yaml
 delegation_packet:
   packet_id: "<stable id or candidate id>"
-  status: "candidate|planned|blocked_by_kah|kab_later|not_operational_support"
+  status: "current_sot|ready_for_implementation|kah_evidenced_kas_integration_pending|failed_closed|kab_later|not_runtime_support"
   source_refs:
     kanban_cards: []
     docs:
@@ -103,8 +105,9 @@ delegation_packet:
   report_contract_ref: "docs/sot/khs-delegation-packet-and-report-contract.md#4-report-fields"
 ```
 
-Before KAH support exists, any packet field that implies persisted artifact
-validation must be labeled `planned` or `blocked_by_kah`. Before KAB support
+Before active KAS emission/validation support exists, any packet field that
+implies persisted artifact validation must be labeled
+`kah_evidenced_kas_integration_pending` or `failed_closed`. Before KAB support
 exists, backend execution evidence fields must be labeled `kab_later` or
 `not_applicable`.
 
@@ -116,16 +119,16 @@ KHS readiness, and operational/runtime support readiness.
 | Field | Required meaning |
 |---|---|
 | `parsed_intent` | Concise interpretation and source refs. |
-| `current_status` | One of `candidate`, `planned`, `blocked`, `failed_closed`, `done`, `candidate_only`, or `not_operational_support` as applicable. |
+| `current_status` | One of `current_sot`, `ready_for_implementation`, `kah_evidenced_kas_integration_pending`, `failed_closed`, `done`, `candidate_only`, or `not_runtime_support` as applicable. |
 | `selected_lane` | Direct Hermes, KHS+KAH minimum/pilot, KHS+KAH+KAB runtime, docs-only SOT, or proposal-only. |
 | `execution_mode` | Read-only, docs-only, code-change, review-only, proposal-only, or runtime execution. |
 | `changed_files` | Exact repo-relative paths changed by the run. |
 | `forbidden_files_touched` | `none` or exact paths; must be `none` for KAH/KAB repos and behavior files in this task. |
 | `external_feedback_child_completion` | Status and evidence path for `docs/sot/external-feedback-intake-policy.md` when relevant. |
-| `whole_khs_pre_kah_readiness` | Status, gaps, and evidence paths for broad readiness. |
-| `operational_runtime_support_readiness` | Explicit KAH/KAB status labels; docs-only records should say `not_operational_support`. |
-| `safe_pre_kah_actions` | Actions that can proceed without KAH/KAB implementation. |
-| `blocked_by_kah` | Exact missing KAH support or evidence. |
+| `post_kah_kas_readiness` | Status, gaps, and evidence paths for post-KAH KAS readiness. Historical reports may still include `whole_khs_pre_kah_readiness`. |
+| `operational_runtime_support_readiness` | Explicit KAH/KAB status labels; docs-only records should say `not_runtime_support`. |
+| `safe_post_kah_actions` | Actions that can proceed with KAH-evidenced surfaces while KAS/KAB work remains gated. |
+| `kah_evidenced_kas_integration_pending` | Exact KAH-supported surface and the remaining KAS adoption work. |
 | `kab_later` | Exact KAB/runtime evidence deferred. |
 | `accepted_items` | Accepted feedback/review/task items with reasons. |
 | `rejected_items` | Rejected items with reasons. |
@@ -139,20 +142,20 @@ KHS readiness, and operational/runtime support readiness.
 
 | Claim type | Allowed current label | Required evidence before stronger claim |
 |---|---|---|
-| Candidate packet/report shape exists | `candidate`, `not_operational_support` | This document and docs index entry. |
-| KAH can persist and validate packet/report artifacts | `blocked_by_kah` | KAH schema, command, code, docs, tests, compatibility/capability output, and artifact examples. |
+| Packet/report shape exists | `current SOT`, `not_runtime_support` | This document and docs index entry. |
+| KAH can persist/validate supporting project artifacts | `kah-evidenced, kas-integration-pending` | KAH 0.1.4 command/capability output plus future KAS packet/report schema and artifact examples. |
 | KAB can produce backend execution evidence for packet phases | `kab_later` | KAB send/wait/read/status/event evidence and backend-specific caveat handling. |
-| External-feedback child policy is documented | `candidate`, scoped complete | `docs/sot/external-feedback-intake-policy.md` and docs index. |
-| Whole KHS pre-KAH readiness is complete | `planned` until all broad readiness areas close | Readiness audit, packet/report contract, stale/overclaim coverage, graph/CLI/self-improvement status, and review closure. |
-| Operational runtime support is ready | `not_operational_support` from docs alone | KAH/KAB implementation evidence plus KHS registry/template/skill updates and verification. |
+| External-feedback policy is KAH-evidenced | `kah-evidenced, kas-integration-pending` | `docs/sot/external-feedback-intake-policy.md`, KAH 0.1.4 capability evidence, and future KAS adoption evidence. |
+| Post-KAH KAS readiness is complete | `ready-for-implementation` only after INITDOC reset closes | INITDOC, packet/report contract, stale/overclaim coverage, graph/CLI/self-improvement status, and review closure. |
+| Operational runtime support is ready | `not_runtime_support` from docs alone | KAH/KAB implementation evidence plus KAS registry/template/skill updates and verification. |
 
 ## 6. Fail-closed rules
 
 Fail closed rather than reporting success when:
 
-- a packet references KAH artifact validation but no KAH evidence exists;
+- a packet references KAH artifact validation but no effective KAH evidence exists;
 - a report claims backend completion from KAB dispatch/send success alone;
-- status labels are missing or collapse `candidate`, `planned`, `blocked_by_kah`, and `kab_later`;
+- status labels are missing or collapse `current_sot`, `ready_for_implementation`, `kah_evidenced_kas_integration_pending`, `failed_closed`, and `kab_later`;
 - child external-feedback completion is reported as whole KHS pre-KAH readiness;
 - stale `1..3` or max-3 feedback surfaces are treated as support for min=1/max=5;
 - `.kkachi-workflow.yaml` is manually edited or created without KAH validation/proposal/apply/audit evidence;
@@ -160,47 +163,47 @@ Fail closed rather than reporting success when:
 - accepted/rejected/deferred feedback items are not separated;
 - evidence paths are vague, missing, or conversation-only.
 
-## 7. Safe pre-KAH usage
+## 7. Safe post-KAH usage
 
-This contract may be used before KAH/KAB implementation for:
+This contract may be used after KAH 0.1.4 evidence and before full KAB runtime support for:
 
 - docs-only SOT drafts;
 - readiness audits;
 - review triage reports;
-- planned packet/report schema discussion;
+- KAS packet/report schema implementation discussion;
 - project-overlay or shared-KHS proposal wording;
 - stale/overclaim prevention.
 
-It must not be used before implementation evidence to claim:
+It must not be used before active KAS implementation evidence to claim:
 
-- validated KAH artifact creation;
-- KAH graph mutation or audit;
+- KAS-emitted validated KAH artifact creation;
+- KAS-controlled KAH graph mutation or audit beyond capability-checked proposal/apply evidence;
 - KAB backend execution completion;
 - automated different-tool review;
-- operational support for `EXTERNAL_FEEDBACK_INTAKE` min=1/max=5;
-- production-ready KHS runtime behavior.
+- active KAS support for `EXTERNAL_FEEDBACK_INTAKE` min=1/max=5;
+- production-ready KAS runtime behavior.
 
 ## 8. Minimal example
 
 ```yaml
-parsed_intent: "create KHS pre-KAH readiness docs for t_2e9d918a"
-current_status: candidate
+parsed_intent: "reset KAS docs to post-KAH authority for INITDOC-002"
+current_status: kah_evidenced_kas_integration_pending
 selected_lane: docs_only_sot
 execution_mode: docs_only
-external_feedback_child_completion:
-  status: candidate
+external_feedback_policy:
+  status: kah_evidenced_kas_integration_pending
   evidence: docs/sot/external-feedback-intake-policy.md
-whole_khs_pre_kah_readiness:
-  status: planned
+post_kah_kas_readiness:
+  status: ready_for_implementation_after_review
   evidence:
-    - docs/sot/khs-pre-kah-readiness-audit-2026-05.md
+    - docs/sot/initdoc-post-kah-reset.md
     - docs/sot/khs-delegation-packet-and-report-contract.md
 operational_runtime_support_readiness:
-  status: not_operational_support
-  kah_status: blocked_by_kah
+  status: not_runtime_support
+  kah_status: evidenced_substrate
   kab_status: kab_later
-blocked_by_kah:
-  - "artifact schema/validation/proposal/apply/audit evidence"
+kas_integration_pending:
+  - "registry/template/skill/report adoption and verification"
 kab_later:
   - "backend review transport and execution evidence"
 ```
@@ -210,8 +213,8 @@ kab_later:
 This contract is complete only when:
 
 - it is discoverable from `docs/README.md`;
-- it names its candidate/non-operational status;
-- it separates KHS, KAH, KAB, and Hermes/KHC responsibilities;
+- it names its post-KAH `current SOT` / `integration-pending` / `not_runtime_support` status;
+- it separates KAS/KHS, KAH, KAB, and Hermes/KHC responsibilities;
 - it preserves `t_fa8f17a3`, `t_2a151490`, and `t_2e9d918a` as bounded source ids;
 - it does not edit registries, templates, phase skills, KAH/KAB repos, or `.kkachi-workflow.yaml`;
 - final reporting includes changed files, diff summary, verification, and remaining risks.

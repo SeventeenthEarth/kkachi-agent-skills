@@ -11,6 +11,12 @@ Evidence/source paths: kanban task `t_caee9433` Blue confirmation, kanban task `
 
 ## Current state
 
+Post-KAH note: KAH 0.1.4 now advertises graph and configurable-feedback
+capabilities, while `capabilities --json` still reports `install_command=false`.
+Therefore KAS owns the CLIMVP install/list/doctor surface; KAH may provide
+project doctor, graph proposal/evidence, and deterministic project substrate,
+but KAH is not the skill-pack installer.
+
 KHS documentation already records the full KHS execution path as a KHS+KAH+KAB run path for code-changing KHS work. That remains valid for full Kkachi-governed execution-runtime use.
 
 The Blue-confirmed design direction in `t_caee9433`, following `t_3e6d8b89` and `t_1af0dc98`, adds a narrower lane: a KHS+KAH minimum/pilot harness where a future `kkachi-hermes-skills` CLI helps users install/profile-inject KHS skills, inspect installed state, compare/sync with explicit approval, and create/validate proposal/evidence records. This lane is not a runner or bridge controller.

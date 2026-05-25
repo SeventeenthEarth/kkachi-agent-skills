@@ -3,9 +3,9 @@
 Date: 2026-05-23
 Owner: KHS documentation archive
 Confirming role: Kanban `t_2e9d918a` Codex app-server soldier draft; Blue-inspected candidate with same-card Red/Gray/Orange ACCEPT gates before final synthesis
-Status: candidate readiness audit; not_operational_support
-Authority level: corrective pre-KAH status record and audit index; does not implement KAH or KAB support
-Scope: `kkachi-hermes-skills` docs-only readiness synthesis before KAH implementation work
+Status: historical/superseded pre-KAH readiness audit; preserved for lineage and overclaim prevention
+Authority level: historical pre-KAH status record; superseded for post-KAH KAS MVP planning by `docs/sot/initdoc-post-kah-reset.md` and active SOT updates
+Scope: `kkachi-hermes-skills` docs-only readiness synthesis before KAH 0.1.4 completion; no longer a blocker for post-KAH KAS MVP work
 Runtime note: this draft was requested with `openai_runtime=codex_app_server`; it is not KAB runtime evidence
 
 Related docs:
@@ -33,6 +33,13 @@ Evidence/source paths:
 - Hermes reference note: `/Users/draccoon/.hermes/skills/dogfood/kkachi-bridge-qa/references/kkachi-khs-pre-kah-readiness-completeness-audit-2026-05-23.md`
 
 ## 1. Decision summary
+
+Post-KAH supersession note: KAH 0.1.4 now advertises graph support and
+`workflow_graph_configurable_feedback_intake=true`. This audit remains useful to
+prevent overclaims, but its `blocked_by_kah` language must be read as historical
+unless the effective KAH binary for a run lacks the required capability. Current
+KAS work should use `kah-evidenced, kas-integration-pending` when KAH support is
+present but KAS registries/templates/skills/reports have not yet adopted it.
 
 KHS pre-KAH readiness must be reported in three separate lanes:
 
@@ -71,7 +78,7 @@ Use these labels precisely:
 | External-feedback child policy | `candidate`, scoped complete, `not_operational_support` | Keep child SOT and docs index clear that min=1/max=5 is target policy only. | Operational bounds validation, graph proposal/apply/audit, generated artifacts, and fail-closed runtime behavior are `blocked_by_kah`; automated different-tool review is `kab_later`. | `docs/sot/external-feedback-intake-policy.md`; `docs/sot/khs-architecture-and-integration.md` section 11 |
 | Whole KHS architecture | `candidate`, development base | Keep KHS as Delegation Packet + Evidence Loop + proposal-gated self-improvement; maintain boundaries and acceptance matrix. | Any implemented support claim from the architecture SOT alone is `not_operational_support`. | `docs/sot/khs-architecture-and-integration.md` |
 | Delegation Packet and report contract | `candidate`, split into child record by this task | Define packet/report fields, status labels, evidence paths, and fail-closed rules. | Emission, validation, KAH artifact persistence, and KAB runtime evidence are `blocked_by_kah` or `kab_later` until implemented. | `docs/sot/khs-delegation-packet-and-report-contract.md`; `docs/sot/khs-architecture-and-integration.md` sections 15-16 |
-| Workflow graph integration | `planned`, KAH graph command evidence is separately capability-gated | Keep `.kkachi-workflow.yaml` rules and KHS/KAH ownership clear; do not create graph files in this docs task. | Applied graph changes, checksum/audit evidence, graph-vs-run conflict handling, and missing support diagnostics are KAH-owned. | `docs/sot/workflow-graph-integration.md`; `docs/roadmap.md` graph epic |
+| Workflow graph integration | KAH-evidenced; KAS integration-pending | Keep `.kkachi-workflow.yaml` rules and KAS/KAH ownership clear; do not create graph files in this docs task. | KAS template registry, guidance, and evidence mapping remain roadmap work; KAH owns applied graph changes, checksum/audit evidence, graph-vs-run conflict handling, and diagnostics. | `docs/sot/workflow-graph-integration.md`; `docs/roadmap.md` graph epic |
 | Minimum/pilot CLI lane | Blue-confirmed lane split; implementation pending | Continue spec work for profile-scoped `list`, `install`, `doctor`, `sync`, and `proposal` support without runtime claims. | Actual CLI behavior, manifests, checksums, backup/recovery, and install/sync writes require implementation evidence. | `docs/sot/minimum-pilot-cli-lane.md`; `docs/roadmap.md` cli epic |
 | KHS activation and phase guidance | partial seed behavior with stale surfaces | Preserve activation boundaries and mark stale/conflicting guidance before support claims. | Registry/template/skill behavior changes are outside this task and may require KAH-compatible artifact validation. | `README.md`; `registries/phase-contracts.yaml`; `templates/run-artifacts/*.tmpl`; `skills/*/SKILL.md` |
 | Operator report clarity | `candidate` | Keep exact report fields, evidence paths, and boundary labels in SOT docs. | Machine emission and KAH/KAB-backed verification are blocked until implemented. | `docs/sot/khs-architecture-and-integration.md` section 16; `docs/sot/khs-delegation-packet-and-report-contract.md` |
@@ -94,7 +101,7 @@ These are safe as docs/candidate work when explicitly scoped:
 
 ### Blocked by KAH
 
-These must not be claimed as implemented until KAH evidence exists:
+In this historical audit, these were not claimable before KAH evidence. Post-KAH KAS work must now read them as integration-pending unless a current effective KAH check lacks the needed capability:
 
 - `EXTERNAL_FEEDBACK_INTAKE` schema, validation, explain, proposal, apply, audit, diagnostics, and compatibility evidence.
 - Generated and validated `phase-plan.yaml`, `checklist.md`, task-contract, report, and graph-vs-run conflict behavior.
@@ -144,8 +151,8 @@ whole_khs_pre_kah_readiness:
     - docs/sot/khs-delegation-packet-and-report-contract.md
 operational_runtime_support_readiness:
   status: blocked
-  support_label: not_operational_support
-  kah_status: blocked_by_kah
+  support_label: historical_not_operational_support
+  kah_status: historical_blocked_by_kah_or_current_unsupported_effective_kah
   kab_status: kab_later
 ```
 

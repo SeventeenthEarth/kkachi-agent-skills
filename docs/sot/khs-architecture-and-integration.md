@@ -1,11 +1,11 @@
-# KHS architecture, usage, and KAH integration SOT
+# KAS architecture, usage, and KAH integration SOT
 
 Date: 2026-05-23
-Owner: KHS workflow/policy layer
-Confirming role: Blue final synthesis after required Red, Orange, and Gray review
-Status: candidate SOT draft revised after required review; not an operational support claim
-Authority level: broad KHS architecture/usage/KAH-integration source of truth after review closure
-Scope: `kkachi-hermes-skills` architecture, repo layout, Hermes usage model, KHS/KAH/KAB/KHC boundaries, workflow policy, self-improvement governance, and development acceptance gates
+Owner: KAS workflow/policy layer
+Confirming role: Blue final synthesis after required Red, Orange, and Gray review; INITDOC post-KAH reset pass
+Status: current broad KAS architecture SOT; KAH 0.1.4 graph/configurable-feedback substrate evidenced; not a KAB runtime support claim
+Authority level: broad KAS architecture/usage/KAH-integration source of truth after INITDOC reset
+Scope: `kkachi-hermes-skills` architecture, repo layout, Hermes usage model, KAS/KAH/KAB/KHC boundaries, workflow policy, self-improvement governance, and development acceptance gates
 Related docs:
 - `README.md`
 - `docs/README.md`
@@ -21,8 +21,8 @@ Evidence/source paths:
 - Current draft review cards: Red `t_f94bca58`, Orange `t_8a3459c0`, Gray `t_29a6f341`; Teal skipped because no concrete UI/screen-flow surface was introduced
 - Post-revision Gray traceability card: `t_6c9ff793` (`REQUEST_CHANGES` for missing `registries/phase-contracts.yaml` stale-line inventory; addressed in this revision)
 - KAH support-plan closure lineage for external feedback intake: `t_ccf7beaf` -> `t_56c9688f` -> `t_9caf23c9` -> `t_dfe4db34`; Red closure verdict recorded as `RED_CLOSURE_ACCEPT`
-- KAH candidate support-plan path: `/Users/draccoon/Workspace/SeventeenthEarth/kkachi/kkachi-agent-helper/.docs/new-support.md` (candidate support evidence only; not implemented KAH capability evidence)
-- KHS direction reference: `/Users/draccoon/.hermes/skills/dogfood/hermes-team-operations/references/hermes-team-khs-direction-delegation-packet-evidence-loop-2026-05.md`
+- Historical KAH support-plan path: `/Users/draccoon/Workspace/SeventeenthEarth/kkachi/kkachi-agent-helper/.docs/new-support.md` (superseded by KAH 0.1.4 capability evidence for graph/configurable-feedback substrate; still useful for lineage)
+- KAS/KHS direction reference: `/Users/draccoon/.hermes/skills/dogfood/hermes-team-operations/references/hermes-team-khs-direction-delegation-packet-evidence-loop-2026-05.md`
 - Kkachi reference records used for source context:
   - `/Users/draccoon/.hermes/skills/dogfood/kkachi-bridge-qa/references/kkachi-khc-khs-kae-repo-extension-productization-2026-05-23.md`
   - `/Users/draccoon/.hermes/skills/dogfood/kkachi-bridge-qa/references/kkachi-khs-kah-minimum-profile-scoped-skill-injection-2026-05-23.md`
@@ -37,21 +37,21 @@ Evidence/source paths:
   - `/Users/draccoon/.hermes/skills/dogfood/kkachi-bridge-qa/references/kkachi-universal-agent-harness-coding-first-vertical-2026-05-23.md`
   - `/Users/draccoon/.hermes/skills/dogfood/kkachi-bridge-qa/references/kkachi-agent-evaluation-kae-design-2026-05-23.md`
 
-Record transition: prior readiness work recommended `docs/sot/external-feedback-intake-policy.md` for a narrower external-feedback policy record. The current parent scope corrected that this task needs the broader `docs/sot/khs-architecture-and-integration.md` SOT covering KHS usage, KAH connection, and repo structure. The external-feedback file remains a child/detail SOT, not a competing path.
+Record transition: prior readiness work recommended `docs/sot/external-feedback-intake-policy.md` for a narrower external-feedback policy record. INITDOC keeps this broader architecture file as the parent SOT for KAS usage, KAH connection, and repo structure. The external-feedback file remains a child/detail SOT, not a competing path.
 
 ## 1. Decision summary
 
-KHS is the Hermes skill/process layer for Kkachi-governed software development. It must not be treated as a broad static `SKILL.md` bundle or a toy self-improvement package.
+KAS is the Hermes skill/process layer for Kkachi-governed software development. The repository and older docs may still say KHS, but INITDOC treats KAS as the current canonical name. KAS must not be treated as a broad static `SKILL.md` bundle or a toy self-improvement package.
 
 The target definition is:
 
 ```text
-KHS = Delegation Packet + Evidence Loop + proposal-gated self-improvement system
+KAS = Delegation Packet + Evidence Loop + proposal-gated self-improvement system
 ```
 
-That means KHS turns a user request into a bounded, reviewable delegation packet for Hermes and backend workers, preserves evidence expectations across KAH and KAB, and routes lessons into run-local, project-overlay, or shared-KHS proposals only after review and approval.
+That means KAS turns a user request into a bounded, reviewable delegation packet for Hermes and backend workers, preserves evidence expectations across KAH and KAB, and routes lessons into run-local, project-overlay, or shared-KAS proposals only after review and approval.
 
-This document is a development base SOT. It defines the target architecture and gates for KHS development/modification. It does not claim that every target surface is currently implemented.
+This document is a current architecture SOT for post-KAH KAS development. It defines target architecture and gates, recognizes KAH 0.1.4 graph/configurable-feedback capability evidence, and still refuses unsupported KAS adoption or KAB runtime claims.
 
 ## 2. ASIS facts
 
@@ -59,12 +59,12 @@ Current repository facts and evidence checked during this drafting pass:
 
 - `README.md` already defines KHS as the prompt/process layer, KAH as deterministic state, and KAB as backend runtime/control.
 - `docs/README.md` defines the documentation authority ladder and marks `docs/sot/` as the durable authority lane.
-- `docs/sot/interface-contract.md` records the current KHS/KAH/KAB interface and reality-first rule: KHS must use surfaces that exist now, and record gaps instead of pretending future interfaces exist.
+- `docs/sot/interface-contract.md` records the current KAS/KAH/KAB interface and reality-first rule: KAS must use surfaces that exist now, and record gaps instead of pretending future interfaces exist.
 - `docs/sot/workflow-graph-integration.md` records `.kkachi-workflow.yaml` as project-level graph state only when backed by KAH graph evidence, while `phase-plan.yaml` remains run-local execution state/evidence.
 - `docs/sot/minimum-pilot-cli-lane.md` records a scoped KHS+KAH minimum/pilot lane for profile-scoped install/list/doctor/sync/proposal support, distinct from the full KHS+KAH+KAB execution-runtime lane.
-- `registries/phase-contracts.yaml`, run-artifact templates, and several phase skills still contain stale `1..3` / `maximum_rounds: 3` feedback-loop assumptions. These are known stale surfaces and must not be treated as support for the target `min=1, max=5` external feedback policy.
-- `EXTERNAL_FEEDBACK_INTAKE` does not currently appear as an implemented KHS support surface in the inspected repo search.
-- The KAH `.docs/new-support.md` external feedback intake plan reached Red closure as a candidate support plan, but that is not proof of implemented KAH schema/template/proposal/apply/audit support.
+- `registries/phase-contracts.yaml`, run-artifact templates, and several phase skills still contain stale `1..3` / `maximum_rounds: 3` feedback-loop assumptions. These are known stale KAS integration surfaces and must not be treated as active support for the target `min=1, max=5` external feedback policy.
+- KAH 0.1.4 capability evidence now advertises graph/configurable-feedback substrate support, but `EXTERNAL_FEEDBACK_INTAKE` still requires KAS registry/template/skill/report adoption before active KAS runs can label it implemented.
+- The KAH `.docs/new-support.md` external feedback intake plan is now historical lineage, not the current blocker.
 - The KHS repo had pre-existing dirty and untracked files before this draft was written. Observed status during review included `MM README.md`, `M docs/README.md`, several modified tracked docs/registries/skills/templates, and untracked `AGENTS.md`, `docs/roadmap.md`, `docs/sot/khs-architecture-and-integration.md`, `docs/sot/minimum-pilot-cli-lane.md`, and `docs/sot/workflow-graph-integration.md`. This draft should be reviewed in that context and must not overwrite unrelated work.
 
 ## 3. TOBE target
@@ -350,8 +350,8 @@ Known stale surfaces before support claim, confirmed by repository search during
 
 | Surface | Confirmed marker | Required status before support claim |
 |---|---|---|
-| `README.md:108` | `request-feedback(1..3) / handle-feedback(1..3)` | update to min=1/max=5 semantics or mark historical |
-| `registries/phase-contracts.yaml:72-73` | `minimum_rounds: 1`, `maximum_rounds: 3` | update registry only after KAH/KHS support evidence or mark stale/candidate |
+| `README.md:108` | Historical `request-feedback(1..3) / handle-feedback(1..3)` marker | updated by INITDOC-002 to min=1/max=5 semantics |
+| `registries/phase-contracts.yaml:72-73` | `minimum_rounds: 1`, `maximum_rounds: 3` | update registry in a KAS adoption task or keep marked stale/integration-pending |
 | `registries/phase-contracts.yaml:140` | `request_feedback_2/3 and handle_feedback_2/3 ... must not exceed round 3` | update to rounds 2..5 optional continuation or mark stale/candidate |
 | `registries/phase-contracts.yaml:202-203` | `conditional_feedback_rounds_2_to_3` | update to rounds 2..5 optional continuation or mark stale/candidate |
 | `registries/phase-contracts.yaml:222` | `Feedback must run at least once and at most three times` | update final checklist rule to min=1/max=5 semantics or mark stale/candidate |
@@ -372,16 +372,16 @@ Known stale surfaces before support claim, confirmed by repository search during
 | `skills/kkachi-request-feedback/SKILL.md:15` and `21` | never exceed three pairs; optional `feedback-2.md` / `feedback-3.md` only | update skill only through skill/change approval gates |
 | `skills/kkachi-handle-feedback/SKILL.md:21-22` | optional round 2/3 handling artifacts only | update skill only through skill/change approval gates |
 
-Operator impact: until these stale surfaces are fixed or explicitly marked historical, generated reports, checklists, and support labels must describe `min=1, max=5` external feedback intake as candidate/planned and must not present it as implemented runtime support.
+Operator impact: until these stale KAS surfaces are fixed or explicitly marked historical, generated reports, checklists, and support labels must describe `min=1, max=5` external feedback intake as `kah-evidenced, kas-integration-pending` and must not present it as implemented KAS runtime support.
 
-Required child record: `docs/sot/external-feedback-intake-policy.md` should be created before KHS claims operational support for external feedback intake. It should lock the detailed min=1/max=5 policy, negative tests, stale-surface remediation manifest, and verification evidence. That child SOT must reference this architecture SOT rather than replace it.
+Child record: `docs/sot/external-feedback-intake-policy.md` is the current detail SOT for configurable external feedback intake. It locks the min=1/max=5 policy, negative tests, stale-surface remediation manifest, and KAH/KAS/KAB evidence boundary. That child SOT references this architecture SOT rather than replacing it.
 
-Preconditions not yet met for an operational support claim:
+Preconditions not yet met for an active KAS support claim:
 
 - stale surface inventory above is remediated or marked historical with evidence;
-- KAH implementation evidence exists for graph/schema/template/proposal/apply/audit handling of external-feedback bounds;
+- KAS registry/template/skill/report adoption exists for the KAH-evidenced graph/configurable-feedback substrate;
 - KAB evidence exists before automated different-tool review is claimed;
-- operator report fields and allowed values in this SOT are implemented or clearly labeled candidate;
+- operator report fields and allowed values in this SOT are implemented or clearly labeled integration-pending;
 - verification results are recorded in the child SOT or a registry/manifest reviewed by the responsible roles.
 
 ## 12. Self-improvement governance
@@ -535,7 +535,7 @@ Minimum field contract:
 | `kah_graph_evidence.status` | `validated`, `explain_generated`, `not_available`, `unsupported`, `conflict_blocked` |
 | `phase_plan.status` | `created`, `loaded`, `validated`, `updated`, `missing_blocked`, `not_applicable`; include `phase_plan.path` |
 | `checklist.status` | `created`, `loaded`, `updated`, `validated`, `missing_blocked`, `not_applicable`; include `checklist.path` |
-| `feedback_rounds.bounds` | `min=1, max=5` for the target policy; label candidate/planned until stale surfaces and KAH evidence are closed |
+| `feedback_rounds.bounds` | `min=1, max=5` for the target policy; label `kah-evidenced, kas-integration-pending` until stale KAS surfaces are closed and active KAS adoption is verified |
 | `feedback_rounds.required` | `round_1` |
 | `feedback_rounds.optional` | `rounds_2_to_5_optional_continuation_only` |
 | `feedback_rounds.current` | current handled/requested round number, or `not_applicable` |
@@ -564,7 +564,7 @@ workflow_config:
 kah_graph_evidence:
   status: conflict_blocked
 feedback_rounds:
-  bounds: "min=1, max=5 (candidate/planned until stale surfaces close)"
+  bounds: "min=1, max=5 (kah-evidenced, kas-integration-pending until stale KAS surfaces close)"
   current: 1
   next_allowed_round: blocked
 next_stop_reason: blocked_by_stale_support
