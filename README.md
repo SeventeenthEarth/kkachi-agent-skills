@@ -56,24 +56,40 @@ backend runtime/control layer.
 
 ## Current CLI Surface
 
-CLIMVP-002 implements the read-only list surface:
+CLIMVP-003 implements the read-only list surface and dry-run install planner:
 
 ```bash
-bin/kkachi-hermes-skills list [--repo <path>] [--profile <profile>] [--category <name>] [--json]
+kkachi-hermes-skills list [--repo <path>] [--profile <profile>] [--category <name>] [--json]
+kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --dry-run [--json]
 ```
 
 `list` discovers source KAS packs from `skills/`, reports direct-layout packs
 as category `core`, supports future `skills/<category>/<skill>/SKILL.md`
 layouts, and can compare against a profile manifest at
 `~/.hermes/profiles/<profile>/.kas/skill-pack-manifest.json` without creating
-profile directories or files. `--profile-root <path>` is accepted only under
-the explicit test/harness guard `KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1`.
+profile directories or files.
+
+`install --dry-run` resolves source packs and target profile paths, validates
+manifest/checksum inputs, reports create/update/skip/conflict/error paths, emits
+a deterministic `dry_run_plan_hash`, and performs no profile writes. Approved
+copy install remains closed until CLIMVP-004; `--approve` fails closed in this
+release. The report states that KAB is not required for minimum dry-run planning,
+while full execution-runtime work remains KAB-gated.
+
+`--profile-root <path>` is accepted only under the explicit test/harness guard
+`KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1`.
 
 Verification for this surface is:
 
 ```bash
+go install ./cmd/kkachi-hermes-skills
 make test
 ```
+
+The Go module path is `github.com/SeventeenthEarth/kkachi-hermes-skills`.
+Local development installs use `go install ./cmd/kkachi-hermes-skills`; once
+versioned remotely, the natural install path is
+`go install github.com/SeventeenthEarth/kkachi-hermes-skills/cmd/kkachi-hermes-skills@<version>`.
 
 ## When KHS Should Trigger
 

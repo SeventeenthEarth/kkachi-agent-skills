@@ -1,18 +1,22 @@
 .PHONY: test test-prepare test-unit test-int test-e2e
 
-PYTHON ?= python3
-PYTHONPATH := src
+GOCACHE ?= /tmp/kkachi-hermes-skills-go-build
+GOPATH ?= /tmp/kkachi-hermes-skills-go-path
+export GOCACHE
+export GOPATH
 
 test-prepare:
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m compileall -q src tests
+	go test ./...
+	go vet ./...
+	go build -o /tmp/kkachi-hermes-skills-test-build ./cmd/kkachi-hermes-skills
 
 test-unit:
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m unittest tests.test_discovery
+	go test ./internal/skills/discovery ./internal/skills/install
 
 test-int:
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m unittest tests.test_cli_integration
+	go test ./internal/skills/cli
 
 test-e2e:
-	PYTHONPATH=$(PYTHONPATH) KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1 $(PYTHON) -m unittest tests.test_e2e_real_repo
+	go test ./tests/e2e
 
 test: test-prepare test-unit test-int test-e2e
