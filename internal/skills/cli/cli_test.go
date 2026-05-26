@@ -28,7 +28,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := stdout.String()
-			if !strings.Contains(out, "list") || !strings.Contains(out, "install") {
+			if !strings.Contains(out, "list") || !strings.Contains(out, "install") || !strings.Contains(out, "doctor") {
 				t.Fatalf("root help did not list available commands: %q", out)
 			}
 			if stderr.Len() != 0 {
@@ -39,7 +39,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 }
 
 func TestSubcommandHelpExitsZero(t *testing.T) {
-	for _, command := range []string{"list", "install"} {
+	for _, command := range []string{"list", "install", "doctor"} {
 		t.Run(command, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			code := Main([]string{command, "--help"}, &stdout, &stderr, nil)
@@ -53,6 +53,72 @@ func TestSubcommandHelpExitsZero(t *testing.T) {
 				t.Fatalf("expected help on stdout only, got stderr=%q", stderr.String())
 			}
 		})
+	}
+}
+
+func TestDoctorJSONHumanAndProfileRootGuard(t *testing.T) {
+	repo := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "alpha"), "Alpha")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"install", "--repo", repo, "--profile", "demo", "alpha", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("dry-run code=%d stderr=%s", code, stderr.String())
+	}
+	var dryRun map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &dryRun); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	evidence := dryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
+	code = Main([]string{"install", "--repo", repo, "--profile", "demo", "alpha", "--approve", evidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("approve code=%d stderr=%s", code, stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"doctor", "--repo", repo, "--profile", "demo", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("doctor code=%d stderr=%s", code, stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["command"] != "doctor" || payload["ok"] != true || payload["manifest"].(map[string]any)["state"] != "ok" {
+		t.Fatalf("unexpected doctor payload: %+v", payload)
+	}
+	kab := payload["kab"].(map[string]any)
+	if kab["required_for_minimum_cli"] != false || kab["required_for_execution_runtime"] != true {
+		t.Fatalf("unexpected KAB payload: %+v", payload)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"doctor", "--repo", repo, "--profile", "demo", "--profile-root", profileRoot, "--no-color"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("doctor human code=%d stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "상태:") || !strings.Contains(stdout.String(), "건강") || !strings.Contains(stdout.String(), "KAB") {
+		t.Fatalf("unexpected human output: %q", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"doctor", "--repo", repo, "--profile", "demo", "--profile-root", filepath.Join(t.TempDir(), "profile"), "--json"}, &stdout, &stderr, map[string]string{})
+	if code != 2 {
+		t.Fatalf("expected guard failure, got %d", code)
+	}
+	payload = map[string]any{}
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["diagnostics"].([]any)[0].(map[string]any)["code"] != "profile_root_override_rejected" {
+		t.Fatalf("unexpected guard payload: %+v", payload)
 	}
 }
 

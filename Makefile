@@ -11,7 +11,7 @@ test-prepare:
 	go build -o /tmp/kkachi-hermes-skills-test-build ./cmd/kkachi-hermes-skills
 
 test-unit:
-	go test ./internal/skills/discovery ./internal/skills/install
+	go test ./internal/skills/discovery ./internal/skills/install ./internal/skills/doctor
 
 test-int:
 	go test ./internal/skills/cli
