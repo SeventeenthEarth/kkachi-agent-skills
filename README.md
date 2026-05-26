@@ -22,7 +22,8 @@ KHS now keeps two lanes distinct:
 
 1. KHS+KAH minimum/pilot harness lane
    - Scope: profile-scoped KHS skill-pack install/list/doctor/sync/proposal
-     support through a future thin `kkachi-hermes-skills` CLI.
+     support through the thin `kkachi-hermes-skills` CLI as each CLIMVP task
+     lands.
    - Purpose: let users pilot KHS skill injection and KAH evidence/proposal
      workflows without requiring KAB runtime readiness.
    - Non-goals: no `run` verb, backend session control, bridge control, KHC
@@ -52,6 +53,27 @@ KAB: kkachi-agent-bridge
 
 KHS is the prompt/process layer. KAH is the deterministic state layer. KAB is the
 backend runtime/control layer.
+
+## Current CLI Surface
+
+CLIMVP-002 implements the read-only list surface:
+
+```bash
+bin/kkachi-hermes-skills list [--repo <path>] [--profile <profile>] [--category <name>] [--json]
+```
+
+`list` discovers source KAS packs from `skills/`, reports direct-layout packs
+as category `core`, supports future `skills/<category>/<skill>/SKILL.md`
+layouts, and can compare against a profile manifest at
+`~/.hermes/profiles/<profile>/.kas/skill-pack-manifest.json` without creating
+profile directories or files. `--profile-root <path>` is accepted only under
+the explicit test/harness guard `KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1`.
+
+Verification for this surface is:
+
+```bash
+make test
+```
 
 ## When KHS Should Trigger
 
