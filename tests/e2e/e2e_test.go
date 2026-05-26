@@ -72,3 +72,41 @@ func TestRealRepoListAndInstallDryRunDoNotWriteProfile(t *testing.T) {
 		t.Fatalf("unexpected install payload: %+v", installPayload)
 	}
 }
+
+func TestRealRepoApprovedCopyWritesTempProfileOnly(t *testing.T) {
+	root := repoRoot(t)
+	binary := buildBinary(t)
+	profileRoot := filepath.Join(t.TempDir(), "profiles", "e2e")
+
+	dryRun := exec.Command(binary, "install", "--repo", root, "--profile", "e2e", "kkachi-plan", "--dry-run", "--profile-root", profileRoot, "--json")
+	dryRun.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	dryRunOut, err := dryRun.CombinedOutput()
+	if err != nil {
+		t.Fatalf("dry-run failed: %v\n%s", err, dryRunOut)
+	}
+	var dryRunPayload map[string]any
+	if err := json.Unmarshal(dryRunOut, &dryRunPayload); err != nil {
+		t.Fatal(err)
+	}
+	evidence := dryRunPayload["approval_request"].(map[string]any)["evidence_ref"].(string)
+
+	approve := exec.Command(binary, "install", "--repo", root, "--profile", "e2e", "kkachi-plan", "--approve", evidence, "--profile-root", profileRoot, "--json")
+	approve.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	approveOut, err := approve.CombinedOutput()
+	if err != nil {
+		t.Fatalf("approve failed: %v\n%s", err, approveOut)
+	}
+	var approvePayload map[string]any
+	if err := json.Unmarshal(approveOut, &approvePayload); err != nil {
+		t.Fatal(err)
+	}
+	if approvePayload["ok"] != true || approvePayload["mode"] != "approved_copy" {
+		t.Fatalf("unexpected approve payload: %+v", approvePayload)
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "kkachi-plan", "SKILL.md")); err != nil {
+		t.Fatalf("approved copy did not write expected skill: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")); err != nil {
+		t.Fatalf("approved copy did not write manifest: %v", err)
+	}
+}

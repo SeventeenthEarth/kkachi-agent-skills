@@ -308,6 +308,227 @@ func TestManifestParseUnknownPackSymlinkAndProfileFailures(t *testing.T) {
 	})
 }
 
+func TestApprovedInstallRejectsWrongHashAndWritesNothing(t *testing.T) {
+	base := t.TempDir()
+	repo := filepath.Join(base, "repo")
+	profileRoot := filepath.Join(base, "profile")
+	writeSkill(t, filepath.Join(repo, "skills", "alpha"), "")
+
+	result, err := ApplyApprovedInstall(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot}, "dry-run:sha256:wrong")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Diagnostics[0].Code != "approval_plan_hash_mismatch" {
+		t.Fatalf("unexpected approval result: %+v", result)
+	}
+	if _, err := os.Stat(profileRoot); !os.IsNotExist(err) {
+		t.Fatalf("wrong approval wrote profile root: %v", err)
+	}
+}
+
+func TestApprovedInstallCreateCopiesFilesAndWritesManifest(t *testing.T) {
+	base := t.TempDir()
+	repo := filepath.Join(base, "repo")
+	profileRoot := filepath.Join(base, "profile")
+	writeSkill(t, filepath.Join(repo, "skills", "alpha"), "# Skill\n\ncreated\n")
+	dryRun, err := BuildDryRun(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := ApplyApprovedInstall(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot}, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.Mode != "approved_copy" || result.Approval.DryRunPlanHash != dryRun.DryRunPlanHash || !result.Approval.MatchedCurrentPlan {
+		t.Fatalf("unexpected approved result: %+v", result)
+	}
+	target := filepath.Join(profileRoot, "skills", "alpha", "SKILL.md")
+	if string(mustRead(t, target)) != string(mustRead(t, filepath.Join(repo, "skills", "alpha", "SKILL.md"))) {
+		t.Fatalf("target was not copied from source")
+	}
+	if result.ManifestPath != filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json") || result.BackupPath == "" || result.Recovery.BackupPath != result.BackupPath {
+		t.Fatalf("missing manifest/backup/recovery: %+v", result)
+	}
+	if result.Summary.CountsByAction["manifest_update"] != 1 {
+		t.Fatalf("missing manifest_update count: %+v", result.Summary)
+	}
+	var manifest map[string]any
+	readJSONFile(t, result.ManifestPath, &manifest)
+	installs := manifest["installs"].([]any)
+	if len(installs) != 1 {
+		t.Fatalf("unexpected installs: %+v", installs)
+	}
+	entry := installs[0].(map[string]any)
+	if entry["pack_id"] != "alpha" || entry["install_id"] != result.InstallID || entry["dry_run_plan_hash"] != dryRun.DryRunPlanHash {
+		t.Fatalf("unexpected manifest entry: %+v", entry)
+	}
+	if entry["approved_plan_hash"] != dryRun.DryRunPlanHash || entry["approval_evidence_ref"] != dryRun.ApprovalRequest.EvidenceRef {
+		t.Fatalf("unexpected approval manifest entry: %+v", entry)
+	}
+	files := entry["files"].([]any)
+	if files[0].(map[string]any)["action"] != "create" || files[0].(map[string]any)["backup_relative_path"] != nil {
+		t.Fatalf("unexpected manifest files: %+v", files)
+	}
+}
+
+func TestApprovedInstallRejectsSymlinkedTargetParentAndWritesNothing(t *testing.T) {
+	base := t.TempDir()
+	repo := filepath.Join(base, "repo")
+	profileRoot := filepath.Join(base, "profile")
+	outside := filepath.Join(base, "outside")
+	writeSkill(t, filepath.Join(repo, "skills", "alpha"), "# Skill\n\ncreated\n")
+	if err := os.MkdirAll(filepath.Join(profileRoot, "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(profileRoot, "skills", "alpha")); err != nil {
+		t.Fatal(err)
+	}
+	dryRun, err := BuildDryRun(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !dryRun.OK || dryRun.ChangedPaths[0].Action != "create" {
+		t.Fatalf("test setup expected an approvable create plan: %+v", dryRun)
+	}
+
+	result, err := ApplyApprovedInstall(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot}, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Diagnostics[0].Code != "unsafe_target_path" {
+		t.Fatalf("expected symlink parent rejection, got: %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "SKILL.md")); !os.IsNotExist(err) {
+		t.Fatalf("approved install wrote through symlinked parent: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")); !os.IsNotExist(err) {
+		t.Fatalf("approved install wrote manifest after symlink rejection: %v", err)
+	}
+}
+
+func TestApprovedInstallUpdateBacksUpBeforeReplacingAndReplacesManifestEntry(t *testing.T) {
+	base := t.TempDir()
+	repo := filepath.Join(base, "repo")
+	profileRoot := filepath.Join(base, "profile")
+	writeSkill(t, filepath.Join(repo, "skills", "alpha"), "# Skill\n\nnew\n")
+	target := filepath.Join(profileRoot, "skills", "alpha", "SKILL.md")
+	oldBody := []byte("---\nname: Sample\n---\n# Skill\n\nold\n")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, oldBody, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldDigest := shaFile(t, target)
+	writeManifest(t, profileRoot, map[string]any{
+		"version": "0.1",
+		"kind":    "kas_profile_skill_manifest",
+		"installs": []map[string]any{
+			{"pack_id": "alpha", "target_path": "skills/alpha", "pack_checksum": "old-pack", "files": []map[string]any{{"relative_path": "SKILL.md", "sha256": oldDigest}}},
+			{"pack_id": "alpha", "target_path": "skills/alpha", "pack_checksum": "duplicate", "files": []map[string]any{{"relative_path": "SKILL.md", "sha256": oldDigest}}},
+			{"pack_id": "beta", "target_path": "skills/beta", "files": []map[string]any{}},
+		},
+	})
+	dryRun, err := BuildDryRun(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := ApplyApprovedInstall(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot}, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.Summary.CountsByAction["backup"] != 1 || result.Summary.CountsByAction["update"] != 1 {
+		t.Fatalf("unexpected update result: %+v", result)
+	}
+	backupPath := filepath.Join(profileRoot, result.ChangedPaths[0].BackupPath)
+	if string(mustRead(t, backupPath)) != string(oldBody) {
+		t.Fatalf("backup did not preserve old file")
+	}
+	if string(mustRead(t, target)) != string(mustRead(t, filepath.Join(repo, "skills", "alpha", "SKILL.md"))) {
+		t.Fatalf("target was not replaced")
+	}
+	var manifest map[string]any
+	readJSONFile(t, result.ManifestPath, &manifest)
+	installs := manifest["installs"].([]any)
+	if len(installs) != 2 {
+		t.Fatalf("expected duplicate alpha entries to be replaced by one current entry plus beta: %+v", installs)
+	}
+	alphaCount := 0
+	for _, raw := range installs {
+		entry := raw.(map[string]any)
+		if entry["pack_id"] == "alpha" {
+			alphaCount++
+			if entry["install_id"] != result.InstallID {
+				t.Fatalf("alpha manifest entry was not replaced: %+v", entry)
+			}
+			files := entry["files"].([]any)
+			backupRel := files[0].(map[string]any)["backup_relative_path"].(string)
+			if !contains(backupRel, result.InstallID) || contains(backupRel, "dry-run") {
+				t.Fatalf("manifest used wrong backup path: %+v", files[0])
+			}
+		}
+	}
+	if alphaCount != 1 {
+		t.Fatalf("expected one alpha entry, got %d in %+v", alphaCount, installs)
+	}
+}
+
+func TestApprovedInstallRejectsConflictOrErrorPlanAndWritesNothing(t *testing.T) {
+	t.Run("conflict", func(t *testing.T) {
+		base := t.TempDir()
+		repo := filepath.Join(base, "repo")
+		profileRoot := filepath.Join(base, "profile")
+		writeSkill(t, filepath.Join(repo, "skills", "alpha"), "")
+		target := filepath.Join(profileRoot, "skills", "alpha", "SKILL.md")
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, []byte("local"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		before := shaFile(t, target)
+		dryRun, err := BuildDryRun(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot})
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := ApplyApprovedInstall(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot}, dryRun.ApprovalRequest.EvidenceRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.OK || result.Diagnostics[0].Code != "install_plan_not_approvable" || shaFile(t, target) != before {
+			t.Fatalf("unexpected conflict approval result: %+v", result)
+		}
+		if _, err := os.Stat(filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")); !os.IsNotExist(err) {
+			t.Fatalf("conflict wrote manifest: %v", err)
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		base := t.TempDir()
+		repo := filepath.Join(base, "repo")
+		profileRoot := filepath.Join(base, "profile")
+		writeSkill(t, filepath.Join(repo, "skills", "alpha"), "")
+		dryRun, err := BuildDryRun(repo, Options{Profile: "demo", PackIDs: []string{"missing"}, ProfileRoot: profileRoot})
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := ApplyApprovedInstall(repo, Options{Profile: "demo", PackIDs: []string{"missing"}, ProfileRoot: profileRoot}, dryRun.ApprovalRequest.EvidenceRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.OK || result.Diagnostics[0].Code != "install_plan_not_approvable" {
+			t.Fatalf("unexpected error approval result: %+v", result)
+		}
+		if _, err := os.Stat(profileRoot); !os.IsNotExist(err) {
+			t.Fatalf("error approval wrote profile root: %v", err)
+		}
+	})
+}
+
 func hashCanonical(t *testing.T, value any) string {
 	t.Helper()
 	data, err := json.Marshal(value)
@@ -334,4 +555,21 @@ func stringContains(value, needle string) bool {
 		}
 	}
 	return false
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func readJSONFile(t *testing.T, path string, value any) {
+	t.Helper()
+	data := mustRead(t, path)
+	if err := json.Unmarshal(data, value); err != nil {
+		t.Fatal(err)
+	}
 }

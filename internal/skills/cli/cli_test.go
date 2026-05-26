@@ -134,15 +134,55 @@ func TestInstallDryRunJSONAndFailClosedGuards(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	code = Main([]string{"install", "--repo", repo, "--profile", "demo", "alpha", "--approve", "dry-run:sha256:test", "--json"}, &stdout, &stderr, nil)
+	code = Main([]string{"install", "--repo", repo, "--profile", "demo", "alpha", "--approve", "dry-run:sha256:test", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
 	if code != 2 {
-		t.Fatalf("expected approve failure, got %d", code)
+		t.Fatalf("expected approve hash failure, got %d", code)
 	}
 	payload = map[string]any{}
 	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload["diagnostics"].([]any)[0].(map[string]any)["code"] != "approved_install_not_implemented" {
+	if payload["diagnostics"].([]any)[0].(map[string]any)["code"] != "approval_plan_hash_mismatch" {
 		t.Fatalf("unexpected approve payload: %+v", payload)
+	}
+	if _, err := os.Stat(profileRoot); !os.IsNotExist(err) {
+		t.Fatalf("wrong approval wrote profile root: %v", err)
+	}
+}
+
+func TestInstallApprovedCopyJSON(t *testing.T) {
+	repo := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "alpha"), "Alpha")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"install", "--repo", repo, "--profile", "demo", "alpha", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("dry-run code=%d stderr=%s", code, stderr.String())
+	}
+	var dryRun map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &dryRun); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	evidence := dryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
+	code = Main([]string{"install", "--repo", repo, "--profile", "demo", "alpha", "--approve", evidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("approve code=%d stderr=%s", code, stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	approval := payload["approval"].(map[string]any)
+	counts := payload["summary"].(map[string]any)["counts_by_action"].(map[string]any)
+	if payload["mode"] != "approved_copy" || approval["dry_run_plan_hash"] != dryRun["dry_run_plan_hash"] || approval["approved_plan_hash"] != dryRun["dry_run_plan_hash"] {
+		t.Fatalf("unexpected approved payload: %+v", payload)
+	}
+	if counts["manifest_update"].(float64) != 1 || payload["manifest_path"] == "" || payload["recovery"] == nil {
+		t.Fatalf("missing manifest/recovery payload: %+v", payload)
 	}
 }

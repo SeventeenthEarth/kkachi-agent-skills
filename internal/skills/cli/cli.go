@@ -89,11 +89,10 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "install", *jsonOutput, "")
 	}
-	if *approve != "" {
-		return emitError(stderr, "approved_install_not_implemented", "approved copy install is not implemented until CLIMVP-004; rerun with --dry-run only.", "install", *jsonOutput, "Use install --dry-run for CLIMVP-003. Approved writes remain closed until CLIMVP-004.")
-	}
 	if !*dryRun {
-		return emitError(stderr, "install_requires_dry_run_or_approve", "install requires --dry-run; approved writes are not implemented until CLIMVP-004.", "install", *jsonOutput, "Rerun with install --profile <profile> <pack-id>... --dry-run.")
+		if *approve == "" {
+			return emitError(stderr, "install_requires_dry_run_or_approve", "install requires --dry-run or --approve dry-run:<hash>.", "install", *jsonOutput, "Rerun with install --profile <profile> <pack-id>... --dry-run.")
+		}
 	}
 	if *profile == "" {
 		return emitError(stderr, "profile_required", "install requires --profile <profile>.", "install", *jsonOutput, "")
@@ -103,7 +102,13 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 		return emitError(stderr, "pack_id_required", "install requires at least one pack id.", "install", *jsonOutput, "")
 	}
 
-	result, err := install.BuildDryRun(*repo, install.Options{Profile: *profile, PackIDs: packIDs, ProfileRoot: *profileRoot})
+	var result install.Result
+	var err error
+	if *approve != "" {
+		result, err = install.ApplyApprovedInstall(*repo, install.Options{Profile: *profile, PackIDs: packIDs, ProfileRoot: *profileRoot}, *approve)
+	} else {
+		result, err = install.BuildDryRun(*repo, install.Options{Profile: *profile, PackIDs: packIDs, ProfileRoot: *profileRoot})
+	}
 	if err != nil {
 		return emitError(stderr, "discovery_failed", err.Error(), "install", *jsonOutput, "")
 	}
@@ -115,6 +120,8 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 	}
 	if *jsonOutput {
 		_ = writeJSON(out, result)
+	} else if result.Mode == "approved_copy" {
+		fmt.Fprintln(out, install.RenderHumanApproved(result))
 	} else {
 		fmt.Fprintln(out, install.RenderHumanDryRun(result))
 	}
