@@ -149,8 +149,8 @@ Implementation remains gated by each later task's responsible approver authoriza
 ## Open questions
 
 - `.kkachi/` repo policy is closed by BOOTSTRAP-003: generated `.kkachi/` files are ignored local KAH/operator state; `docs/kkachi-docs-map.yaml` is committed repo-visible KAH metadata.
-- CLIMVP manifest/checksum file format is specified by `docs/sot/kas-cli-contract.md`; implementation remains CLIMVP-002 through CLIMVP-005 work.
-- Exact backup/rollback implementation for approved profile install remains CLIMVP-004 work.
+- CLIMVP manifest/checksum file format is specified by `docs/sot/kas-cli-contract.md`; `CLIMVP-001` through `CLIMVP-005` are implemented and closed.
+- Approved profile install backup/recovery behavior is implemented for CLIMVP; future `sync` recovery behavior remains separately gated.
 - Exact KAS graph template registry schema remains GRAPHMVP-001 work.
 - Exact KAS artifact mapping for KAH proposal, audit, checksum, and event evidence remains GRAPHMVP-004 work.
 - KAB alignment requires a separately assigned KAB docs/update task.

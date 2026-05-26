@@ -110,9 +110,9 @@ The safe minimum user path is:
 ## Resolved decisions and open questions
 
 - CLIMVP-001 resolved the minimum manifest/checksum contract for profile installs in `docs/sot/kas-cli-contract.md`, including SHA-256 file and pack checksums, dry-run plan hashes, approved-plan matching, changed-path categories, and the recommended profile metadata path.
-- Exact backup/rollback implementation details for approved `install` remain CLIMVP-004 work under the CLIMVP-001 contract; exact backup/rollback behavior for future `sync` remains separately gated.
+- Approved `install` backup/recovery behavior is implemented under CLIMVP-004 for the profile-scoped minimum lane; exact backup/rollback behavior for future `sync` remains separately gated.
 - Exact `proposal` CLI arguments and mapping to KAH proposal/evidence paths remain future implementation design.
 
 ## Next record action
 
-Update implementation tasks one at a time. CLIMVP-001 is accepted in `docs/sot/kas-cli-contract.md`; the next implementation task is CLIMVP-002 `list`. `install --dry-run`, approved copy install, and `doctor` follow as CLIMVP-003 through CLIMVP-005. `sync` and broad `proposal` remain gated until their fail-closed behavior is specified and reviewed.
+CLIMVP-001 through CLIMVP-005 are implemented and closed for the profile-scoped minimum CLI lane. Future implementation tasks should proceed one at a time from the remaining roadmap rows; `sync` and broad `proposal` remain gated until their fail-closed behavior is specified and reviewed.

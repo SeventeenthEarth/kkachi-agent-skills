@@ -56,11 +56,13 @@ backend runtime/control layer.
 
 ## Current CLI Surface
 
-CLIMVP-003 implements the read-only list surface and dry-run install planner:
+CLIMVP implements the profile-scoped minimum CLI surface:
 
 ```bash
 kkachi-hermes-skills list [--repo <path>] [--profile <profile>] [--category <name>] [--json]
 kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --dry-run [--json]
+kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --approve dry-run:<hash> [--json]
+kkachi-hermes-skills doctor [--repo <path>] --profile <profile> [--project <path>] [--json]
 ```
 
 `list` discovers source KAS packs from `skills/`, reports direct-layout packs
@@ -72,9 +74,15 @@ profile directories or files.
 `install --dry-run` resolves source packs and target profile paths, validates
 manifest/checksum inputs, reports create/update/skip/conflict/error paths, emits
 a deterministic `dry_run_plan_hash`, and performs no profile writes. Approved
-copy install remains closed until CLIMVP-004; `--approve` fails closed in this
-release. The report states that KAB is not required for minimum dry-run planning,
-while full execution-runtime work remains KAB-gated.
+copy install requires `--approve dry-run:<hash>`, recomputes the plan, fails
+closed on hash mismatch, copies selected packs into the target profile, records
+manifest/checksum evidence, and prints recovery guidance.
+
+`doctor` verifies source pack integrity, installed profile state,
+manifest/checksum consistency, KAH availability/version/capabilities, optional
+project bootstrap/doctor status, and the KAB boundary for the requested lane.
+KAB is not required for this profile-scoped minimum CLI lane, while full
+execution-runtime work remains KAB-gated.
 
 `--profile-root <path>` is accepted only under the explicit test/harness guard
 `KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1`.

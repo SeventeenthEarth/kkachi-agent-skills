@@ -22,7 +22,7 @@ This directory separates durable KAS/KHS sources of truth from working discussio
 | `sot/phase-orchestration-policy.md` | Current KHS phase/run orchestration policy | Authoritative for run-local phase behavior |
 | `sot/workflow-graph-integration.md` | Current KAS/KAH graph integration SOT | Confirmed KAS/KAH ownership and evidence rules for implemented KAH 0.1.4 `kkachi-agent-helper graph`; KAS template registry/guidance work remains integration-pending and `kah graph` alias stays separately gated |
 | `sot/minimum-pilot-cli-lane.md` | Blue-confirmed KHS+KAH minimum/pilot CLI lane SOT | Confirmed lane split and safety constraints for profile-scoped install/list/doctor/sync/proposal support; does not replace full KHS+KAH+KAB execution-runtime authority |
-| `sot/kas-cli-contract.md` | CLIMVP-001 KAS minimum CLI contract SOT | Accepted command-surface and manifest/checksum contract for profile-scoped `list`, `install --dry-run`, approved copy install, and `doctor`; `list` and `install --dry-run` are implemented, while approved copy install and `doctor` remain CLIMVP-004/005 |
+| `sot/kas-cli-contract.md` | CLIMVP-001 KAS minimum CLI contract SOT | Accepted command-surface and manifest/checksum contract for profile-scoped `list`, `install --dry-run`, approved copy install, and `doctor`; CLIMVP-001 through CLIMVP-005 are implemented and closed, while `sync` and broad `proposal` remain gated future surfaces |
 | `sot/concept.md` | KHS concept SOT | Durable background; not changed by this graph docs pass |
 | `sot/architecture-understanding.md` | KHS architecture understanding | Durable background; not changed by this graph docs pass |
 | `sot/skill-template.md` | Skill template guidance | Durable background; not changed by this graph docs pass |
@@ -44,7 +44,7 @@ Durable source-of-truth documents for KHS behavior, architecture, and skill desi
 - `sot/interface-contract.md`
 - `sot/workflow-graph-integration.md` — current SOT for `.kkachi-workflow.yaml` / capability-checked KAH 0.1.4 `kkachi-agent-helper graph` integration; KAS templates/guidance remain integration-pending and `kah graph` alias remains candidate until separately evidenced
 - `sot/minimum-pilot-cli-lane.md` — Blue-confirmed SOT for the KHS+KAH minimum/pilot CLI lane; keeps profile-scoped install/list/doctor/sync/proposal support separate from full KHS+KAH+KAB execution-runtime authority
-- `sot/kas-cli-contract.md` — CLIMVP-001 accepted SOT for KAS-owned `list`, `install --dry-run`, approved copy install, and `doctor`; records manifest/checksum, changed-path, approval, backup/recovery, status vocabulary, and fail-closed boundaries while approved copy install and `doctor` remain later CLIMVP work
+- `sot/kas-cli-contract.md` — CLIMVP-001 accepted SOT for KAS-owned `list`, `install --dry-run`, approved copy install, and `doctor`; records manifest/checksum, changed-path, approval, backup/recovery, status vocabulary, and fail-closed boundaries for the now-closed CLIMVP surface
 
 ## `roadmap.md`
 
@@ -87,7 +87,7 @@ A discussion note becomes SOT only after the decision is reflected in the releva
 - KAS owns graph templates, policy selection, phase applicability, proposal content, and skill/CLI adoption work.
 - KAH owns deterministic validation/write/apply/diff/audit behavior for evidenced `kkachi-agent-helper graph` surfaces; KAH 0.1.4 also advertises configurable external-feedback intake capability, while KAS adoption remains integration-pending.
 - The KHS+KAH minimum/pilot CLI lane is limited to profile-scoped install/list/doctor/sync/proposal support and does not claim KHC, Doksuri, KAB run/control, or bridge-runtime authority.
-- `sot/kas-cli-contract.md` is the accepted CLIMVP-001 contract for KAS-owned profile-scoped `list`, `install --dry-run`, approved copy install, and `doctor`; current implementation evidence covers `list` and `install --dry-run`, while approved copy install and `doctor` remain future CLIMVP work.
+- `sot/kas-cli-contract.md` is the accepted CLIMVP-001 contract for KAS-owned profile-scoped `list`, `install --dry-run`, approved copy install, and `doctor`; implementation evidence now covers the full CLIMVP surface, while `sync` and broad `proposal` remain future gated work.
 - KAB remains backend/session/plan evidence, not graph policy authority.
 - Kkachi v2 `.kkachi/config/workflows/` is out of KAH/KHS graph scope and has no fallback/merge relationship with `.kkachi-workflow.yaml`.
 
