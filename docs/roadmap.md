@@ -93,7 +93,7 @@ Deferred from CLIMVP unless separately approved: `sync`, broad `proposal`, symli
 
 | Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
 |---|---|---|---|---|
-| GRAPHMVP-001 | Define KAS graph template registry schema | Planned | A registry/spec defines template id rules, template file paths, owner metadata, versioning, required phases, edges, gates, approvals, feedback-intake bounds, compatibility requirements, and KAH validation expectations. | Docs/registry task. Verification includes schema/readback checks and examples for valid and invalid template metadata. |
+| GRAPHMVP-001 | Define KAS graph template registry schema | Completed | A registry/spec defines template id rules, template file paths, owner metadata, versioning, required phases, edges, gates, approvals, feedback-intake bounds, compatibility requirements, and KAH validation expectations. | Completed by `docs/sot/graph-template-registry.md`, `registries/graph-template-registry.yaml`, and valid/invalid examples; team review via 하후연/여몽/진궁 Kanban completed. |
 | GRAPHMVP-002 | Add default KAS workflow graph template | Planned | A default template can initialize `.kkachi-workflow.yaml` through `kkachi-agent-helper graph init --from-template`; it encodes the current KAS MVP phase path without direct YAML fallback or `init --profile`. | Verification includes KAH capability/help check, `graph init` in a temp repo, `graph validate`, `graph explain`, and preservation of generated checksum/evidence. |
 | GRAPHMVP-003 | Add capability-checked graph guidance to KAS orchestration | Planned | KAS guidance checks effective `kkachi-agent-helper graph` support before graph use; if missing, stale, or unsupported, it records a gap and fails closed instead of pretending commands exist. | Verification includes docs/skill readback, stale `kah graph` alias guard, missing-capability examples, and no direct `.kkachi-workflow.yaml` fallback instructions. |
 | GRAPHMVP-004 | Define graph evidence preservation in run artifacts/reports | Planned | KAS report/artifact guidance names template id/path, proposal id/path, semantic diff, validation report, approval/audit evidence, graph checksum/version, KAH graph audit event ids, and capability-check evidence when graph changes affect a run. | Verification includes template/report examples and compatibility with `docs/sot/workflow-graph-integration.md`. |
@@ -151,10 +151,10 @@ Implementation remains gated by each later task's responsible approver authoriza
 - `.kkachi/` repo policy is closed by BOOTSTRAP-003: generated `.kkachi/` files are ignored local KAH/operator state; `docs/kkachi-docs-map.yaml` is committed repo-visible KAH metadata.
 - CLIMVP manifest/checksum file format is specified by `docs/sot/kas-cli-contract.md`; `CLIMVP-001` through `CLIMVP-005` are implemented and closed.
 - Approved profile install backup/recovery behavior is implemented for CLIMVP; future `sync` recovery behavior remains separately gated.
-- Exact KAS graph template registry schema remains GRAPHMVP-001 work.
+- KAS graph template registry schema is defined by `docs/sot/graph-template-registry.md`; exact default template content remains GRAPHMVP-002 work.
 - Exact KAS artifact mapping for KAH proposal, audit, checksum, and event evidence remains GRAPHMVP-004 work.
 - KAB alignment requires a separately assigned KAB docs/update task.
 
 ## Next record action
 
-INITDOC, BOOTSTRAP, and `CLIMVP-001` through `CLIMVP-005` are completed with the Go module path `github.com/SeventeenthEarth/kkachi-hermes-skills`. The next implementation slice should come from the remaining roadmap rows unless 주군 chooses a different priority.
+INITDOC, BOOTSTRAP, `CLIMVP-001` through `CLIMVP-005`, and `GRAPHMVP-001` are completed with the Go module path `github.com/SeventeenthEarth/kkachi-hermes-skills`. The next implementation slice should come from `GRAPHMVP-002` unless 주군 chooses a different priority.

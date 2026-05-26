@@ -1,0 +1,34 @@
+# Invalid by design. Do not add this entry to registries/graph-template-registry.yaml.
+id: "KAS Default Workflow"
+path: ../.kkachi-workflow.yaml
+version: latest
+status: implemented
+owner:
+  team: blue
+summary: Invalid example showing expected rejection cases.
+compatibility:
+  kah_min_version: 0.1.4
+  required_capabilities:
+    - kah graph
+phases:
+  - id: plan
+    applicability: required
+edges:
+  - from: plan
+    to: missing_phase
+    type: sequence
+gates: []
+approvals: []
+feedback_intake:
+  policy_key: EXTERNAL_FEEDBACK_INTAKE
+  min_rounds: 1
+  max_rounds: 3
+  round_1_required: false
+  optional_continuation_rounds:
+    - 2
+    - 3
+  five_rounds_mandatory: true
+validation_expectations:
+  direct_yaml_fallback_allowed: true
+evidence_contract:
+  preserve: []

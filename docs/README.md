@@ -21,6 +21,7 @@ This directory separates durable KAS/KHS sources of truth from working discussio
 | `sot/external-feedback-intake-policy.md` | KAH-evidenced policy SOT for configurable `EXTERNAL_FEEDBACK_INTAKE` bounds | KAH 0.1.4 advertises configurable feedback intake capability; KAS registry/template/skill adoption remains integration-pending; current MVP still uses user-supplied `feedback.md`; automated review-by-different-tool remains `kab_later` |
 | `sot/phase-orchestration-policy.md` | Current KHS phase/run orchestration policy | Authoritative for run-local phase behavior |
 | `sot/workflow-graph-integration.md` | Current KAS/KAH graph integration SOT | Confirmed KAS/KAH ownership and evidence rules for implemented KAH 0.1.4 `kkachi-agent-helper graph`; KAS template registry/guidance work remains integration-pending and `kah graph` alias stays separately gated |
+| `sot/graph-template-registry.md` | Current KAS graph template registry schema SOT | Defines graph template id/path/version/owner metadata, phase/edge/gate/approval/feedback-intake fields, KAH validation expectations, and registry evidence requirements; template instances remain future GRAPHMVP work |
 | `sot/minimum-pilot-cli-lane.md` | Blue-confirmed KHS+KAH minimum/pilot CLI lane SOT | Confirmed lane split and safety constraints for profile-scoped install/list/doctor/sync/proposal support; does not replace full KHS+KAH+KAB execution-runtime authority |
 | `sot/kas-cli-contract.md` | CLIMVP-001 KAS minimum CLI contract SOT | Accepted command-surface and manifest/checksum contract for profile-scoped `list`, `install --dry-run`, approved copy install, and `doctor`; CLIMVP-001 through CLIMVP-005 are implemented and closed, while `sync` and broad `proposal` remain gated future surfaces |
 | `sot/concept.md` | KHS concept SOT | Durable background; not changed by this graph docs pass |
@@ -43,6 +44,7 @@ Durable source-of-truth documents for KHS behavior, architecture, and skill desi
 - `sot/phase-orchestration-policy.md`
 - `sot/interface-contract.md`
 - `sot/workflow-graph-integration.md` — current SOT for `.kkachi-workflow.yaml` / capability-checked KAH 0.1.4 `kkachi-agent-helper graph` integration; KAS templates/guidance remain integration-pending and `kah graph` alias remains candidate until separately evidenced
+- `sot/graph-template-registry.md` — current GRAPHMVP-001 SOT for graph template registry metadata and schema expectations; active registry file is `registries/graph-template-registry.yaml`
 - `sot/minimum-pilot-cli-lane.md` — Blue-confirmed SOT for the KHS+KAH minimum/pilot CLI lane; keeps profile-scoped install/list/doctor/sync/proposal support separate from full KHS+KAH+KAB execution-runtime authority
 - `sot/kas-cli-contract.md` — CLIMVP-001 accepted SOT for KAS-owned `list`, `install --dry-run`, approved copy install, and `doctor`; records manifest/checksum, changed-path, approval, backup/recovery, status vocabulary, and fail-closed boundaries for the now-closed CLIMVP surface
 
@@ -97,7 +99,7 @@ Older wording that calls `phase-plan.yaml` the whole workflow SOT must be read n
 
 ## Open questions
 
-- Exact KAS template registry format for graph generation remains roadmap work.
+- KAS graph template registry format is defined by `sot/graph-template-registry.md`; exact default template content remains GRAPHMVP-002 work.
 - Exact KAS artifact mapping for KAH graph proposal paths, checksums, and audit event ids remains roadmap work; KAH graph proposal/apply and configurable-feedback capability are evidenced, but KAS adoption still requires registry/template/skill/report updates.
 - KAB alignment requires separate KAB docs work and is non-authoritative here.
 

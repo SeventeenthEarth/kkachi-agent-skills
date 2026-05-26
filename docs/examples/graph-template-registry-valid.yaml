@@ -1,0 +1,122 @@
+id: kas-default-workflow
+path: templates/workflow-graphs/kas-default-workflow.yaml
+version: 0.1.0
+status: candidate
+owner:
+  team: blue
+  role: hwangchung
+  reviewers:
+    - hahuyeon
+    - yeomong
+    - jingung
+summary: Default KAS workflow graph template candidate for GRAPHMVP-002.
+compatibility:
+  kah_min_version: 0.1.4
+  required_capabilities:
+    - kkachi-agent-helper graph init --from-template
+    - kkachi-agent-helper graph validate
+    - kkachi-agent-helper graph explain
+    - kkachi-agent-helper graph diff
+    - kkachi-agent-helper graph propose
+    - kkachi-agent-helper graph apply
+    - kkachi-agent-helper graph export
+    - workflow_graph_configurable_feedback_intake
+phases:
+  - id: plan
+    applicability: required
+    owner_role: planner_backend
+    evidence_artifact: plan.md
+  - id: ask
+    applicability: required
+    owner_role: planner_backend_plus_hermes
+    evidence_artifact: ask.md
+  - id: implement
+    applicability: conditional
+    condition: development_or_docs_change_required
+    owner_role: implementer_backend
+    evidence_artifact: impl-log.md
+  - id: request_feedback
+    applicability: required
+    owner_role: feedback_backend
+    evidence_artifact: feedback-request.md
+  - id: handle_feedback
+    applicability: required
+    owner_role: implementer_backend
+    evidence_artifact: handle-feedback-1.md
+  - id: final_verify
+    applicability: required
+    owner_role: hwangchung
+    evidence_artifact: final-report.md
+edges:
+  - from: plan
+    to: ask
+    type: sequence
+  - from: ask
+    to: implement
+    type: conditional
+    condition: implementation_approved
+  - from: implement
+    to: request_feedback
+    type: sequence
+  - from: request_feedback
+    to: handle_feedback
+    type: feedback_loop
+    max_rounds: 5
+  - from: handle_feedback
+    to: final_verify
+    type: sequence
+gates:
+  - id: plan_gate
+    phase: plan
+    blocking: true
+    evidence_required:
+      - plan.md
+      - acceptance-criteria.md
+  - id: final_gate
+    phase: final_verify
+    blocking: true
+    evidence_required:
+      - verification.md
+      - final-report.md
+approvals:
+  - role: hwangchung
+    required_when: implementation_or_docs_mutation
+    evidence_required:
+      - ask.md
+      - plan.md
+feedback_intake:
+  policy_key: EXTERNAL_FEEDBACK_INTAKE
+  min_rounds: 1
+  max_rounds: 5
+  round_1_required: true
+  optional_continuation_rounds:
+    - 2
+    - 3
+    - 4
+    - 5
+  five_rounds_mandatory: false
+validation_expectations:
+  direct_yaml_fallback_allowed: false
+  required_kah_checks:
+    - graph validate
+    - graph explain
+  fail_closed_when:
+    - missing_effective_kah_graph_capability
+    - template_file_missing
+    - graph_validation_failed
+    - graph_run_artifact_conflict
+evidence_contract:
+  preserve:
+    - registry_version
+    - template_id
+    - template_path
+    - template_version
+    - owner_reviewer_metadata
+    - kah_capability_evidence
+    - validation_report_path
+    - explain_or_diff_output_path
+    - proposal_id_path
+    - approval_evidence_ref
+    - applied_graph_checksum_version
+    - kah_event_ids
+    - conflict_fail_closed_reason

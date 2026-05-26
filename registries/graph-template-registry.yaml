@@ -1,0 +1,67 @@
+registry_version: 0.1.0
+kind: kas_graph_template_registry
+status: schema_only
+owner:
+  team: blue
+  role: hwangchung
+authority:
+  sot: docs/sot/graph-template-registry.md
+  graph_integration_sot: docs/sot/workflow-graph-integration.md
+  phase_policy_sot: docs/sot/phase-orchestration-policy.md
+schema:
+  id_pattern: "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+  template_path_pattern: "^templates/workflow-graphs/[a-z][a-z0-9]*(?:-[a-z0-9]+)*\\.yaml$"
+  version_pattern: "^v?[0-9]+\\.[0-9]+\\.[0-9]+$"
+  allowed_statuses:
+    - candidate
+    - implemented
+    - deprecated
+    - unsupported
+  allowed_phase_applicability:
+    - required
+    - conditional
+    - optional
+    - not_applicable
+  allowed_edge_types:
+    - sequence
+    - conditional
+    - feedback_loop
+  required_template_fields:
+    - id
+    - path
+    - version
+    - status
+    - owner
+    - summary
+    - compatibility
+    - phases
+    - edges
+    - gates
+    - approvals
+    - feedback_intake
+    - validation_expectations
+    - evidence_contract
+kah_validation_expectations:
+  capability_check_required: true
+  required_commands:
+    - kkachi-agent-helper graph init --from-template
+    - kkachi-agent-helper graph validate
+    - kkachi-agent-helper graph explain
+    - kkachi-agent-helper graph diff
+    - kkachi-agent-helper graph propose
+    - kkachi-agent-helper graph apply
+    - kkachi-agent-helper graph export
+  direct_yaml_fallback_allowed: false
+  kah_graph_alias_authoritative: false
+feedback_intake_policy:
+  policy_key: EXTERNAL_FEEDBACK_INTAKE
+  min_rounds: 1
+  max_rounds: 5
+  round_1_required: true
+  optional_continuation_rounds:
+    - 2
+    - 3
+    - 4
+    - 5
+  five_rounds_mandatory: false
+templates: []
