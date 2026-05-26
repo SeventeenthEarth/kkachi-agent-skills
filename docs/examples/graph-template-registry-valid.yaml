@@ -1,5 +1,5 @@
-id: kas-default-workflow
-path: templates/workflow-graphs/kas-default-workflow.yaml
+id: kas-default
+path: templates/workflow-graphs/kas-default.yaml
 version: 0.1.0
 status: candidate
 owner:

@@ -159,7 +159,7 @@ Mermaid and PlantUML outputs are generated visualization artifacts only. They do
 
 ## Open questions
 
-- KAS graph template registry format is defined by `graph-template-registry.md`; exact default template content and KAH-applied instance validation remain GRAPHMVP follow-up work.
+- KAS graph template registry format and default template content are defined by `graph-template-registry.md`, `registries/graph-template-registry.yaml`, and `templates/workflow-graphs/kas-default.yaml`; KAS orchestration guidance remains GRAPHMVP-003 and artifact/report mapping remains GRAPHMVP-004.
 - Exact KAS mapping of KAH proposal paths, event ids, and checksum/version evidence into run artifacts remains KAS integration work; KAH graph proposal/apply surfaces are implemented.
 - KAB alignment with applied graph version is future/non-authoritative until a separate KAB docs update is assigned.
 

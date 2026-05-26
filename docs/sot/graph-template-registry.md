@@ -2,26 +2,26 @@
 
 Date: 2026-05-26
 Owner: KAS workflow/policy layer
-Status: current registry schema SOT for GRAPHMVP-001; template instances remain integration-pending until GRAPHMVP-002+
+Status: current registry and default template SOT through GRAPHMVP-002
 Authority level: KAS graph template registry schema and validation expectation record
-Scope: KAS docs/registry metadata only; no KAH code, KAB runtime, profile config, gateway, or direct `.kkachi-workflow.yaml` mutation
+Scope: KAS docs/registry metadata and default template asset only; no KAH code, KAB runtime, profile config, gateway, or direct real-project `.kkachi-workflow.yaml` mutation
 Related docs: `workflow-graph-integration.md`, `phase-orchestration-policy.md`, `external-feedback-intake-policy.md`, `../roadmap.md`
 
 ## Purpose
 
 The graph template registry lets KAS name, version, review, and select workflow graph templates before KAH deterministically initializes, validates, explains, proposes, applies, or audits graph state. KAS owns template policy and metadata. KAH owns graph-file validation, write/apply mechanics, checksum/version evidence, semantic diff, and audit events.
 
-GRAPHMVP-001 defines the registry schema only. GRAPHMVP-002 may add the first default workflow graph template. GRAPHMVP-003 may wire capability-checked guidance into KAS orchestration. GRAPHMVP-004 may expand run artifact/report preservation.
+GRAPHMVP-001 defined the registry schema. GRAPHMVP-002 adds the first default workflow graph template, `kas-default`, and verifies it through KAH graph init/validate/explain in an isolated temp repo. GRAPHMVP-003 may wire capability-checked guidance into KAS orchestration. GRAPHMVP-004 may expand run artifact/report preservation.
 
 ## File layout
 
 | Path | Meaning | Status |
 |---|---|---|
 | `registries/graph-template-registry.yaml` | Registry index and schema rules for graph templates | current schema registry |
-| `templates/workflow-graphs/<template-id>.yaml` | KAS-owned workflow graph template files named by registry entries | future template instances |
+| `templates/workflow-graphs/kas-default.yaml` | KAS-owned default workflow graph template named by the active registry entry | implemented by GRAPHMVP-002 |
 | `docs/examples/graph-template-registry-valid.yaml` | Positive metadata example for schema/readback checks | example only |
 | `docs/examples/graph-template-registry-invalid.yaml` | Negative metadata example documenting expected rejections | example only |
-| `.kkachi-workflow.yaml` | Project graph instance after KAH init/validate/apply evidence | not created by GRAPHMVP-001 |
+| `.kkachi-workflow.yaml` | Project graph instance after KAH init/validate/apply evidence | generated only in target/temp projects; ignored at repo root |
 
 KAS must never silently direct-edit `.kkachi-workflow.yaml` as fallback. Registry entries are allowed as template selection/proposal inputs only.
 
@@ -32,15 +32,19 @@ KAS must never silently direct-edit `.kkachi-workflow.yaml` as fallback. Registr
 ```yaml
 registry_version: 0.1.0
 kind: kas_graph_template_registry
-status: schema_only
+status: implemented
 schema:
   id_pattern: "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
   template_path_pattern: "^templates/workflow-graphs/[a-z][a-z0-9]*(?:-[a-z0-9]+)*\\.yaml$"
   version_pattern: "^v?[0-9]+\\.[0-9]+\\.[0-9]+$"
-templates: []
+templates:
+  - id: kas-default
+    path: templates/workflow-graphs/kas-default.yaml
+    version: 0.1.0
+    status: implemented
 ```
 
-`templates` remains empty until a later task adds accepted template instances. Example metadata in `docs/examples/` is not active registry content.
+`templates` contains the active `kas-default` entry after GRAPHMVP-002. Example metadata in `docs/examples/` remains example-only and is not active registry content.
 
 ## Template entry schema
 
@@ -133,7 +137,7 @@ kkachi-agent-helper graph apply
 kkachi-agent-helper graph export
 ```
 
-KAH validates graph instances, not this KAS registry by default. Until KAH or KAS adds a deterministic registry validator, GRAPHMVP-001 verification is docs/schema/readback plus YAML parse and example inspection. KAS guidance must fail closed rather than use a registry entry when the effective KAH binary lacks required capabilities, the template file is missing, the template graph fails KAH validation, or graph/runtime/run-local evidence conflicts.
+KAH validates graph instances, not this KAS registry by default. Until KAH or KAS adds a deterministic registry validator, registry verification is docs/schema/readback plus YAML parse, registry smoke checks, and template init/validate/explain evidence for implemented entries. KAS guidance must fail closed rather than use a registry entry when the effective KAH binary lacks required capabilities, the template file is missing, the template graph fails KAH validation, or graph/runtime/run-local evidence conflicts.
 
 ## Evidence contract
 
@@ -173,4 +177,4 @@ KAS must reject or mark unsupported:
 
 ## Next record action
 
-GRAPHMVP-002 may add a default KAS workflow graph template using this registry schema and verify it with capability-checked `kkachi-agent-helper graph init --from-template`, `graph validate`, and `graph explain` in a temporary repo.
+GRAPHMVP-002 adds `kas-default` using this registry schema and verifies it with capability-checked `kkachi-agent-helper graph init --from-template templates/workflow-graphs/kas-default.yaml`, `graph validate`, and `graph explain` in a temporary repo. The next task, GRAPHMVP-003, may add capability-checked orchestration guidance for using this template.

@@ -1,6 +1,6 @@
 registry_version: 0.1.0
 kind: kas_graph_template_registry
-status: schema_only
+status: implemented
 owner:
   team: blue
   role: hwangchung
@@ -64,4 +64,194 @@ feedback_intake_policy:
     - 4
     - 5
   five_rounds_mandatory: false
-templates: []
+templates:
+  - id: kas-default
+    path: templates/workflow-graphs/kas-default.yaml
+    version: 0.1.0
+    status: implemented
+    owner:
+      team: blue
+      role: hwangchung
+      reviewers:
+        - hahuyeon
+        - yeomong
+        - jingung
+    summary: Default KAS MVP workflow graph template for capability-checked KAH graph initialization.
+    compatibility:
+      kah_min_version: 0.1.4
+      required_capabilities:
+        - kkachi-agent-helper graph init --from-template
+        - kkachi-agent-helper graph validate
+        - kkachi-agent-helper graph explain
+        - kkachi-agent-helper graph diff
+        - kkachi-agent-helper graph propose
+        - kkachi-agent-helper graph apply
+        - kkachi-agent-helper graph export
+        - workflow_graph_configurable_feedback_intake
+    phases:
+      - id: intake
+        applicability: required
+        owner_role: hwangchung
+        evidence_artifact: intake-classification.md
+      - id: sot
+        applicability: required
+        owner_role: hwangchung
+        evidence_artifact: sot-basis.md
+      - id: roadmap
+        applicability: required
+        owner_role: hwangchung
+        evidence_artifact: roadmap-update.md
+      - id: plan
+        applicability: required
+        owner_role: planner_backend
+        evidence_artifact: plan.md
+      - id: ask
+        applicability: required
+        owner_role: planner_backend_plus_hwangchung
+        evidence_artifact: prompt.md
+      - id: implement
+        applicability: required
+        owner_role: implementer_backend
+        evidence_artifact: impl-log.md
+      - id: optimize
+        applicability: required
+        owner_role: implementer_backend
+        evidence_artifact: improvement-note.md
+      - id: request-feedback-1
+        applicability: required
+        owner_role: feedback_backend
+        evidence_artifact: feedback-request.md
+      - id: handle-feedback-1
+        applicability: required
+        owner_role: implementer_backend
+        evidence_artifact: handle-feedback-1.md
+      - id: review
+        applicability: required
+        owner_role: hahuyeon
+        evidence_artifact: review.md
+      - id: verify
+        applicability: required
+        owner_role: hwangchung
+        evidence_artifact: verification.md
+      - id: docs
+        applicability: required
+        owner_role: hwangchung
+        evidence_artifact: docs-update.md
+      - id: final
+        applicability: required
+        owner_role: hwangchung
+        evidence_artifact: final-report.md
+    edges:
+      - from: intake
+        to: sot
+        type: sequence
+      - from: sot
+        to: roadmap
+        type: sequence
+      - from: roadmap
+        to: plan
+        type: sequence
+      - from: plan
+        to: ask
+        type: sequence
+      - from: ask
+        to: implement
+        type: sequence
+      - from: implement
+        to: optimize
+        type: sequence
+      - from: optimize
+        to: request-feedback-1
+        type: sequence
+      - from: request-feedback-1
+        to: handle-feedback-1
+        type: sequence
+      - from: handle-feedback-1
+        to: review
+        type: sequence
+      - from: review
+        to: verify
+        type: sequence
+      - from: verify
+        to: docs
+        type: sequence
+      - from: docs
+        to: final
+        type: sequence
+    gates:
+      - id: final-gate
+        scope: final
+        blocking: true
+        evidence_required:
+          - intake-classification.md
+          - sot-basis.md
+          - roadmap-update.md
+          - plan.md
+          - impl-log.md
+          - review.md
+          - verification.md
+          - docs-update.md
+          - final-report.md
+        authority: hwangchung
+      - id: graph-validation-gate
+        scope: template
+        blocking: true
+        evidence_required:
+          - kah_graph_init_json
+          - kah_graph_validate_json
+          - kah_graph_explain_json
+          - graph_checksum
+        authority: kah
+    approvals:
+      - authority: hwangchung
+        trigger: graph_template_selection_or_registry_update
+        evidence_required:
+          - roadmap_task_id
+          - registry_entry_id
+          - KAH graph capability evidence
+      - authority: hahuyeon
+        trigger: safety_or_fail_closed_review
+        evidence_required:
+          - review verdict
+          - blocking findings disposition
+    feedback_intake:
+      policy_key: EXTERNAL_FEEDBACK_INTAKE
+      min_rounds: 1
+      max_rounds: 5
+      round_1_required: true
+      optional_continuation_rounds:
+        - 2
+        - 3
+        - 4
+        - 5
+      five_rounds_mandatory: false
+    validation_expectations:
+      graph_init_command: kkachi-agent-helper graph init --from-template templates/workflow-graphs/kas-default.yaml --json
+      graph_validate_command: kkachi-agent-helper graph validate --json
+      graph_explain_command: kkachi-agent-helper graph explain --json
+      direct_yaml_fallback_allowed: false
+      init_profile_allowed: false
+      kah_graph_alias_authoritative: false
+      temp_repo_verification_required: true
+      expected_phase_count: 13
+      expected_edge_count: 12
+      phase_path_note: Mirrors the KAH 0.1.4 built-in khs-default graph path; enhance-test remains a phase-contract policy concern until KAH graph schema exposes it as a separate phase.
+    evidence_contract:
+      preserve:
+        - registry_version
+        - template_id
+        - template_path
+        - template_version
+        - owner_reviewer_metadata
+        - kah_capability_evidence
+        - validation_report_path
+        - explain_or_diff_output_path
+        - proposal_id_path
+        - approval_evidence_ref
+        - applied_graph_checksum_version
+        - kah_graph_init_json
+        - kah_graph_validate_json
+        - kah_graph_explain_json
+        - graph_checksum
+        - kah_event_ids
+        - conflict_fail_closed_reason
