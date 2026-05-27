@@ -149,7 +149,7 @@ templates, phase skills, or `.kkachi-workflow.yaml` in this preparation task.
 
 | Surface | ASIS | TOBE target | Current post-KAH status | Remaining KAS work | Verification evidence |
 |---|---|---|---|---|---|
-| `README.md:108` | `request-feedback(1..3)` and `handle-feedback(1..3)` run shape | Document min=1/max=5 with required round 1 and optional rounds 2..5 | Updated by INITDOC-002 in repository README | Remaining registries/templates/skills/reports still require KAS adoption evidence | README read-back and stale-marker search |
+| `README.md:108` | `request-feedback(1..3)` and `handle-feedback(1..3)` run shape | Document min=1/max=5 with required round 1 and optional rounds 2..5 | Updated by INITDOC-002 in repository README | Registries/templates/skills are updated; operator reports/e2e adoption remain integration-pending | README read-back and stale-marker search |
 | `registries/phase-contracts.yaml:72-73` | `minimum_rounds: 1`, `maximum_rounds: 3` | Schema/registry declares min 1 and max 5 after KAS adoption task | Updated by STALECLEAN-002 | Support label remains `kah-evidenced, kas-integration-pending` until end-to-end KAS adoption is verified | Docs-contract test and stale-marker search |
 | `registries/phase-contracts.yaml:140` | Conditional feedback must not exceed round 3 | Optional continuation rounds are 2..5 and not mandatory | Updated by STALECLEAN-002 | Preserve optional, not mandatory, continuation wording | Stale-marker search |
 | `registries/phase-contracts.yaml:202-203` | `conditional_feedback_rounds_2_to_3` | Conditional feedback range is 2..5 | Updated by STALECLEAN-002 | Keep checklist rows aligned with the active policy | Docs-contract test |
@@ -160,11 +160,11 @@ templates, phase skills, or `.kkachi-workflow.yaml` in this preparation task.
 | `templates/run-artifacts/phase-plan.yaml.tmpl:64-65` | `max_rounds: 3` | Phase plans are generated from validated policy with max 5 | Updated by STALECLEAN-002 | Rounds 4 and 5 remain skipped unless explicitly requested | Docs-contract test |
 | `templates/run-artifacts/phase-plan.yaml.tmpl:170-188` | Explicit round-3 maximum shape | Optional realized rows can include rounds 4 and 5 when useful feedback exists | Updated by STALECLEAN-002 | Round 5 is the maximum feedback round | Docs-contract test |
 | `templates/run-artifacts/checklist.md.tmpl:41-42` | Round 3 is the maximum feedback round | Checklist reflects configured bounds and realized optional rounds up to 5 | Updated by STALECLEAN-002 | Round 5 is the maximum feedback round | Docs-contract test |
-| `docs/sot/phase-orchestration-policy.md:98-99` | Up to two additional rounds, maximum three pairs | Supersede or amend to required round 1 and optional 2..5 | Still pending docs cleanup | Out of STALECLEAN-002 active-surface scope | Parent SOT inventory records the rows |
-| `docs/sot/phase-orchestration-policy.md:121-122` | Final verification expects one to three rounds | Final verification distinguishes candidate policy from implemented support | Still pending docs cleanup | Out of STALECLEAN-002 active-surface scope | Parent SOT inventory records the rows |
-| `docs/sot/skill-template.md:356` and `581` | Rounds 2-3 only | Rounds 2..5 optional continuation when support exists | Still pending docs cleanup | Out of STALECLEAN-002 active-surface scope | Parent SOT inventory records the rows |
-| `docs/sot/concept.md:64` | Feedback may run up to three rounds | Mark historical or update after support evidence | Still pending docs cleanup | Out of STALECLEAN-002 active-surface scope | `rg` found stale concept marker |
-| `docs/sot/concept.md:690` | Rounds 2-3 only | Rounds 2..5 optional continuation when support exists | Still pending docs cleanup | Out of STALECLEAN-002 active-surface scope | Parent SOT inventory records the row |
+| `docs/sot/phase-orchestration-policy.md:98-99` | Up to two additional rounds, maximum three pairs | Required round 1 and optional 2..5 | Updated by STALECLEAN-003 | Preserve max 5 and KAB-runtime boundary wording | Docs-contract test and SOT readback |
+| `docs/sot/phase-orchestration-policy.md:121-122` | Final verification expects one to three rounds | Final verification checks active KAS policy and KAB evidence only when KAB-backed/runtime evidence is claimed | Updated by STALECLEAN-003 | Preserve KAB-later runtime boundary | Docs-contract test and SOT readback |
+| `docs/sot/skill-template.md:356` and `581` | Rounds 2-3 only | Rounds 2..5 optional continuation when support exists | Updated by STALECLEAN-004 | Historical template guidance aligned with active policy | Docs-contract test and readback |
+| `docs/sot/concept.md:64` | Feedback may run up to three rounds | Update to max 5 optional-continuation policy | Updated by STALECLEAN-004 | Concept SOT aligned with active policy | Docs-contract test and readback |
+| `docs/sot/concept.md:690` | Rounds 2-3 only | Rounds 2..5 optional continuation when support exists | Updated by STALECLEAN-004 | Concept SOT aligned with active policy | Docs-contract test and readback |
 | `skills/kkachi-final-verify/SKILL.md:15` | Final verify checks one to three rounds | Final verify accepts required round 1 and optional realized rounds 2..5 | Already active-policy wording; no STALECLEAN-002 edit required | Skill refers to active KAS policy rather than fixed round 3 | Skill readback |
 | `skills/kkachi-orchestrate/SKILL.md:35` | Feedback runs at most three rounds | Orchestration can plan optional rounds 2..5 after support evidence | Updated by STALECLEAN-002 | Preserve matching handle-feedback requirement | Docs-contract test and skill readback |
 | `skills/kkachi-plan/SKILL.md:80` | Rounds 2-3 conditional; do not exceed three pairs | Plan phase can express optional continuation 2..5 after support evidence | Updated by STALECLEAN-002 | Preserve required round 1 and explicit max 5 | Docs-contract test and skill readback |
@@ -173,16 +173,16 @@ templates, phase skills, or `.kkachi-workflow.yaml` in this preparation task.
 
 ## Verification requirements before support claim
 
-Before KAS may label configurable external feedback intake as implemented, the
-following evidence must exist:
+Before KAS may label configurable external feedback intake as fully implemented,
+the following remaining evidence must exist:
 
 - KAH docs/specs/compatibility state the accepted graph policy contract;
 - KAH command/code/test evidence proves validation, proposal-first mutation,
   audit, diagnostics, and fail-closed cases for the policy;
-- KAS registries/templates/phase skills are updated through approved KAS change
-  tasks;
-- stale `1..3` and `max3` surfaces are removed, updated, or explicitly marked
-  historical with evidence;
+- KAS operator/delegation reports can emit the adopted status fields and labels
+  for realized feedback rounds;
+- any remaining stale `1..3` and `max3` references are explicitly historical
+  inventory entries rather than active guidance;
 - KAB evidence exists before any automated review-by-different-tool claim;
 - operator/delegation reports can show source, bounds, current realized rounds,
   skipped optional rounds, missing evidence, and `kah_graph_evidence.status`.

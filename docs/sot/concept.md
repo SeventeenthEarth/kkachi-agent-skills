@@ -57,11 +57,11 @@ User-confirmed orchestration policy:
 
 - The master selects the target roadmap task id or task item for each KHS run.
 - KAS/KHS treats `.kkachi-workflow.yaml` as project workflow graph only when backed by KAH graph evidence; `phase-plan.yaml` is run-local execution state/evidence. KAH `work_path`, `work_mode`, and `execution_mode` are helper classification metadata only.
-- Hermes is manager, risk approval router, and final verifier; KAB backend roles do substantive plan/code/docs/feedback work.
-- KHS code-change runs use KAB. If the master forbids KAB for code changes, treat the request as a normal direct Hermes task rather than a KHS run.
-- Docs-only KHS runs use KAB by default; direct docs edits require explicit no-KAB instruction and recorded rationale.
+- Hermes is manager, risk approval router, and final verifier; KAB backend roles do substantive plan/code/docs/feedback work only for KAB-backed phases.
+- KAB is required when a run needs backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence.
+- Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when authorized and recorded, but must not claim KAB runtime support.
 - `ask`, feedback round 1, matching feedback handling, and final verification are mandatory.
-- Feedback may run up to three rounds. `optimize` is strongly recommended for code changes and requires a skip reason when omitted.
+- Feedback may run up to five rounds: round 1 is required when external feedback is in the run contract, and rounds 2..5 are optional continuation rounds. `optimize` is strongly recommended for code changes and requires a skip reason when omitted.
 
 ## Task and prompt model
 
@@ -687,7 +687,7 @@ Allowed reductions:
 - `plan.md` may be concise.
 - red-team plan review may be merged into final red-team review.
 - `context-pack.md` may be minimal.
-- feedback round 1 is mandatory for KHS; rounds 2-3 may be skipped with an explicit reason.
+- feedback round 1 is mandatory for KHS; optional continuation rounds 2..5 may be skipped with an explicit reason.
 - test scope may be targeted rather than broad.
 - UI QA may be marked not applicable when the change has no UI impact.
 

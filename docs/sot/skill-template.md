@@ -353,7 +353,7 @@ The phase sequence is Standard Mode by default. The orchestrator first classifie
 11. run-tests
 12. optimize
 13. update-docs
-14. request-feedback round 1 always, rounds 2-3 if Hermes judges more feedback useful
+14. request-feedback round 1 always, optional continuation rounds 2..5 if Hermes judges more feedback useful
 15. handle-feedback
 16. rerun-tests-if-feedback-changed
 17. ui-qa-if-needed
@@ -578,7 +578,7 @@ Light Mode must not skip:
 
 - `plan.md` may be concise.
 - red-team plan review may be merged into final red-team review.
-- feedback round 1 is mandatory; additional rounds 2-3 may be skipped with explicit reason.
+- feedback round 1 is mandatory; optional continuation rounds 2..5 may be skipped with explicit reason.
 - `context-pack.md` may be minimal.
 - test scope may be targeted.
 - UI QA may be marked not applicable.

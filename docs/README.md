@@ -3,7 +3,7 @@
 Date: 2026-05-21
 Owner: KHS documentation archive
 Confirming role: Responsible approver / governance evidence record
-Status: post-KAH docs index / authority ladder; KAH 0.1.4 graph and configurable-feedback capability evidence is recognized, CLIMVP and GRAPHMVP-001..003 KAS guidance surfaces are implemented, and KAB runtime work remains separately gated
+Status: post-KAH docs index / authority ladder; KAH 0.1.4 graph and configurable-feedback capability evidence is recognized, CLIMVP and GRAPHMVP-001..004 KAS guidance surfaces are implemented, and KAB runtime work remains separately gated
 Authority level: source of truth for how to read KHS docs after confirmation
 Scope: `kkachi-hermes-skills/docs` only
 Evidence/source path: governance evidence record in kanban task `t_2fb00394`
@@ -50,7 +50,7 @@ Durable source-of-truth documents for KHS behavior, architecture, and skill desi
 
 ## `roadmap.md`
 
-KAS post-KAH enablement roadmap. It uses PR-candidate task sizing and is not implementation authorization by itself. KAH 0.1.4 graph and configurable-feedback support are now evidenced through capabilities/help; CLIMVP and GRAPHMVP-001..003 KAS surfaces are implemented, while `kah graph` alias behavior, GRAPHMVP artifact/report mapping, and KAB runtime alignment still proceed one task at a time with evidence and review gates.
+KAS post-KAH enablement roadmap. It uses PR-candidate task sizing and is not implementation authorization by itself. KAH 0.1.4 graph and configurable-feedback support are now evidenced through capabilities/help; CLIMVP and GRAPHMVP-001..004 KAS surfaces are implemented, while `kah graph` alias behavior and KAB runtime alignment still proceed one task at a time with evidence and review gates.
 
 ## `discussions/`
 
@@ -72,7 +72,7 @@ Temporary or evolving discussion material that should not be treated as final po
 | `planned` | Expected future work with no current operational guarantee |
 | `implemented` | Proven by current command/code/docs/test or effective-binary capability evidence for the exact surface claimed |
 | `kah-evidenced, kas-integration-pending` | KAH advertises or proves the required deterministic surface, but KAS docs/templates/registries/skills/CLI have not yet adopted it end-to-end |
-| `blocked_by_kah` | KHS can describe the desired policy, but KAH lacks required schema, validation, proposal, audit, or compatibility support |
+| `blocked_by_kah` | KHS can describe the desired policy, but the effective KAH binary lacks required schema, validation, proposal, audit, or compatibility support. Do not apply this label to KAH 0.1.4 `kkachi-agent-helper graph` or configurable-feedback surfaces when current capability/help evidence proves them. |
 | `kab_later` | Requires KAB backend/runtime evidence and is outside current MVP |
 | `unsupported` | The current toolchain cannot safely execute or validate the requested support |
 | `historical` | Preserved context; not current authority by itself |
@@ -96,7 +96,7 @@ A discussion note becomes SOT only after the decision is reflected in the releva
 
 ## Stale/conflict markers
 
-Older wording that calls `phase-plan.yaml` the whole workflow SOT must be read narrowly as run-local execution state/evidence. Any `kah graph` reference in these docs is planned/candidate unless alias capability/help evidence proves implementation. `kkachi-agent-helper graph` references may be treated as implemented after effective KAH 0.1.4 capability/help checks. Configurable external-feedback bounds are KAH-evidenced in 0.1.4 but remain KAS integration-pending until registries/templates/skills and reports are updated.
+Older wording that calls `phase-plan.yaml` the whole workflow SOT must be read narrowly as run-local execution state/evidence. Any `kah graph` reference in these docs is planned/candidate unless alias capability/help evidence proves implementation. `kkachi-agent-helper graph` references may be treated as implemented after effective KAH 0.1.4 capability/help checks. Configurable external-feedback bounds are KAH-evidenced in 0.1.4; KAS registries/templates/skills are updated, while operator report/e2e adoption remains `kas-integration-pending` until verified.
 
 ## Open questions
 

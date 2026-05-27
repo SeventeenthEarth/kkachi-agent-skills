@@ -62,8 +62,8 @@ Current repository facts and evidence checked during this drafting pass:
 - `docs/sot/interface-contract.md` records the current KAS/KAH/KAB interface and reality-first rule: KAS must use surfaces that exist now, and record gaps instead of pretending future interfaces exist.
 - `docs/sot/workflow-graph-integration.md` records `.kkachi-workflow.yaml` as project-level graph state only when backed by KAH graph evidence, while `phase-plan.yaml` remains run-local execution state/evidence.
 - `docs/sot/minimum-pilot-cli-lane.md` records a scoped KHS+KAH minimum/pilot lane for profile-scoped install/list/doctor/sync/proposal support, distinct from the full KHS+KAH+KAB execution-runtime lane.
-- `registries/phase-contracts.yaml`, run-artifact templates, and several phase skills still contain stale `1..3` / `maximum_rounds: 3` feedback-loop assumptions. These are known stale KAS integration surfaces and must not be treated as active support for the target `min=1, max=5` external feedback policy.
-- KAH 0.1.4 capability evidence now advertises graph/configurable-feedback substrate support, but `EXTERNAL_FEEDBACK_INTAKE` still requires KAS registry/template/skill/report adoption before active KAS runs can label it implemented.
+- `registries/phase-contracts.yaml`, run-artifact templates, and phase skills have been updated to the `min=1, max=5` feedback-loop policy; older `1..3` / `maximum_rounds: 3` mentions in this document are historical inventory rows only.
+- KAH 0.1.4 capability evidence now advertises graph/configurable-feedback substrate support, and KAS registry/template/skill adoption exists; operator report/e2e adoption remains integration-pending before active KAS runs can label the full surface implemented.
 - The KAH `.docs/new-support.md` external feedback intake plan is now historical lineage, not the current blocker.
 - The KHS repo had pre-existing dirty and untracked files before this draft was written. Observed status during review included `MM README.md`, `M docs/README.md`, several modified tracked docs/registries/skills/templates, and untracked `AGENTS.md`, `docs/roadmap.md`, `docs/sot/khs-architecture-and-integration.md`, `docs/sot/minimum-pilot-cli-lane.md`, and `docs/sot/workflow-graph-integration.md`. This draft should be reviewed in that context and must not overwrite unrelated work.
 
@@ -363,14 +363,14 @@ Known stale surfaces before support claim, confirmed by repository search during
 | `templates/run-artifacts/checklist.md.tmpl:41-42` | `request_feedback_3` / `handle_feedback_3` as maximum feedback round | updated by STALECLEAN-002 with optional request/handle rows for rounds 4 and 5 |
 | `docs/sot/phase-orchestration-policy.md` feedback loop | historical max-three wording | updated by STALECLEAN-003 while preserving `kah-evidenced, kas-integration-pending` until end-to-end adoption is verified |
 | `docs/sot/phase-orchestration-policy.md` final verification | historical unconditional KAB evidence requirement | updated by STALECLEAN-003 to require KAB evidence when the run is KAB-backed or claims backend runtime evidence |
-| `docs/sot/skill-template.md:356` and `581` | rounds 2-3 only | update or mark historical/stale |
-| `docs/sot/concept.md:64` | feedback may run up to three rounds | update or mark historical/stale |
-| `docs/sot/concept.md:690` | rounds 2-3 only | update or mark historical/stale |
-| `skills/kkachi-final-verify/SKILL.md:15` | feedback rounds between one and three | update skill only through skill/change approval gates |
-| `skills/kkachi-orchestrate/SKILL.md:35` | at most three rounds | update skill only through skill/change approval gates |
-| `skills/kkachi-plan/SKILL.md:80` | rounds 2-3 conditional; do not exceed three pairs | update skill only through skill/change approval gates |
-| `skills/kkachi-request-feedback/SKILL.md:15` and `21` | never exceed three pairs; optional `feedback-2.md` / `feedback-3.md` only | update skill only through skill/change approval gates |
-| `skills/kkachi-handle-feedback/SKILL.md:21-22` | optional round 2/3 handling artifacts only | update skill only through skill/change approval gates |
+| `docs/sot/skill-template.md:356` and `581` | historical rounds 2-3 only wording | updated by STALECLEAN-004 to optional continuation rounds 2..5 |
+| `docs/sot/concept.md:64` | historical feedback may run up to three rounds wording | updated by STALECLEAN-004 to max 5 optional-continuation policy |
+| `docs/sot/concept.md:690` | historical rounds 2-3 only wording | updated by STALECLEAN-004 to optional continuation rounds 2..5 |
+| `skills/kkachi-final-verify/SKILL.md:15` | active-policy check could be misread as fixed round count | already active-policy wording; no STALECLEAN-004 edit required |
+| `skills/kkachi-orchestrate/SKILL.md:35` | at most three rounds | updated by STALECLEAN-002 to at most five rounds |
+| `skills/kkachi-plan/SKILL.md:80` | rounds 2-3 conditional; do not exceed three pairs | updated by STALECLEAN-002 to optional continuation rounds 2..5 and max five pairs |
+| `skills/kkachi-request-feedback/SKILL.md:15` and `21` | never exceed three pairs; optional `feedback-2.md` / `feedback-3.md` only | updated by STALECLEAN-002 to optional `feedback-2.md` through `feedback-5.md` and max five pairs |
+| `skills/kkachi-handle-feedback/SKILL.md:21-22` | optional round 2/3 handling artifacts only | updated by STALECLEAN-002 to optional handling artifacts through round 5 |
 
 Operator impact: until these stale KAS surfaces are fixed or explicitly marked historical, generated reports, checklists, and support labels must describe `min=1, max=5` external feedback intake as `kah-evidenced, kas-integration-pending` and must not present it as implemented KAS runtime support.
 
@@ -379,7 +379,7 @@ Child record: `docs/sot/external-feedback-intake-policy.md` is the current detai
 Preconditions not yet met for an active KAS support claim:
 
 - stale surface inventory above is remediated or marked historical with evidence;
-- KAS registry/template/skill/report adoption exists for the KAH-evidenced graph/configurable-feedback substrate;
+- KAS registry/template/skill adoption exists for the KAH-evidenced graph/configurable-feedback substrate; operator report/e2e adoption remains integration-pending until verified;
 - KAB evidence exists before automated different-tool review is claimed;
 - operator report fields and allowed values in this SOT are implemented or clearly labeled integration-pending;
 - verification results are recorded in the child SOT or a registry/manifest reviewed by the responsible roles.
@@ -511,7 +511,7 @@ Before KHS claims support for any target behavior, run the acceptance matrix in 
 | External feedback intake | min=1/max=5 policy, round 1 required, rounds 2..5 optional, no five-mandatory wording | Child external-feedback SOT or registry manifest with search evidence |
 | External feedback stale surfaces | `1..3`, `max_rounds: 3`, `maximum_rounds: 3`, `round 3`, and `three` in feedback context are removed, updated, or marked historical | Gray traceability review after each surface-group task; evidence recorded in child SOT or stale-surface manifest |
 | MVP feedback path | user-supplied `feedback.md` source/ref/checksum and triage/handle artifacts exist when used | KAH run artifacts or operator report with file path/ref/checksum |
-| KAH dependency | KAH implementation evidence validates allowed bounds, rejects invalid bounds, rejects round 6, handles missing/unknown/conflicting fields, and fails closed on graph-vs-run conflicts; until implementation evidence exists, KHS must fail closed | Red+Gray review of KAH implementation evidence and audit output |
+| KAH dependency | KAH 0.1.4 capability/help evidence advertises graph and configurable-feedback support; KHS still fails closed when the effective binary, graph policy, or run-local state is missing, unknown, stale, or conflicting | Red+Gray review of KAH implementation evidence and audit output |
 | KAB-later review | automated different-tool review remains deferred unless KAB implementation/evidence is present | Red review of KAB evidence and Blue deferral/acceptance record |
 | Team review | external feedback and KHC team review are separate gates with separate evidence | Parent/child Kanban review cards, final report, and evidence paths |
 | Self-improvement | improvement note/proposal/evaluation/review/approval/version/measure path exists before shared KHS mutation | responsible-approver/user approval record plus proposal/evaluation ledger |
