@@ -12,7 +12,7 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 ## Core rule
 
-Completion is artifact-backed and Hermes-owned. Do not claim done when required gates, tests, docs decisions, KAH state, KAB evidence, `phase-plan.yaml`, or `checklist.md` are incomplete. Final verification must prove every required phase is done, every skipped/not-applicable phase has a reason, feedback rounds are between one and three, and code-change runs include optimize evidence or an explicit skip reason.
+Completion is artifact-backed and Hermes-owned. Do not claim done when required gates, tests, docs decisions, KAH state, KAB evidence, graph capability evidence when graph-managed workflow is selected, `phase-plan.yaml`, or `checklist.md` are incomplete. Final verification must prove every required phase is done, every skipped/not-applicable phase has a reason, feedback rounds follow the active KAS policy, and code-change runs include optimize evidence or an explicit skip reason.
 
 For KAB-backed phases, final evidence must include the selected bridge observation path:
 
@@ -21,6 +21,8 @@ For KAB-backed phases, final evidence must include the selected bridge observati
 - `hybrid`: stream evidence plus fallback `wait/read/status` evidence.
 
 Final verification must reject any run where the only bridge proof is `send` success.
+
+Final verification must also reject graph-managed workflow claims when the run lacks effective-binary evidence for `kkachi-agent-helper graph`, lacks `graph validate/explain` evidence for the graph file used, uses `kah graph` as if it were implemented, or describes direct `.kkachi-workflow.yaml` editing as fallback repair. Missing graph capability is acceptable only when the final report records a gap and states that the run used run-local phase evidence only.
 
 Final verification must also confirm selected backend caveats were handled:
 

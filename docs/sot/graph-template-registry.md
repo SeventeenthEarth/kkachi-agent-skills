@@ -11,7 +11,7 @@ Related docs: `workflow-graph-integration.md`, `phase-orchestration-policy.md`, 
 
 The graph template registry lets KAS name, version, review, and select workflow graph templates before KAH deterministically initializes, validates, explains, proposes, applies, or audits graph state. KAS owns template policy and metadata. KAH owns graph-file validation, write/apply mechanics, checksum/version evidence, semantic diff, and audit events.
 
-GRAPHMVP-001 defined the registry schema. GRAPHMVP-002 adds the first default workflow graph template, `kas-default`, and verifies it through KAH graph init/validate/explain in an isolated temp repo. GRAPHMVP-003 may wire capability-checked guidance into KAS orchestration. GRAPHMVP-004 may expand run artifact/report preservation.
+GRAPHMVP-001 defined the registry schema. GRAPHMVP-002 added the first default workflow graph template, `kas-default`, and verified it through KAH graph init/validate/explain in an isolated temp repo. GRAPHMVP-003 wires capability-checked guidance into KAS orchestration. GRAPHMVP-004 may expand run artifact/report preservation.
 
 ## File layout
 
@@ -177,4 +177,4 @@ KAS must reject or mark unsupported:
 
 ## Next record action
 
-GRAPHMVP-002 adds `kas-default` using this registry schema and verifies it with capability-checked `kkachi-agent-helper graph init --from-template templates/workflow-graphs/kas-default.yaml`, `graph validate`, and `graph explain` in a temporary repo. The next task, GRAPHMVP-003, may add capability-checked orchestration guidance for using this template.
+GRAPHMVP-003 adds capability-checked orchestration guidance for using `kas-default`. The next task, GRAPHMVP-004, should define durable artifact/report mapping for template id/path, proposal path, validation/explain/diff outputs, approval/audit evidence, checksum/version, KAH graph event ids, and capability-check evidence.

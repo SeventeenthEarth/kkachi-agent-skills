@@ -3,7 +3,7 @@
 Date: 2026-05-21
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record
-Status: current KAS/KAH graph integration SOT; KAH 0.1.4 `kkachi-agent-helper graph` implementation evidence present; KAS template/guidance adoption remains integration-pending; `kah graph` alias remains candidate/unimplemented
+Status: current KAS/KAH graph integration SOT; KAH 0.1.4 `kkachi-agent-helper graph` implementation evidence present; KAS default template and orchestration guidance are implemented through GRAPHMVP-003; `kah graph` alias remains candidate/unimplemented
 Authority level: current KAS/KAH graph integration SOT for capability-checked `kkachi-agent-helper graph` use
 Scope: KAS docs only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
 Related docs: `phase-orchestration-policy.md`, `interface-contract.md`, `../roadmap.md`, KAH `docs/specs.md`, KAH `docs/compatibility.md`
@@ -45,6 +45,35 @@ KAS owns workflow policy, graph templates, phase applicability, proposal content
 - KAS uses `init --from-template`, not `init --profile`.
 - KAS must not ask KAH to execute imperative policy mutations such as `gate set`, `review-policy set`, or `graph set-policy`.
 - KAS preserves graph evidence in run artifacts when graph changes affect a run.
+
+## Orchestration capability preflight
+
+Before any KAS orchestration step uses a project workflow graph, the operator or KAS skill must capture effective-binary evidence from the same environment that will execute the run:
+
+1. Run `kkachi-agent-helper --version`.
+2. Run `kkachi-agent-helper capabilities --json` and verify workflow-graph capability flags or equivalent graph support fields are present.
+3. Run `kkachi-agent-helper graph --help` and verify the exact subcommands required for the intended action.
+4. For template initialization, also verify the selected registry entry and template path, then run `kkachi-agent-helper graph init --from-template <template-id-or-path> --json` only in the target or isolated temp project where graph creation is intended.
+5. For existing graph state, run `kkachi-agent-helper graph validate --file .kkachi-workflow.yaml --json` and `kkachi-agent-helper graph explain --file .kkachi-workflow.yaml --json` before deriving run-local phase state from it.
+
+Fail closed and record a gap when any evidence is missing, stale, or unsupported. The gap record must include the attempted command, exit code or missing field, expected capability, affected roadmap/task id, and the reason KAS refused graph-managed workflow. Safe fallback is run-local `phase-plan.yaml` evidence only; it is not permission to write or repair `.kkachi-workflow.yaml` manually.
+
+### Missing-capability gap example
+
+```yaml
+graph_guidance:
+  status: blocked_by_missing_kah_graph_capability
+  attempted_command: kkachi-agent-helper graph --help
+  expected_capabilities:
+    - kkachi-agent-helper graph init --from-template
+    - kkachi-agent-helper graph validate
+    - kkachi-agent-helper graph explain
+  fallback_allowed: run_local_phase_plan_only
+  forbidden_fallbacks:
+    - kah graph
+    - direct .kkachi-workflow.yaml edit
+  gap_record: docs/roadmap.md#GRAPHMVP-or-follow-up
+```
 
 ## Capability-checked command use
 
@@ -159,10 +188,10 @@ Mermaid and PlantUML outputs are generated visualization artifacts only. They do
 
 ## Open questions
 
-- KAS graph template registry format and default template content are defined by `graph-template-registry.md`, `registries/graph-template-registry.yaml`, and `templates/workflow-graphs/kas-default.yaml`; KAS orchestration guidance remains GRAPHMVP-003 and artifact/report mapping remains GRAPHMVP-004.
+- KAS graph template registry format, default template content, and capability-checked orchestration guidance are defined by `graph-template-registry.md`, `registries/graph-template-registry.yaml`, `templates/workflow-graphs/kas-default.yaml`, this SOT, and the KAS orchestration skills; artifact/report mapping remains GRAPHMVP-004.
 - Exact KAS mapping of KAH proposal paths, event ids, and checksum/version evidence into run artifacts remains KAS integration work; KAH graph proposal/apply surfaces are implemented.
 - KAB alignment with applied graph version is future/non-authoritative until a separate KAB docs update is assigned.
 
 ## Next record action
 
-After INITDOC closure, implement remaining KAS graph integration one PR-candidate task at a time from `docs/roadmap.md`, starting with template registry and capability-checked command guidance for the evidenced KAH 0.1.4 `kkachi-agent-helper graph` surface.
+After GRAPHMVP-003, implement remaining KAS graph integration one PR-candidate task at a time from `docs/roadmap.md`, starting with GRAPHMVP-004 artifact/report mapping for the evidenced KAH 0.1.4 `kkachi-agent-helper graph` surface.

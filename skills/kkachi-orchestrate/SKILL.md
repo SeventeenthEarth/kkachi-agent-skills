@@ -12,7 +12,7 @@ Do not use this skill for ordinary direct Hermes edits, small one-file fixes, ty
 
 ## Core rule
 
-Orchestration chooses phases and gates; it does not bypass phase contracts. KHS `phase_plan` is the workflow SOT. KAH is mandatory once KHS is triggered because KAH owns deterministic state, artifacts, events, locks, schemas, diagnostics, and gates, but KAH `work_path`, `work_mode`, and `execution_mode` are helper classification metadata rather than phase authority. KAB-backed work additionally requires task contract, backend selection, capability check, rendered prompt, and bridge evidence.
+Orchestration chooses phases and gates; it does not bypass phase contracts. KHS has two workflow layers: `.kkachi-workflow.yaml` is project-level graph state only after capability-checked `kkachi-agent-helper graph` evidence, while `.kkachi/runs/<run_id>/phase-plan.yaml` is run-local execution state/evidence. KAH is mandatory once KHS is triggered because KAH owns deterministic state, artifacts, events, locks, schemas, diagnostics, gates, and graph validation/apply mechanics, but KAH `work_path`, `work_mode`, and `execution_mode` are helper classification metadata rather than phase authority. KAB-backed work additionally requires task contract, backend selection, capability check, rendered prompt, and bridge evidence.
 
 Hermes is manager/orchestrator/final verifier, not the default code author. KAB backend roles perform substantive planning, implementation, docs, feedback, and feedback handling during KHS runs. Simple direct Hermes fixes are outside KHS unless the master explicitly keeps the task inside KHS.
 
@@ -43,7 +43,9 @@ After plan and ask are complete, Hermes may start low-risk implementation automa
 - classify Path A or Path B
 - select Standard or Light mode
 - invoke `kkachi-task-contract`
-- create `phase-plan.yaml` from `templates/run-artifacts/phase-plan.yaml.tmpl` and keep it as the workflow SOT
+- run the graph capability preflight before using `.kkachi-workflow.yaml`: same effective binary, `kkachi-agent-helper --version`, `capabilities --json`, `graph --help`, then `graph validate/explain` for existing graph state or `graph init --from-template` only when graph creation is intended
+- create `phase-plan.yaml` from `templates/run-artifacts/phase-plan.yaml.tmpl` and keep it as run-local execution state/evidence
+- fail closed into a gap record when graph capability/help evidence is missing; do not use `kah graph` alias text or direct `.kkachi-workflow.yaml` edit fallback
 - invoke `kkachi-backend-select` when a KAB lane is needed
 - invoke `kkachi-prompt-compose` before KAB delivery
 - use `kkachi-phase-state` and KAH at every phase boundary

@@ -14,7 +14,7 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 KAH owns deterministic state. KHS must use the installed KAH command surface instead of inventing parallel KAH state. Install or update KAH with `go install github.com/SeventeenthEarth/kkachi-agent-helper@latest`. KAH has no dedicated `phase start` command, but KAH does provide the managed `phase-plan init/show/set/validate` surface for KHS-declared phase state. Phase evidence is represented through run lifecycle commands, KAH-managed phase-plan state, canonical artifact files, `event append`, approval records when required, and gate checks.
 
-`phase-plan.yaml` is KHS-declared workflow state stored at `.kkachi/runs/<run_id>/phase-plan.yaml` through `phase-plan init/show/set/validate`. KAH validates structure, skipped/not-applicable reasons, final evidence links, feedback bounds, and approval records for rows marked `approval_required: true`; KHS still owns phase applicability, phase order, and workflow policy decisions.
+`phase-plan.yaml` is KHS-declared run-local execution state stored at `.kkachi/runs/<run_id>/phase-plan.yaml` through `phase-plan init/show/set/validate`. `.kkachi-workflow.yaml` is project-level graph state only when the same effective KAH binary proves `kkachi-agent-helper graph` support and validates/explains or applies it. KAH validates structure, skipped/not-applicable reasons, final evidence links, feedback bounds, approval records for rows marked `approval_required: true`, and graph state when the graph surface is used; KHS still owns phase applicability, phase order, and workflow policy decisions.
 
 ## Implemented KAH commands
 
@@ -52,6 +52,14 @@ kkachi-agent-helper phase-plan show <run_id-or-prefix> [--json]
 kkachi-agent-helper phase-plan set <run_id-or-prefix> <phase-id> --status <pending|in_progress|complete|skipped|not_applicable|blocked> [--evidence <path>] [--reason <text>] [--approval-required true|false] [--json]
 kkachi-agent-helper phase-plan validate <run_id-or-prefix> [--final] [--json]
 
+kkachi-agent-helper graph init --from-template <template-id-or-path> [--output .kkachi-workflow.yaml] [--json]
+kkachi-agent-helper graph validate [--file .kkachi-workflow.yaml] [--json]
+kkachi-agent-helper graph explain [--file .kkachi-workflow.yaml] [--json]
+kkachi-agent-helper graph diff --from <repo-relative-graph> --to <repo-relative-graph> [--semantic] [--json]
+kkachi-agent-helper graph propose --candidate-file <repo-relative-candidate-graph> --reason <text> [--json]
+kkachi-agent-helper graph apply --proposal <proposal-id> --approval <evidence-ref> [--json]
+kkachi-agent-helper graph export --format mermaid|plantuml [--output <path>] [--json]
+
 kkachi-agent-helper approval request <run_id-or-prefix> --phase <phase-id> --reason <reason> [--evidence <ref>] [--json]
 kkachi-agent-helper approval record <run_id-or-prefix> --phase <phase-id> --decision <approved|rejected> --by <approver> --evidence <ref> [--reason <reason>] [--json]
 kkachi-agent-helper approval show <run_id-or-prefix> [--phase <phase-id>] [--json]
@@ -78,6 +86,7 @@ KAH mutating commands fail closed when `.kkachi/status.json.last_event_id` disag
 3. Create canonical baseline artifacts with `artifact init <run_id>`.
 4. Initialize or inspect KHS-declared phase state with `phase-plan init <run_id>` or `phase-plan show <run_id>`.
 5. Update declared phase rows with `phase-plan set <run_id> <phase-id> ...`; use `phase-plan validate <run_id>` during the run and `phase-plan validate <run_id> --final` before final reporting.
+5a. Use `.kkachi-workflow.yaml` only after graph capability preflight passes for the effective KAH binary. If `capabilities --json`, `graph --help`, or the required `graph validate/explain/init` command is missing or stale, record a gap and continue only with run-local `phase-plan.yaml` evidence; never repair graph state through direct YAML fallback.
 6. Populate canonical artifact files in `.kkachi/runs/<run_id>/`; prefer `artifact write` and `artifact append` when available so KAH records path-safety checks, atomic mutation, and audit events. Use `artifact set-status` only for artifacts whose status field is KAH lifecycle-owned; never use it as a blanket completion step for schema-owned backend JSON artifacts such as `selected-cli.json`.
 7. Use `event append <type> --run <run_id> --payload '<json-object>'` for compact phase milestones such as `phase.started`, `phase.completed`, `artifact.updated`, or `kab.prompt.sent`.
 8. Use `approval request`, `approval record`, and `approval show` when KHS has declared that a high-risk phase needs approval; KAH records the approval state but KHS decides when approval is required.

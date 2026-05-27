@@ -143,7 +143,7 @@ manually create ad hoc state files. Hermes should run KAH `project init` in the
 target project, using the project's docs map, backend policy, commander,
 red-team partner, SOT policy, execution mode, and test commands.
 
-After project init, Hermes should use KAS/KHS skills for Kkachi-governed runs. `.kkachi-workflow.yaml` is the project workflow graph only when backed by KAH graph validation/proposal/apply evidence; `phase-plan.yaml` remains run-local execution state/evidence. KAH `work_path`, `work_mode`, and `execution_mode` remain deterministic helper metadata only.
+After project init, Hermes should use KAS/KHS skills for Kkachi-governed runs. `.kkachi-workflow.yaml` is the project workflow graph only when backed by capability-checked `kkachi-agent-helper graph` validation/proposal/apply evidence; `phase-plan.yaml` remains run-local execution state/evidence. If the effective KAH binary lacks required graph support, record a gap and continue only with run-local phase evidence rather than writing `.kkachi-workflow.yaml` manually. KAH `work_path`, `work_mode`, and `execution_mode` remain deterministic helper metadata only.
 
 ```text
 orchestrate

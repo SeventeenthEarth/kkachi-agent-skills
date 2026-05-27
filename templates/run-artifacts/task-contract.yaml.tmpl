@@ -7,8 +7,11 @@ phase: "{{ phase }}"
 execution_mode: "{{ execution_mode }}"
 
 workflow_authority:
-  phase_plan_artifact: "phase-plan.yaml"
-  rule: "KHS phase_plan is the workflow SOT; KAH metadata is helper classification only."
+  project_graph_artifact: ".kkachi-workflow.yaml"
+  run_local_phase_artifact: "phase-plan.yaml"
+  rule: ".kkachi-workflow.yaml is project-level graph state only after capability-checked KAH graph evidence; phase-plan.yaml is run-local execution state/evidence; KAH metadata is helper classification only."
+  graph_capability_preflight_required: "{{ graph_capability_preflight_required }}"
+  missing_graph_capability_policy: "record_gap_and_use_run_local_phase_evidence_only"
 
 selected_task:
   user_selected: true
@@ -39,6 +42,11 @@ required_capabilities:
   retained_events: "{{ required_retained_events }}"
   observability: "{{ required_observability }}"
   restart_recovery: "{{ restart_recovery_sensitivity }}"
+  graph_workflow: "{{ required_graph_workflow }}"
+  graph_commands:
+    - "kkachi-agent-helper graph --help"
+    - "kkachi-agent-helper graph validate --file .kkachi-workflow.yaml --json"
+    - "kkachi-agent-helper graph explain --file .kkachi-workflow.yaml --json"
 
 user_backend_preference:
   provided: "{{ user_backend_preference_provided }}"
