@@ -59,6 +59,7 @@ Temporary or evolving discussion material that should not be treated as final po
 - `discussions/follow-up-discussion.md`
 - `discussions/feedback-for-KAH.md`
 - `discussions/feedback-for-KAB.md`
+- `discussions/staleclean-001-active-surface-manifest.md` — STALECLEAN-001 audit artifact mapping active stale markers to update/defer/historical dispositions; not an implementation change by itself
 
 ## Status vocabulary
 
