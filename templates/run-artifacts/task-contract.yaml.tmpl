@@ -9,9 +9,29 @@ execution_mode: "{{ execution_mode }}"
 workflow_authority:
   project_graph_artifact: ".kkachi-workflow.yaml"
   run_local_phase_artifact: "phase-plan.yaml"
+  graph_evidence_artifact: "graph-evidence.md"
   rule: ".kkachi-workflow.yaml is project-level graph state only after capability-checked KAH graph evidence; phase-plan.yaml is run-local execution state/evidence; KAH metadata is helper classification only."
   graph_capability_preflight_required: "{{ graph_capability_preflight_required }}"
   missing_graph_capability_policy: "record_gap_and_use_run_local_phase_evidence_only"
+  graph_evidence_preservation:
+    required_when_graph_affects_run: true
+    artifact: "graph-evidence.md"
+    report_section: "kah_graph_evidence"
+    fields:
+      - template_id
+      - template_path
+      - template_version
+      - proposal_id
+      - proposal_path
+      - semantic_diff_output_path
+      - validation_report_path
+      - explain_report_path
+      - approval_evidence_ref
+      - audit_evidence_path
+      - graph_checksum
+      - graph_version
+      - kah_graph_audit_event_ids
+      - capability_check_evidence
 
 selected_task:
   user_selected: true

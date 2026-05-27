@@ -25,6 +25,7 @@ Plan from durable authority, not chat-only instruction. Path A plans prepare imp
 
 - `plan.md`
 - `checklist.md`
+- `graph-evidence.md` mapping requirement when the plan initializes, validates, explains, diffs, proposes, applies, or otherwise relies on graph state
 - KAH phase/gate events, when supported
 
 ## KAB plan capture rule

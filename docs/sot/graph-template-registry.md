@@ -11,7 +11,7 @@ Related docs: `workflow-graph-integration.md`, `phase-orchestration-policy.md`, 
 
 The graph template registry lets KAS name, version, review, and select workflow graph templates before KAH deterministically initializes, validates, explains, proposes, applies, or audits graph state. KAS owns template policy and metadata. KAH owns graph-file validation, write/apply mechanics, checksum/version evidence, semantic diff, and audit events.
 
-GRAPHMVP-001 defined the registry schema. GRAPHMVP-002 added the first default workflow graph template, `kas-default`, and verified it through KAH graph init/validate/explain in an isolated temp repo. GRAPHMVP-003 wires capability-checked guidance into KAS orchestration. GRAPHMVP-004 may expand run artifact/report preservation.
+GRAPHMVP-001 defined the registry schema. GRAPHMVP-002 added the first default workflow graph template, `kas-default`, and verified it through KAH graph init/validate/explain in an isolated temp repo. GRAPHMVP-003 wires capability-checked guidance into KAS orchestration. GRAPHMVP-004 defines the run artifact/report preservation mapping in `templates/run-artifacts/graph-evidence.md.tmpl`.
 
 ## File layout
 
@@ -23,7 +23,7 @@ GRAPHMVP-001 defined the registry schema. GRAPHMVP-002 added the first default w
 | `docs/examples/graph-template-registry-invalid.yaml` | Negative metadata example documenting expected rejections | example only |
 | `.kkachi-workflow.yaml` | Project graph instance after KAH init/validate/apply evidence | generated only in target/temp projects; ignored at repo root |
 
-KAS must never silently direct-edit `.kkachi-workflow.yaml` as fallback. Registry entries are allowed as template selection/proposal inputs only.
+KAS must never repair `.kkachi-workflow.yaml` through manual edits. Registry entries are allowed as template selection/proposal inputs only.
 
 ## Registry object
 
@@ -141,22 +141,23 @@ KAH validates graph instances, not this KAS registry by default. Until KAH or KA
 
 ## Evidence contract
 
-When a graph template affects a run, reports and artifacts must preserve at least:
+When a graph template affects a run, reports and artifacts must preserve the canonical `graph-evidence.md` mapping:
 
-- registry version;
-- template id;
-- template path;
-- template version;
-- owner/reviewer metadata;
-- compatibility/capability evidence;
-- KAH validation report path;
-- KAH explain or diff output path when used;
-- proposal id/path when a graph change is proposed;
-- approval evidence ref when a graph change is applied;
-- applied graph checksum/version and KAH audit event ids;
-- conflict/fail-closed reason if graph use is refused.
+- `registry_version`;
+- `template_id`, `template_path`, and `template_version`;
+- `owner_reviewer_metadata`;
+- `capability_check_evidence` linked from `capability-check.md`;
+- `validation_report_path`;
+- `explain_report_path`;
+- `semantic_diff_output_path` when diff was used;
+- `proposal_id` and `proposal_path` when a graph change is proposed;
+- `approval_evidence_ref` when a graph change is applied;
+- `audit_evidence_path`;
+- `graph_checksum` and `graph_version`;
+- `kah_graph_audit_event_ids`;
+- `conflict_fail_closed_reason` if graph use is refused.
 
-GRAPHMVP-004 owns the final artifact/report mapping. This document defines the required fields so later tasks do not invent incompatible evidence names.
+`templates/run-artifacts/graph-evidence.md.tmpl` is the run-artifact template for this mapping. Final reports must summarize the same fields under `kah_graph_evidence` without treating KAB runtime state as graph policy authority.
 
 ## Negative cases
 
@@ -171,10 +172,10 @@ KAS must reject or mark unsupported:
 - edges pointing at undeclared phases;
 - unbounded feedback loops;
 - stale fixed-three feedback semantics;
-- direct YAML fallback instructions;
+- direct `.kkachi-workflow.yaml` edit instructions;
 - claims that `kah graph` alias is implemented without separate alias evidence;
 - claims that KAB runtime state is graph policy authority.
 
-## Next record action
+## Record state
 
-GRAPHMVP-003 adds capability-checked orchestration guidance for using `kas-default`. The next task, GRAPHMVP-004, should define durable artifact/report mapping for template id/path, proposal path, validation/explain/diff outputs, approval/audit evidence, checksum/version, KAH graph event ids, and capability-check evidence.
+GRAPHMVP-004 defines durable artifact/report mapping for template id/path/version, proposal id/path, validation/explain/diff outputs, approval/audit evidence, checksum/version, KAH graph audit event ids, and capability-check evidence. Later graph tasks must build on this mapping instead of inventing alternate field names.

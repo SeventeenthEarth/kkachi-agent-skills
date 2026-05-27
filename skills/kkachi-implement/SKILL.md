@@ -40,6 +40,7 @@ Plan mode and pending control are backend-sensitive:
 - `selected-cli.json`
 - `capability-check.md`
 - `prompt.md`
+- `graph-evidence.md` when graph state affects implementation scope or graph-managed workflow was requested
 
 ## Outputs
 

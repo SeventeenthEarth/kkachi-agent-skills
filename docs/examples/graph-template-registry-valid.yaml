@@ -106,17 +106,23 @@ validation_expectations:
     - graph_validation_failed
     - graph_run_artifact_conflict
 evidence_contract:
+  canonical_artifact: templates/run-artifacts/graph-evidence.md.tmpl
+  run_artifact_path: graph-evidence.md
+  report_section: kah_graph_evidence
   preserve:
     - registry_version
     - template_id
     - template_path
     - template_version
-    - owner_reviewer_metadata
-    - kah_capability_evidence
+    - capability_check_evidence
     - validation_report_path
-    - explain_or_diff_output_path
-    - proposal_id_path
+    - explain_report_path
+    - semantic_diff_output_path
+    - proposal_id
+    - proposal_path
     - approval_evidence_ref
-    - applied_graph_checksum_version
-    - kah_event_ids
+    - audit_evidence_path
+    - graph_checksum
+    - graph_version
+    - kah_graph_audit_event_ids
     - conflict_fail_closed_reason

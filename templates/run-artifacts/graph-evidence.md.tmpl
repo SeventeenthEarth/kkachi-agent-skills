@@ -1,0 +1,68 @@
+# Graph evidence
+
+Status: `{{ status }}`
+
+Run: `{{ run_id }}`
+Roadmap task: `{{ roadmap_task_id }}`
+Workflow graph path: `.kkachi-workflow.yaml`
+
+## Applicability
+
+- graph affected this run: `{{ graph_affected_run }}`
+- selected graph path: `{{ selected_graph_path }}`
+- fail-closed reason, if graph use was refused: `{{ conflict_fail_closed_reason }}`
+
+## Capability Check Evidence
+
+- capability_check_evidence: `capability-check.md`
+- effective helper version: `{{ effective_helper_version }}`
+- capabilities JSON evidence path: `{{ kah_capabilities_json_path }}`
+- graph help evidence path: `{{ kah_graph_help_path }}`
+- required graph commands present: `{{ required_graph_commands_present }}`
+
+## Template Evidence
+
+- template id: `{{ template_id }}`
+- template path: `{{ template_path }}`
+- template version: `{{ template_version }}`
+- registry version: `{{ registry_version }}`
+
+## Proposal Evidence
+
+- proposal id: `{{ proposal_id }}`
+- proposal path: `{{ proposal_path }}`
+- candidate graph path: `{{ candidate_graph_path }}`
+- proposal reason: `{{ proposal_reason }}`
+
+## Semantic Diff Output
+
+- semantic diff command: `kkachi-agent-helper graph diff --from {{ diff_from_graph }} --to {{ diff_to_graph }} --semantic --json`
+- semantic diff output path: `{{ semantic_diff_output_path }}`
+- semantic diff summary: `{{ semantic_diff_summary }}`
+
+## Validation And Explain Reports
+
+- validation report path: `{{ validation_report_path }}`
+- explain report path: `{{ explain_report_path }}`
+- init report path, if initialized from template: `{{ init_report_path }}`
+
+## Approval And Audit Evidence
+
+- approval evidence ref: `{{ approval_evidence_ref }}`
+- audit evidence path: `{{ audit_evidence_path }}`
+- kah_graph_audit_event_ids:
+  - `{{ kah_graph_audit_event_id }}`
+
+## Applied Graph Identity
+
+- graph checksum: `{{ graph_checksum }}`
+- graph version: `{{ graph_version }}`
+- checksum/version source: `{{ graph_checksum_version_source }}`
+
+## Boundary Notes
+
+- KHS owns template/policy/proposal content.
+- KAH owns validation, diff/propose/apply mechanics, checksum/version, and audit events.
+- KAB evidence is backend/session evidence only, not graph policy authority.
+- `kah graph` alias support is not assumed; use only evidenced `kkachi-agent-helper graph` command output.
+- Missing graph capability means record the gap and use run-local `phase-plan.yaml` evidence only; do not directly edit `.kkachi-workflow.yaml` as fallback.

@@ -533,6 +533,15 @@ Minimum field contract:
 | `workflow_config.path` | root `.kkachi-workflow.yaml` when graph-managed; otherwise `not_applicable` with reason |
 | `workflow_config.source` | existing file, template/policy version, proposal id, or `missing` |
 | `kah_graph_evidence.status` | `validated`, `explain_generated`, `not_available`, `unsupported`, `conflict_blocked` |
+| `kah_graph_evidence.artifact` | `graph-evidence.md` when graph state affects the run or graph-managed workflow was requested |
+| `kah_graph_evidence.template_id` / `template_path` / `template_version` | source graph template identity when initialized or selected |
+| `kah_graph_evidence.proposal_id` / `proposal_path` | KAH graph proposal identity when a graph change is proposed |
+| `kah_graph_evidence.semantic_diff_output_path` | KAH semantic diff output path when diff was used |
+| `kah_graph_evidence.validation_report_path` / `explain_report_path` | KAH graph validation and explain report paths |
+| `kah_graph_evidence.approval_evidence_ref` / `audit_evidence_path` | approval and audit evidence for applied graph changes |
+| `kah_graph_evidence.graph_checksum` / `graph_version` | graph identity after init/validate/apply, as reported by KAH evidence |
+| `kah_graph_evidence.kah_graph_audit_event_ids` | KAH audit event ids for graph init/propose/apply/audit events |
+| `kah_graph_evidence.capability_check_evidence` | reference to `capability-check.md` plus effective-binary `capabilities --json` and `graph --help` captures |
 | `phase_plan.status` | `created`, `loaded`, `validated`, `updated`, `missing_blocked`, `not_applicable`; include `phase_plan.path` |
 | `checklist.status` | `created`, `loaded`, `updated`, `validated`, `missing_blocked`, `not_applicable`; include `checklist.path` |
 | `feedback_rounds.bounds` | `min=1, max=5` for the target policy; label `kah-evidenced, kas-integration-pending` until stale KAS surfaces are closed and active KAS adoption is verified |
@@ -563,6 +572,8 @@ workflow_config:
   path: .kkachi-workflow.yaml
 kah_graph_evidence:
   status: conflict_blocked
+  artifact: graph-evidence.md
+  capability_check_evidence: capability-check.md
 feedback_rounds:
   bounds: "min=1, max=5 (kah-evidenced, kas-integration-pending until stale KAS surfaces close)"
   current: 1

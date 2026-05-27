@@ -21,7 +21,7 @@ KAS owns workflow policy, graph templates, phase applicability, proposal content
 
 | Layer | Owns | Must not own |
 |---|---|---|
-| KAS | graph templates, policy selection, phase applicability/order, declarative proposal content, run evidence requirements | deterministic graph apply/audit mechanics, direct fallback mutation |
+| KAS | graph templates, policy selection, phase applicability/order, declarative proposal content, run evidence requirements | deterministic graph apply/audit mechanics, manual graph mutation |
 | KAH | validation, explanation, semantic diff, proposal record, approved graph apply, checksum/version, audit events, fail-closed source precedence | workflow policy decisions, gate/review policy choice, phase applicability |
 | KAB | backend sessions, plan lifecycle, prompt dispatch, retained bridge evidence | graph policy authority or project graph source of truth |
 
@@ -41,7 +41,7 @@ KAS owns workflow policy, graph templates, phase applicability, proposal content
 - KAS chooses a source template or drafts declarative graph proposal content.
 - KAS first checks effective KAH capabilities for graph support. If graph support is missing from the effective binary, KAS records a roadmap/feedback gap instead of pretending the command exists.
 - KAS uses `kkachi-agent-helper graph` commands only when available and capability-checked. `kah graph` remains shorthand/candidate alias text until a real alias is separately advertised.
-- KAS refuses silent direct YAML edit fallback. Direct edits to `.kkachi-workflow.yaml` are unmanaged input until KAH validates or repairs them through proposal/apply evidence.
+- KAS refuses manual `.kkachi-workflow.yaml` repair. Direct edits are unmanaged input until KAH validates or repairs them through proposal/apply evidence.
 - KAS uses `init --from-template`, not `init --profile`.
 - KAS must not ask KAH to execute imperative policy mutations such as `gate set`, `review-policy set`, or `graph set-policy`.
 - KAS preserves graph evidence in run artifacts when graph changes affect a run.
@@ -77,7 +77,7 @@ graph_guidance:
 
 ## Capability-checked command use
 
-Status: implemented for the real `kkachi-agent-helper graph` command surface when the effective KAH binary advertises it through capabilities/help and command-exit evidence. `kah graph` remains candidate alias behavior unless alias evidence exists.
+Status: implemented for the real `kkachi-agent-helper graph` command surface when the effective KAH binary advertises it through capabilities/help and command-exit evidence. `kah graph` is not current implementation authority unless separate alias evidence exists.
 
 ```text
 kkachi-agent-helper graph init --from-template <template-id-or-path> [--output .kkachi-workflow.yaml] [--json]
@@ -85,7 +85,7 @@ kkachi-agent-helper graph validate [--file .kkachi-workflow.yaml] [--json]
 kkachi-agent-helper graph explain [--file .kkachi-workflow.yaml] [--json]
 kkachi-agent-helper graph diff --from <file-or-ref> --to <file-or-ref> [--semantic] [--json]
 kkachi-agent-helper graph propose --candidate-file <repo-relative-candidate-graph> --reason <text> [--json]
-kkachi-agent-helper graph propose --patch <patch-file> --reason <text> [--json]  # legacy compatibility alias
+kkachi-agent-helper graph propose --patch <repo-relative-candidate-graph> --reason <text> [--json]  # legacy compatibility alias for --candidate-file; not a partial patch DSL
 kkachi-agent-helper graph apply --proposal <proposal-id> --approval <evidence-ref> [--json]
 kkachi-agent-helper graph export --format mermaid|plantuml [--output <path>] [--json]
 ```
@@ -144,16 +144,24 @@ Fail closed when:
 
 ## Evidence preservation requirements
 
-When KAS proposes, initializes, validates, or applies graph state, the run artifacts or final report must preserve:
+When KAS proposes, initializes, validates, or applies graph state, the run must preserve the mapping in `.kkachi/runs/<run_id>/graph-evidence.md` using `templates/run-artifacts/graph-evidence.md.tmpl`, and the final report must summarize the same evidence under `kah_graph_evidence`.
 
-- source template id/path;
-- proposal id/path;
-- semantic diff;
-- validation report;
-- approval/audit evidence;
-- applied graph checksum/version;
-- KAH graph audit event ids;
-- capability check proving the graph command surface existed when used.
+Canonical mapping:
+
+| Required evidence | Artifact/report field |
+|---|---|
+| source template id/path/version | `template_id`, `template_path`, `template_version` |
+| proposal id/path | `proposal_id`, `proposal_path` |
+| semantic diff output | `semantic_diff_output_path` |
+| validation report | `validation_report_path` |
+| explain report | `explain_report_path` |
+| approval evidence | `approval_evidence_ref` |
+| audit evidence | `audit_evidence_path` |
+| graph checksum/version | `graph_checksum`, `graph_version` |
+| KAH graph audit event ids | `kah_graph_audit_event_ids` |
+| capability-check evidence | `capability_check_evidence` |
+
+`capability_check_evidence` must point back to `capability-check.md` and the captured effective-binary `capabilities --json` / `graph --help` evidence. If graph support is missing or stale, preserve the gap in `graph-evidence.md` and continue only with run-local `phase-plan.yaml` evidence.
 
 ## Relationship to run-local phase state
 
@@ -176,7 +184,7 @@ Mermaid and PlantUML outputs are generated visualization artifacts only. They do
 |---|---|
 | MF-1 | `.kkachi-workflow.yaml` is project-level graph state; `phase-plan.yaml` remains run-local execution state/evidence and is not deprecated. |
 | MF-2 | Kkachi v2 `.kkachi/config/workflows/` is outside KAH/KAS graph scope; no fallback, merge, or namespace sharing is implied. |
-| MF-3 | `kkachi-agent-helper graph` is implemented when effective KAH capabilities/help prove it; `kah graph` alias remains planned/candidate until alias evidence exists. |
+| MF-3 | `kkachi-agent-helper graph` is implemented when effective KAH capabilities/help prove it; `kah graph` must not be treated as implemented without alias evidence. |
 | MF-4 | Mutation input precedence, runtime/evidence precedence, and fail-closed rules are explicit above. |
 | MF-5 | Command classification contains zero policy-mutation commands; KAS must not ask KAH for imperative policy-setting graph commands. |
 
@@ -184,14 +192,14 @@ Mermaid and PlantUML outputs are generated visualization artifacts only. They do
 
 - Any older KAS wording that calls `phase-plan.yaml` the entire workflow SOT is narrowed to run-local execution state/evidence.
 - Any prior `.kkachi-config.yaml` or `.kkachi-config.json` graph language is superseded by `.kkachi-workflow.yaml` for this integration plan.
-- Any use of `kah graph` without alias capability evidence is planned/candidate shorthand, not current implementation authority. Use `kkachi-agent-helper graph` for the evidenced command surface after effective-binary capability checks.
+- Any use of `kah graph` without alias capability evidence is non-authoritative shorthand. Use `kkachi-agent-helper graph` for the evidenced command surface after effective-binary capability checks.
 
 ## Open questions
 
-- KAS graph template registry format, default template content, and capability-checked orchestration guidance are defined by `graph-template-registry.md`, `registries/graph-template-registry.yaml`, `templates/workflow-graphs/kas-default.yaml`, this SOT, and the KAS orchestration skills; artifact/report mapping remains GRAPHMVP-004.
-- Exact KAS mapping of KAH proposal paths, event ids, and checksum/version evidence into run artifacts remains KAS integration work; KAH graph proposal/apply surfaces are implemented.
+- KAS graph template registry format, default template content, capability-checked orchestration guidance, and artifact/report mapping are defined by `graph-template-registry.md`, `registries/graph-template-registry.yaml`, `templates/workflow-graphs/kas-default.yaml`, `templates/run-artifacts/graph-evidence.md.tmpl`, this SOT, and the KAS orchestration skills.
+- Exact KAH output payload names remain owned by KAH, but KAS artifacts must normalize proposal paths, event ids, and checksum/version evidence into the canonical fields above.
 - KAB alignment with applied graph version is future/non-authoritative until a separate KAB docs update is assigned.
 
-## Next record action
+## Record state
 
-After GRAPHMVP-003, implement remaining KAS graph integration one PR-candidate task at a time from `docs/roadmap.md`, starting with GRAPHMVP-004 artifact/report mapping for the evidenced KAH 0.1.4 `kkachi-agent-helper graph` surface.
+GRAPHMVP-004 records artifact/report evidence fields only. Later graph work must stay scoped to `docs/roadmap.md`; do not add graph apply automation, assume `kah graph` alias support, or make KAB graph-version propagation authoritative without separate evidence.

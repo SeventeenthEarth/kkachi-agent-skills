@@ -100,7 +100,7 @@ Older wording that calls `phase-plan.yaml` the whole workflow SOT must be read n
 ## Open questions
 
 - KAS graph template registry format, default `kas-default` template content, and capability-checked orchestration adoption are defined by `sot/graph-template-registry.md`, `registries/graph-template-registry.yaml`, `templates/workflow-graphs/kas-default.yaml`, `sot/workflow-graph-integration.md`, and the KAS orchestration skills.
-- Exact KAS artifact mapping for KAH graph proposal paths, checksums, and audit event ids remains GRAPHMVP-004 roadmap work; KAH graph proposal/apply capability, registry/template adoption, and orchestration guidance are evidenced, while report/artifact mapping still requires the next focused update.
+- Exact KAS artifact mapping for KAH graph proposal paths, semantic diff, validation/explain reports, approvals/audit evidence, checksums, graph versions, audit event ids, and capability-check evidence is defined by `templates/run-artifacts/graph-evidence.md.tmpl` and summarized in final reports under `kah_graph_evidence`.
 - KAB alignment requires separate KAB docs work and is non-authoritative here.
 
 ## Next record action
