@@ -12,7 +12,7 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 ## Core rule
 
-Do not implement from chat-only instruction. Do not bypass KAB for KHS code-change or development runs. If the master requires code change without KAB, convert to a normal direct Hermes task rather than continuing as KHS.
+Do not implement from chat-only instruction. Do not bypass KAB when implementation requires backend execution, KAB plan lifecycle, bridge evidence, or KAB-backed code-change authority. Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB only when explicitly authorized and recorded; such work must not claim KAB runtime support.
 
 Implementation starts only after `plan`, `ask`, `phase-plan.yaml`, `checklist.md`, backend selection, capability check, and prompt composition are complete. Hermes may auto-start only low-risk work after notifying the master. Require explicit master approval for API, DB/schema/migration, security/auth/secrets, dependency, architecture, SOT, large diff/broad fanout, low confidence, or unresolved ask ambiguity.
 

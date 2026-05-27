@@ -361,8 +361,8 @@ Known stale surfaces before support claim, confirmed by repository search during
 | `templates/run-artifacts/phase-plan.yaml.tmpl:64-65` | `min_rounds: 1`, `max_rounds: 3` | updated by STALECLEAN-002 to `max_rounds: 5` |
 | `templates/run-artifacts/phase-plan.yaml.tmpl:170-188` | explicit `request_feedback_3` / `handle_feedback_3` maximum-round shape | updated by STALECLEAN-002 with optional request/handle rows for rounds 4 and 5 |
 | `templates/run-artifacts/checklist.md.tmpl:41-42` | `request_feedback_3` / `handle_feedback_3` as maximum feedback round | updated by STALECLEAN-002 with optional request/handle rows for rounds 4 and 5 |
-| `docs/sot/phase-orchestration-policy.md:98-99` | up to two additional rounds; maximum three pairs | supersede or amend before operational support claim |
-| `docs/sot/phase-orchestration-policy.md:121-122` | final verification expects feedback rounds between one and three | supersede or amend before operational support claim |
+| `docs/sot/phase-orchestration-policy.md` feedback loop | historical max-three wording | updated by STALECLEAN-003 while preserving `kah-evidenced, kas-integration-pending` until end-to-end adoption is verified |
+| `docs/sot/phase-orchestration-policy.md` final verification | historical unconditional KAB evidence requirement | updated by STALECLEAN-003 to require KAB evidence when the run is KAB-backed or claims backend runtime evidence |
 | `docs/sot/skill-template.md:356` and `581` | rounds 2-3 only | update or mark historical/stale |
 | `docs/sot/concept.md:64` | feedback may run up to three rounds | update or mark historical/stale |
 | `docs/sot/concept.md:690` | rounds 2-3 only | update or mark historical/stale |

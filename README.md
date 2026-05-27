@@ -3,11 +3,13 @@
 Kkachi Agent Skills (KAS; repository historically named `kkachi-hermes-skills` / KHS) is the Hermes Agent skill/process pack for running
 Kkachi software-development workflows.
 
-KHS does not execute external AI CLIs directly and does not own project state.
+KHS does not own project state and does not replace KAB runtime control.
 It teaches Hermes Agent how to classify a task, prepare an AI-neutral task
-contract, select a KAB backend lane, render the backend-specific prompt, call
-KAH for deterministic run state, call KAB for backend execution, and preserve
-evidence for review, verification, documentation, and self-improvement.
+contract, call KAH for deterministic run state, and preserve evidence for
+review, verification, documentation, and self-improvement. When a run needs
+backend execution, automated review-by-different-tool transport, KAB plan
+lifecycle, or bridge evidence, KHS must select a KAB backend lane, render the
+backend-specific prompt, call KAB, and preserve KAB runtime evidence.
 
 Maturity note: KAS is now in the post-KAH 0.1.4 enablement lane. It is still an
 early skill/process pack rather than a final polished product, but KAH graph and
@@ -31,9 +33,8 @@ KHS now keeps two lanes distinct:
    - Candidate record: `docs/sot/minimum-pilot-cli-lane.md`.
 
 2. Full execution-runtime lane
-   - Scope: KHS-governed code-change or backend-executed runs.
-   - Authority: existing KHS+KAH+KAB path remains the required execution path
-     for KAB-backed KHS runs.
+   - Scope: KHS-governed backend-executed runs, automated review-by-different-tool transport, KAB plan lifecycle, and bridge evidence.
+   - Authority: existing KHS+KAH+KAB path remains required when the run is KAB-backed or claims backend runtime evidence. Scoped CLIMVP/GRAPHMVP/KAS docs or CLI work may proceed without KAB only when the lane is explicitly KAS/KAH-local and records that no KAB runtime support is claimed.
 
 ## Components
 
@@ -81,8 +82,9 @@ manifest/checksum evidence, and prints recovery guidance.
 `doctor` verifies source pack integrity, installed profile state,
 manifest/checksum consistency, KAH availability/version/capabilities, optional
 project bootstrap/doctor status, and the KAB boundary for the requested lane.
-KAB is not required for this profile-scoped minimum CLI lane, while full
-execution-runtime work remains KAB-gated.
+KAB is not required for this profile-scoped minimum CLI lane. KAB remains
+required for backend execution, automated review-by-different-tool transport,
+KAB plan lifecycle, and bridge evidence when those surfaces are in scope.
 
 `--profile-root <path>` is accepted only under the explicit test/harness guard
 `KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1`.
@@ -136,7 +138,9 @@ Kkachi stack:
 If the master asks only for the scoped KHS+KAH minimum/pilot harness, KAB
 verification is not mandatory for profile-scoped skill install/injection,
 `list`, `doctor`, `sync`, or `proposal` planning. That scoped lane must still
-report that KAB is required before any KAB-backed KHS code-change run.
+report that KAB is required before backend-executed runs, automated
+review-by-different-tool transport, KAB plan lifecycle, or bridge evidence are
+claimed.
 
 If the master says "apply KHS to this project directory", Hermes should not
 manually create ad hoc state files. Hermes should run KAH `project init` in the
@@ -158,7 +162,7 @@ orchestrate
   -> improve
 ```
 
-The user selects the target roadmap task for each run. Hermes manages, approves risk, and final-verifies; KAB backend roles do the substantive planning, implementation, docs, feedback, and feedback handling. Code-change KHS runs use KAB; if the user forbids KAB for code changes, treat the work as a normal direct Hermes task instead of a KHS run.
+The user selects the target roadmap task for each run. Hermes manages, approves risk, and final-verifies. KAB backend roles perform substantive planning, implementation, docs, feedback, and feedback handling only for KAB-backed phases. Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when explicitly authorized and recorded, but must not claim backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence.
 
 ## Install Flow
 

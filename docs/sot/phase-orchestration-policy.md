@@ -36,10 +36,10 @@ This document records the current user-confirmed KHS behavior for software-devel
 
 ## KAB usage
 
-- KHS code-change and development runs use KAB.
-- If the master wants code changes without KAB, the task becomes a normal direct Hermes task, not a KHS run.
-- Docs-only KHS runs also use KAB by default.
-- Direct docs editing is allowed only when the master explicitly forbids KAB; KHS records the no-KAB rationale in `phase-plan.yaml`, `docs-update.md`, and the final report.
+- KAB is required when a run needs backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence.
+- KAB-backed code-change and development runs must preserve selected backend identity, runtime evidence, and bridge completion evidence.
+- Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when the master or roadmap authorizes that lane.
+- No-KAB KAS/KAH-local work must record the rationale in `phase-plan.yaml`, `docs-update.md`, and the final report, and must not claim KAB runtime support.
 
 ## Canonical phase spine
 
@@ -95,8 +95,8 @@ Hermes may auto-start low-risk work after notifying the master. Explicit master 
 ## Feedback loop
 
 - Request feedback at least once for every KHS run.
-- Hermes may request up to two additional rounds when more feedback is useful.
-- Maximum: three request-feedback/handle-feedback pairs.
+- Hermes may request optional continuation rounds 2..5 when more feedback is useful.
+- Maximum: five request-feedback/handle-feedback pairs.
 - Each requested feedback round must have matching handling.
 - If feedback has no actionable items, record `no actionable feedback`.
 
@@ -115,7 +115,7 @@ Hermes owns final verification. Before reporting completion, Hermes checks:
 - `phase-plan.yaml` final state
 - `checklist.md` final state
 - KAH gate/final gate results
-- KAB evidence, not just dispatch success
+- KAB evidence, not just dispatch success, when the run is KAB-backed or claims backend runtime evidence
 - required artifacts and skip reasons
 - test/verification evidence
 - docs-update decision

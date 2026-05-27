@@ -62,11 +62,19 @@ task_basis:
     - todo
 
 kab_usage_policy:
-  khs_code_change: required
-  khs_dev_run: required
-  khs_docs_only: default_required
-  docs_only_no_kab_exception: "Allowed only when the master explicitly forbids KAB; record rationale in phase_plan and final report."
-  code_change_no_kab_request: "Convert to a normal direct Hermes task, not a KHS run."
+  backend_execution: required_when_backend_or_bridge_evidence_needed
+  automated_review_by_different_tool: kab_later_until_transport_evidenced
+  plan_lifecycle: required_when_kab_plan_surface_is_used
+  bridge_evidence: required_when_runtime_completion_or_backend_identity_is_claimed
+  khs_code_change: required_when_kab_backed_or_backend_executed
+  khs_dev_run: required_when_backend_execution_plan_lifecycle_or_bridge_evidence_is_part_of_contract
+  khs_docs_only: not_required_unless_backend_execution_or_kab_review_transport_needed
+  kas_kah_local_exception: "Allowed for scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance when explicitly authorized and recorded; must not claim KAB runtime support."
+  kab_later_required_for:
+    - backend_execution
+    - automated_review_by_different_tool
+    - kab_plan_lifecycle
+    - bridge_evidence
 
 feedback_loop_policy:
   minimum_rounds: 1
@@ -92,7 +100,7 @@ implementation_approval_policy:
 paths:
   A_development_execution:
     description: "Existing SOT, roadmap trace, and acceptance basis exists before implementation."
-    code_write_default: allowed_through_kab_for_khs
+    code_write_default: allowed_through_approved_lane; KAB required only for KAB-backed or backend-executed writes
     required_before_write:
       - sot_basis
       - roadmap_trace_or_not_applicable_reason

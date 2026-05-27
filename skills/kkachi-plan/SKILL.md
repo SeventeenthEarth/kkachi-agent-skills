@@ -46,7 +46,7 @@ kkachi-agent-bridge plan read --session <session_id>
 # or: GET /api/plan/<session_id>
 ```
 
-Copy the response field `plan.plan_text` into `plan.md`. Preserve `plan.plan_state`, `plan.plan_ref`, and `plan.source_evidence` in `plan.md` and/or `bridge-events.md`.
+Copy the response field `plan.plan_text` into `plan.md` when a KAB planner lane is used. Preserve `plan.plan_state`, `plan.plan_ref`, and `plan.source_evidence` in `plan.md` and/or `bridge-events.md`. For explicitly authorized KAS/KAH-local planning, record the non-KAB plan source and do not claim KAB plan lifecycle evidence.
 
 Backend timing rules:
 
@@ -64,7 +64,7 @@ Safe order:
 
 ## Checklist rule
 
-`checklist.md` is mandatory, not optional. KAB does not directly provide the normalized KHS checklist. KAB provides `plan.plan_text`, and KHS should ask the planner to include a parse-friendly `KHS Checklist Seed` inside that plan. KHS/Hermes must transform that seed plus the KHS phase contract into a normalized KHS progress checklist and store it as the KAH `checklist.md` artifact during the plan phase, after `plan.plan_text` is captured. Then update it after `ask` and after every later phase. The checklist is the operator-facing progress tracker for the KHS run.
+`checklist.md` is mandatory, not optional. KAB does not directly provide the normalized KHS checklist. When a KAB planner lane is used, KAB provides `plan.plan_text`, and KHS should ask the planner to include a parse-friendly `KHS Checklist Seed` inside that plan. KHS/Hermes must transform that seed plus the KHS phase contract into a normalized KHS progress checklist and store it as the KAH `checklist.md` artifact during the plan phase, after the plan source is captured. Then update it after `ask` and after every later phase. The checklist is the operator-facing progress tracker for the KHS run.
 
 The checklist must include:
 

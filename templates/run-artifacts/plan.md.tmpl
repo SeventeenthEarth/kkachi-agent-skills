@@ -4,17 +4,18 @@ Status: draft
 
 Run: `{{ run_id }}`
 Task: `{{ task_id }}`
-Planner backend: `{{ backend_type }}/{{ adapter_type }}`
-Session: `{{ session_id }}`
-Plan state at capture: `{{ plan_state }}`
-Plan ref: `{{ plan_ref }}`
-Captured from: `kkachi-agent-bridge plan read --session {{ session_id }}` or `GET /api/plan/{{ session_id }}`
+Planner source: `{{ planner_source }}`
+KAB backend when used: `{{ backend_type }}/{{ adapter_type }}`
+Session when used: `{{ session_id }}`
+Plan state at capture when KAB-backed: `{{ plan_state }}`
+Plan ref when KAB-backed: `{{ plan_ref }}`
+Captured from: `kkachi-agent-bridge plan read --session {{ session_id }}` or `GET /api/plan/{{ session_id }}` when KAB-backed; otherwise record the approved KAS/KAH-local planning source.
 Captured before approval: `<yes|no>`
 Approved after capture: `<yes|no>`
 
 ## Capture Rule
 
-KHS must copy `plan.plan_text` from KAB into this artifact before implementation starts.
+When a KAB planner lane is used, copy KAB response field `plan.plan_text` into this artifact before implementation starts. For explicitly authorized KAS/KAH-local planning, record the non-KAB plan source here and do not claim KAB plan lifecycle evidence.
 
 For Claude, GLM, and Codex, `plan approve` starts implementation immediately, so capture must happen while the session is in `plan_pending_approval` and before approval.
 
@@ -30,7 +31,7 @@ If OpenCode reports `PLAN_AMBIGUOUS`, stop and resolve the `.sisyphus/plans/*.md
 
 ## Approved Plan Text
 
-<!-- Paste KAB response field `plan.plan_text` here. Do not summarize away actionable steps. The plan should include a parse-friendly `KHS Checklist Seed` section when KHS requested one. -->
+<!-- Paste KAB response field `plan.plan_text` here when KAB-backed, or paste the authorized KAS/KAH-local plan source. Do not summarize away actionable steps. The plan should include a parse-friendly `KHS Checklist Seed` section when KHS requested one. -->
 
 {{ plan_text }}
 
