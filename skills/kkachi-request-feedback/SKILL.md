@@ -12,11 +12,11 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 ## Core rule
 
-Feedback request is required at least once for every KHS run. It is independent, scoped, and read-only unless explicitly authorized. Hermes may request up to two additional rounds when the first feedback exposes unresolved risk, broad changes, or unclear verification; never exceed three request-feedback/handle-feedback pairs.
+Feedback request is required at least once for every KHS run. It is independent, scoped, and read-only unless explicitly authorized. Hermes may request optional continuation rounds 2..5 when earlier feedback exposes unresolved risk, broad changes, or unclear verification; never exceed five request-feedback/handle-feedback pairs.
 
 ## Outputs
 
 - `feedback-request.md`
 - `feedback-1.md`
-- optional `feedback-2.md` / `feedback-3.md` as KHS supplemental artifacts when additional rounds run
+- optional `feedback-2.md` through `feedback-5.md` as KHS supplemental artifacts when additional rounds run
 - KAH phase/gate events, when supported

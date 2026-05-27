@@ -351,16 +351,16 @@ Known stale surfaces before support claim, confirmed by repository search during
 | Surface | Confirmed marker | Required status before support claim |
 |---|---|---|
 | `README.md:108` | Historical `request-feedback(1..3) / handle-feedback(1..3)` marker | updated by INITDOC-002 to min=1/max=5 semantics |
-| `registries/phase-contracts.yaml:72-73` | `minimum_rounds: 1`, `maximum_rounds: 3` | update registry in a KAS adoption task or keep marked stale/integration-pending |
-| `registries/phase-contracts.yaml:140` | `request_feedback_2/3 and handle_feedback_2/3 ... must not exceed round 3` | update to rounds 2..5 optional continuation or mark stale/candidate |
-| `registries/phase-contracts.yaml:202-203` | `conditional_feedback_rounds_2_to_3` | update to rounds 2..5 optional continuation or mark stale/candidate |
-| `registries/phase-contracts.yaml:222` | `Feedback must run at least once and at most three times` | update final checklist rule to min=1/max=5 semantics or mark stale/candidate |
-| `registries/phase-contracts.yaml:286-293` | request-feedback intent says optional extra rounds up to three; applicability says `rounds_2_to_3`; outputs stop at `feedback-3.md` | update request-feedback phase contract to rounds 2..5 optional continuation or mark stale/candidate |
-| `registries/phase-contracts.yaml:304-305` | handle-feedback outputs stop at `feedback-triage-3.md` / `handle-feedback-3.md` | update handle-feedback phase contract to rounds 2..5 optional continuation or mark stale/candidate |
-| `templates/run-artifacts/task-contract.yaml.tmpl:59-61` | `feedback_rounds: min: 1 / max: 3` | confirmed stale marker; update or mark historical before support claim |
-| `templates/run-artifacts/phase-plan.yaml.tmpl:64-65` | `min_rounds: 1`, `max_rounds: 3` | update or mark historical before support claim |
-| `templates/run-artifacts/phase-plan.yaml.tmpl:170-188` | explicit `request_feedback_3` / `handle_feedback_3` maximum-round shape | add 4/5 support or mark seed as stale/candidate |
-| `templates/run-artifacts/checklist.md.tmpl:41-42` | `request_feedback_3` / `handle_feedback_3` as maximum feedback round | add 4/5 support or mark seed as stale/candidate |
+| `registries/phase-contracts.yaml:72-73` | `minimum_rounds: 1`, `maximum_rounds: 3` | updated by STALECLEAN-002 to `maximum_rounds: 5`; support label remains `kah-evidenced, kas-integration-pending` until end-to-end adoption is verified |
+| `registries/phase-contracts.yaml:140` | `request_feedback_2/3 and handle_feedback_2/3 ... must not exceed round 3` | updated by STALECLEAN-002 to conditional continuation rounds 2..5 |
+| `registries/phase-contracts.yaml:202-203` | `conditional_feedback_rounds_2_to_3` | updated by STALECLEAN-002 to `conditional_feedback_rounds_2_to_5` |
+| `registries/phase-contracts.yaml:222` | `Feedback must run at least once and at most three times` | updated by STALECLEAN-002 to min 1 / max 5 with optional rounds 2..5 |
+| `registries/phase-contracts.yaml:286-293` | request-feedback intent says optional extra rounds up to three; applicability says `rounds_2_to_3`; outputs stop at `feedback-3.md` | updated by STALECLEAN-002 with optional request-feedback outputs through `feedback-5.md` |
+| `registries/phase-contracts.yaml:304-305` | handle-feedback outputs stop at `feedback-triage-3.md` / `handle-feedback-3.md` | updated by STALECLEAN-002 with handle-feedback outputs through round 5 |
+| `templates/run-artifacts/task-contract.yaml.tmpl:59-61` | `feedback_rounds: min: 1 / max: 3` | updated by STALECLEAN-002 to min 1 / max 5 |
+| `templates/run-artifacts/phase-plan.yaml.tmpl:64-65` | `min_rounds: 1`, `max_rounds: 3` | updated by STALECLEAN-002 to `max_rounds: 5` |
+| `templates/run-artifacts/phase-plan.yaml.tmpl:170-188` | explicit `request_feedback_3` / `handle_feedback_3` maximum-round shape | updated by STALECLEAN-002 with optional request/handle rows for rounds 4 and 5 |
+| `templates/run-artifacts/checklist.md.tmpl:41-42` | `request_feedback_3` / `handle_feedback_3` as maximum feedback round | updated by STALECLEAN-002 with optional request/handle rows for rounds 4 and 5 |
 | `docs/sot/phase-orchestration-policy.md:98-99` | up to two additional rounds; maximum three pairs | supersede or amend before operational support claim |
 | `docs/sot/phase-orchestration-policy.md:121-122` | final verification expects feedback rounds between one and three | supersede or amend before operational support claim |
 | `docs/sot/skill-template.md:356` and `581` | rounds 2-3 only | update or mark historical/stale |

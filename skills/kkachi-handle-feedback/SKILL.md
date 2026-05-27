@@ -20,6 +20,8 @@ Do not blindly apply feedback. Handle every requested feedback round. Separate v
 - `handle-feedback-1.md`
 - optional `feedback-triage-2.md` / `handle-feedback-2.md` as KHS supplemental artifacts when round 2 runs
 - optional `feedback-triage-3.md` / `handle-feedback-3.md` as KHS supplemental artifacts when round 3 runs
+- optional `feedback-triage-4.md` / `handle-feedback-4.md` as KHS supplemental artifacts when round 4 runs
+- optional `feedback-triage-5.md` / `handle-feedback-5.md` as KHS supplemental artifacts when round 5 runs
 - updated diff when valid feedback is applied
 - rerun verification evidence when feedback changes code/docs
 - KAH phase/gate events, when supported

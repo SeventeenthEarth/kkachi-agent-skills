@@ -69,7 +69,7 @@ implementation_approval:
 
 feedback_loop:
   min_rounds: 1
-  max_rounds: 3
+  max_rounds: 5
   planned_rounds: "{{ planned_feedback_rounds }}"
   round_decision_reason: "{{ feedback_round_decision_reason }}"
 
@@ -181,7 +181,7 @@ phases:
     backend_or_session: "{{ feedback_session_id }}"
     evidence:
       - feedback-3.md
-    check: "Maximum feedback round."
+    check: "Run only if Hermes requests a third feedback round."
     skip_reason: "{{ feedback_3_skip_reason }}"
   - phase: handle_feedback_3
     applicability: conditional
@@ -193,6 +193,44 @@ phases:
       - handle-feedback-3.md
     check: "Required only if request_feedback_3 runs."
     skip_reason: "{{ feedback_3_skip_reason }}"
+  - phase: request_feedback_4
+    applicability: conditional
+    state: skipped
+    owner_role: feedback_backend
+    backend_or_session: "{{ feedback_session_id }}"
+    evidence:
+      - feedback-4.md
+    check: "Run only if Hermes requests a fourth feedback round."
+    skip_reason: "{{ feedback_4_skip_reason }}"
+  - phase: handle_feedback_4
+    applicability: conditional
+    state: skipped
+    owner_role: implementer_backend_plus_hermes
+    backend_or_session: "{{ implementer_session_id }}"
+    evidence:
+      - feedback-triage-4.md
+      - handle-feedback-4.md
+    check: "Required only if request_feedback_4 runs."
+    skip_reason: "{{ feedback_4_skip_reason }}"
+  - phase: request_feedback_5
+    applicability: conditional
+    state: skipped
+    owner_role: feedback_backend
+    backend_or_session: "{{ feedback_session_id }}"
+    evidence:
+      - feedback-5.md
+    check: "Maximum feedback round; run only if Hermes requests a fifth feedback round."
+    skip_reason: "{{ feedback_5_skip_reason }}"
+  - phase: handle_feedback_5
+    applicability: conditional
+    state: skipped
+    owner_role: implementer_backend_plus_hermes
+    backend_or_session: "{{ implementer_session_id }}"
+    evidence:
+      - feedback-triage-5.md
+      - handle-feedback-5.md
+    check: "Required only if request_feedback_5 runs."
+    skip_reason: "{{ feedback_5_skip_reason }}"
   - phase: final_verify
     applicability: required
     state: pending

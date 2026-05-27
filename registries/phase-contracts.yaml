@@ -70,9 +70,9 @@ kab_usage_policy:
 
 feedback_loop_policy:
   minimum_rounds: 1
-  maximum_rounds: 3
+  maximum_rounds: 5
   round_1_required: true
-  additional_rounds: "Hermes decides when another request-feedback/handle-feedback pair is useful."
+  additional_rounds: "Hermes decides when optional request-feedback/handle-feedback continuation rounds 2..5 are useful; additional rounds are not mandatory."
   no_actionable_feedback: "Still run handle-feedback and record 'no actionable feedback'."
 
 implementation_approval_policy:
@@ -137,7 +137,7 @@ phase_plan_contract:
     - "KAH work_path/work_mode/execution_mode may inform initial defaults but must not override phase_plan applicability."
     - "Skipped or not_applicable entries require a reason."
     - "request_feedback_1 and handle_feedback_1 are required for every KHS run."
-    - "request_feedback_2/3 and handle_feedback_2/3 are conditional and must not exceed round 3."
+    - "request_feedback_2..5 and handle_feedback_2..5 are conditional continuation rounds and must not exceed round 5."
     - "Code-change runs include optimize as conditional_recommended; skipping requires a reason."
     - "final_verify checks phase_plan and checklist.md before final report."
 
@@ -200,7 +200,7 @@ phases:
       required_rows:
         - every_canonical_phase
         - feedback_round_1
-        - conditional_feedback_rounds_2_to_3
+        - conditional_feedback_rounds_2_to_5
       required_fields:
         - phase
         - required_or_conditional
@@ -219,7 +219,7 @@ phases:
       rules:
         - "Skipped or not-applicable phases must keep a row with an explicit reason."
         - "Code-change runs include optimize by default; skipping optimize requires a reason."
-        - "Feedback must run at least once and at most three times."
+        - "Feedback must run at least once and at most five times; rounds 2..5 are optional continuation rounds only."
         - "Final verification must use checklist.md to prove every required phase has evidence."
     gate: plan_gate
   ask:
@@ -283,14 +283,16 @@ phases:
       - "A no-docs-change decision is still an artifact, not an omitted phase."
     gate: docs_gate
   request_feedback:
-    intent: "Request independent read-only feedback for every KHS run, with optional extra rounds up to three."
+    intent: "Request independent read-only feedback for every KHS run, with optional continuation rounds 2..5 when useful feedback risk remains."
     owner_role: feedback_backend
-    applicability: required_round_1_conditional_rounds_2_to_3
+    applicability: required_round_1_conditional_rounds_2_to_5
     expected_outputs:
       - feedback-request.md
       - feedback-1.md
       - feedback-2.md_when_round_2_runs
       - feedback-3.md_when_round_3_runs
+      - feedback-4.md_when_round_4_runs
+      - feedback-5.md_when_round_5_runs
     gate: feedback_request_gate
   handle_feedback:
     intent: "Triage every requested feedback round, apply valid items, and reject invalid items with evidence."
@@ -303,6 +305,10 @@ phases:
       - handle-feedback-2.md_when_round_2_runs
       - feedback-triage-3.md_when_round_3_runs
       - handle-feedback-3.md_when_round_3_runs
+      - feedback-triage-4.md_when_round_4_runs
+      - handle-feedback-4.md_when_round_4_runs
+      - feedback-triage-5.md_when_round_5_runs
+      - handle-feedback-5.md_when_round_5_runs
     rules:
       - "If feedback has no actionable items, record 'no actionable feedback'."
       - "When feedback changes code/docs, rerun affected verification."

@@ -78,7 +78,7 @@ The checklist must include:
 - explicit skip reason for any skipped or not-applicable phase;
 - micro-task rows derived from the approved plan.
 
-For code-change runs, include an `optimize` row by default. It may be skipped only with a reason. For feedback, include round 1 as required and rounds 2-3 as conditional; do not exceed three feedback/handle-feedback pairs.
+For code-change runs, include an `optimize` row by default. It may be skipped only with a reason. For feedback, include round 1 as required and rounds 2..5 as conditional continuation rounds; do not exceed five feedback/handle-feedback pairs.
 
 ## Gate
 

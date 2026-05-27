@@ -38,8 +38,12 @@ KAB does not own this file. KAB supplies the backend-authored plan text and sour
 | handle_feedback_1 | yes | pending | implementer + Hermes | TBD | `feedback-triage-1.md`, `handle-feedback-1.md` | feedback handling | Record no actionable feedback if applicable. |
 | request_feedback_2 | conditional | skipped | feedback | TBD | `feedback-2.md` | feedback evidence | Use only when Hermes judges another round necessary. |
 | handle_feedback_2 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-2.md`, `handle-feedback-2.md` | feedback handling | Required only if round 2 is requested. |
-| request_feedback_3 | conditional | skipped | feedback | TBD | `feedback-3.md` | feedback evidence | Maximum feedback round. |
+| request_feedback_3 | conditional | skipped | feedback | TBD | `feedback-3.md` | feedback evidence | Use only when Hermes judges a third round necessary. |
 | handle_feedback_3 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-3.md`, `handle-feedback-3.md` | feedback handling | Required only if round 3 is requested. |
+| request_feedback_4 | conditional | skipped | feedback | TBD | `feedback-4.md` | feedback evidence | Use only when Hermes judges a fourth round necessary. |
+| handle_feedback_4 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-4.md`, `handle-feedback-4.md` | feedback handling | Required only if round 4 is requested. |
+| request_feedback_5 | conditional | skipped | feedback | TBD | `feedback-5.md` | feedback evidence | Maximum feedback round; use only when Hermes judges a fifth round necessary. |
+| handle_feedback_5 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-5.md`, `handle-feedback-5.md` | feedback handling | Required only if round 5 is requested. |
 | final_verify | yes | pending | Hermes | local + KAH/KAB evidence | `verification.md`, `final-report.md` | `kkachi-agent-helper gate final <run_id> --json` | Hermes verifies artifacts, gates, repo state, and final user report. Use `gate check <run_id> final --json` only as an older-helper compatibility fallback. |
 | improve | conditional | pending | Hermes | local | `improvement-note.md` | improvement review | Record reusable lessons or explicit no-promotion decision. |
 

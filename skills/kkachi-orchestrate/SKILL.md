@@ -32,7 +32,7 @@ Path B replaces production code implementation with shaping, SOT, roadmap, accep
 - Logical backend roles are planner (`plan`, `ask`), implementer (`implement`, `enhance-test`, `optimize`, `docs-update`, `handle-feedback`), and feedback (`request-feedback`). They may map to the same or different physical backends.
 - `ask`, `request-feedback-1`, `handle-feedback-1`, and `final-verify` are mandatory for every KHS run.
 - `optimize` is conditional but strongly recommended for code-change runs to remove AI slop, duplication, and small structural waste; skipping requires a reason.
-- Feedback runs at least once and at most three rounds. Each requested feedback round must have a matching handle-feedback round.
+- Feedback runs at least once and at most five rounds. Rounds 2..5 are optional continuation rounds, and each requested feedback round must have a matching handle-feedback round.
 
 ## Implementation approval policy
 
