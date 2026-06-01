@@ -138,9 +138,10 @@ Kkachi stack:
 If the master asks only for the scoped KHS+KAH minimum/pilot harness, KAB
 verification is not mandatory for profile-scoped skill install/injection,
 `list`, `doctor`, `sync`, or `proposal` planning. That scoped lane must still
-report that KAB is required before backend-executed runs, automated
+report that KAB is required before KAB-backed execution, automated
 review-by-different-tool transport, KAB plan lifecycle, or bridge evidence are
-claimed.
+claimed. The current P1/kan-plugin lane may use Hermes direct Codex app-server
+through KAS/KAH with no KAB runtime claim until KAB implementation is ready.
 
 If the master says "apply KHS to this project directory", Hermes should not
 manually create ad hoc state files. Hermes should run KAH `project init` in the

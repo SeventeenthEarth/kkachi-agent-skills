@@ -36,7 +36,7 @@ This document records the current user-confirmed KHS behavior for software-devel
 
 ## KAB usage
 
-- KAB is required when a run needs backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence.
+- KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. Direct Codex app-server pilot work remains a no-KAB lane until KAB runtime is ready.
 - KAB-backed code-change and development runs must preserve selected backend identity, runtime evidence, and bridge completion evidence.
 - Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when the master or roadmap authorizes that lane.
 - No-KAB KAS/KAH-local work must record the rationale in `phase-plan.yaml`, `docs-update.md`, and the final report, and must not claim KAB runtime support.

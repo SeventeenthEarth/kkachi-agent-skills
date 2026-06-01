@@ -6,13 +6,13 @@ version: 0.1.0
 
 # Kkachi Backend Select
 
-Use this skill after `task-contract.yaml` exists and before composing any KAB prompt.
+Use this skill after `task-contract.yaml` exists and before composing any KAB prompt. Do not use it for the current direct Codex app-server pilot lane unless the run explicitly selects KAB or claims bridge evidence.
 
 Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an explicit master request has selected KHS/Kkachi for the work. Do not trigger it for ordinary direct Hermes edits, quick one-file fixes, typo/config patches, or read-only explanations unless the master explicitly asks for KHS/Kkachi or delegates the work to a KHS-using commander such as 조운 or 마초.
 
 ## Core rule
 
-Capability and project-policy gates run before user preference. Preference ranks eligible backends; it cannot make an ineligible backend safe.
+Capability and project-policy gates run before user preference. Preference ranks eligible KAB backends; it cannot make an ineligible backend safe. If KAB runtime is not implemented/ready for the project, select the explicit no-KAB direct Codex app-server lane outside this KAB backend-selection skill and record the rationale in task/phase artifacts.
 
 ## Inputs
 

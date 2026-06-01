@@ -22,7 +22,7 @@ func TestStaleClean004KAHCapabilityPostureIsCurrent(t *testing.T) {
 	})
 
 	requireContainsAll(t, "docs/sot/concept.md", []string{
-		"KAB is required when a run needs backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence.",
+		"KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract.",
 		"Feedback may run up to five rounds: round 1 is required when external feedback is in the run contract, and rounds 2..5 are optional continuation rounds.",
 		"optional continuation rounds 2..5 may be skipped with an explicit reason.",
 	})
