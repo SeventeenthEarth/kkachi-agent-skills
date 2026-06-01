@@ -62,6 +62,7 @@ task_basis:
     - todo
 
 task_classification_policy:
+  activation_boundary: "Classification is inside KHS/Kkachi project-execution mode only; default Hermes/direct commander conversation remains outside KHS unless activation triggers are met."
   classification_required_before_phase_selection: true
   source: registries/task-taxonomy.yaml
   classes:
@@ -72,10 +73,12 @@ task_classification_policy:
     - bootstrap_config
     - collaboration_review
   rules:
+    - "Do not classify every chat turn; first decide whether KHS mode is active for this project/run."
     - "Do not apply the full development spine to read-only research, evidence collection, simple command/report, or pure docs tasks."
     - "Every skipped development phase must have an explicit reason in task-contract.yaml, phase-plan.yaml, checklist.md, and final report."
     - "Simple command/report tasks normally stay outside KHS unless the master explicitly keeps them inside a KHS/KAH run."
     - "Long-lived team-member collaboration uses Kanban evidence; temporary subagents do not count as team-member delegation."
+    - "State investigation that only reports current facts maps to research_evidence; changing spec/SOT/roadmap/handoff from that evidence maps to docs_only + Path B unless it also changes executable behavior or execution policy."
     - "If a docs-only task changes architecture, process policy, contracts, roadmap status, or examples that tests validate, require docs validation and consider CodeGraph refresh."
   default_spines:
     development_full:

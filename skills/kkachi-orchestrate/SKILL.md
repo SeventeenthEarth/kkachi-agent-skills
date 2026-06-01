@@ -10,6 +10,12 @@ Use this skill when the master asks Hermes Agent to run a Kkachi project task en
 
 Do not use this skill for ordinary direct Hermes edits, small one-file fixes, typo/config tweaks, or read-only explanations unless the master explicitly requests KHS/Kkachi or delegates the work to a KHS-using commander.
 
+## Activation boundary
+
+Default mode is direct commander response: answer, inspect, or perform bounded non-durable work without creating a KHS task. KHS mode starts only when the master explicitly selects KHS/Kkachi/KAB/KAH, applies KHS to a project directory, requests durable repo artifact changes under a Kkachi-governed project, asks for phase/gate evidence, or the work needs backend execution, KAB plan lifecycle, bridge evidence, or long-lived team collaboration. Task classification is mandatory only after KHS mode is active; it must not turn every chat message into a KAS task.
+
+For state investigation that leads to spec or roadmap work, use `research_evidence` for the read-only evidence stage and `docs_only + Path B shaping` for durable spec/SOT/roadmap/handoff edits. Escalate to `development` only when the request includes code, tests, build behavior, executable contracts, or future execution-policy changes.
+
 ## Core rule
 
 Orchestration chooses phases and gates; it does not bypass phase contracts. KHS has two workflow layers: `.kkachi-workflow.yaml` is project-level graph state only after capability-checked `kkachi-agent-helper graph` evidence, while `.kkachi/runs/<run_id>/phase-plan.yaml` is run-local execution state/evidence. KAH is mandatory once KHS is triggered because KAH owns deterministic state, artifacts, events, locks, schemas, diagnostics, gates, and graph validation/apply mechanics, but KAH `work_path`, `work_mode`, and `execution_mode` are helper classification metadata rather than phase authority. KAB-backed work additionally requires task contract, backend selection, capability check, rendered prompt, and bridge evidence.

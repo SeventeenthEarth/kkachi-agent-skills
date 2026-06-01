@@ -149,7 +149,9 @@ red-team partner, SOT policy, execution mode, and test commands.
 
 After project init, Hermes should use KAS/KHS skills for Kkachi-governed runs. `.kkachi-workflow.yaml` is the project workflow graph only when backed by capability-checked `kkachi-agent-helper graph` validation/proposal/apply evidence; `phase-plan.yaml` remains run-local execution state/evidence. If the effective KAH binary lacks required graph support, record a gap and continue only with run-local phase evidence rather than writing `.kkachi-workflow.yaml` manually. KAH `work_path`, `work_mode`, and `execution_mode` remain deterministic helper metadata only.
 
-Every KHS run starts by classifying the task class: `development`, `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`. The full development loop below applies only to `development`; lighter classes record explicit skipped-phase reasons and use evidence/docs/review/config verification instead of implementation/test/optimize phases.
+KHS task classification is not a global Hermes personality or all-chat rule. Default Hermes mode remains direct commander response. Classification starts only after KHS/Kkachi project-execution mode is active: explicit KHS/Kkachi/KAB/KAH instruction, applying KHS to a project directory, durable repo artifact changes under a governed Kkachi project, phase/gate evidence requirements, backend execution/KAB plan lifecycle/bridge evidence claims, or long-lived team collaboration.
+
+Every active KHS run then starts by classifying the task class: `development`, `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`. The full development loop below applies only to `development`; lighter classes record explicit skipped-phase reasons and use evidence/docs/review/config verification instead of implementation/test/optimize phases. State investigation that only reports facts maps to `research_evidence`; changing spec/SOT/roadmap/handoff from that evidence maps to `docs_only + Path B shaping` unless executable behavior or execution policy changes.
 
 ```text
 orchestrate

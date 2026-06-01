@@ -1,6 +1,22 @@
 version: 0.1.0
 purpose: "AI-neutral task taxonomy used before backend prompt rendering."
 
+activation_scope:
+  default_mode: direct_commander_response
+  rule: "Do not classify every Hermes interaction. Apply task_class only after KHS/Kkachi project-execution mode is active."
+  kas_mode_required_when:
+    - explicit_khs_kkachi_kab_kah_run_request
+    - master_applies_khs_to_project_directory
+    - durable_repo_artifact_change_needs_run_evidence
+    - backend_execution_plan_lifecycle_or_bridge_evidence_is_claimed
+    - phase_gate_review_or_long_lived_team_collaboration_is_required
+  kas_mode_not_required_when:
+    - ordinary_explanation_or_design_chat
+    - quick_status_check_or_single_command_report_without_durable_change
+    - simple_direct_hermes_edit_outside_khs
+    - non_project_chat
+  project_directory_scope: "Project-local policy applies to the selected Kkachi project directory and its governed artifacts; it is not a global personality or all-chat constraint."
+
 task_classes:
   development:
     description: "Code, test, build, architecture, or process-contract change that can affect executable behavior or future execution policy."
@@ -41,7 +57,7 @@ task_classes:
       - enhance_test
       - optimize
   docs_only:
-    description: "Durable documentation authoring or synchronization that does not change executable behavior or execution policy."
+    description: "Durable documentation authoring, spec/SOT shaping, roadmap shaping, or synchronization that does not change executable behavior or execution policy."
     default_work_path: B_discovery_shaping
     default_work_mode: light
     default_execution_mode: docs_only
@@ -111,7 +127,11 @@ task_types:
     description: "Create or refine implementation plan, acceptance criteria, and task breakdown."
     default_execution_mode: docs_only
   shaping:
-    description: "Create or update SOT, roadmap trace, acceptance criteria, and handoff before implementation."
+    description: "Create or update SOT, roadmap trace, acceptance criteria, and handoff before implementation. Usually maps to `docs_only + Path B` after KHS mode is active."
+    default_path: B_discovery_shaping
+    default_execution_mode: docs_only
+  spec_roadmap_shaping:
+    description: "State investigation plus spec, SOT, acceptance criteria, roadmap, epic, or handoff updates before implementation. Use `research_evidence` for the read-only investigation stage, then `docs_only + Path B` for durable spec/roadmap edits."
     default_path: B_discovery_shaping
     default_execution_mode: docs_only
   enhance_test:

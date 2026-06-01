@@ -6,6 +6,12 @@ work_mode: "{{ work_mode }}"
 phase: "{{ phase }}"
 execution_mode: "{{ execution_mode }}"
 
+activation_scope:
+  mode: "{{ activation_mode }}" # direct_commander_response | khs_project_execution
+  trigger: "{{ khs_activation_trigger }}"
+  project_directory_scope: "{{ project_directory_scope }}"
+  non_khs_reason: "{{ non_khs_reason }}"
+
 task_classification:
   task_class: "{{ task_class }}"
   task_type: "{{ task_type }}"
@@ -93,6 +99,8 @@ verification:
     - "{{ evidence_required }}"
 
 khs_operating_policy:
+  classify_only_after_khs_activation: true
+  default_mode_is_direct_commander_response: true
   classify_before_phase_selection: true
   development_full_spine_only_for_development_tasks: true
   research_docs_simple_tasks_use_light_spines: true
