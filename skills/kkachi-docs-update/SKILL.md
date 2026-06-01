@@ -14,8 +14,11 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 Git commits, chat memory, and implementation notes are not durable project docs. Update canonical docs or record why no docs update is needed. Docs-only KHS runs still use KAB by default unless the master explicitly forbids KAB; if direct docs editing is used, record the non-KAB rationale in `phase-plan.yaml`, `docs-update.md`, and final report.
 
+When a roadmap task is completed, update the roadmap only after implementation scope, verification, KAH evidence, and required review gates support completion. If completion confidence is insufficient, record `Blocked` or `In Progress` with the missing evidence instead of marking `Completed`. After docs changes that affect generated outputs, examples, or tested contracts, run `make test` or the repository's docs validation target.
+
 ## Outputs
 
 - `docs-update.md`
+- `roadmap-update.md` when roadmap status changes
 - updated docs diff, when needed
 - KAH phase/gate events, when supported

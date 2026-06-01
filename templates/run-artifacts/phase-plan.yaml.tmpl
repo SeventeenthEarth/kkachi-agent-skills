@@ -73,6 +73,19 @@ feedback_loop:
   planned_rounds: "{{ planned_feedback_rounds }}"
   round_decision_reason: "{{ feedback_round_decision_reason }}"
 
+codegraph:
+  required: "{{ codegraph_required }}"
+  command: "{{ codegraph_command }}"
+  status_evidence: "{{ codegraph_status_evidence }}"
+  unavailable_or_degraded_reason: "{{ codegraph_unavailable_reason }}"
+
+verification_commands:
+  aggregate: "make test"
+  prepare: "make test-prepare"
+  unit: "make test-unit"
+  integration: "make test-int"
+  e2e: "make test-e2e"
+
 phases:
   - phase: plan
     applicability: required
@@ -83,6 +96,7 @@ phases:
       - plan.md
       - checklist.md
       - acceptance-criteria.md
+      - codegraph_status_evidence_when_required
     check: "kkachi-agent-helper gate check {{ run_id }} plan --json"
     skip_reason: ""
   - phase: ask
@@ -104,7 +118,8 @@ phases:
       - diff.patch
       - impl-log.md
       - cli-output.md
-    check: "Implementation matches approved plan and acceptance criteria."
+      - make-test-after-implementation
+    check: "Implementation matches approved plan and acceptance criteria; aggregate verification passes after implementation changes."
     skip_reason: "{{ implement_skip_reason }}"
   - phase: enhance_test
     applicability: conditional
@@ -114,7 +129,8 @@ phases:
     evidence:
       - test-plan.md
       - test-log.md
-    check: "Focused regression coverage added or no-change reason recorded."
+      - make-test-after-test-enhancement
+    check: "Unit, integration, and e2e coverage considered; focused regression coverage added or no-change reason recorded; aggregate verification passes after changes."
     skip_reason: "{{ enhance_test_skip_reason }}"
   - phase: optimize
     applicability: conditional_recommended_for_code_change
@@ -122,9 +138,12 @@ phases:
     owner_role: implementer_backend
     backend_or_session: "{{ implementer_session_id }}"
     evidence:
+      - slop-cleanup-log.md
       - optimize-log.md
+      - make-test-after-slop-cleanup
+      - make-test-after-optimization
       - verification_after_cleanup
-    check: "AI slop, duplication, and small structural waste considered; regression checked after cleanup."
+    check: "AI slop, duplication, unnecessary abstraction, and algorithmic/structural waste considered; aggregate verification passes after cleanup/optimization changes."
     skip_reason: "{{ optimize_skip_reason }}"
   - phase: update_docs
     applicability: conditional
@@ -133,7 +152,8 @@ phases:
     backend_or_session: "{{ implementer_session_id }}"
     evidence:
       - docs-update.md
-    check: "Docs updated or no-change reason recorded."
+      - roadmap-update.md
+    check: "Docs and roadmap updated or no-change reason recorded; completion status matches evidence."
     skip_reason: "{{ update_docs_skip_reason }}"
   - phase: request_feedback_1
     applicability: required

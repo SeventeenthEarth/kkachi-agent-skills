@@ -7,4 +7,5 @@ __pycache__/
 *$py.class
 
 .kkachi/
+.codegraph/
 .kkachi-workflow.yaml

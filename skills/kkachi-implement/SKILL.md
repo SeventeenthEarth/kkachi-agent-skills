@@ -16,6 +16,8 @@ Do not implement from chat-only instruction. Do not bypass KAB when implementati
 
 Implementation starts only after `plan`, `ask`, `phase-plan.yaml`, `checklist.md`, backend selection, capability check, and prompt composition are complete. Hermes may auto-start only low-risk work after notifying the master. Require explicit master approval for API, DB/schema/migration, security/auth/secrets, dependency, architecture, SOT, large diff/broad fanout, low confidence, or unresolved ask ambiguity.
 
+For code-changing tasks, implementation is not complete until the repository aggregate verification command, normally `make test`, succeeds after the implementation changes. If `make test` fails, capture the failing command, exit status, and relevant output; route the evidence back to the implementer backend for analysis/fix; then rerun the failing target and the aggregate command.
+
 KAB dispatch has two valid observation modes:
 
 - CLI loop: `send` -> `wait` -> `read` or `status` -> resolve `approve` / `reject` / `answer` pendings -> repeat until terminal or accepted idle state -> `stop`.
@@ -49,6 +51,7 @@ Plan mode and pending control are backend-sensitive:
 - `impl-log.md`
 - `bridge-session-snapshot.json`
 - `bridge-events.md`
+- `make test` evidence after implementation changes
 - KAH phase/gate events, when supported
 
 `bridge-events.md` must say which KAB observation mode was used: `cli_loop`, `retained_stream`, or `hybrid`. For stream-backed evidence, include stream cursor/epoch information when available and record daemon-restart discontinuities as evidence gaps, not as durable replay.

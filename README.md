@@ -153,16 +153,21 @@ After project init, Hermes should use KAS/KHS skills for Kkachi-governed runs. `
 orchestrate
   -> task-contract
   -> phase-plan
+  -> codegraph-refresh(index, or init -i when first initialization is due)
   -> backend-select
   -> prompt-compose
-  -> plan / ask
-  -> implement / enhance-test / optimize
-  -> docs-update / request-feedback(1..5, round 1 required, rounds 2-5 optional) / handle-feedback(1..5)
+  -> plan / ask / required Red plan approval when project policy requires it
+  -> implement / make test
+  -> enhance-test(unit, integration, e2e) / make test
+  -> AI slop cleanup / make test
+  -> optimize(duplication, abstraction, algorithm/structure) / make test
+  -> docs-update / roadmap-update
+  -> Blue first review / request-feedback(하후연, 여몽, 진궁 when required) / handle-feedback
   -> verify / final-verify
   -> improve
 ```
 
-The user selects the target roadmap task for each run. Hermes manages, approves risk, and final-verifies. KAB backend roles perform substantive planning, implementation, docs, feedback, and feedback handling only for KAB-backed phases. Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when explicitly authorized and recorded, but must not claim backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence.
+The user selects the target roadmap task for each run. Hermes manages, approves risk, and final-verifies. KAB backend roles perform substantive planning, implementation, docs, feedback, and feedback handling only for KAB-backed phases. Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when explicitly authorized and recorded, but must not claim backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence. For development-path runs, the default commander workflow is plan-first, fixed-plan, backend implementation, repeated `make test` checkpoints, test enhancement, AI slop cleanup, bounded optimization, docs/roadmap update, Blue review, required role reviews, and review-ready pre-commit reporting.
 
 ## Install Flow
 

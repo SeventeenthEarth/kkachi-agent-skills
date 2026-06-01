@@ -14,12 +14,28 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 Plan from durable authority, not chat-only instruction. Path A plans prepare implementation; Path B plans prepare shaping and handoff.
 
+## 주군 development-pipeline preference
+
+When 주군 asks to run KAS/Kkachi development work, treat the preferred default as a Codex app-server/KAB-backed plan-first loop unless project policy, capability evidence, or explicit instruction says otherwise:
+
+1. refresh CodeGraph evidence before planning;
+2. ask Codex app-server/KAB planner for a plan-only response; do not allow implementation before plan capture;
+3. copy the fixed plan into `.kkachi/runs/<run_id>/plan.md` and normalize `checklist.md` from the plan plus KHS phase contract;
+4. 황충 may edit/normalize the plan for acceptance criteria, evidence, phase rows, and verification clarity;
+5. require Red plan approval from 하후연 before implementation when the work is KAS/Kkachi code-development or another risk-bearing project run;
+6. only then approve/start the implementer backend.
+
+Record deviations in `phase-plan.yaml`, `checklist.md`, and the final report instead of silently using a lighter path.
+
+Before backend planning for a code-changing or process-changing task, refresh CodeGraph evidence for the target repository. If `.codegraph/` already exists, run `codegraph index <repo>` and preserve `codegraph status <repo>` output. If CodeGraph is due for first initialization after the first completed task and `.codegraph/` is missing, run `codegraph init -i <repo>` and preserve status evidence. If CodeGraph is unavailable, record the missing capability as a blocker or degraded-evidence reason instead of silently planning from stale code context.
+
 ## Inputs
 
 - `task-contract.yaml`
 - SOT basis and roadmap trace
 - project overlay
 - related code/docs evidence
+- CodeGraph status evidence or explicit unavailable/degraded reason when required
 
 ## Outputs
 
@@ -60,7 +76,8 @@ Safe order:
 2. `plan read`
 3. save `plan.plan_text` to `plan.md`
 4. KHS/Hermes derives `checklist.md` from the saved plan, the `KHS Checklist Seed` section, KHS phase contract, task contract, acceptance criteria, and expected evidence
-5. then approve/start according to backend timing
+5. when project policy requires Red plan approval, request and resolve that review before implementation
+6. then approve/start according to backend timing
 
 ## Checklist rule
 
@@ -76,7 +93,9 @@ The checklist must include:
 - evidence artifact expected for completion;
 - gate/check command or review condition;
 - explicit skip reason for any skipped or not-applicable phase;
-- micro-task rows derived from the approved plan.
+- micro-task rows derived from the approved plan;
+- CodeGraph refresh evidence when required;
+- repeated `make test` checkpoints after implementation, test enhancement, AI slop cleanup, and optimization when those stages change files.
 
 For code-change runs, include an `optimize` row by default. It may be skipped only with a reason. For feedback, include round 1 as required and rounds 2..5 as conditional continuation rounds; do not exceed five feedback/handle-feedback pairs.
 

@@ -61,6 +61,18 @@ task_basis:
     - implementation_notes
     - todo
 
+codegraph_policy:
+  first_task_completion_command: "codegraph init -i"
+  new_task_start_command: "codegraph index"
+  required_when:
+    - code_change_run
+    - docs_or_skill_change_that_changes_process_or_architecture
+    - task_uses_codegraph_mcp_context
+  evidence_rules:
+    - "At the start of every new KHS task after CodeGraph exists, run `codegraph index <repo>` and preserve `codegraph status <repo>` evidence before backend planning."
+    - "If the repository has no `.codegraph/` and the previous completed task made CodeGraph initialization due, run `codegraph init -i <repo>` and preserve the resulting status evidence."
+    - "If CodeGraph is unavailable, record the missing command as a blocker or explicit degraded-evidence reason; do not silently skip code context refresh."
+
 kab_usage_policy:
   backend_execution: required_when_backend_or_bridge_evidence_needed
   automated_review_by_different_tool: kab_later_until_transport_evidenced
@@ -112,6 +124,8 @@ paths:
       - backend_selection_when_kab_lane_is_used
       - capability_check_when_kab_lane_is_used
       - prompt_md_when_kab_lane_is_used
+      - codegraph_index_or_unavailable_reason
+      - plan_fixed_with_required_red_approval_when_project_policy_requires_it
       - ask_phase_completed
   B_discovery_shaping:
     description: "SOT, roadmap trace, acceptance criteria, or implementation handoff is missing or weak."
@@ -158,6 +172,7 @@ phases:
       - phase_plan
       - sot_basis
       - project_overlay
+      - codegraph_status_or_degraded_reason_when_required
     expected_outputs:
       - plan.md
       - checklist.md
@@ -178,6 +193,7 @@ phases:
       storage_rules:
         - "Copy plan.plan_text into plan.md before implementation starts."
         - "Preserve plan.plan_state, plan.plan_ref, and plan.source_evidence in plan.md and/or bridge-events.md."
+        - "When project policy requires Red plan approval, keep implementation blocked until the Red verdict is ACCEPT or accepted feedback has been folded into a fixed plan."
       backend_timing:
         claude: "capture in plan_pending_approval before approve; approve starts implementation"
         glm: "capture in plan_pending_approval before approve; approve starts implementation"
@@ -227,6 +243,7 @@ phases:
       rules:
         - "Skipped or not-applicable phases must keep a row with an explicit reason."
         - "Code-change runs include optimize by default; skipping optimize requires a reason."
+        - "Code-change runs include CodeGraph refresh evidence, implementation `make test`, test-enhancement `make test`, slop-cleanup `make test`, and optimization `make test` rows unless explicitly not applicable."
         - "Feedback must run at least once and at most five times; rounds 2..5 are optional continuation rounds only."
         - "Final verification must use checklist.md to prove every required phase has evidence."
     gate: plan_gate
@@ -261,25 +278,39 @@ phases:
       - diff.patch
       - impl-log.md
       - cli-output.md
+      - verification_after_implementation_make_test
+    rules:
+      - "After implementation changes, run the repository aggregate test command, normally `make test`, before marking implementation complete."
     gate: implementation_gate
   enhance_test:
-    intent: "Add or improve regression coverage where risk warrants it."
+    intent: "Add or improve unit, integration, and e2e regression coverage where risk warrants it, then re-run the aggregate verification command."
     owner_role: implementer_backend
     applicability: conditional
     skip_rule: "Allowed only when phase_plan and checklist.md record why no test enhancement is useful."
     expected_outputs:
       - test-plan.md
       - test-log.md
+      - verification_after_test_enhancement_make_test
+    rules:
+      - "Assess unit, integration, and e2e coverage separately for the changed behavior."
+      - "Integration tests should use mocks/fakes/stubs instead of production external resources."
+      - "E2E tests must use isolated test environments and must not affect live Hermes, Discord, gateway, auth, or production user state."
+      - "Run `make test` after test enhancement changes before completing this phase."
     gate: test_gate
   optimize:
-    intent: "Perform bounded cleanup after behavior is protected: remove AI slop, duplication, and small structural waste without broad rewrites."
+    intent: "Perform bounded cleanup after behavior is protected: run AI slop cleanup, remove duplication, remove unnecessary abstraction, and simplify or optimize internal algorithms without broad rewrites."
     owner_role: implementer_backend
     applicability: conditional_recommended_for_code_change
     skip_rule: "Code-change runs should run optimize when practical; skipping requires explicit reason in phase_plan and checklist.md."
     expected_outputs:
+      - slop-cleanup-log.md
       - optimize-log.md
       - updated_diff_when_cleanup_is_applied
       - verification_after_cleanup
+    rules:
+      - "Treat AI slop cleanup as an explicit micro-stage before structural optimization when a backend/code actor is used."
+      - "After slop cleanup, run `make test` before proceeding to broader optimization when files changed."
+      - "After duplication/abstraction/algorithm optimization, run `make test` again before completing optimize."
     gate: regression_gate
   update_docs:
     intent: "Update durable project docs or record why no update is needed."
@@ -289,6 +320,8 @@ phases:
       - docs-update.md
     rules:
       - "A no-docs-change decision is still an artifact, not an omitted phase."
+      - "When a roadmap task is completed, update the roadmap status only after implementation, verification, KAH evidence, and required reviews support completion."
+      - "Run `make test` or the docs validation target after docs changes when docs participate in generated outputs, examples, or tested contracts."
     gate: docs_gate
   request_feedback:
     intent: "Request independent read-only feedback for every KHS run, with optional continuation rounds 2..5 when useful feedback risk remains."
@@ -322,7 +355,7 @@ phases:
       - "When feedback changes code/docs, rerun affected verification."
     gate: feedback_handling_gate
   final_verify:
-    intent: "Hermes proves the run is complete from phase_plan, checklist.md, artifacts, KAH gates, KAB evidence, repo state, and user-facing report readiness."
+    intent: "Hermes proves the run is complete from phase_plan, checklist.md, artifacts, KAH gates, KAB evidence, CodeGraph evidence, repo state, required reviews, and user-facing report readiness before commit."
     owner_role: hermes
     applicability: required
     expected_outputs:
