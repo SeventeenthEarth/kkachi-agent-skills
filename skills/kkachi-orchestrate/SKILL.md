@@ -14,6 +14,8 @@ Do not use this skill for ordinary direct Hermes edits, small one-file fixes, ty
 
 Default mode is direct commander response: answer, inspect, or perform bounded non-durable work without creating a KHS task. KHS mode starts only when the master explicitly selects KHS/Kkachi/KAB/KAH, applies KHS to a project directory, requests durable repo artifact changes under a Kkachi-governed project, asks for phase/gate evidence, or the work needs backend execution, KAB plan lifecycle, bridge evidence, or long-lived team collaboration. Task classification is mandatory only after KHS mode is active; it must not turn every chat message into a KAS task.
 
+See `references/kas-activation-scope.md` for the durable activation-scope lesson and investigation/spec/roadmap mapping.
+
 For state investigation that leads to spec or roadmap work, use `research_evidence` for the read-only evidence stage and `docs_only + Path B shaping` for durable spec/SOT/roadmap/handoff edits. Escalate to `development` only when the request includes code, tests, build behavior, executable contracts, or future execution-policy changes.
 
 ## Core rule
