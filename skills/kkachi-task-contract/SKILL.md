@@ -28,13 +28,14 @@ The task contract is backend-neutral. Do not include Claude, Codex, Gemini, GLM,
 ## Flow
 
 1. Confirm the master-selected roadmap task id or task item. Do not auto-select the next roadmap task by default.
-2. Classify task type, work path, phase, mode, urgency, SOT policy, and execution mode as KAH helper metadata.
-3. Record desired state, acceptance criteria, constraints, non-goals, context sources, required capabilities, graph capability requirements when graph-managed workflow is selected, and verification evidence.
+2. Classify task class first (`development`, `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`), then task type, work path, phase spine, mode, urgency, SOT policy, and execution mode as KAH helper metadata.
+3. Record the classification reason, selected spine, KAB/KAH/CodeGraph defaults, and explicit skip reasons for development-only phases when the task is not a development task.
+4. Record desired state, acceptance criteria, constraints, non-goals, context sources, required capabilities, graph capability requirements when graph-managed workflow is selected, and verification evidence.
 4. Record graph workflow authority explicitly: `.kkachi-workflow.yaml` is project-level graph state only after capability-checked KAH graph evidence, `phase-plan.yaml` is run-local execution state/evidence, and KAH metadata is helper classification only.
-5. Preserve user backend preference only as selection metadata; do not let it bypass capability gates.
-6. Render from `templates/run-artifacts/task-contract.yaml.tmpl` as a KHS supplemental run artifact.
-7. Also summarize the same contract in KAH canonical `task-brief.md` or `context-pack.md` so current KAH artifact gates can see the run authority.
-8. Record a compact event with `kkachi-agent-helper event append artifact.updated --run <run_id> --payload '{"path":"task-contract.yaml","phase":"task-contract"}' --json` when useful.
+6. Preserve user backend preference only as selection metadata; do not let it bypass capability gates.
+7. Render from `templates/run-artifacts/task-contract.yaml.tmpl` as a KHS supplemental run artifact.
+8. Also summarize the same contract in KAH canonical `task-brief.md` or `context-pack.md` so current KAH artifact gates can see the run authority.
+9. Record a compact event with `kkachi-agent-helper event append artifact.updated --run <run_id> --payload '{"path":"task-contract.yaml","phase":"task-contract"}' --json` when useful.
 
 ## Output
 
@@ -45,4 +46,4 @@ The task contract is backend-neutral. Do not include Claude, Codex, Gemini, GLM,
 
 ## Gate
 
-PASS only when the contract is explicit enough for backend selection and prompt composition. BLOCKED when desired state, authority, acceptance criteria, or non-goals require a master decision.
+PASS only when the contract is explicit enough for backend selection and prompt composition, and when the task class justifies the selected phase spine. BLOCKED when desired state, authority, acceptance criteria, classification, or non-goals require a master decision.

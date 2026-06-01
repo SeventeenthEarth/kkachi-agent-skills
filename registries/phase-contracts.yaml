@@ -61,6 +61,36 @@ task_basis:
     - implementation_notes
     - todo
 
+task_classification_policy:
+  classification_required_before_phase_selection: true
+  source: registries/task-taxonomy.yaml
+  classes:
+    - development
+    - research_evidence
+    - docs_only
+    - simple_command_report
+    - bootstrap_config
+    - collaboration_review
+  rules:
+    - "Do not apply the full development spine to read-only research, evidence collection, simple command/report, or pure docs tasks."
+    - "Every skipped development phase must have an explicit reason in task-contract.yaml, phase-plan.yaml, checklist.md, and final report."
+    - "Simple command/report tasks normally stay outside KHS unless the master explicitly keeps them inside a KHS/KAH run."
+    - "Long-lived team-member collaboration uses Kanban evidence; temporary subagents do not count as team-member delegation."
+    - "If a docs-only task changes architecture, process policy, contracts, roadmap status, or examples that tests validate, require docs validation and consider CodeGraph refresh."
+  default_spines:
+    development_full:
+      phases: [codegraph_refresh, plan, ask, implement, enhance_test, optimize, update_docs, request_feedback, handle_feedback, final_verify, improve]
+    research_evidence_light:
+      phases: [task_contract, evidence_collection, source_citation, final_verify]
+    docs_only_light:
+      phases: [task_contract, plan, update_docs, docs_validation, final_verify]
+    direct_report:
+      phases: [command_evidence, final_report]
+    bootstrap_config:
+      phases: [task_contract, preflight, configure, verification, final_verify]
+    review_light:
+      phases: [task_contract, review_request, feedback_evidence, final_verify]
+
 codegraph_policy:
   first_task_completion_command: "codegraph init -i"
   new_task_start_command: "codegraph index"
@@ -155,8 +185,8 @@ phase_plan_contract:
     - optional
     - not_applicable
   rules:
-    - "Every canonical phase must have a phase_plan entry."
-    - "KAH work_path/work_mode/execution_mode may inform initial defaults but must not override phase_plan applicability."
+    - "Every canonical phase in the selected task spine must have a phase_plan entry; development-only phases outside the selected spine may be omitted or marked not_applicable with reasons."
+    - "KAH work_path/work_mode/execution_mode may inform initial defaults but must not override task_classification or phase_plan applicability."
     - "Skipped or not_applicable entries require a reason."
     - "request_feedback_1 and handle_feedback_1 are required for every KHS run."
     - "request_feedback_2..5 and handle_feedback_2..5 are conditional continuation rounds and must not exceed round 5."

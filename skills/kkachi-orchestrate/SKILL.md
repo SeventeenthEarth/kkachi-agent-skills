@@ -16,13 +16,26 @@ Orchestration chooses phases and gates; it does not bypass phase contracts. KHS 
 
 Hermes is manager/orchestrator/final verifier, not the default code author. KAB backend roles perform substantive planning, implementation, docs, feedback, and feedback handling during KAB-backed KHS phases. Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when explicitly authorized and recorded, but must not claim backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence. Simple direct Hermes fixes are outside KHS unless the master explicitly keeps the task inside KHS.
 
+## Task classification first
+
+Before selecting phases or creating backend prompts, classify the request using `registries/task-taxonomy.yaml` and record the result in `task-contract.yaml`:
+
+- `development`: code, tests, build, architecture, process contract, or behavior-changing work. Use the full development spine.
+- `research_evidence`: read-only investigation, evidence gathering, option comparison, log/source inspection, or current-state report. Do not run implementation/test/optimize phases unless the classification changes.
+- `docs_only`: durable docs authoring/sync with no executable behavior or execution-policy change. Use docs validation, not code implementation phases.
+- `simple_command_report`: bounded command/status check with no durable project change. Keep it outside KHS by default unless the master explicitly keeps it in KHS.
+- `bootstrap_config`: repo/KAH project/profile/manifest/tooling/test-bed setup. Use preflight/configure/verification; require explicit approval for auth/secrets/gateway changes.
+- `collaboration_review`: durable review/risk/team feedback routing. Use Kanban for long-lived team-member collaboration; temporary subagents are not team-member delegation.
+
+Record the classification reason and every skipped phase reason. Do not silently apply the development spine to research, docs-only, simple-command, bootstrap, or review tasks.
+
 ## Default phase spine
 
 ```text
 plan -> ask -> implement -> enhance-test -> optimize -> docs-update -> request-feedback -> handle-feedback -> final-verify -> improve
 ```
 
-Path B replaces production code implementation with shaping, SOT, roadmap, acceptance, and handoff artifacts until Path A gates pass.
+This full spine is the default only for `development` tasks. Path B replaces production code implementation with shaping, SOT, roadmap, acceptance, and handoff artifacts until Path A gates pass.
 
 ## User-confirmed operating policy
 
@@ -40,8 +53,9 @@ After plan and ask are complete, Hermes may start low-risk implementation automa
 
 ## Required responsibilities
 
+- classify task class before Path A/Path B (`development`, `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`)
 - classify Path A or Path B
-- select Standard or Light mode
+- select Standard or Light mode from the task class
 - invoke `kkachi-task-contract`
 - run the graph capability preflight before using `.kkachi-workflow.yaml`: same effective binary, `kkachi-agent-helper --version`, `capabilities --json`, `graph --help`, then `graph validate/explain` for existing graph state or `graph init --from-template` only when graph creation is intended
 - create `phase-plan.yaml` from `templates/run-artifacts/phase-plan.yaml.tmpl` and keep it as run-local execution state/evidence

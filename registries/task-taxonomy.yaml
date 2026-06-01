@@ -1,6 +1,104 @@
 version: 0.1.0
 purpose: "AI-neutral task taxonomy used before backend prompt rendering."
 
+task_classes:
+  development:
+    description: "Code, test, build, architecture, or process-contract change that can affect executable behavior or future execution policy."
+    default_work_path: A_development_execution
+    default_work_mode: standard
+    default_execution_mode: production_write
+    default_spine: development_full
+    kab_default: required_when_backend_execution_plan_lifecycle_or_bridge_evidence_is_claimed
+    codegraph_default: required
+    required_phases:
+      - task_contract
+      - phase_plan
+      - codegraph_refresh
+      - plan
+      - ask
+      - implement
+      - enhance_test
+      - optimize
+      - update_docs
+      - request_feedback
+      - handle_feedback
+      - final_verify
+  research_evidence:
+    description: "Read-only investigation, evidence gathering, option comparison, log/source inspection, or current-state report."
+    default_work_path: B_discovery_shaping
+    default_work_mode: light
+    default_execution_mode: research
+    default_spine: research_evidence_light
+    kab_default: optional_when_backend_or_bridge_identity_is_needed
+    codegraph_default: optional_when_code_context_is_material
+    required_phases:
+      - task_contract
+      - evidence_collection
+      - source_citation
+      - final_verify
+    skipped_by_default:
+      - implement
+      - enhance_test
+      - optimize
+  docs_only:
+    description: "Durable documentation authoring or synchronization that does not change executable behavior or execution policy."
+    default_work_path: B_discovery_shaping
+    default_work_mode: light
+    default_execution_mode: docs_only
+    default_spine: docs_only_light
+    kab_default: optional_unless_backend_execution_or_independent_review_transport_is_required
+    codegraph_default: conditional_when_docs_change_architecture_process_or_code_contract
+    required_phases:
+      - task_contract
+      - plan
+      - update_docs
+      - docs_validation
+      - final_verify
+    skipped_by_default:
+      - implement
+      - enhance_test
+      - optimize
+  simple_command_report:
+    description: "Bounded command execution or status check with no durable project change."
+    default_work_path: B_discovery_shaping
+    default_work_mode: light
+    default_execution_mode: verification
+    default_spine: direct_report
+    kah_default: not_required_unless_master_explicitly_keeps_it_inside_khs
+    kab_default: not_required
+    codegraph_default: not_required
+    required_phases:
+      - command_evidence
+      - final_report
+  bootstrap_config:
+    description: "Repository, KAH project, profile, manifest, tooling, or local test-bed setup/configuration."
+    default_work_path: A_development_execution
+    default_work_mode: standard
+    default_execution_mode: readiness_hardening
+    default_spine: bootstrap_config
+    kab_default: optional_unless_backend_execution_or_bridge_evidence_is_claimed
+    codegraph_default: conditional_when_source_context_or_policy_changes
+    required_phases:
+      - task_contract
+      - preflight
+      - configure
+      - verification
+      - final_verify
+  collaboration_review:
+    description: "Durable review, risk triage, team-member feedback routing, or decision capture without direct implementation."
+    default_work_path: B_discovery_shaping
+    default_work_mode: light
+    default_execution_mode: verification
+    default_spine: review_light
+    kanban_default: required_for_long_lived_team_member_collaboration
+    kab_default: optional_when_automated_review_by_different_tool_transport_is_evidenced
+    codegraph_default: optional_when_review_depends_on_current_code_context
+    required_phases:
+      - task_contract
+      - review_request
+      - feedback_evidence
+      - final_verify
+
 task_types:
   implementation:
     description: "Change production code or tests to satisfy an existing SOT-backed task."
@@ -33,6 +131,7 @@ task_contract_fields:
   required:
     - task_id
     - project
+    - task_class
     - work_path
     - phase
     - desired_state
@@ -47,3 +146,5 @@ task_contract_fields:
     - risk_notes
     - project_overlay
     - related_artifacts
+    - task_classification_reason
+    - skipped_phase_reasons

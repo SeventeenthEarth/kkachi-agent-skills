@@ -16,7 +16,7 @@ Plan from durable authority, not chat-only instruction. Path A plans prepare imp
 
 ## 주군 development-pipeline preference
 
-When 주군 asks to run KAS/Kkachi development work, treat the preferred default as a Codex app-server/KAB-backed plan-first loop unless project policy, capability evidence, or explicit instruction says otherwise:
+When 주군 asks to run KAS/Kkachi development work and the task is classified as `development`, treat the preferred default as a Codex app-server/KAB-backed plan-first loop unless project policy, capability evidence, or explicit instruction says otherwise:
 
 1. refresh CodeGraph evidence before planning;
 2. ask Codex app-server/KAB planner for a plan-only response; do not allow implementation before plan capture;
@@ -25,7 +25,7 @@ When 주군 asks to run KAS/Kkachi development work, treat the preferred default
 5. require Red plan approval from 하후연 before implementation when the work is KAS/Kkachi code-development or another risk-bearing project run;
 6. only then approve/start the implementer backend.
 
-Record deviations in `phase-plan.yaml`, `checklist.md`, and the final report instead of silently using a lighter path.
+Record deviations in `phase-plan.yaml`, `checklist.md`, and the final report instead of silently using a lighter path. For `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`, use the selected light spine from `task-contract.yaml`; do not manufacture implementation/test/optimize phases unless the classification changes to `development`.
 
 Before backend planning for a code-changing or process-changing task, refresh CodeGraph evidence for the target repository. If `.codegraph/` already exists, run `codegraph index <repo>` and preserve `codegraph status <repo>` output. If CodeGraph is due for first initialization after the first completed task and `.codegraph/` is missing, run `codegraph init -i <repo>` and preserve status evidence. If CodeGraph is unavailable, record the missing capability as a blocker or degraded-evidence reason instead of silently planning from stale code context.
 

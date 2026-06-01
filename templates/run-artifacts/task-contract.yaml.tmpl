@@ -6,6 +6,19 @@ work_mode: "{{ work_mode }}"
 phase: "{{ phase }}"
 execution_mode: "{{ execution_mode }}"
 
+task_classification:
+  task_class: "{{ task_class }}"
+  task_type: "{{ task_type }}"
+  classification_reason: "{{ task_classification_reason }}"
+  selected_spine: "{{ selected_spine }}"
+  kab_default: "{{ kab_default }}"
+  kah_required: "{{ kah_required }}"
+  codegraph_required: "{{ codegraph_required }}"
+  skipped_phase_reasons:
+    implement: "{{ implement_skip_reason }}"
+    enhance_test: "{{ enhance_test_skip_reason }}"
+    optimize: "{{ optimize_skip_reason }}"
+
 workflow_authority:
   project_graph_artifact: ".kkachi-workflow.yaml"
   run_local_phase_artifact: "phase-plan.yaml"
@@ -80,8 +93,12 @@ verification:
     - "{{ evidence_required }}"
 
 khs_operating_policy:
+  classify_before_phase_selection: true
+  development_full_spine_only_for_development_tasks: true
+  research_docs_simple_tasks_use_light_spines: true
   kab_required_for_code_change: true
-  docs_only_uses_kab_by_default: true
+  docs_only_uses_kab_by_default: false
+  docs_only_uses_kab_when_backend_execution_or_review_transport_is_required: true
   no_kab_code_change_means_direct_hermes_not_khs: true
   ask_phase_required: true
   feedback_rounds:
