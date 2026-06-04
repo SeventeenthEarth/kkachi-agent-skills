@@ -21,9 +21,12 @@ When 주군 asks to run KAS/Kkachi development work and the task is classified a
 1. refresh CodeGraph evidence before planning;
 2. ask Codex app-server/KAB planner for a plan-only response; do not allow implementation before plan capture;
 3. copy the fixed plan into `.kkachi/runs/<run_id>/plan.md` and normalize `checklist.md` from the plan plus KHS phase contract;
-4. 황충 may edit/normalize the plan for acceptance criteria, evidence, phase rows, and verification clarity;
-5. require Red plan approval from 하후연 before implementation when the work is KAS/Kkachi code-development or another risk-bearing project run;
-6. only then approve/start the implementer backend.
+4. Blue vets the Codex plan for SOT alignment, acceptance criteria, evidence, phase rows, and verification clarity, but must not directly author or rewrite the substantive implementation plan in place of Codex app-server/KAB planner output unless 주군 explicitly requests direct Blue planning or the work is outside the roadmap/KAS+KAH path;
+5. require Red plan vet/approval from 하후연 before implementation when the work is KAS/Kkachi code-development or another risk-bearing project run;
+6. route Blue or Red `REQUEST_CHANGES` back to Codex app-server/KAB planner for a revised plan, then repeat Blue/Red vetting;
+7. only after Blue+Red approval, approve/start the implementer backend.
+
+Render planner prompts so every command example uses the real user home, for example `HOME=<real-user-home> <command>` in reusable artifacts. This includes Git commands because commit-time global `user.name`, `user.email`, signing, hooks, and credential helpers must come from the user's real home.
 
 Record deviations in `phase-plan.yaml`, `checklist.md`, and the final report instead of silently using a lighter path. For `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`, use the selected light spine from `task-contract.yaml`; do not manufacture implementation/test/optimize phases unless the classification changes to `development`.
 
@@ -101,4 +104,4 @@ For code-change runs, include an `optimize` row by default. It may be skipped on
 
 ## Gate
 
-PASS when scope, non-scope, affected surfaces, backend capability needs, verification strategy, docs impact, rollback/blocker conditions, and the mandatory progress checklist are explicit. The KAH plan gate requires `acceptance-criteria.md`, `plan.md`, and `checklist.md`.
+PASS when scope, non-scope, affected surfaces, backend capability needs, verification strategy, docs impact, rollback/blocker conditions, the mandatory progress checklist, and Blue+Red plan vet verdicts are explicit. The KAH plan gate requires `acceptance-criteria.md`, `plan.md`, and `checklist.md`; KAS/KAH roadmap code-development must also preserve Blue+Red approval or a recorded 주군-approved exception before implementation.

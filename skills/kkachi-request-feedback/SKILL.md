@@ -34,4 +34,5 @@ When 주군 requests official KAB GLM `/octo:review` feedback:
 5. If the prompt appears pasted but not submitted, send Enter to the bridge tmux session and re-read status/TUI until `prompt_confirmed: true` or a bounded failure is recorded.
 6. Use a bounded watcher after activation is confirmed; Octo may take up to 30 minutes. On completion, copy feedback into the KAH run directory, append the KAH feedback event, create/dispatch Blue/Red/Orange/Gray triage/re-review cards as required, then remove any watcher.
 7. Parse verdicts only from the actual verdict heading/field, not examples or requested-output text.
-8. Clean generated local sidecars such as `.claude/` before final status unless they are intentionally in scope.
+8. If GLM/Octo feedback requires repository changes, do not patch them directly in Blue/Red/Orange/Gray review lanes. Record the finding and route the fix through Codex app-server/KAB implementer via `handle-feedback`; after Codex changes anything, rerun affected verification and the required post-change color review.
+9. Clean generated local sidecars such as `.claude/` before final status unless they are intentionally in scope.
