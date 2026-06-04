@@ -27,9 +27,9 @@ Use this template for 주군-facing Kkachi/KAS reports before asking for commit 
 
 6. `GLM Octo Review 및 개선`
    - For implementation tasks, include official `/octo:review` evidence or an explicit pre-start 주군 waiver/blocker. For non-implementation tasks, state whether Octo was requested/declared/run, or mark `해당 없음` with the reason when Octo was not part of the active policy.
-   - When Octo ran, include session id, watcher/evidence path, and verdict.
+   - When Octo ran, include KAB session id, backend type `glm`, KAB/bridge/tmux evidence path, real-user-HOME `command -v kkachi-agent-bridge` and `command -v glm`/version preflight, resolved `glm_command` when recorded, prompt first line `/octo:review`, `prompt_confirmed: true`, watcher/evidence path, feedback artifact path, and verdict.
    - Summarize GLM findings by severity and disposition: fixed/deferred/rejected.
-   - If only plain GLM review ran, say it is not official Octo gate evidence.
+   - If only plain/direct GLM CLI review ran, say it is not official Octo gate evidence and keep the gate failed or blocked unless 주군 gave an explicit pre-start Octo waiver.
 
 7. `재리뷰 및 개선 확인`
    - Required for implementation tasks after official Octo, and for any other task when official Octo ran or another later feedback round changed the work after first color review; otherwise mark `해당 없음` with the reason.

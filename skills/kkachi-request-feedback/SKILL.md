@@ -23,16 +23,19 @@ GLM Octo is mandatory for `development` / implementation tasks unless 주군 exp
 - optional `feedback-2.md` through `feedback-5.md` as KHS supplemental artifacts when additional rounds run
 - KAH phase/gate events, when supported
 
-## KAB GLM feedback lane notes
+## KAB GLM Octo feedback lane notes (mandatory for official Octo)
 
-When 주군 requests official KAB GLM `/octo:review` feedback:
+Official GLM Octo feedback is valid only when it is run through `kkachi-agent-bridge` as a GLM backend session. Direct `glm` CLI invocation is allowed only for real-user-HOME path/auth/version preflight; a direct `glm` review transcript is not official Octo evidence and must fail closed.
+
+When running official GLM `/octo:review` feedback:
 
 1. Use this after the normal KAS/KAH path has reached docs/verification, first Blue/Red/Orange/Gray color review, and any required improvement pass, unless 주군 explicitly asks for earlier feedback. This is mandatory for `development` / implementation tasks unless 주군 explicitly waives Octo before start. For non-implementation durable-change runs, Octo remains requested/project-local/high-risk opt-in.
-2. Use an explicit KAB config artifact for the run, including backend type, GLM command path/model, and approved args/caveats.
-3. Before start/send, run a GLM HOME/auth preflight from the real user home that owns the GLM token store. Do not copy one operator's home path into generic KAS source guidance.
-4. The actual prompt sent to the backend must begin with `/octo:review` as the first command text. Evidence must include the exact prompt artifact and TUI/readback snippet showing the command was submitted and activated.
-5. If the prompt appears pasted but not submitted, send Enter to the bridge tmux session and re-read status/TUI until `prompt_confirmed: true` or a bounded failure is recorded.
-6. Use a bounded watcher after activation is confirmed; Octo may take up to 30 minutes. On completion, copy feedback into the KAH run directory, append the KAH feedback event, create/dispatch Blue/Red/Orange/Gray triage/re-review cards as required, then remove any watcher.
-7. Parse verdicts only from the actual verdict heading/field, not examples or requested-output text.
-8. If GLM/Octo feedback requires repository changes, do not patch them directly in Blue/Red/Orange/Gray review lanes. Record the finding and route the fix through Codex app-server/KAB implementer via `handle-feedback`; after Codex changes anything, rerun affected verification and the required post-change color review.
-9. Clean generated local sidecars such as `.claude/` before final status unless they are intentionally in scope.
+2. Use an explicit KAB config/evidence artifact for the run, including `backend_type: glm`, adapter identity, GLM model, resolved `glm_command` from the real user home/PATH, approved args/caveats, and the KAB session controller path. Do not copy one operator's home path into generic KAS source guidance; concrete run artifacts may record the actual resolved path such as `/Users/draccoon/.local/bin/glm`.
+3. Before start/send, run KAB and GLM HOME/auth preflight from the real user home that owns the GLM token store, e.g. `HOME=<real-user-home> zsh -lc 'command -v kkachi-agent-bridge && command -v glm && glm --version'`. This preflight may prove availability only; it must not perform the review outside KAB.
+4. Start/send through KAB only. Evidence must include KAB session id, backend type `glm`, bridge/tmux/session controller evidence, `selected-cli.json`, `capability-check.md`, `bridge-session-snapshot.json`, and `bridge-events.md` or equivalent KAH artifacts.
+5. The actual prompt sent to the KAB GLM backend must begin with `/octo:review` as the first command text. Evidence must include the exact prompt artifact and TUI/readback snippet showing the command was submitted and activated.
+6. If the prompt appears pasted but not submitted, send Enter to the bridge tmux/session and re-read status/TUI until `prompt_confirmed: true` or a bounded failure is recorded.
+7. Use a bounded watcher after activation is confirmed; Octo may take up to 30 minutes. On completion, copy feedback into the KAH run directory, append the KAH feedback event, create/dispatch Blue/Red/Orange/Gray triage/re-review cards as required, then remove any watcher.
+8. Parse verdicts only from the actual verdict heading/field, not examples or requested-output text.
+9. If GLM/Octo feedback requires repository changes, do not patch them directly in Blue/Red/Orange/Gray review lanes. Record the finding and route the fix through Codex app-server/KAB implementer via `handle-feedback`; after Codex changes anything, rerun affected verification and the required post-change color review.
+10. Clean generated local sidecars such as `.claude/`, `.claude-octopus/`, or GLM/Octo scratch state before final status unless they are intentionally in scope and ignored/recorded.

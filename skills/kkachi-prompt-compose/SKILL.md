@@ -45,6 +45,7 @@ KHS renders a backend-specific prompt, and KAH stores that rendered prompt in th
 - Gemini prompts must not imply that plan approval starts implementation; explicit post-approval start is required.
 - OpenCode prompts must respect API/SSE authority and must not treat rendered question-like text as a bridge `needs_input` pending.
 - GLM review/verification prompts must check `response_fidelity_warning` after a rejected permission.
+- Official GLM Octo prompts must be rendered for KAB GLM delivery only, not direct `glm` CLI review. The rendered prompt's first command text must be `/octo:review`, and the prompt/evidence contract must require KAB session id, backend type `glm`, real-user-HOME KAB/GLM path preflight, `prompt_confirmed: true`, readback/events, bounded watcher, and feedback artifact evidence.
 
 ## Outputs
 
