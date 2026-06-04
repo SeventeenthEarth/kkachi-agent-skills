@@ -181,6 +181,54 @@ kkachi-agent-helper project init \
 
 Use `--force` only for non-destructive reconfiguration of existing KAH bootstrap files.
 
+After project init, update repository ignores for local runtime/tool state before verification:
+
+```gitignore
+.kkachi/
+.codegraph/
+.omx/
+.omc/
+.claude-octopus/
+```
+
+Then verify the project application from the target repo root:
+
+```bash
+kkachi-agent-helper graph validate --json
+kkachi-agent-helper project doctor --json
+```
+
+For split repos, also verify that sibling project `.kkachi/`, `.kkachi-workflow.yaml`, docs maps, overlays, and test policies are not referenced or copied.
+
+## KAS install vs project overlay boundary
+
+When 주군 asks to apply or update KAS for a specific project, treat project-specific KAS/KAH as isolated per repo. Do not reuse a sibling repo's KAS installation/overlay/reference, `.kkachi` state, workflow graph, docs map, CodeGraph evidence, or test-command policy when language, layout, roadmap IDs, test commands, or authority boundaries differ. Duplication is acceptable and preferred over cross-repo bleed-through.
+
+For split repositories that are operated independently, isolation is not satisfied by only creating one thin umbrella skill. Create or verify a complete project-specific operational KAS suite that covers the recurring phase classes for that repo (task contract, backend select, phase state, prompt compose, plan, implement, ask/blockers, review, feedback, verify, docs update, final verify, improvement capture, and any repo-specific bootstrap/conformance lane). If only the umbrella exists, report it as an incomplete bootstrap, not as KAS installation complete.
+
+Canonical installed layout for independently operated split repos is project-name category grouping under the active Hermes profile:
+
+```text
+~/.hermes/profiles/<profile>/skills/<project-name>/<skill-name>/SKILL.md
+```
+
+Examples:
+
+```text
+~/.hermes/profiles/hwangchung/skills/kan-plugin/<skill-name>/SKILL.md
+~/.hermes/profiles/hwangchung/skills/kan-control/<skill-name>/SKILL.md
+```
+
+Keep the frontmatter `name` globally unique even when the directory is project-scoped, for example `kan-control-plan` or `kan-plugin-plan`. This avoids collisions with generic skills such as `kkachi-plan` or `software-development/plan` while still making filesystem management project-local.
+
+When 주군 asks to apply or update KAS for a specific project, distinguish three locations before writing files:
+
+- **Installed operational KAS**: `~/.hermes/profiles/<profile>/skills/...` (or `$HERMES_HOME/skills/...`). This is the first target when the user wants the currently running Hermes/KAS behavior updated for one active profile.
+- **KAS source repository**: `kkachi-hermes-skills/skills/...`. Update this when promoting the installed/profile-local learning back into canonical KAS.
+- **Project repository state**: `<project>/.kkachi/`, `<project>/.kkachi-workflow.yaml`, project docs/config. Do not create `<project>/skills/` as a stand-in for KAS unless the user explicitly asks for a project-local Hermes skill package.
+
+Pitfall: phrases like “apply to the kan-plugin KAS first, promote to KAS later” usually mean “patch the installed Hermes-profile KAS guidance for kan-plugin now, then later promote that change to the KAS repo.” They do **not** by themselves authorize creating a new `skills/` directory inside `kkachi-agent-network-plugin`.
+
 ## Report format
 
 Report to master in Korean:

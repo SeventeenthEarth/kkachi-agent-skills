@@ -12,11 +12,13 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 ## Core rule
 
-Do not implement from chat-only instruction. Do not claim KAB support unless the work is actually KAB-backed. When KAB runtime implementation is not ready, current kan-plugin/P1 development uses the explicitly authorized direct Codex app-server lane through Hermes/KAS/KAH and records direct Codex evidence instead of bridge evidence. Scoped KAS/KAH-local CLIMVP, GRAPHMVP, docs-only maintenance, and direct Codex app-server pilot work may proceed without KAB when explicitly authorized and recorded; such work must not claim KAB runtime support.
+Do not implement from chat-only instruction. Do not claim KAB support unless the work is actually KAB-backed. When KAB runtime implementation is not ready or the task explicitly selects a no-KAB lane, the authorized direct Codex app-server lane through Hermes/KAS/KAH records direct Codex evidence instead of bridge evidence. Scoped KAS/KAH-local CLIMVP, GRAPHMVP, docs-only maintenance, and direct Codex app-server pilot work may proceed without KAB when explicitly authorized and recorded; such work must not claim KAB runtime support.
 
 Implementation starts only after `plan`, `ask`, `phase-plan.yaml`, and `checklist.md` are complete. For KAB-backed lanes, backend selection, capability check, and prompt composition must also be complete. For the direct Codex app-server pilot lane, record the direct Codex session/prompt evidence and no-KAB rationale instead. Hermes may auto-start only low-risk work after notifying the master. Require explicit master approval for API, DB/schema/migration, security/auth/secrets, dependency, architecture, SOT, large diff/broad fanout, low confidence, or unresolved ask ambiguity.
 
 For code-changing tasks, implementation is not complete until the repository aggregate verification command, normally `make test`, succeeds after the implementation changes. If `make test` fails, capture the failing command, exit status, and relevant output; route the evidence back to the implementer backend for analysis/fix; then rerun the failing target and the aggregate command.
+
+Implementation-task review is not complete after first color review alone. After implementation changes, run first Blue + Red/Orange/Gray color review, handle any findings, then run official GLM Octo review as the next feedback round unless 주군 explicitly waives it before start. After Octo feedback is handled, rerun affected verification and request post-Octo Blue + Red/Orange/Gray re-review before final/pre-commit reporting.
 
 KAB dispatch has two valid observation modes:
 

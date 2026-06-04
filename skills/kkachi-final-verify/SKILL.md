@@ -16,11 +16,13 @@ Completion is artifact-backed and Hermes-owned. Do not claim done when required 
 
 For 주군's KAS/Kkachi development pipeline, final verification happens before commit and must also confirm:
 
-- CodeGraph was refreshed at task start (`codegraph index <repo>` when `.codegraph/` exists, or `codegraph init -i <repo>` when first initialization is due), or an explicit unavailable/degraded reason was recorded;
+Before declaring teammate review unavailable or blocked, check the durable Hermes Kanban CLI surface. Absence of injected `kanban_*` worker tools in the current chat schema is not enough to block review. Use `HOME=<real-user-home> hermes kanban --help`, `hermes kanban boards current`, `hermes profile list`, or `hermes kanban assignees --json`, then create/dispatch review cards through `hermes kanban create` and `hermes kanban dispatch --json` when available. Record Red/Orange/Gray card IDs and verdicts back into KAH evidence.
+
+- CodeGraph was refreshed at task start (`codegraph index <repo>` when `.codegraph/` exists, or `codegraph init -i <repo>` when source code already exists but no index exists), or a no-code bootstrap deferral / explicit unavailable-degraded reason was recorded;
 - implementation, test-enhance, AI-slop-cleaner, optimize, and docs-affecting passes each have `make test` evidence after the final relevant change, or an explicit skip/blocker reason;
 - docs under `docs/` and the roadmap were updated, or a no-change/no-roadmap-update artifact explains why;
-- 황충 completed a first review and any actionable fixes were routed back to the Codex app-server/KAB implementer;
-- 하후연/Red, 여몽/Orange, and 진궁/Gray review evidence is captured for final review when the task is a Kkachi/KAS development run;
+- Blue completed a first review and any actionable fixes were routed back to the Codex app-server/KAB implementer or responsible shaping/docs lane;
+- Red/Orange/Gray first color review evidence is captured when the KAS/KAH run changed durable repository artifacts, workflow state, docs, or release/commit evidence, even if the task was not classified as implementation. Pure read-only/no-durable-change runs may mark this not applicable only with a concrete reason;
 - the repo remains review-ready and uncommitted until 주군 receives the report and approves commit.
 
 Before reporting to the master for commit consideration, verify the repo is in review-ready uncommitted state unless the master has already approved commit. The final report must separate changed files, test evidence, KAH gate evidence, role-review evidence, risks, and the exact approval needed for install/commit.
@@ -56,4 +58,8 @@ Final verification must also confirm selected backend caveats were handled:
 - final `make test` evidence after the last relevant change
 - review-ready pre-commit repo state summary
 - `kkachi-agent-helper gate final <run_id> --json` result; use `gate check <run_id> final --json` only as an older-helper compatibility fallback
+- KAH gate freshness behavior: final gate must be run after the last artifact/evidence change. If updating `final-report.md`, `checklist.md`, or any artifact referenced by a prior gate after a final gate pass, immediately rerun the affected prior gate and then rerun the final gate.
+- before asking for commit approval, use the standardized pre-commit completion report format in `references/pre-commit-completion-report-template.md`; for implementation tasks include official GLM Octo evidence and post-Octo re-review evidence, and for non-implementation tasks include not-applicable reasons when Octo was not requested/declared/run.
+- official GLM Octo evidence and the post-Octo Blue/Red/Orange/Gray re-review are required for implementation tasks and for any other workflow where Octo was requested/declared/run. Do not report “Octo review complete” or ask for commit approval on an Octo-required/run workflow until `/octo:review` actually ran or was explicitly waived before start by 주군, accepted findings were applied or deferred with reasons, affected verification reran, and Blue plus Red/Orange/Gray re-review happened after Octo fixes. For non-implementation tasks where Octo was not requested/declared/run, record it as not applicable.
+- when 주군 authorizes commit conditional on final Blue/Red/Orange/Gray approval, create a local Blue artifact, fan out evidence-pinned Kanban cards for Red/Orange/Gray, require explicit ACCEPT from all lanes, rerun final verification/gate after report updates, stage only intended files, commit with the task-prefixed one-line message, then verify clean git state and record the commit handle.
 - `kkachi-agent-helper run close <run_id> --json` for successful completion, or `run abort` for abandoned work

@@ -84,5 +84,12 @@ edges:
     to: "docs"
   - from: "docs"
     to: "final"
+feedback_intake:
+  policy: "EXTERNAL_FEEDBACK_INTAKE"
+  schema_version: "external-feedback-intake/v1"
+  min_rounds: 1
+  max_rounds: 5
+  required_rounds: [1]
+  optional_rounds: [2, 3, 4, 5]
 proposals:
   policy: "proposal-first"
