@@ -198,6 +198,8 @@ func runSyncProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env ma
 	project := fs.String("project", "", "project-specific KAS id")
 	statePath := fs.String("state", "", "project kas-project-state.yaml path")
 	legacyMarkerPath := fs.String("legacy-marker", "", "optional legacy kab-adoption-stage.md path")
+	repoPath := fs.String("repo", "", "current upstream KAS source repo path")
+	projectRoot := fs.String("project-root", "", "project-specific KAS root path")
 	dryRun := fs.Bool("dry-run", false, "validate state without writing")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
 	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
@@ -210,7 +212,7 @@ func runSyncProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env ma
 		return 2
 	}
 	if !*dryRun {
-		return emitError(stderr, "sync_project_kas_requires_dry_run", "sync-project-kas is read-only for KASUPD-002 and requires --dry-run.", "sync-project-kas", *jsonOutput, "Rerun with sync-project-kas --profile <profile> --project <project-id> --state <path> --dry-run.")
+		return emitError(stderr, "sync_project_kas_requires_dry_run", "sync-project-kas is read-only for KASUPD-003 and requires --dry-run.", "sync-project-kas", *jsonOutput, "Rerun with sync-project-kas --profile <profile> --project <project-id> --state <path> --dry-run.")
 	}
 	if *profile == "" {
 		return emitError(stderr, "profile_required", "sync-project-kas requires --profile <profile>.", "sync-project-kas", *jsonOutput, "")
@@ -218,7 +220,7 @@ func runSyncProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env ma
 	if *project == "" {
 		return emitError(stderr, "project_required", "sync-project-kas requires --project <project-id>.", "sync-project-kas", *jsonOutput, "")
 	}
-	result := kasstate.Build(kasstate.Options{Profile: *profile, Project: *project, StatePath: *statePath, LegacyMarkerPath: *legacyMarkerPath, DryRun: *dryRun})
+	result := kasstate.Build(kasstate.Options{Profile: *profile, Project: *project, StatePath: *statePath, LegacyMarkerPath: *legacyMarkerPath, DryRun: *dryRun, RepoPath: *repoPath, ProjectRoot: *projectRoot})
 	out := stdout
 	code := 0
 	if !result.OK {

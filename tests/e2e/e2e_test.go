@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
 )
 
 func repoRoot(t *testing.T) string {
@@ -178,17 +180,13 @@ func TestRealRepoDoctorReportsApprovedTempProfileReadOnly(t *testing.T) {
 
 func TestSyncProjectKASValidateStateReadOnly(t *testing.T) {
 	binary := buildBinary(t)
-	dir := t.TempDir()
-	statePath := filepath.Join(dir, "kas-project-state.yaml")
-	if err := os.WriteFile(statePath, []byte(e2eValidKASState()), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	repo, projectRoot, statePath := setupE2ESyncFixture(t)
 	before, err := os.ReadFile(statePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cmd := exec.Command(binary, "sync-project-kas", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--dry-run", "--json")
+	cmd := exec.Command(binary, "sync-project-kas", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--dry-run", "--json", "--repo", repo, "--project-root", projectRoot)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("sync-project-kas failed: %v\n%s", err, out)
@@ -197,8 +195,17 @@ func TestSyncProjectKASValidateStateReadOnly(t *testing.T) {
 	if err := json.Unmarshal(out, &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload["ok"] != true || payload["yaml_state_path"] != statePath || payload["legacy_marker_path"] != filepath.Join(dir, "kab-adoption-stage.md") {
+	if payload["ok"] != true || payload["mode"] != "dry_run_classification" || payload["yaml_state_path"] != statePath || payload["legacy_marker_path"] != filepath.Join(filepath.Dir(statePath), "kab-adoption-stage.md") {
 		t.Fatalf("unexpected sync-project-kas payload: %+v", payload)
+	}
+	summary := payload["summary"].(map[string]any)
+	counts := summary["counts_by_classification"].(map[string]any)
+	if counts["semantic_merge_required"] != float64(1) || summary["semantic_port_packet_count"] != float64(1) || summary["write_count"] != float64(0) {
+		t.Fatalf("unexpected classification summary: %+v", summary)
+	}
+	packets := payload["semantic_port_packets"].([]any)
+	if len(packets) != 1 || !strings.Contains(packets[0].(map[string]any)["content"].(string), "no_write_statement") {
+		t.Fatalf("unexpected semantic packet payload: %+v", packets)
 	}
 	after, err := os.ReadFile(statePath)
 	if err != nil {
@@ -220,6 +227,82 @@ func TestSyncProjectKASValidateStateReadOnly(t *testing.T) {
 	if missingPayload["ok"] != false || missingPayload["diagnostics"].([]any)[0].(map[string]any)["code"] != "sync_project_kas_requires_dry_run" {
 		t.Fatalf("unexpected missing dry-run payload: %+v", missingPayload)
 	}
+}
+
+func setupE2ESyncFixture(t *testing.T) (string, string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "upstream")
+	projectRoot := filepath.Join(dir, "project")
+	e2eGitInit(t, repo)
+	writeE2ESkillPack(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan", "baseline")
+	writeE2ESkillPack(t, filepath.Join(projectRoot, "skills", "kan-plugin", "kan-plugin-plan"), "kkachi-plan", "baseline")
+	e2eGitCommitAll(t, repo, "baseline")
+	commit := strings.TrimSpace(e2eRunGit(t, repo, "rev-parse", "HEAD"))
+	sourceChecksum := e2eChecksumFor(t, filepath.Join(repo, "skills", "kkachi-plan"))
+	projectChecksum := e2eChecksumFor(t, filepath.Join(projectRoot, "skills", "kan-plugin", "kan-plugin-plan"))
+	writeE2ESkillPack(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan", "upstream changed")
+	e2eGitCommitAll(t, repo, "current")
+	writeE2ESkillPack(t, filepath.Join(projectRoot, "skills", "kan-plugin", "kan-plugin-plan"), "kkachi-plan", "local changed")
+
+	state := strings.Replace(e2eValidKASState(), "commit: \"0123456789abcdef0123456789abcdef01234567\"", "commit: \""+commit+"\"", 1)
+	state = strings.Replace(state, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", sourceChecksum, 1)
+	state = strings.Replace(state, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", projectChecksum, 1)
+	statePath := filepath.Join(projectRoot, "skills", "kan-plugin", "kan-plugin-kas", "references", "kas-project-state.yaml")
+	if err := os.MkdirAll(filepath.Dir(statePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(statePath, []byte(state), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return repo, projectRoot, statePath
+}
+
+func writeE2ESkillPack(t *testing.T, dir string, name string, body string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "---\nname: " + name + "\n---\n# " + name + "\n\n" + body + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func e2eChecksumFor(t *testing.T, dir string) string {
+	t.Helper()
+	checksum, err := discovery.ComputePackChecksum(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return "sha256:" + checksum
+}
+
+func e2eGitInit(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e2eRunGit(t, dir, "init")
+	e2eRunGit(t, dir, "config", "user.email", "test@example.com")
+	e2eRunGit(t, dir, "config", "user.name", "Test User")
+}
+
+func e2eGitCommitAll(t *testing.T, dir string, message string) {
+	t.Helper()
+	e2eRunGit(t, dir, "add", "-A")
+	e2eRunGit(t, dir, "commit", "-m", message)
+}
+
+func e2eRunGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, out)
+	}
+	return string(out)
 }
 
 func e2eValidKASState() string {

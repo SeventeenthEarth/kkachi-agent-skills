@@ -246,15 +246,17 @@ JSON shape extension for dry-run, approved install, and doctor where relevant:
 
 `doctor --profile <profile> [--project <path>] --json` should report the installed marker state for project-specific KAS packs when discoverable. It must distinguish `not_applicable`, `marker_present`, `marker_missing`, `marker_unreadable`, and `unsupported_stage`.
 
-### 6.2.2 Project KAS state validation read
+### 6.2.2 Project KAS dry-run classification read
 
-KASUPD-002 adds a bounded read-only validation surface for project-specific KAS state:
+KASUPD-002 added a bounded read-only validation surface for project-specific KAS state. KASUPD-003 extends the same `sync-project-kas --dry-run` surface: after state validation succeeds, the command performs read-only three-way classification and emits semantic-port packet content as JSON evidence.
 
 ```bash
 kkachi-hermes-skills sync-project-kas \
   --profile <profile> \
   --project <project-id> \
   --state skills/<project>/<project>-kas/references/kas-project-state.yaml \
+  [--repo <current-upstream-kas-repo>] \
+  [--project-root <project-specific-kas-root>] \
   --dry-run \
   --json
 ```
@@ -264,6 +266,10 @@ Purpose:
 - read and validate `kas-project-state.yaml` using the schema in `docs/sot/project-kas-sync-state.md`;
 - optionally read the sibling legacy `references/kab-adoption-stage.md` marker for compatibility reporting;
 - report the effective static stage claim without claiming KAB runtime execution;
+- compare current upstream KAS packs, recorded upstream baseline checksums, and mapped project-local skills without checkout mutation;
+- classify changed mapped packs with the documented six-value vocabulary;
+- represent unchanged mapped packs separately as `unchanged_mappings` and `summary.no_action_count`;
+- generate semantic-port packet JSON content for `semantic_merge_required` and `new_upstream_candidate` classifications;
 - perform no writes, no profile install, no KAH state mutation, and no KAB/backend/session control.
 
 Rules:
@@ -276,6 +282,12 @@ Rules:
 - The legacy marker can be read for compatibility/reporting, but legacy-only evidence must not upgrade missing or invalid YAML to a valid state.
 - The parser intentionally supports the documented scalar/list YAML subset only. Unsupported YAML features fail closed with diagnostics rather than adding an external dependency or accepting ambiguous state.
 - State input must not contain auth tokens, secrets, gateway credentials, provider keys, model credentials, or mutable runtime/session state.
+- Dirty current upstream source fails closed for KASUPD-003 unless explicit approval exists.
+- Baseline pack checksum verification must use git object reads or an equivalent internal read abstraction. It must not mutate checkout state, overwrite the worktree, or write temporary baseline files into the project.
+- Project skill path inference must fail closed on ambiguity, path traversal, symlink escape, or missing expected mapped local skill.
+- Any `fail_closed_conflict` makes the command return `ok:false` with a non-zero exit while still emitting useful JSON diagnostics.
+- The required classification vocabulary is exactly `auto_copy_candidate`, `local_only`, `semantic_merge_required`, `new_upstream_candidate`, `removed_or_renamed_upstream`, and `fail_closed_conflict`. Do not add no-op/unchanged as a seventh classification without a new SOT update.
+- Semantic-port packet content is evidence only. Human output summarizes packet counts; the command must not write packet files.
 
 Minimum JSON shape:
 
@@ -283,7 +295,7 @@ Minimum JSON shape:
 {
   "ok": true,
   "command": "sync-project-kas",
-  "mode": "state_validate",
+  "mode": "dry_run_classification",
   "dry_run": true,
   "target_profile": "hwangchung",
   "project_id": "kan-plugin",
@@ -307,7 +319,73 @@ Minimum JSON shape:
     "pack_baseline_count": 1,
     "diagnostics": []
   },
-  "next_action": "State is valid for KASUPD-003 dry-run classification; no files were written."
+  "source_repo": {
+    "path": "/repo/kkachi-hermes-skills",
+    "git_commit": "<current-sha-or-null>",
+    "dirty": false
+  },
+  "baseline_repo": {
+    "git_commit": "<state.upstream_kas.commit>",
+    "dirty_recorded": false,
+    "baseline_verified": true
+  },
+  "project_root": {
+    "path": "/project-root",
+    "resolution": "explicit",
+    "state": "resolved"
+  },
+  "summary": {
+    "total_mappings": 1,
+    "counts_by_classification": {
+      "auto_copy_candidate": 0,
+      "local_only": 0,
+      "semantic_merge_required": 1,
+      "new_upstream_candidate": 0,
+      "removed_or_renamed_upstream": 0,
+      "fail_closed_conflict": 0
+    },
+    "no_action_count": 0,
+    "semantic_port_packet_count": 1,
+    "write_count": 0
+  },
+  "classifications": [
+    {
+      "id": "kas-sync-item-0001",
+      "upstream_pack": "kkachi-plan",
+      "project_skill": "kan-plugin-plan",
+      "classification": "semantic_merge_required",
+      "basis": [
+        "project_skill_mapping_exists",
+        "local_changed_since_baseline",
+        "upstream_changed_since_baseline"
+      ],
+      "paths": {
+        "baseline_upstream_path": "skills/kkachi-plan",
+        "current_upstream_path": "skills/kkachi-plan",
+        "project_skill_path": "skills/kan-plugin/kan-plugin-plan"
+      },
+      "checksums": {
+        "recorded_source_checksum": "sha256:<hex>",
+        "computed_baseline_source_checksum": "sha256:<hex>",
+        "current_source_checksum": "sha256:<hex>",
+        "recorded_project_checksum": "sha256:<hex>",
+        "current_project_checksum": "sha256:<hex>"
+      },
+      "requires_semantic_port": true,
+      "diagnostics": []
+    }
+  ],
+  "unchanged_mappings": [],
+  "semantic_port_packets": [
+    {
+      "packet_id": "semantic-port-kas-sync-item-0001",
+      "classification_id": "kas-sync-item-0001",
+      "recommended_artifact_path": ".kas/dry-runs/semantic-port-kas-sync-item-0001.md",
+      "content_sha256": "sha256:<hex>",
+      "content": "<semantic-port packet content>"
+    }
+  ],
+  "next_action": "Review dry-run classifications and semantic-port packets; no files were written."
 }
 ```
 

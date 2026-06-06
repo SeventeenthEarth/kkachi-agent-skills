@@ -24,7 +24,7 @@ This directory separates durable KAS/KHS sources of truth from working discussio
 | `sot/graph-template-registry.md` | Current KAS graph template registry/default-template SOT | Defines graph template id/path/version/owner metadata, phase/edge/gate/approval/feedback-intake fields, KAH validation expectations, registry evidence requirements, and active `kas-default` template metadata |
 | `sot/minimum-pilot-cli-lane.md` | Blue-confirmed KHS+KAH minimum/pilot CLI lane SOT | Confirmed lane split and safety constraints for profile-scoped install/list/doctor/sync/proposal support; does not replace full KHS+KAH+KAB execution-runtime authority |
 | `sot/kas-cli-contract.md` | CLIMVP-001 KAS minimum CLI contract SOT plus KABADOPT-001 stage-selector closure | Accepted command-surface and manifest/checksum contract for profile-scoped `list`, `install --dry-run`, approved copy install, and `doctor`; also owns KAB adoption stage selector details and fallback-audit review posture; CLIMVP-001 through CLIMVP-005 are implemented and closed, while broad `proposal` remains gated future surface |
-| `sot/project-kas-sync-state.md` | KASUPD-001 project-specific KAS state/sync SOT | Accepted SOT for project-specific KAS static state: one `kas-project-state.yaml` combines KAB adoption stage, upstream KAS commit/checksum baselines, project skill mapping, overlay policy, and dry-run/semantic-merge update workflow for KAN/KLM-style suites; KASUPD-002 adds read-only validation while classification/pilot work remains planned |
+| `sot/project-kas-sync-state.md` | KASUPD-001 project-specific KAS state/sync SOT | Accepted SOT for project-specific KAS static state: one `kas-project-state.yaml` combines KAB adoption stage, upstream KAS commit/checksum baselines, project skill mapping, overlay policy, and dry-run/semantic-merge update workflow for KAN/KLM-style suites; KASUPD-002 validates state and KASUPD-003 emits dry-run classification plus semantic-port packet evidence while write-capable sync/pilot work remains planned |
 | `sot/concept.md` | KHS concept SOT | Durable background; not changed by this graph docs pass |
 | `sot/architecture-understanding.md` | KHS architecture understanding | Durable background; not changed by this graph docs pass |
 | `sot/skill-template.md` | Skill template guidance | Durable background; not changed by this graph docs pass |
@@ -48,7 +48,7 @@ Durable source-of-truth documents for KHS behavior, architecture, and skill desi
 - `sot/graph-template-registry.md` — current GRAPHMVP-001/002 SOT for graph template registry metadata, schema expectations, and the `kas-default` template; active registry file is `registries/graph-template-registry.yaml`
 - `sot/minimum-pilot-cli-lane.md` — Blue-confirmed SOT for the KHS+KAH minimum/pilot CLI lane; keeps profile-scoped install/list/doctor/sync/proposal support separate from full KHS+KAH+KAB execution-runtime authority
 - `sot/kas-cli-contract.md` — CLIMVP-001 accepted SOT for KAS-owned `list`, `install --dry-run`, approved copy install, and `doctor`; also records the KABADOPT stage selector, generated marker shape, and fallback-audit review posture; records manifest/checksum, changed-path, approval, backup/recovery, status vocabulary, and fail-closed boundaries for the now-closed CLIMVP surface
-- `sot/project-kas-sync-state.md` — KASUPD-001 SOT for project-specific KAS `kas-project-state.yaml`, upstream KAS baselines, dry-run evidence, three-way classification, and semantic-port update workflow; KASUPD-002 implements the read-only validation/legacy-marker compatibility surface only
+- `sot/project-kas-sync-state.md` — KASUPD-001 SOT for project-specific KAS `kas-project-state.yaml`, upstream KAS baselines, dry-run evidence, three-way classification, and semantic-port update workflow; KASUPD-002 implements read-only validation/legacy-marker compatibility and KASUPD-003 implements dry-run classification/semantic-port evidence without writes
 
 ## `roadmap.md`
 
@@ -93,7 +93,7 @@ A discussion note becomes SOT only after the decision is reflected in the releva
 - KAH owns deterministic validation/write/apply/diff/audit behavior for evidenced `kkachi-agent-helper graph` surfaces; KAH 0.1.4 also advertises configurable external-feedback intake capability, while KAS adoption remains integration-pending.
 - The KHS+KAH minimum/pilot CLI lane is limited to profile-scoped install/list/doctor/sync/proposal support and does not claim KHC, Doksuri, KAB run/control, or bridge-runtime authority.
 - `sot/kas-cli-contract.md` is the accepted CLIMVP-001 contract for KAS-owned profile-scoped `list`, `install --dry-run`, approved copy install, and `doctor`, and the accepted KABADOPT-001 contract for the stage selector/fallback-audit posture; implementation evidence now covers the full CLIMVP surface, while broad `proposal` remains future gated work.
-- `sot/project-kas-sync-state.md` is the accepted KASUPD-001 contract for project-specific KAS sync state and update workflow; KASUPD-002 validation implementation is completed with Blue/review closure, and KASUPD-003/004 sync/pilot behavior remains planned.
+- `sot/project-kas-sync-state.md` is the accepted KASUPD-001 contract for project-specific KAS sync state and update workflow; KASUPD-002 validation and KASUPD-003 dry-run classification/semantic-port evidence are completed, while KASUPD-004 write-capable sync/pilot behavior remains planned.
 - KAB remains backend/session/plan evidence, not graph policy authority.
 - Kkachi v2 `.kkachi/config/workflows/` is out of KAH/KHS graph scope and has no fallback/merge relationship with `.kkachi-workflow.yaml`.
 
@@ -103,7 +103,7 @@ Older wording that calls `phase-plan.yaml` the whole workflow SOT must be read n
 
 ## Open questions
 
-- Project-specific KAS static state and sync/update workflow are defined by `sot/project-kas-sync-state.md`; read-only validation is completed for KASUPD-002, while sync classification and pilot updates remain planned under the KASUPD roadmap epic.
+- Project-specific KAS static state and sync/update workflow are defined by `sot/project-kas-sync-state.md`; read-only validation is completed for KASUPD-002 and dry-run classification/semantic-port evidence is completed for KASUPD-003, while KASUPD-004 pilot/write-capable sync remains planned under the KASUPD roadmap epic.
 - KAS graph template registry format, default `kas-default` template content, and capability-checked orchestration adoption are defined by `sot/graph-template-registry.md`, `registries/graph-template-registry.yaml`, `templates/workflow-graphs/kas-default.yaml`, `sot/workflow-graph-integration.md`, and the KAS orchestration skills.
 - Exact KAS artifact mapping for KAH graph proposal paths, semantic diff, validation/explain reports, approvals/audit evidence, checksums, graph versions, audit event ids, and capability-check evidence is defined by `templates/run-artifacts/graph-evidence.md.tmpl` and summarized in final reports under `kah_graph_evidence`.
 - KAB alignment requires separate KAB docs work and is non-authoritative here.

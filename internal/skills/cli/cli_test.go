@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
 )
 
 func writeCLITestSkill(t *testing.T, dir string, name string) {
@@ -57,14 +60,10 @@ func TestSubcommandHelpExitsZero(t *testing.T) {
 }
 
 func TestSyncProjectKASJSONAndFailClosedGuards(t *testing.T) {
-	dir := t.TempDir()
-	statePath := filepath.Join(dir, "kas-project-state.yaml")
-	if err := os.WriteFile(statePath, []byte(cliValidKASState()), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	repo, projectRoot, statePath := setupCLISyncFixture(t)
 
 	var stdout, stderr bytes.Buffer
-	code := Main([]string{"sync-project-kas", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--dry-run", "--json"}, &stdout, &stderr, nil)
+	code := Main([]string{"sync-project-kas", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--dry-run", "--json", "--repo", repo, "--project-root", projectRoot}, &stdout, &stderr, nil)
 	if code != 0 {
 		t.Fatalf("code=%d stderr=%s", code, stderr.String())
 	}
@@ -75,7 +74,10 @@ func TestSyncProjectKASJSONAndFailClosedGuards(t *testing.T) {
 	if payload["ok"] != true || payload["command"] != "sync-project-kas" || payload["yaml_state_path"] != statePath {
 		t.Fatalf("unexpected payload: %+v", payload)
 	}
-	if payload["legacy_marker_path"] != filepath.Join(dir, "kab-adoption-stage.md") || payload["write_target_after_approved_sync"] != "yaml_state_path" {
+	if payload["mode"] != "dry_run_classification" || payload["summary"].(map[string]any)["no_action_count"] != float64(1) {
+		t.Fatalf("missing classification shape: %+v", payload)
+	}
+	if payload["legacy_marker_path"] != filepath.Join(filepath.Dir(statePath), "kab-adoption-stage.md") || payload["write_target_after_approved_sync"] != "yaml_state_path" {
 		t.Fatalf("missing path/write target distinction: %+v", payload)
 	}
 	stage := payload["effective_stage_claim"].(map[string]any)
@@ -103,6 +105,7 @@ func TestSyncProjectKASJSONAndFailClosedGuards(t *testing.T) {
 	}
 	stdout.Reset()
 	stderr.Reset()
+	dir := t.TempDir()
 	badStatePath := filepath.Join(dir, "bad-state.yaml")
 	if err := os.WriteFile(badStatePath, []byte(strings.Replace(cliValidKASState(), "commit: \"0123456789abcdef0123456789abcdef01234567\"", "commit: \"HEAD\"", 1)), 0o644); err != nil {
 		t.Fatal(err)
@@ -129,6 +132,78 @@ func TestSyncProjectKASJSONAndFailClosedGuards(t *testing.T) {
 	if string(before) != string(after) {
 		t.Fatal("sync-project-kas dry-run rewrote state")
 	}
+}
+
+func setupCLISyncFixture(t *testing.T) (string, string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "upstream")
+	projectRoot := filepath.Join(dir, "project")
+	cliGitInit(t, repo)
+	writeCLISkillPack(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan", "baseline")
+	writeCLISkillPack(t, filepath.Join(projectRoot, "skills", "kan-plugin", "kan-plugin-plan"), "kkachi-plan", "baseline")
+	cliGitCommitAll(t, repo, "baseline")
+	commit := strings.TrimSpace(cliRunGit(t, repo, "rev-parse", "HEAD"))
+	sourceChecksum := cliChecksumFor(t, filepath.Join(repo, "skills", "kkachi-plan"))
+	projectChecksum := cliChecksumFor(t, filepath.Join(projectRoot, "skills", "kan-plugin", "kan-plugin-plan"))
+	state := strings.Replace(cliValidKASState(), "commit: \"0123456789abcdef0123456789abcdef01234567\"", "commit: \""+commit+"\"", 1)
+	state = strings.Replace(state, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", sourceChecksum, 1)
+	state = strings.Replace(state, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", projectChecksum, 1)
+	statePath := filepath.Join(projectRoot, "skills", "kan-plugin", "kan-plugin-kas", "references", "kas-project-state.yaml")
+	if err := os.MkdirAll(filepath.Dir(statePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(statePath, []byte(state), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return repo, projectRoot, statePath
+}
+
+func writeCLISkillPack(t *testing.T, dir string, name string, body string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "---\nname: " + name + "\n---\n# " + name + "\n\n" + body + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func cliChecksumFor(t *testing.T, dir string) string {
+	t.Helper()
+	checksum, err := discovery.ComputePackChecksum(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return "sha256:" + checksum
+}
+
+func cliGitInit(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cliRunGit(t, dir, "init")
+	cliRunGit(t, dir, "config", "user.email", "test@example.com")
+	cliRunGit(t, dir, "config", "user.name", "Test User")
+}
+
+func cliGitCommitAll(t *testing.T, dir string, message string) {
+	t.Helper()
+	cliRunGit(t, dir, "add", "-A")
+	cliRunGit(t, dir, "commit", "-m", message)
+}
+
+func cliRunGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, out)
+	}
+	return string(out)
 }
 
 func cliValidKASState() string {

@@ -3,10 +3,13 @@ package kasstate
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -27,6 +30,8 @@ type Options struct {
 	StatePath        string
 	LegacyMarkerPath string
 	DryRun           bool
+	RepoPath         string
+	ProjectRoot      string
 }
 
 type ReadSurface struct {
@@ -55,22 +60,77 @@ type Validation struct {
 	Diagnostics       []discovery.Diagnostic `json:"diagnostics"`
 }
 
+type BaselineRepo struct {
+	GitCommit        string `json:"git_commit,omitempty"`
+	DirtyRecorded    *bool  `json:"dirty_recorded,omitempty"`
+	BaselineVerified bool   `json:"baseline_verified"`
+}
+
+type ProjectRoot struct {
+	Path       string `json:"path,omitempty"`
+	Resolution string `json:"resolution"`
+	State      string `json:"state"`
+}
+
+type Summary struct {
+	TotalMappings           int            `json:"total_mappings"`
+	CountsByClassification  map[string]int `json:"counts_by_classification"`
+	NoActionCount           int            `json:"no_action_count"`
+	SemanticPortPacketCount int            `json:"semantic_port_packet_count"`
+	WriteCount              int            `json:"write_count"`
+}
+
+type Classification struct {
+	ID                   string                 `json:"id"`
+	UpstreamPack         string                 `json:"upstream_pack,omitempty"`
+	ProjectSkill         string                 `json:"project_skill,omitempty"`
+	Classification       string                 `json:"classification"`
+	Basis                []string               `json:"basis"`
+	Paths                map[string]string      `json:"paths"`
+	Checksums            map[string]string      `json:"checksums"`
+	RequiresSemanticPort bool                   `json:"requires_semantic_port"`
+	Diagnostics          []discovery.Diagnostic `json:"diagnostics"`
+}
+
+type UnchangedMapping struct {
+	ID           string            `json:"id"`
+	UpstreamPack string            `json:"upstream_pack"`
+	ProjectSkill string            `json:"project_skill"`
+	Paths        map[string]string `json:"paths"`
+	Checksums    map[string]string `json:"checksums"`
+}
+
+type SemanticPortPacket struct {
+	PacketID                string `json:"packet_id"`
+	ClassificationID        string `json:"classification_id"`
+	RecommendedArtifactPath string `json:"recommended_artifact_path"`
+	ContentSHA256           string `json:"content_sha256"`
+	Content                 string `json:"content"`
+}
+
 type Result struct {
-	OK                           bool                `json:"ok"`
-	Command                      string              `json:"command"`
-	Mode                         string              `json:"mode"`
-	CLIVersion                   string              `json:"cli_version"`
-	DryRun                       bool                `json:"dry_run"`
-	TargetProfile                string              `json:"target_profile"`
-	ProjectID                    string              `json:"project_id"`
-	YAMLStatePath                string              `json:"yaml_state_path"`
-	LegacyMarkerPath             string              `json:"legacy_marker_path"`
-	StateSource                  string              `json:"state_source"`
-	ReadSurfaces                 ReadSurfaces        `json:"read_surfaces"`
-	EffectiveStageClaim          EffectiveStageClaim `json:"effective_stage_claim"`
-	WriteTargetAfterApprovedSync string              `json:"write_target_after_approved_sync"`
-	Validation                   Validation          `json:"validation"`
-	NextAction                   string              `json:"next_action"`
+	OK                           bool                  `json:"ok"`
+	Command                      string                `json:"command"`
+	Mode                         string                `json:"mode"`
+	CLIVersion                   string                `json:"cli_version"`
+	DryRun                       bool                  `json:"dry_run"`
+	TargetProfile                string                `json:"target_profile"`
+	ProjectID                    string                `json:"project_id"`
+	YAMLStatePath                string                `json:"yaml_state_path"`
+	LegacyMarkerPath             string                `json:"legacy_marker_path"`
+	StateSource                  string                `json:"state_source"`
+	ReadSurfaces                 ReadSurfaces          `json:"read_surfaces"`
+	EffectiveStageClaim          EffectiveStageClaim   `json:"effective_stage_claim"`
+	WriteTargetAfterApprovedSync string                `json:"write_target_after_approved_sync"`
+	Validation                   Validation            `json:"validation"`
+	SourceRepo                   *discovery.SourceRepo `json:"source_repo,omitempty"`
+	BaselineRepo                 *BaselineRepo         `json:"baseline_repo,omitempty"`
+	ProjectRoot                  *ProjectRoot          `json:"project_root,omitempty"`
+	Summary                      *Summary              `json:"summary,omitempty"`
+	Classifications              []Classification      `json:"classifications,omitempty"`
+	UnchangedMappings            []UnchangedMapping    `json:"unchanged_mappings,omitempty"`
+	SemanticPortPackets          []SemanticPortPacket  `json:"semantic_port_packets,omitempty"`
+	NextAction                   string                `json:"next_action"`
 }
 
 type stateFile struct {
@@ -167,6 +227,7 @@ func Build(opts Options) Result {
 		FailClosedToStage1:       false,
 	}
 	result.NextAction = "State is valid for KASUPD-003 dry-run classification; no files were written."
+	classifyDryRun(&result, parsed, opts)
 	return result
 }
 
@@ -182,11 +243,562 @@ func RenderHuman(result Result) string {
 		fmt.Sprintf("effective stage: %d %s (source %s, KAB execution claim allowed: %t)", result.EffectiveStageClaim.Numeric, result.EffectiveStageClaim.Canonical, result.EffectiveStageClaim.Source, result.EffectiveStageClaim.KABExecutionClaimAllowed),
 		fmt.Sprintf("write target after approved sync: %s", result.WriteTargetAfterApprovedSync),
 	}
+	if result.SourceRepo != nil {
+		commit := "unknown"
+		if result.SourceRepo.GitCommit != nil {
+			commit = *result.SourceRepo.GitCommit
+		}
+		dirty := "unknown"
+		if result.SourceRepo.Dirty != nil {
+			dirty = strconv.FormatBool(*result.SourceRepo.Dirty)
+		}
+		lines = append(lines, fmt.Sprintf("source repo: %s @ %s (dirty: %s)", result.SourceRepo.Path, commit, dirty))
+	}
+	if result.ProjectRoot != nil {
+		lines = append(lines, fmt.Sprintf("project root: %s (%s, %s)", result.ProjectRoot.Path, result.ProjectRoot.Resolution, result.ProjectRoot.State))
+	}
+	if result.Summary != nil {
+		lines = append(lines, fmt.Sprintf("classification counts: auto_copy_candidate=%d, local_only=%d, semantic_merge_required=%d, new_upstream_candidate=%d, removed_or_renamed_upstream=%d, fail_closed_conflict=%d, no_action=%d",
+			result.Summary.CountsByClassification["auto_copy_candidate"],
+			result.Summary.CountsByClassification["local_only"],
+			result.Summary.CountsByClassification["semantic_merge_required"],
+			result.Summary.CountsByClassification["new_upstream_candidate"],
+			result.Summary.CountsByClassification["removed_or_renamed_upstream"],
+			result.Summary.CountsByClassification["fail_closed_conflict"],
+			result.Summary.NoActionCount,
+		))
+		lines = append(lines, fmt.Sprintf("semantic-port packets: %d; writes: %d", result.Summary.SemanticPortPacketCount, result.Summary.WriteCount))
+	}
 	for _, diagnostic := range result.Validation.Diagnostics {
 		lines = append(lines, fmt.Sprintf("%s: %s — %s", diagnostic.Level, diagnostic.Code, diagnostic.Message))
 	}
+	for _, classification := range result.Classifications {
+		for _, diagnostic := range classification.Diagnostics {
+			lines = append(lines, fmt.Sprintf("%s: %s — %s", diagnostic.Level, diagnostic.Code, diagnostic.Message))
+		}
+	}
 	lines = append(lines, "다음: "+result.NextAction)
 	return strings.Join(lines, "\n")
+}
+
+func classifyDryRun(result *Result, state stateFile, opts Options) {
+	result.Mode = "dry_run_classification"
+	result.Summary = &Summary{
+		TotalMappings:          len(state.packBaselines),
+		CountsByClassification: emptyClassificationCounts(),
+		WriteCount:             0,
+	}
+	dirtyRecorded := state.upstream["dirty"] == "true"
+	result.BaselineRepo = &BaselineRepo{
+		GitCommit:        state.upstream["commit"],
+		DirtyRecorded:    &dirtyRecorded,
+		BaselineVerified: true,
+	}
+
+	repoPath, err := resolveSourceRepo(opts.RepoPath)
+	if err != nil {
+		addDiag(result, "error", "source_repo_unresolved", err.Error())
+		addSyntheticConflict(result, "source_repo_unresolved", "cannot resolve current upstream KAS repo")
+		finishClassification(result)
+		return
+	}
+	info := discovery.SourceRepoInfo(repoPath)
+	result.SourceRepo = &info
+
+	root := resolveProjectRoot(opts.ProjectRoot, opts.StatePath, opts.Project)
+	result.ProjectRoot = &root
+	if root.State != "resolved" {
+		addSyntheticConflict(result, "project_root_"+root.State, "cannot safely resolve project KAS root")
+		finishClassification(result)
+		return
+	}
+
+	if info.Dirty != nil && *info.Dirty {
+		addDiag(result, "error", "source_repo_dirty_requires_review", "current upstream source repo is dirty; KASUPD-003 has no approval to classify against dirty source")
+		for i, baseline := range sortedBaselines(state.packBaselines) {
+			result.Classifications = append(result.Classifications, conflictForBaseline(i+1, baseline, []discovery.Diagnostic{
+				diag("error", "source_repo_dirty_requires_review", "current upstream source repo is dirty and requires explicit review before dry-run classification"),
+			}))
+		}
+		finishClassification(result)
+		return
+	}
+
+	currentPacks, err := discovery.DiscoverSourcePacks(repoPath)
+	if err != nil {
+		addDiag(result, "error", "source_repo_unreadable", err.Error())
+		addSyntheticConflict(result, "source_repo_unreadable", "cannot read current upstream KAS packs")
+		finishClassification(result)
+		return
+	}
+	currentByID := map[string]discovery.SourcePack{}
+	for _, pack := range currentPacks {
+		currentByID[pack.PackID] = pack
+	}
+
+	seen := map[string]bool{}
+	for i, baseline := range sortedBaselines(state.packBaselines) {
+		id := fmt.Sprintf("kas-sync-item-%04d", i+1)
+		classification, unchanged := classifyBaseline(id, repoPath, root.Path, state, baseline, currentByID)
+		seen[baseline["upstream_pack"]] = true
+		if unchanged != nil {
+			result.UnchangedMappings = append(result.UnchangedMappings, *unchanged)
+			result.Summary.NoActionCount++
+			continue
+		}
+		result.Classifications = append(result.Classifications, classification)
+	}
+	sort.Slice(currentPacks, func(i, j int) bool { return currentPacks[i].PackID < currentPacks[j].PackID })
+	for _, pack := range currentPacks {
+		if seen[pack.PackID] {
+			continue
+		}
+		id := fmt.Sprintf("kas-sync-item-%04d", len(result.Classifications)+len(result.UnchangedMappings)+1)
+		classification := Classification{
+			ID:                   id,
+			UpstreamPack:         pack.PackID,
+			Classification:       "new_upstream_candidate",
+			Basis:                []string{"current_upstream_pack_not_in_state_baselines"},
+			Paths:                map[string]string{"current_upstream_path": pack.SourcePath},
+			Checksums:            map[string]string{"current_source_checksum": ensureChecksumPrefix(pack.Checksum)},
+			RequiresSemanticPort: true,
+			Diagnostics:          []discovery.Diagnostic{},
+		}
+		result.Classifications = append(result.Classifications, classification)
+	}
+	for _, classification := range result.Classifications {
+		if classification.RequiresSemanticPort {
+			result.SemanticPortPackets = append(result.SemanticPortPackets, buildSemanticPacket(result, state, classification))
+		}
+	}
+	finishClassification(result)
+}
+
+func classifyBaseline(id string, repoPath string, projectRoot string, state stateFile, baseline map[string]string, currentByID map[string]discovery.SourcePack) (Classification, *UnchangedMapping) {
+	upstreamPack := baseline["upstream_pack"]
+	projectSkill := baseline["project_skill"]
+	classification := Classification{
+		ID:             id,
+		UpstreamPack:   upstreamPack,
+		ProjectSkill:   projectSkill,
+		Classification: "fail_closed_conflict",
+		Basis:          []string{"project_skill_mapping_exists"},
+		Paths: map[string]string{
+			"baseline_upstream_path": packPathFromID(upstreamPack),
+			"current_upstream_path":  packPathFromID(upstreamPack),
+		},
+		Checksums: map[string]string{
+			"recorded_source_checksum":  baseline["source_checksum"],
+			"recorded_project_checksum": baseline["project_checksum"],
+		},
+		Diagnostics: []discovery.Diagnostic{},
+	}
+	baselineChecksum, err := computeGitPackChecksum(repoPath, state.upstream["commit"], packPathFromID(upstreamPack))
+	if err != nil {
+		classification.Diagnostics = append(classification.Diagnostics, diag("error", "baseline_commit_unreadable", err.Error()))
+		return classification, nil
+	}
+	classification.Checksums["computed_baseline_source_checksum"] = baselineChecksum
+	if baselineChecksum != baseline["source_checksum"] {
+		classification.Diagnostics = append(classification.Diagnostics, diag("error", "baseline_source_checksum_mismatch", "recorded source checksum does not match the pack at upstream_kas.commit"))
+		return classification, nil
+	}
+	current, currentExists := currentByID[upstreamPack]
+	if !currentExists {
+		classification.Classification = "removed_or_renamed_upstream"
+		classification.Basis = append(classification.Basis, "current_upstream_pack_missing")
+		classification.Diagnostics = []discovery.Diagnostic{}
+		return classification, nil
+	}
+	classification.Paths["current_upstream_path"] = current.SourcePath
+	currentSourceChecksum := ensureChecksumPrefix(current.Checksum)
+	classification.Checksums["current_source_checksum"] = currentSourceChecksum
+
+	projectPath, projectRel, err := resolveProjectSkillPath(projectRoot, state.project["id"], projectSkill)
+	if err != nil {
+		code := "project_skill_missing"
+		if strings.Contains(err.Error(), "ambiguous") {
+			code = "project_skill_path_ambiguous"
+		} else if strings.Contains(err.Error(), "escape") || strings.Contains(err.Error(), "invalid") {
+			code = "project_skill_path_invalid"
+		}
+		classification.Diagnostics = append(classification.Diagnostics, diag("error", code, err.Error()))
+		return classification, nil
+	}
+	classification.Paths["project_skill_path"] = projectRel
+	projectChecksum, err := discovery.ComputePackChecksum(projectPath)
+	if err != nil {
+		classification.Diagnostics = append(classification.Diagnostics, diag("error", "project_skill_unreadable", err.Error()))
+		return classification, nil
+	}
+	currentProjectChecksum := ensureChecksumPrefix(projectChecksum)
+	classification.Checksums["current_project_checksum"] = currentProjectChecksum
+
+	upstreamChanged := currentSourceChecksum != baseline["source_checksum"]
+	localChanged := currentProjectChecksum != baseline["project_checksum"]
+	switch {
+	case upstreamChanged && localChanged:
+		classification.Classification = "semantic_merge_required"
+		classification.Basis = append(classification.Basis, "local_changed_since_baseline", "upstream_changed_since_baseline")
+		classification.RequiresSemanticPort = true
+	case upstreamChanged:
+		classification.Classification = "auto_copy_candidate"
+		classification.Basis = append(classification.Basis, "local_unchanged_since_baseline", "upstream_changed_since_baseline")
+	case localChanged:
+		classification.Classification = "local_only"
+		classification.Basis = append(classification.Basis, "local_changed_since_baseline", "upstream_unchanged_since_baseline")
+	default:
+		unchanged := UnchangedMapping{
+			ID:           id,
+			UpstreamPack: upstreamPack,
+			ProjectSkill: projectSkill,
+			Paths:        classification.Paths,
+			Checksums:    classification.Checksums,
+		}
+		return Classification{}, &unchanged
+	}
+	classification.Diagnostics = []discovery.Diagnostic{}
+	return classification, nil
+}
+
+func finishClassification(result *Result) {
+	if result.Summary == nil {
+		return
+	}
+	for _, classification := range result.Classifications {
+		if _, ok := result.Summary.CountsByClassification[classification.Classification]; ok {
+			result.Summary.CountsByClassification[classification.Classification]++
+		}
+		if classification.Classification == "fail_closed_conflict" {
+			result.OK = false
+			result.BaselineRepo.BaselineVerified = false
+		}
+	}
+	result.Summary.SemanticPortPacketCount = len(result.SemanticPortPackets)
+	if result.OK {
+		result.NextAction = "Review dry-run classifications and semantic-port packets; no files were written."
+	} else {
+		result.NextAction = "Resolve fail-closed diagnostics before any project KAS sync; no files were written."
+	}
+}
+
+func emptyClassificationCounts() map[string]int {
+	return map[string]int{
+		"auto_copy_candidate":         0,
+		"local_only":                  0,
+		"semantic_merge_required":     0,
+		"new_upstream_candidate":      0,
+		"removed_or_renamed_upstream": 0,
+		"fail_closed_conflict":        0,
+	}
+}
+
+func addSyntheticConflict(result *Result, code string, message string) {
+	if result.Summary == nil {
+		result.Summary = &Summary{CountsByClassification: emptyClassificationCounts()}
+	}
+	result.Classifications = append(result.Classifications, Classification{
+		ID:             "kas-sync-item-0001",
+		Classification: "fail_closed_conflict",
+		Basis:          []string{code},
+		Paths:          map[string]string{},
+		Checksums:      map[string]string{},
+		Diagnostics:    []discovery.Diagnostic{diag("error", code, message)},
+	})
+}
+
+func conflictForBaseline(n int, baseline map[string]string, diagnostics []discovery.Diagnostic) Classification {
+	return Classification{
+		ID:             fmt.Sprintf("kas-sync-item-%04d", n),
+		UpstreamPack:   baseline["upstream_pack"],
+		ProjectSkill:   baseline["project_skill"],
+		Classification: "fail_closed_conflict",
+		Basis:          []string{"project_skill_mapping_exists"},
+		Paths: map[string]string{
+			"baseline_upstream_path": packPathFromID(baseline["upstream_pack"]),
+			"current_upstream_path":  packPathFromID(baseline["upstream_pack"]),
+		},
+		Checksums: map[string]string{
+			"recorded_source_checksum":  baseline["source_checksum"],
+			"recorded_project_checksum": baseline["project_checksum"],
+		},
+		Diagnostics: diagnostics,
+	}
+}
+
+func sortedBaselines(baselines []map[string]string) []map[string]string {
+	out := append([]map[string]string(nil), baselines...)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i]["upstream_pack"] == out[j]["upstream_pack"] {
+			return out[i]["project_skill"] < out[j]["project_skill"]
+		}
+		return out[i]["upstream_pack"] < out[j]["upstream_pack"]
+	})
+	return out
+}
+
+func buildSemanticPacket(result *Result, state stateFile, classification Classification) SemanticPortPacket {
+	content := strings.Join([]string{
+		"# Semantic Port Packet",
+		"",
+		"packet_scope: KASUPD-003 dry-run evidence only",
+		"no_write_statement: sync-project-kas --dry-run wrote no project KAS files, profiles, manifests, KAH state, KAB state, or packet files.",
+		fmt.Sprintf("state_path: %s", result.YAMLStatePath),
+		fmt.Sprintf("state_sha256: %s", result.ReadSurfaces.YAML.SHA256),
+		fmt.Sprintf("classification_id: %s", classification.ID),
+		fmt.Sprintf("classification: %s", classification.Classification),
+		fmt.Sprintf("upstream_pack: %s", classification.UpstreamPack),
+		fmt.Sprintf("project_skill: %s", classification.ProjectSkill),
+		fmt.Sprintf("baseline_commit: %s", state.upstream["commit"]),
+		fmt.Sprintf("paths_json: %s", mustJSON(classification.Paths)),
+		fmt.Sprintf("checksums_json: %s", mustJSON(classification.Checksums)),
+		"",
+		"Preservation constraints:",
+		"- Preserve project authority, roadmap IDs, test commands, role labels, and selected KAB adoption stage.",
+		"- Do not change auth, tokens, secrets, gateway/provider/model config, KAB runtime state, or installed Hermes profiles.",
+		"- Treat this packet as review input only; approved sync/apply/write-capable behavior is out of scope.",
+		"",
+		"Dry-run evidence:",
+		fmt.Sprintf("- basis: %s", strings.Join(classification.Basis, ", ")),
+	}, "\n")
+	sum := sha256.Sum256([]byte(content))
+	packetID := "semantic-port-" + classification.ID
+	return SemanticPortPacket{
+		PacketID:                packetID,
+		ClassificationID:        classification.ID,
+		RecommendedArtifactPath: filepath.ToSlash(filepath.Join(".kas", "dry-runs", packetID+".md")),
+		ContentSHA256:           "sha256:" + hex.EncodeToString(sum[:]),
+		Content:                 content,
+	}
+}
+
+func mustJSON(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return "{}"
+	}
+	return string(data)
+}
+
+func resolveSourceRepo(value string) (string, error) {
+	if value == "" {
+		return discovery.FindSourceRepo("")
+	}
+	abs, err := filepath.Abs(value)
+	if err != nil {
+		return "", err
+	}
+	return discovery.FindSourceRepo(abs)
+}
+
+func resolveProjectRoot(explicit string, statePath string, project string) ProjectRoot {
+	if explicit != "" {
+		root, err := cleanExistingDirInside("", explicit)
+		if err != nil {
+			return ProjectRoot{Path: explicit, Resolution: "explicit", State: "missing"}
+		}
+		return ProjectRoot{Path: root, Resolution: "explicit", State: "resolved"}
+	}
+	abs, err := filepath.Abs(statePath)
+	if err != nil {
+		return ProjectRoot{Path: statePath, Resolution: "inferred_from_state", State: "ambiguous"}
+	}
+	eval, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return ProjectRoot{Path: abs, Resolution: "inferred_from_state", State: "missing"}
+	}
+	parts := strings.Split(filepath.ToSlash(eval), "/")
+	suffix := []string{"skills", project, project + "-kas", "references", "kas-project-state.yaml"}
+	if len(parts) < len(suffix)+1 {
+		return ProjectRoot{Path: eval, Resolution: "inferred_from_state", State: "ambiguous"}
+	}
+	start := len(parts) - len(suffix)
+	for i, want := range suffix {
+		if parts[start+i] != want {
+			return ProjectRoot{Path: eval, Resolution: "inferred_from_state", State: "ambiguous"}
+		}
+	}
+	rootSlash := strings.Join(parts[:start], "/")
+	if rootSlash == "" {
+		rootSlash = "/"
+	}
+	root := filepath.FromSlash(rootSlash)
+	return ProjectRoot{Path: root, Resolution: "inferred_from_state", State: "resolved"}
+}
+
+func resolveProjectSkillPath(root string, project string, projectSkill string) (string, string, error) {
+	if discovery.IsInvalidRelativePath(projectSkill) {
+		return "", "", fmt.Errorf("invalid project_skill path %q", projectSkill)
+	}
+	candidates := []string{
+		filepath.Join(root, "skills", project, projectSkill),
+		filepath.Join(root, "skills", projectSkill),
+	}
+	found := []string{}
+	for _, candidate := range candidates {
+		resolved, err := cleanExistingDirInside(root, candidate)
+		if err != nil {
+			continue
+		}
+		if !isRegularFile(filepath.Join(resolved, "SKILL.md")) {
+			continue
+		}
+		found = append(found, resolved)
+	}
+	if len(found) == 0 {
+		return "", "", fmt.Errorf("project skill %q missing under expected mapped paths", projectSkill)
+	}
+	if len(found) > 1 {
+		return "", "", fmt.Errorf("project skill path ambiguous for %q", projectSkill)
+	}
+	rel, err := filepath.Rel(root, found[0])
+	if err != nil {
+		return "", "", err
+	}
+	return found[0], filepath.ToSlash(rel), nil
+}
+
+func cleanExistingDirInside(root string, path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || !info.IsDir() {
+		return "", fmt.Errorf("missing directory %s", path)
+	}
+	if root != "" {
+		rootResolved, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			return "", err
+		}
+		rel, err := filepath.Rel(rootResolved, resolved)
+		if err != nil || rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+			return "", fmt.Errorf("path %s would escape project root", path)
+		}
+	}
+	return resolved, nil
+}
+
+func computeGitPackChecksum(repo string, commit string, packPath string) (string, error) {
+	if discovery.IsInvalidRelativePath(packPath) {
+		return "", fmt.Errorf("invalid baseline upstream path %q", packPath)
+	}
+	type entry struct {
+		Path   string `json:"path"`
+		Bytes  int    `json:"bytes"`
+		Mode   string `json:"mode"`
+		SHA256 string `json:"sha256"`
+	}
+	out, err := gitOutput(repo, "ls-tree", "-r", "-z", "-l", commit, "--", packPath)
+	if err != nil {
+		return "", err
+	}
+	entries := []entry{}
+	for _, record := range strings.Split(string(out), "\x00") {
+		if record == "" {
+			continue
+		}
+		meta, path, ok := strings.Cut(record, "\t")
+		if !ok {
+			return "", fmt.Errorf("unexpected git ls-tree record for %s", packPath)
+		}
+		fields := strings.Fields(meta)
+		if len(fields) < 4 || fields[1] != "blob" {
+			continue
+		}
+		rel, err := filepath.Rel(filepath.FromSlash(packPath), filepath.FromSlash(path))
+		if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+			return "", fmt.Errorf("baseline path %s escapes pack %s", path, packPath)
+		}
+		rel = filepath.ToSlash(rel)
+		if excludedPackPath(rel) {
+			continue
+		}
+		data, err := gitOutput(repo, "show", commit+":"+path)
+		if err != nil {
+			return "", err
+		}
+		size, err := strconv.Atoi(fields[3])
+		if err != nil {
+			size = len(data)
+		}
+		sum := sha256.Sum256(data)
+		entries = append(entries, entry{
+			Path:   rel,
+			Bytes:  size,
+			Mode:   gitModeString(fields[0]),
+			SHA256: hex.EncodeToString(sum[:]),
+		})
+	}
+	if len(entries) == 0 {
+		return "", fmt.Errorf("baseline pack %s not found at commit %s", packPath, commit)
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Path < entries[j].Path })
+	payload, err := json.Marshal(entries)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(payload)
+	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}
+
+func gitOutput(repo string, args ...string) ([]byte, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = repo
+	out, err := cmd.Output()
+	if err != nil {
+		if exit, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("git %s failed: %s", strings.Join(args, " "), strings.TrimSpace(string(exit.Stderr)))
+		}
+		return nil, err
+	}
+	return out, nil
+}
+
+func packPathFromID(packID string) string {
+	if strings.Contains(packID, "/") {
+		return "skills/" + packID
+	}
+	return "skills/" + packID
+}
+
+func ensureChecksumPrefix(value string) string {
+	if strings.HasPrefix(value, "sha256:") {
+		return value
+	}
+	return "sha256:" + value
+}
+
+func gitModeString(mode string) string {
+	switch mode {
+	case "100755":
+		return "0755"
+	default:
+		return "0644"
+	}
+}
+
+func excludedPackPath(relativePath string) bool {
+	parts := strings.Split(relativePath, "/")
+	for _, part := range parts {
+		if part == ".git" || part == ".kkachi" || part == "__pycache__" {
+			return true
+		}
+		if part == ".DS_Store" || strings.HasSuffix(part, ".swp") || strings.HasSuffix(part, ".swo") {
+			return true
+		}
+	}
+	return false
+}
+
+func isRegularFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular()
 }
 
 func readLegacyMarker(path string) ReadSurface {

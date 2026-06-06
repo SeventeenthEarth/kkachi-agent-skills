@@ -11,4 +11,5 @@ __pycache__/
 .kkachi-workflow.yaml
 .omc/
 .claude/
+.claude-octopus/
 feedback.md

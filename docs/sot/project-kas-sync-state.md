@@ -3,7 +3,7 @@
 Date: 2026-06-06
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record
-Status: accepted SOT for `KASUPD-001`; `KASUPD-002` implements read-only state validation and legacy-marker compatibility read, while dry-run classification, semantic-port packets, and pilot updates remain planned
+Status: accepted SOT for `KASUPD-001`; `KASUPD-002` implements read-only state validation and legacy-marker compatibility read, and `KASUPD-003` implements dry-run classification plus semantic-port packet evidence while approved sync writes and pilot updates remain planned
 Authority level: SOT for project-specific KAS static state and upstream sync/update workflow
 Scope: installed/profile-local project-specific KAS suites such as KAN, KLM, `kan-plugin`, and `kan-control`; no runtime KAB execution, profile mutation, or project KAS update is authorized by this document alone
 Related docs: `docs/roadmap.md`, `docs/sot/kas-cli-contract.md`, `docs/sot/khs-architecture-and-integration.md`, `docs/kkachi-docs-map.yaml`
@@ -126,18 +126,20 @@ Project-specific KAS update work must use the state YAML plus dry-run evidence, 
 
 ## 5. Automation contract
 
-KASUPD-002 implements the first bounded read-only surface for this workflow:
+KASUPD-002 implemented the first bounded read-only validation surface for this workflow. KASUPD-003 extends that same dry-run command with read-only three-way classification and semantic-port packet evidence:
 
 ```bash
 kkachi-hermes-skills sync-project-kas \
   --profile <profile> \
   --project <project-id> \
   --state skills/<project>/<project>-kas/references/kas-project-state.yaml \
+  [--repo <current-upstream-kas-repo>] \
+  [--project-root <project-specific-kas-root>] \
   --dry-run \
   --json
 ```
 
-For KASUPD-002 this command only reads and validates state. It must:
+This command must:
 
 - require `--dry-run` and fail closed when it is omitted;
 - read `kas-project-state.yaml` from `--state`;
@@ -147,9 +149,15 @@ For KASUPD-002 this command only reads and validates state. It must:
 - recognize valid Stage 1 and Stage 2 static YAML values but keep `kab_execution_claim_allowed=false`;
 - keep Stage 3 unsupported/reserved;
 - reject unsupported YAML features, invalid schema, bad commits/checksums, weakened overlay/evidence posture, and secret/auth/token/gateway/provider/runtime-state-like input;
+- when state is valid, compare current upstream KAS packs, the recorded upstream baseline at `upstream_kas.commit`, and mapped project-local skills;
+- verify baseline pack checksums without checkout mutation or worktree overwrite;
+- emit only the six documented classifications: `auto_copy_candidate`, `local_only`, `semantic_merge_required`, `new_upstream_candidate`, `removed_or_renamed_upstream`, and `fail_closed_conflict`;
+- represent unchanged mapped packs outside the classification vocabulary as `unchanged_mappings` and `summary.no_action_count`;
+- generate semantic-port packet JSON content for `semantic_merge_required` and `new_upstream_candidate` classifications without writing packet files;
+- fail closed with `ok:false` and non-zero exit on dirty current upstream source, baseline checksum mismatch, ambiguous or escaping project skill paths, missing expected mapped local skills, unreadable baseline commits, or any `fail_closed_conflict`;
 - perform no writes.
 
-KASUPD-002 does not implement dry-run three-way classification, semantic-port packet generation, approved sync writes, or a project pilot. Those remain under KASUPD-003 and KASUPD-004.
+KASUPD-003 still does not implement approved sync writes, write-capable apply mode, or a project pilot. Those remain under KASUPD-004 or a later explicitly approved task.
 
 Write-capable project-specific KAS sync must require a later approved task and:
 
