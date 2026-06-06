@@ -175,3 +175,104 @@ func TestRealRepoDoctorReportsApprovedTempProfileReadOnly(t *testing.T) {
 		t.Fatal("doctor rewrote the install manifest")
 	}
 }
+
+func TestSyncProjectKASValidateStateReadOnly(t *testing.T) {
+	binary := buildBinary(t)
+	dir := t.TempDir()
+	statePath := filepath.Join(dir, "kas-project-state.yaml")
+	if err := os.WriteFile(statePath, []byte(e2eValidKASState()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binary, "sync-project-kas", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--dry-run", "--json")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("sync-project-kas failed: %v\n%s", err, out)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["yaml_state_path"] != statePath || payload["legacy_marker_path"] != filepath.Join(dir, "kab-adoption-stage.md") {
+		t.Fatalf("unexpected sync-project-kas payload: %+v", payload)
+	}
+	after, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("sync-project-kas rewrote state file")
+	}
+
+	missingDryRun := exec.Command(binary, "sync-project-kas", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--json")
+	missingOut, err := missingDryRun.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected missing --dry-run failure, got success: %s", missingOut)
+	}
+	var missingPayload map[string]any
+	if err := json.Unmarshal(missingOut, &missingPayload); err != nil {
+		t.Fatal(err)
+	}
+	if missingPayload["ok"] != false || missingPayload["diagnostics"].([]any)[0].(map[string]any)["code"] != "sync_project_kas_requires_dry_run" {
+		t.Fatalf("unexpected missing dry-run payload: %+v", missingPayload)
+	}
+}
+
+func e2eValidKASState() string {
+	checksum := "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	return `version: "0.1"
+project:
+  id: "kan-plugin"
+  repo: "kkachi-agent-network-plugin"
+  kas_suite: "kan-plugin"
+  profile: "hwangchung"
+kab_adoption_stage:
+  numeric: 1
+  canonical: "stage1_direct_codex_app_server_baseline"
+  selection_source: "approved_project_policy"
+  selected_at: "2026-06-06T00:00:00Z"
+  approval_evidence: "not_applicable"
+  stage2_activation: false
+upstream_kas:
+  repo: "kkachi-hermes-skills"
+  remote: "github.com/SeventeenthEarth/kkachi-hermes-skills"
+  commit: "0123456789abcdef0123456789abcdef01234567"
+  dirty: false
+  synced_at: "2026-06-06T00:00:00Z"
+  sync_task: "KASUPD-001"
+pack_baselines:
+  - upstream_pack: "kkachi-plan"
+    project_skill: "kan-plugin-plan"
+    source_checksum: "` + checksum + `"
+    project_checksum: "` + checksum + `"
+    merge_mode: "semantic_port"
+overlay_policy:
+  local_overlay_allowed: true
+  preserve_project_authority: true
+  preserve_project_roadmap_ids: true
+  preserve_project_test_commands: true
+  preserve_role_labels: true
+  overwrite_mode: "never_without_review"
+update_policy:
+  default_mode: "dry_run_then_semantic_merge"
+  auto_apply_when:
+    - "target_file_missing"
+  require_llm_merge_when:
+    - "project_skill_mapping_exists"
+  fail_closed_when:
+    - "state_file_missing"
+    - "state_schema_invalid"
+    - "stage_unsupported"
+    - "upstream_commit_unknown"
+    - "checksum_mismatch_without_baseline"
+    - "auth_token_gateway_or_provider_mutation_detected"
+evidence_posture:
+  not_kab_runtime_evidence: true
+  not_stage2_activation_by_itself: true
+  missing_or_unreadable_fails_to_stage1_claims: true
+`
+}

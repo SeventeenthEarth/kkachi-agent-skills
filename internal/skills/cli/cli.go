@@ -12,6 +12,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
 	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/doctor"
 	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/install"
+	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/kasstate"
 )
 
 var installPromptInput io.Reader = os.Stdin
@@ -32,7 +33,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list or install command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, doctor, or sync-project-kas command", "", false, "")
 	}
 	if isHelpArg(argv[0]) {
 		printRootHelp(stdout)
@@ -45,8 +46,10 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runInstall(argv[1:], stdout, stderr, env)
 	case "doctor":
 		return runDoctor(argv[1:], stdout, stderr, env)
+	case "sync-project-kas":
+		return runSyncProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, and doctor commands are implemented", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, doctor, and sync-project-kas commands are implemented", argv[0], false, "")
 	}
 }
 
@@ -188,6 +191,48 @@ func runDoctor(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	return code
 }
 
+func runSyncProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("sync-project-kas", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	profile := fs.String("profile", "", "Hermes target profile name")
+	project := fs.String("project", "", "project-specific KAS id")
+	statePath := fs.String("state", "", "project kas-project-state.yaml path")
+	legacyMarkerPath := fs.String("legacy-marker", "", "optional legacy kab-adoption-stage.md path")
+	dryRun := fs.Bool("dry-run", false, "validate state without writing")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if !*dryRun {
+		return emitError(stderr, "sync_project_kas_requires_dry_run", "sync-project-kas is read-only for KASUPD-002 and requires --dry-run.", "sync-project-kas", *jsonOutput, "Rerun with sync-project-kas --profile <profile> --project <project-id> --state <path> --dry-run.")
+	}
+	if *profile == "" {
+		return emitError(stderr, "profile_required", "sync-project-kas requires --profile <profile>.", "sync-project-kas", *jsonOutput, "")
+	}
+	if *project == "" {
+		return emitError(stderr, "project_required", "sync-project-kas requires --project <project-id>.", "sync-project-kas", *jsonOutput, "")
+	}
+	result := kasstate.Build(kasstate.Options{Profile: *profile, Project: *project, StatePath: *statePath, LegacyMarkerPath: *legacyMarkerPath, DryRun: *dryRun})
+	out := stdout
+	code := 0
+	if !result.OK {
+		out = stderr
+		code = 2
+	}
+	if *jsonOutput {
+		_ = writeJSON(out, result)
+	} else {
+		fmt.Fprintln(out, kasstate.RenderHuman(result))
+	}
+	return code
+}
+
 func normalizeInstallArgs(argv []string) []string {
 	rewritten := []string{}
 	positionals := []string{}
@@ -274,6 +319,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  list     List available KAS skill packs")
 	fmt.Fprintln(w, "  install  Plan a profile-scoped KAS skill-pack install")
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS skill-pack install")
+	fmt.Fprintln(w, "  sync-project-kas  Validate project-specific KAS state without writing")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Use \"kkachi-hermes-skills <command> --help\" for command options.")
 }

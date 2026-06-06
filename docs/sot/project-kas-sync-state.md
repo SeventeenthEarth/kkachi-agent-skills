@@ -3,7 +3,7 @@
 Date: 2026-06-06
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record
-Status: candidate SOT for `KASUPD-001`; implementation starts only after this SOT and roadmap task are accepted
+Status: accepted SOT for `KASUPD-001`; `KASUPD-002` implements read-only state validation and legacy-marker compatibility read, while dry-run classification, semantic-port packets, and pilot updates remain planned
 Authority level: SOT for project-specific KAS static state and upstream sync/update workflow
 Scope: installed/profile-local project-specific KAS suites such as KAN, KLM, `kan-plugin`, and `kan-control`; no runtime KAB execution, profile mutation, or project KAS update is authorized by this document alone
 Related docs: `docs/roadmap.md`, `docs/sot/kas-cli-contract.md`, `docs/sot/khs-architecture-and-integration.md`, `docs/kkachi-docs-map.yaml`
@@ -126,7 +126,7 @@ Project-specific KAS update work must use the state YAML plus dry-run evidence, 
 
 ## 5. Automation contract
 
-A future KAS command or skill may implement this workflow, but it must remain fail-closed:
+KASUPD-002 implements the first bounded read-only surface for this workflow:
 
 ```bash
 kkachi-hermes-skills sync-project-kas \
@@ -137,7 +137,21 @@ kkachi-hermes-skills sync-project-kas \
   --json
 ```
 
-The first implementation should be docs/state/evidence planning only unless separately approved for writes. Write-capable project-specific KAS sync must require:
+For KASUPD-002 this command only reads and validates state. It must:
+
+- require `--dry-run` and fail closed when it is omitted;
+- read `kas-project-state.yaml` from `--state`;
+- read the sibling legacy `kab-adoption-stage.md` marker for compatibility/reporting when present;
+- keep legacy-only evidence from upgrading missing or invalid YAML to valid state;
+- emit `yaml_state_path`, `legacy_marker_path`, read-surface states, effective static stage claim, write target after future approved sync, validation diagnostics, and next action;
+- recognize valid Stage 1 and Stage 2 static YAML values but keep `kab_execution_claim_allowed=false`;
+- keep Stage 3 unsupported/reserved;
+- reject unsupported YAML features, invalid schema, bad commits/checksums, weakened overlay/evidence posture, and secret/auth/token/gateway/provider/runtime-state-like input;
+- perform no writes.
+
+KASUPD-002 does not implement dry-run three-way classification, semantic-port packet generation, approved sync writes, or a project pilot. Those remain under KASUPD-003 and KASUPD-004.
+
+Write-capable project-specific KAS sync must require a later approved task and:
 
 - valid state YAML;
 - current dry-run evidence;
@@ -160,14 +174,18 @@ Fallback audit policy from `docs/sot/kas-cli-contract.md` applies regardless of 
 
 ## 7. Acceptance criteria for KASUPD implementation
 
-A future implementation task may only close after it proves:
+KASUPD-002 may only close after it proves:
 
 - state YAML schema parsing and validation;
 - compatibility read of the old stage-only marker where needed;
 - machine output that distinguishes YAML state paths from legacy marker paths;
 - source commit/checksum capture;
+- fail-closed behavior for schema, checksum, unsupported stage, auth/token/gateway/provider mutation, and ambiguous mapping cases;
+- no-write behavior for the validation command.
+
+Later KASUPD tasks may only close after they additionally prove:
+
 - dry-run evidence integration;
 - three-way classification;
 - semantic-port prompt/evidence artifact generation;
-- fail-closed behavior for schema, checksum, unsupported stage, auth/token/gateway/provider mutation, and ambiguous mapping cases;
 - project-specific pilot evidence on one approved KAS suite such as KAN, KLM, `kan-plugin`, or `kan-control`.

@@ -28,7 +28,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := stdout.String()
-			if !strings.Contains(out, "list") || !strings.Contains(out, "install") || !strings.Contains(out, "doctor") {
+			if !strings.Contains(out, "list") || !strings.Contains(out, "install") || !strings.Contains(out, "doctor") || !strings.Contains(out, "sync-project-kas") {
 				t.Fatalf("root help did not list available commands: %q", out)
 			}
 			if stderr.Len() != 0 {
@@ -39,7 +39,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 }
 
 func TestSubcommandHelpExitsZero(t *testing.T) {
-	for _, command := range []string{"list", "install", "doctor"} {
+	for _, command := range []string{"list", "install", "doctor", "sync-project-kas"} {
 		t.Run(command, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			code := Main([]string{command, "--help"}, &stdout, &stderr, nil)
@@ -54,6 +54,136 @@ func TestSubcommandHelpExitsZero(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSyncProjectKASJSONAndFailClosedGuards(t *testing.T) {
+	dir := t.TempDir()
+	statePath := filepath.Join(dir, "kas-project-state.yaml")
+	if err := os.WriteFile(statePath, []byte(cliValidKASState()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"sync-project-kas", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--dry-run", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%s", code, stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["command"] != "sync-project-kas" || payload["yaml_state_path"] != statePath {
+		t.Fatalf("unexpected payload: %+v", payload)
+	}
+	if payload["legacy_marker_path"] != filepath.Join(dir, "kab-adoption-stage.md") || payload["write_target_after_approved_sync"] != "yaml_state_path" {
+		t.Fatalf("missing path/write target distinction: %+v", payload)
+	}
+	stage := payload["effective_stage_claim"].(map[string]any)
+	if stage["kab_execution_claim_allowed"] != false || stage["source"] != "yaml" {
+		t.Fatalf("unexpected stage claim: %+v", stage)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"sync-project-kas", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected missing dry-run failure, got %d", code)
+	}
+	payload = map[string]any{}
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["diagnostics"].([]any)[0].(map[string]any)["code"] != "sync_project_kas_requires_dry_run" {
+		t.Fatalf("unexpected missing dry-run payload: %+v", payload)
+	}
+
+	before, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	badStatePath := filepath.Join(dir, "bad-state.yaml")
+	if err := os.WriteFile(badStatePath, []byte(strings.Replace(cliValidKASState(), "commit: \"0123456789abcdef0123456789abcdef01234567\"", "commit: \"HEAD\"", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code = Main([]string{"sync-project-kas", "--profile", "hwangchung", "--project", "kan-plugin", "--state", badStatePath, "--dry-run", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected invalid state failure, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	payload = map[string]any{}
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["yaml_state_path"] != badStatePath || payload["legacy_marker_path"] != filepath.Join(dir, "kab-adoption-stage.md") {
+		t.Fatalf("invalid JSON did not include both paths: %+v", payload)
+	}
+	stage = payload["effective_stage_claim"].(map[string]any)
+	if stage["fail_closed_to_stage1"] != true || stage["source"] != "fail_closed" {
+		t.Fatalf("invalid state did not fail closed to Stage 1: %+v", stage)
+	}
+	after, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("sync-project-kas dry-run rewrote state")
+	}
+}
+
+func cliValidKASState() string {
+	checksum := "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	return `version: "0.1"
+project:
+  id: "kan-plugin"
+  repo: "kkachi-agent-network-plugin"
+  kas_suite: "kan-plugin"
+  profile: "hwangchung"
+kab_adoption_stage:
+  numeric: 1
+  canonical: "stage1_direct_codex_app_server_baseline"
+  selection_source: "approved_project_policy"
+  selected_at: "2026-06-06T00:00:00Z"
+  approval_evidence: "not_applicable"
+  stage2_activation: false
+upstream_kas:
+  repo: "kkachi-hermes-skills"
+  remote: "github.com/SeventeenthEarth/kkachi-hermes-skills"
+  commit: "0123456789abcdef0123456789abcdef01234567"
+  dirty: false
+  synced_at: "2026-06-06T00:00:00Z"
+  sync_task: "KASUPD-001"
+pack_baselines:
+  - upstream_pack: "kkachi-plan"
+    project_skill: "kan-plugin-plan"
+    source_checksum: "` + checksum + `"
+    project_checksum: "` + checksum + `"
+    merge_mode: "semantic_port"
+overlay_policy:
+  local_overlay_allowed: true
+  preserve_project_authority: true
+  preserve_project_roadmap_ids: true
+  preserve_project_test_commands: true
+  preserve_role_labels: true
+  overwrite_mode: "never_without_review"
+update_policy:
+  default_mode: "dry_run_then_semantic_merge"
+  auto_apply_when:
+    - "target_file_missing"
+  require_llm_merge_when:
+    - "project_skill_mapping_exists"
+  fail_closed_when:
+    - "state_file_missing"
+    - "state_schema_invalid"
+    - "stage_unsupported"
+    - "upstream_commit_unknown"
+    - "checksum_mismatch_without_baseline"
+    - "auth_token_gateway_or_provider_mutation_detected"
+evidence_posture:
+  not_kab_runtime_evidence: true
+  not_stage2_activation_by_itself: true
+  missing_or_unreadable_fails_to_stage1_claims: true
+`
 }
 
 func TestDoctorJSONHumanAndProfileRootGuard(t *testing.T) {

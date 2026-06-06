@@ -246,6 +246,73 @@ JSON shape extension for dry-run, approved install, and doctor where relevant:
 
 `doctor --profile <profile> [--project <path>] --json` should report the installed marker state for project-specific KAS packs when discoverable. It must distinguish `not_applicable`, `marker_present`, `marker_missing`, `marker_unreadable`, and `unsupported_stage`.
 
+### 6.2.2 Project KAS state validation read
+
+KASUPD-002 adds a bounded read-only validation surface for project-specific KAS state:
+
+```bash
+kkachi-hermes-skills sync-project-kas \
+  --profile <profile> \
+  --project <project-id> \
+  --state skills/<project>/<project>-kas/references/kas-project-state.yaml \
+  --dry-run \
+  --json
+```
+
+Purpose:
+
+- read and validate `kas-project-state.yaml` using the schema in `docs/sot/project-kas-sync-state.md`;
+- optionally read the sibling legacy `references/kab-adoption-stage.md` marker for compatibility reporting;
+- report the effective static stage claim without claiming KAB runtime execution;
+- perform no writes, no profile install, no KAH state mutation, and no KAB/backend/session control.
+
+Rules:
+
+- `--dry-run` is mandatory. Missing `--dry-run` fails closed.
+- `--profile`, `--project`, and `--state` are required. CLI `--profile` and `--project` must match the YAML `project.profile` and `project.id` when the YAML is readable.
+- Valid YAML may recognize Stage 1 or Stage 2 static state values. Stage 3 remains reserved and unsupported.
+- YAML state is not KAB runtime evidence and is not Stage 2 activation by itself.
+- Missing, unreadable, unsupported, or schema-invalid YAML fails closed to Stage 1 claims and must not claim KAB Codex execution.
+- The legacy marker can be read for compatibility/reporting, but legacy-only evidence must not upgrade missing or invalid YAML to a valid state.
+- The parser intentionally supports the documented scalar/list YAML subset only. Unsupported YAML features fail closed with diagnostics rather than adding an external dependency or accepting ambiguous state.
+- State input must not contain auth tokens, secrets, gateway credentials, provider keys, model credentials, or mutable runtime/session state.
+
+Minimum JSON shape:
+
+```json
+{
+  "ok": true,
+  "command": "sync-project-kas",
+  "mode": "state_validate",
+  "dry_run": true,
+  "target_profile": "hwangchung",
+  "project_id": "kan-plugin",
+  "yaml_state_path": "skills/kan-plugin/kan-plugin-kas/references/kas-project-state.yaml",
+  "legacy_marker_path": "skills/kan-plugin/kan-plugin-kas/references/kab-adoption-stage.md",
+  "state_source": "yaml",
+  "read_surfaces": {
+    "yaml": {"state": "valid", "path": "skills/kan-plugin/kan-plugin-kas/references/kas-project-state.yaml"},
+    "legacy_marker": {"state": "missing", "path": "skills/kan-plugin/kan-plugin-kas/references/kab-adoption-stage.md"}
+  },
+  "effective_stage_claim": {
+    "numeric": 1,
+    "canonical": "stage1_direct_codex_app_server_baseline",
+    "source": "yaml",
+    "kab_execution_claim_allowed": false,
+    "fail_closed_to_stage1": false
+  },
+  "write_target_after_approved_sync": "yaml_state_path",
+  "validation": {
+    "schema_version": "0.1",
+    "pack_baseline_count": 1,
+    "diagnostics": []
+  },
+  "next_action": "State is valid for KASUPD-003 dry-run classification; no files were written."
+}
+```
+
+For invalid or missing YAML, JSON output must keep `ok: false`, exit non-zero, include both `yaml_state_path` and `legacy_marker_path`, set `effective_stage_claim.fail_closed_to_stage1: true`, and keep `write_target_after_approved_sync: "yaml_state_path"`.
+
 ### 6.3 `list`
 
 Canonical form:
