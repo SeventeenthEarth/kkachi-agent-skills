@@ -6,7 +6,7 @@ Confirming role: Responsible approver / governance evidence record; INITDOC post
 Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced; KAS integration work remains separately gated
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-kas-sync-state.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -47,6 +47,7 @@ INITDOC-003
   -> GRAPHMVP-001..004
   -> STALECLEAN-001..004
   -> KABADOPT-001..004
+  -> KASUPD-001..004
 ```
 
 INITDOC is closed before implementation begins so the temporary transition SOT does not become new legacy. `BOOTSTRAP` should happen first because it gives later KAS work a deterministic KAH project state and doctor evidence. `STALECLEAN` may run in parallel with late CLIMVP/GRAPHMVP tasks only when the touched surfaces do not overlap.
@@ -126,12 +127,26 @@ Deferred from GRAPHMVP unless separately approved: graph `apply` automation, dec
 
 KABADOPT deferrals unless separately approved: Stage 3 backend-selected implementation, Antigravity lane work, non-Codex KAB implementation backends for KAS/KAH development, silent fallback from Stage 2 to direct Codex, and mutation of auth/tokens/gateway/model/provider config.
 
+### EPIC: KASUPD — project-specific KAS upstream sync and semantic-port workflow
+
+> Goal: let KAN, KLM, `kan-plugin`, `kan-control`, and other project-specific KAS suites adopt new shared KAS policy without overwriting project-local authority, roadmap IDs, test commands, or role boundaries. This epic records the static state YAML first, then implements dry-run evidence, three-way classification, semantic-port prompting, and one approved pilot. The roadmap entry itself is not write authorization for any installed profile or project-specific KAS suite.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| KASUPD-001 | Specify project-specific KAS state and sync workflow SOT | Completed | `docs/sot/project-kas-sync-state.md` defines `kas-project-state.yaml` as the canonical project-specific KAS static state file, combining KAB adoption stage, upstream KAS commit/checksum baselines, project skill mapping, overlay policy, dry-run evidence use, three-way classification, semantic-port merge rules, and fail-closed conditions. `docs/README.md` and `docs/kkachi-docs-map.yaml` register the SOT. | Completed as docs-only SOT freeze with `git diff --check`, docs-map YAML parse, `make test`, KAH docs/roadmap evidence, and Red/Orange/Gray ACCEPT. No implementation, profile mutation, or project KAS update is authorized by this task. |
+| KASUPD-002 | Implement state YAML validation and compatibility read | Planned | KAS tooling or skill workflow reads `kas-project-state.yaml`, validates schema version, stage, upstream commit/checksum fields, pack mappings, overlay policy, and evidence posture; it can read old `kab-adoption-stage.md` markers for compatibility but writes the YAML state for new approved sync work. Machine output distinguishes `yaml_state_path` from `legacy_marker_path`. Missing/unreadable/invalid state fails closed to Stage 1 claims. | Unit/CLI or scripted validation tests, invalid YAML/schema fixtures, compatibility-marker fixtures, docs update, Red/Orange/Gray review, and no auth/token/gateway/provider mutation. |
+| KASUPD-003 | Implement dry-run three-way classification and semantic-port packet | Planned | Sync dry-run compares upstream bare KAS, recorded baseline, and project-specific local skill files; emits `auto_copy_candidate`, `local_only`, `semantic_merge_required`, `new_upstream_candidate`, `removed_or_renamed_upstream`, or `fail_closed_conflict`; composes an LLM semantic-port packet without mutating files. | Dry-run JSON/evidence tests, checksum mismatch/fail-closed fixtures, generated semantic-port artifact review, `make test`, and color review. |
+| KASUPD-004 | Pilot project-specific KAS update on one approved suite | Planned | One 주군-approved project-specific suite such as KAN, KLM, `kan-plugin`, or `kan-control` uses the state YAML plus dry-run/semantic-port workflow to adopt selected upstream KAS changes while preserving project-local authority and selected KAB stage. | 주군 project choice/approval, preflight state readback, dry-run evidence, semantic-port diff, verification, Blue/Red/Orange/Gray review, official GLM Octo only if the task class/policy requires it, final KAH gate, and commit approval. |
+
+KASUPD deferrals unless separately approved: broad write-capable sync across multiple projects, automatic overwrite of project-specific local changes, shared `skills.external_dirs` behavior, auth/token/gateway/provider config mutation, Stage 3 backend-selected policy updates, and any hidden fallback from selected project KAS stage.
+
 ## Deferred / non-MVP work
 
-- KAS `sync` write behavior after dry-run/diff/approval/recovery spec and Red/operator review.
+- KAS write-capable sync behavior after KASUPD dry-run/state/semantic-port evidence, approval, recovery spec, and Red/operator review.
 - Broad `proposal` CLI mapping across profile install ledgers, project overlays, KAH graph proposals, run-local improvement notes, and shared KAS promotion gates.
 - KAB context/prompt alignment with applied graph version/checksum.
 - KAS/KAH development Stage 2 KAB Codex-first adoption remains planned under KABADOPT until selector implementation, marker/runbook references, and one approved pilot provide evidence.
+- Project-specific KAS upstream sync remains planned under KASUPD until state YAML, dry-run classification, semantic-port packet, and one approved pilot provide evidence.
 - Automated review-by-different-tool transport and evidence; this remains `kab_later`.
 - KHC/Doksuri integration and command/control surfaces.
 - Repo-root Hermes multi-skill-pack install claims until Hermes behavior is verified.
@@ -169,8 +184,9 @@ Implementation remains gated by each later task's responsible approver authoriza
 - Approved profile install backup/recovery behavior is implemented for CLIMVP; future `sync` recovery behavior remains separately gated.
 - KAS graph template registry schema and default `kas-default` template content are defined by `docs/sot/graph-template-registry.md`, `registries/graph-template-registry.yaml`, and `templates/workflow-graphs/kas-default.yaml`.
 - Exact KAS artifact mapping for KAH proposal, semantic diff, validation/explain, approval/audit, checksum/version, event-id, and capability-check evidence is defined by GRAPHMVP-004 in `templates/run-artifacts/graph-evidence.md.tmpl` and the graph SOTs.
+- Project-specific KAS sync/update is now tracked by KASUPD; implementation still requires a separately approved KASUPD task.
 - KAB alignment requires a separately assigned KAB docs/update task.
 
 ## Next record action
 
-INITDOC, BOOTSTRAP, `CLIMVP-001` through `CLIMVP-005`, `GRAPHMVP-001` through `GRAPHMVP-004`, `STALECLEAN-001` through `STALECLEAN-004`, and `KABADOPT-001` through `KABADOPT-003` are completed with the Go module path `github.com/SeventeenthEarth/kkachi-hermes-skills`. KABADOPT-004 remains `Planned` until its own Stage 2 pilot evidence/review gates pass. No further STALECLEAN task is listed; any epic-level closure needs a dedicated review/update task.
+INITDOC, BOOTSTRAP, `CLIMVP-001` through `CLIMVP-005`, `GRAPHMVP-001` through `GRAPHMVP-004`, `STALECLEAN-001` through `STALECLEAN-004`, `KABADOPT-001` through `KABADOPT-003`, and KASUPD-001 are completed with the Go module path `github.com/SeventeenthEarth/kkachi-hermes-skills`. KABADOPT-004 remains `Planned` until its own Stage 2 pilot evidence/review gates pass. KASUPD-002 through KASUPD-004 remain `Planned` until their own implementation/pilot evidence gates pass. No further STALECLEAN task is listed; any epic-level closure needs a dedicated review/update task.

@@ -189,7 +189,7 @@ Choice [1]:
 
 Marker output:
 
-- The selected/defaulted stage is recorded in installed project-specific KAS guidance, preferably as `references/kab-adoption-stage.md` under the installed umbrella project skill, for example `skills/<project>/<project>-kas/references/kab-adoption-stage.md`.
+- The selected/defaulted stage is recorded in installed project-specific KAS guidance. `references/kab-adoption-stage.md` is the legacy stage-only marker; new project-specific KAS sync work should record the stage inside `references/kas-project-state.yaml` as defined by `docs/sot/project-kas-sync-state.md`.
 - The marker must include the numeric choice, canonical value, selection source, selected-at/install id when available, responsible approval evidence when available, and the required evidence posture for future runs.
 - The marker is an operating-policy reference, not KAH state and not KAB execution evidence.
 - Stage 2 markers must state that future implementation/fix/docs-bound execution uses KAB `native_codex` and that falling back to direct Codex requires a recorded break-glass approval/rationale.
