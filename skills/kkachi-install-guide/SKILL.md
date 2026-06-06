@@ -51,7 +51,7 @@ Before starting, identify:
 - Bun required for the KAB OpenCode TypeScript plugin build
 - Rust/Cargo required for the KAB Codex wrapper build
 - backend CLI availability: `claude`, `glm`, `codex`, `opencode`, `gemini` as needed for selected KAB lanes
-- KAS KAB adoption stage for the target project/profile: `stage1_direct_codex_app_server_baseline`, `stage2_kab_codex_first`, or `stage3_kab_backend_selected`
+- KAS KAB adoption stage for the target project/profile: `stage1_direct_codex_app_server_baseline`, `stage2_kab_codex_first`, or `stage3_kab_backend_selected`; read `references/kas-kab-adoption-stage-runbook.md` before reporting evidence expectations
 - network access: GitHub, Go module proxy, Bun/TypeScript package resolution when dependencies are missing
 - existing installations: check `kkachi-agent-helper` and `kkachi-agent-bridge` binaries
 
@@ -251,6 +251,10 @@ Pitfall: phrases like “apply to the kan-plugin KAS first, promote to KAS later
 
 Reference: `references/kas-kab-adoption-stage-boundary.md` captures the Stage
 1/2/3 marker pattern, preferred installed-profile location, and KAH boundary.
+Reference: `references/kas-kab-adoption-stage-runbook.md` captures the Stage 1
+direct Codex evidence posture, Stage 2 KAB `native_codex` evidence posture, and
+break-glass handling. Do not duplicate the full runbook in phase skills; point
+operators to the marker plus this reference.
 
 ## Report format
 

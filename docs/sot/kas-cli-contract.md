@@ -206,9 +206,22 @@ Selection source: default_stage1
 Selected at: <install-id-or-timestamp>
 Approval evidence: <approval-ref-or-not_applicable>
 
+## Runbook references
+
+- Canonical runbook: skills/kkachi-install-guide/references/kas-kab-adoption-stage-runbook.md
+- Generated marker path: references/kab-adoption-stage.md
+
 ## Execution policy
 
 Future KAS/KAH development runs for this project use the direct Codex app-server baseline unless a later approved reconfiguration changes this marker to Stage 2.
+
+## Selected-stage evidence posture
+
+- Record direct Codex app-server prompt/session/output evidence for plan, implementation, docs/fix, cleanup, and verification support.
+- Record the no-KAB-Codex rationale for the selected direct lane.
+- Do not claim KAB Codex execution evidence for Stage 1 work.
+
+This marker is operating-policy guidance only. It is not Stage 2 activation by itself and is not KAB execution evidence.
 ```
 
 JSON shape extension for dry-run, approved install, and doctor where relevant:

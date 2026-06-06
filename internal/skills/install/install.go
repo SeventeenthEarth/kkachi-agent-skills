@@ -248,6 +248,10 @@ func kabAdoptionStageMarkerContent(stage KABAdoptionStage, selectedAt string, ap
 	if stage.Numeric == 2 {
 		policy = "Future KAS/KAH implementation, fix, and docs-bound execution for this project uses KAB native_codex after required preflight/session evidence; direct Codex fallback requires a recorded break-glass approval and rationale."
 	}
+	evidencePosture := "- Record direct Codex app-server prompt/session/output evidence for plan, implementation, docs/fix, cleanup, and verification support.\n- Record the no-KAB-Codex rationale for the selected direct lane.\n- Do not claim KAB Codex execution evidence for Stage 1 work."
+	if stage.Numeric == 2 {
+		evidencePosture = "- Record KAB `native_codex` selected CLI/capability preflight before execution.\n- Preserve KAB session/read/status/wait or retained stream evidence plus bridge events.\n- Use direct Codex only as break-glass with recorded approval and rationale; never as silent fallback."
+	}
 	return fmt.Sprintf(`# KAB adoption stage
 
 Numeric stage: %d
@@ -256,12 +260,21 @@ Selection source: %s
 Selected at: %s
 Approval evidence: %s
 
+## Runbook references
+
+- Canonical runbook: skills/kkachi-install-guide/references/kas-kab-adoption-stage-runbook.md
+- Generated marker path: references/kab-adoption-stage.md
+
 ## Execution policy
 
 %s
 
+## Selected-stage evidence posture
+
+%s
+
 This marker is operating-policy guidance only. It is not Stage 2 activation by itself and is not KAB execution evidence.
-`, stage.Numeric, stage.Canonical, hashBoundKABStageSource(stage), selectedAt, approvalEvidence, policy)
+`, stage.Numeric, stage.Canonical, hashBoundKABStageSource(stage), selectedAt, approvalEvidence, policy, evidencePosture)
 }
 
 func ParseKABAdoptionStageMarker(data []byte) (KABAdoptionStage, bool) {

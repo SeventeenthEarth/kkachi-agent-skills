@@ -1,6 +1,6 @@
 # KAS KAB adoption stage boundary
 
-Use this reference when installing or changing a project-specific KAS suite and the project must declare whether it runs as Stage 1, Stage 2, or Stage 3.
+Use this reference when installing or changing a project-specific KAS suite and the project must declare whether it runs as Stage 1, Stage 2, or Stage 3. After reading the boundary, use `kas-kab-adoption-stage-runbook.md` for the concrete Stage 1 and Stage 2 evidence checklist.
 
 ## Ownership
 
@@ -27,6 +27,9 @@ For current split projects this means examples such as:
 ```
 
 The umbrella project KAS skill should explicitly say to read `references/kab-adoption-stage.md` before selecting planner/implementer lanes.
+It should then apply the canonical runbook at
+`skills/kkachi-install-guide/references/kas-kab-adoption-stage-runbook.md`
+instead of duplicating stage evidence rules in every phase skill.
 
 ## Stage record shape
 
@@ -70,3 +73,9 @@ If KAH project state is rewritten, preserve:
 ## Fail-closed rule
 
 If the stage marker is missing, invalid, or ambiguous, KAS must fail closed to Stage 1 behavior. Direct Codex evidence may be recorded, but KAB Codex execution must not be claimed unless Stage 2 or Stage 3 is explicitly selected and evidenced.
+
+## Runbook pointer
+
+The detailed operator checklist for marker readback, Stage 1 direct Codex
+evidence, Stage 2 KAB `native_codex` evidence, and break-glass handling lives in
+`kas-kab-adoption-stage-runbook.md`.

@@ -416,6 +416,66 @@ func TestKABAdoptionStageParsingHashBindingAndSourceMarkerConflict(t *testing.T)
 	}
 }
 
+func TestKABAdoptionStageMarkerRunbookEvidencePostureAndReadback(t *testing.T) {
+	stage1, err := ResolveKABAdoptionStage(StageSelectionInput{Numeric: "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stage1Marker := KABAdoptionStageMarkerContent(stage1)
+	for _, needle := range []string{
+		"Numeric stage: 1",
+		"Canonical stage: " + KABStage1Canonical,
+		"Selection source: explicit_stage_selection",
+		"Runbook references",
+		"Canonical runbook: skills/kkachi-install-guide/references/kas-kab-adoption-stage-runbook.md",
+		"Generated marker path: references/kab-adoption-stage.md",
+		"Selected-stage evidence posture",
+		"direct Codex app-server prompt/session/output evidence",
+		"no-KAB-Codex rationale",
+		"Do not claim KAB Codex execution evidence for Stage 1 work.",
+		"operating-policy guidance only",
+		"not Stage 2 activation by itself",
+		"not KAB execution evidence",
+	} {
+		if !contains(stage1Marker, needle) {
+			t.Fatalf("Stage 1 marker missing %q:\n%s", needle, stage1Marker)
+		}
+	}
+	parsed1, ok := ParseKABAdoptionStageMarker([]byte(stage1Marker))
+	if !ok || parsed1.Numeric != 1 || parsed1.Canonical != KABStage1Canonical || parsed1.Source != "explicit_stage_selection" {
+		t.Fatalf("Stage 1 marker readback failed: ok=%v stage=%+v marker=\n%s", ok, parsed1, stage1Marker)
+	}
+
+	stage2, err := ResolveKABAdoptionStage(StageSelectionInput{Canonical: KABStage2Canonical})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stage2Marker := KABAdoptionStageMarkerContent(stage2)
+	for _, needle := range []string{
+		"Numeric stage: 2",
+		"Canonical stage: " + KABStage2Canonical,
+		"Selection source: explicit_stage_selection",
+		"Runbook references",
+		"Canonical runbook: skills/kkachi-install-guide/references/kas-kab-adoption-stage-runbook.md",
+		"Generated marker path: references/kab-adoption-stage.md",
+		"KAB native_codex after required preflight/session evidence",
+		"break-glass approval and rationale",
+		"KAB `native_codex` selected CLI/capability preflight",
+		"KAB session/read/status/wait or retained stream evidence plus bridge events",
+		"never as silent fallback",
+		"not Stage 2 activation by itself",
+		"not KAB execution evidence",
+	} {
+		if !contains(stage2Marker, needle) {
+			t.Fatalf("Stage 2 marker missing %q:\n%s", needle, stage2Marker)
+		}
+	}
+	parsed2, ok := ParseKABAdoptionStageMarker([]byte(stage2Marker))
+	if !ok || parsed2.Numeric != 2 || parsed2.Canonical != KABStage2Canonical || parsed2.Source != "explicit_stage_selection" {
+		t.Fatalf("Stage 2 marker readback failed: ok=%v stage=%+v marker=\n%s", ok, parsed2, stage2Marker)
+	}
+}
+
 func TestApprovedInstallWritesKABMarkerManifestAndRejectsDifferentStage(t *testing.T) {
 	base := t.TempDir()
 	repo := filepath.Join(base, "repo")
