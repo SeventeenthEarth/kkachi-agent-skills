@@ -122,11 +122,20 @@ kkachi-agent-helper project init \
   --docs-map-todo-dir <path-to-todo-dir> \
   --docs-map-spec-dir <path-to-spec-dir> \
   --test-commands "<command1>,<command2>" \
-  --backend-policy "<allowed-backends-or-policy>" \
+  --backend-policy "stage=<stage1_direct_codex_app_server_baseline|stage2_kab_codex_first|stage3_kab_backend_selected>; allowed=<allowed-backends-or-policy>" \
   --execution-mode <mode> \
   --sot-policy <policy> \
   --json
 ```
+
+KAS KAB adoption stage is selected at project application time. KAH does not need
+to interpret the stage semantically because the same graph/run/artifact mechanics
+apply across Stage 1, Stage 2, and Stage 3. Record the stage in KAS guidance and,
+when project state is initialized through KAH, in the backend policy string and
+generated project overlay/reference. To change stage for an initialized project,
+rerun `project init ... --force` only when the persisted KAH project overlay or
+backend-policy must change; preserve the old and new stage in the report, and
+rerun project doctor when KAH project state was rewritten.
 
 Use `--force` only for intentional non-destructive reconfiguration of bootstrap files. KAH is expected to preserve runs, status, artifacts, events, and gate history during force reconfiguration; still report that `--force` was used.
 

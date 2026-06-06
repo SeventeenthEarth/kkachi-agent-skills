@@ -107,13 +107,14 @@ codegraph_policy:
     - "If CodeGraph is unavailable, record the missing command as a blocker or explicit degraded-evidence reason; do not silently skip code context refresh."
 
 kab_usage_policy:
+  kab_adoption_stage: required_in_project_backend_policy_or_run_artifact
   backend_execution: required_when_backend_or_bridge_evidence_needed
   automated_review_by_different_tool: kab_later_until_transport_evidenced
   plan_lifecycle: required_when_kab_plan_surface_is_used
   bridge_evidence: required_when_runtime_completion_or_backend_identity_is_claimed
   khs_code_change: required_when_kab_backed_or_backend_executed
   khs_dev_run: required_when_kab_backed_execution_plan_lifecycle_or_bridge_evidence_is_part_of_contract
-  direct_codex_app_server_pilot: allowed_when_explicitly_authorized_and_no_kab_runtime_claimed
+  stage1_direct_codex_app_server_baseline: allowed_when_explicitly_authorized_and_no_kab_codex_runtime_claimed
   khs_docs_only: not_required_unless_backend_execution_or_kab_review_transport_needed
   kas_kah_local_exception: "Allowed for scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance when explicitly authorized and recorded; must not claim KAB runtime support."
   kab_later_required_for:

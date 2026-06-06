@@ -186,6 +186,36 @@ KHS must preserve these distinctions:
 - Backend-specific caveats must remain visible in `selected-cli.json`, `capability-check.md`, `prompt.md`, `bridge-events.md`, and the final report.
 - Automated different-tool review is KAB-later unless an effective KAB implementation and evidence path exist.
 
+### 8.1 KAB adoption stages for KAS/KAH development
+
+KAS owns the operating policy for applying KAB to KAS/KAH development runs. KAH and KAB are tools used by that policy: KAH records deterministic run state and gates, while KAB executes and observes backend sessions. The stages below describe KAS maturity, not a change in KAH or KAB ownership.
+
+| Stage | Name | KAS/KAH development execution lane | Backend choice posture | Evidence posture |
+|---|---|---|---|---|
+| 1 | Direct Codex app-server baseline | Direct Codex app-server calls handle plan, implementation, feedback fixes, task-bound docs, cleanup, and verification support. | Codex is fixed by the direct lane. | Record direct Codex prompt/session/output evidence and a no-KAB-Codex rationale. Do not claim KAB Codex execution evidence. |
+| 2 | KAB Codex-first execution | Replace direct Codex app-server calls with KAB-backed Codex execution through `native_codex` while preserving the same KAS/KAH phases and review scenarios. | Codex remains the default planning/implementation backend; do not broaden backend selection yet. | Record KAB Codex session, selected CLI/capability, plan/read/status/wait/watch or retained event evidence, and bridge events. |
+| 3 | KAB backend-selected execution | Run planning/implementation/fix lanes through a selected KAB backend. | Select among eligible Codex, Claude, and GLM backends from task requirements, project policy, compatibility evidence, and user preference after capability gates. | Record the selected backend's KAB evidence and rejected-backend reasons; fail closed when capability evidence is missing or stale. |
+
+Stage 2 is a transport migration from direct Codex app-server to KAB Codex. Stage 3 is a backend orchestration policy. Do not collapse these stages: proving KAB Codex-first execution is the prerequisite for safely expanding backend selection.
+
+Official GLM Octo review is an independent feedback/review lane. It remains KAB GLM `/octo:review` with its existing trigger policy, preflight, prompt-confirmation, watcher/readback, feedback artifact, and post-Octo re-review requirements. Selecting GLM as a possible Stage 3 implementation backend does not satisfy or replace official GLM Octo review, and running official GLM Octo review does not imply GLM was the implementation backend.
+
+The active stage is a project/profile operating setting, not just prose in a
+single phase skill. KAS install or project application must choose the stage,
+and an existing project may change stage only through an explicit KAS
+reconfiguration record with preserved evidence. KAH does not need a
+stage-specific graph or gate model because the graph state, run state, events,
+locks, artifact schemas, and gate mechanics are unchanged by the implementation
+backend transport. KAS records the chosen stage in installed/project-specific
+KAS guidance, preferably as a small project-stage reference under the installed
+umbrella project skill, such as
+`skills/<project>/<project>-kas/references/kab-adoption-stage.md`. KAS may also
+mirror the stage into project backend policy or overlay/reference material when
+project state is initialized through KAH, and must record it in run-local
+task/phase evidence. If the stage is missing or ambiguous, KAS must fail closed
+to Stage 1 behavior: direct Codex evidence may be recorded, but KAB Codex
+execution must not be claimed.
+
 ## 9. Repository structure and artifact roles
 
 Current and target KHS repo structure:

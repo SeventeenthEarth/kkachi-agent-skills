@@ -15,7 +15,7 @@ This directory separates durable KAS/KHS sources of truth from working discussio
 | Path | Meaning | Authority |
 |---|---|---|
 | `sot/interface-contract.md` | Current KAS/KAH/KAB interface SOT | Authoritative for reality-first interface guidance; KAH 0.1.4 `kkachi-agent-helper graph` and configurable-feedback support are capability-evidenced, remaining KAS adoption is integration-pending, `kah graph` alias remains candidate, and KAB runtime claims remain later |
-| `sot/khs-architecture-and-integration.md` | Broad KHS architecture/usage/KAH-integration SOT | Blue-reviewed candidate development base accepted in `t_f29b6ee9`; distinguishes target architecture from operational support claims |
+| `sot/khs-architecture-and-integration.md` | Broad KHS architecture/usage/KAH-integration SOT | Blue-reviewed candidate development base accepted in `t_f29b6ee9`; distinguishes target architecture from operational support claims and records the Stage 1/2/3 KAB adoption model for KAS/KAH development |
 | `sot/khs-pre-kah-readiness-audit-2026-05.md` | Historical pre-KAH readiness audit | Superseded audit input from `t_2e9d918a`; no longer blocks post-KAH KAS MVP work after INITDOC closure, but still preserves overclaim and lineage warnings |
 | `sot/khs-delegation-packet-and-report-contract.md` | Candidate Delegation Packet and operator report contract | Candidate docs-only contract; records packet/report fields and status labels without claiming KAH artifact or KAB runtime support |
 | `sot/external-feedback-intake-policy.md` | KAH-evidenced policy SOT for configurable `EXTERNAL_FEEDBACK_INTAKE` bounds | KAH 0.1.4 advertises configurable feedback intake capability; KAS registry/template/skill adoption remains integration-pending; current MVP still uses user-supplied `feedback.md`; automated review-by-different-tool remains `kab_later` |
@@ -37,7 +37,7 @@ Durable source-of-truth documents for KHS behavior, architecture, and skill desi
 - `sot/concept.md`
 - `sot/architecture-understanding.md`
 - `sot/skill-template.md`
-- `sot/khs-architecture-and-integration.md` — candidate broad SOT for KHS purpose, Hermes usage, KHS/KAH/KAB/KHC boundaries, repo structure, operator report contract, self-improvement governance, and development acceptance gates; external feedback intake is summarized there and detailed by `sot/external-feedback-intake-policy.md`
+- `sot/khs-architecture-and-integration.md` — candidate broad SOT for KHS purpose, Hermes usage, KHS/KAH/KAB/KHC boundaries, KAB Stage 1/2/3 adoption model for KAS/KAH development, repo structure, operator report contract, self-improvement governance, and development acceptance gates; external feedback intake is summarized there and detailed by `sot/external-feedback-intake-policy.md`
 - `sot/khs-pre-kah-readiness-audit-2026-05.md` — historical/superseded pre-KAH readiness audit for `t_2e9d918a`; preserved for lineage and overclaim prevention, not as a post-KAH blocker
 - `sot/khs-delegation-packet-and-report-contract.md` — candidate docs-only Delegation Packet and report contract; defines packet/report fields, evidence paths, and status labels without upgrading them to KAH/KAB support
 - `sot/external-feedback-intake-policy.md` — KAH-evidenced policy record for configurable `EXTERNAL_FEEDBACK_INTAKE` bounds; records min=1/max=5 semantics, user-supplied `feedback.md` MVP intake, KAS integration-pending surfaces, KAB-later automation, status labels, report fields, and a stale-surface manifest

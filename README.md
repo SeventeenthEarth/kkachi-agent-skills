@@ -36,6 +36,16 @@ KHS now keeps two lanes distinct:
    - Scope: KHS-governed backend-executed runs, automated review-by-different-tool transport, KAB plan lifecycle, and bridge evidence.
    - Authority: existing KHS+KAH+KAB path remains required when the run is KAB-backed or claims backend runtime evidence. Scoped CLIMVP/GRAPHMVP/KAS docs or CLI work may proceed without KAB only when the lane is explicitly KAS/KAH-local and records that no KAB runtime support is claimed.
 
+## KAB Adoption Stages for KAS/KAH Development
+
+KAS owns the operating policy for how KAH evidence and KAB backend execution are used. KAH remains the deterministic state/evidence/gate tool, and KAB remains the backend runtime/control tool. The KAS adoption model is staged so the user-facing workflow can stay stable while the execution transport matures:
+
+1. **Stage 1 — Direct Codex app-server baseline.** KAS/KAH development tasks use the direct Codex app-server lane for plan, implementation, feedback fixes, docs updates, cleanup, and verification support. KAB may still be used for independent GLM Octo review when that review is required or requested. Stage 1 records direct Codex evidence and must not claim KAB Codex execution evidence.
+2. **Stage 2 — KAB Codex-first execution.** KAS/KAH keeps the same planning, implementation, review, and verification scenario, but replaces direct Codex app-server calls with KAB-backed Codex execution through the `native_codex` adapter. Backend choice is intentionally not broadened in this stage: Codex remains the default implementation/planning backend, while KAB supplies bridge session, plan lifecycle, retained event/watch/read/status, and backend evidence.
+3. **Stage 3 — KAB backend-selected execution.** After Stage 2 is proven, KAS may select among eligible KAB backends such as Codex, Claude, and GLM according to task requirements, project policy, compatibility evidence, and user preference after capability gates. This is a backend-selection maturity step, not a change to KAH or KAB ownership.
+
+The GLM Octo review lane is independent of these stages. Using GLM as a possible Stage 3 implementation backend is not the same as running official GLM Octo review. Official GLM Octo review remains a KAB GLM `/octo:review` feedback lane with its existing trigger policy and evidence requirements.
+
 ## Components
 
 ```text
@@ -276,6 +286,38 @@ kkachi-agent-helper project init \
 Use `--force` only for non-destructive reconfiguration of existing KAH project
 bootstrap files. KAH preserves runs, artifacts, events, and gate history during
 that reconfiguration.
+
+### KAB adoption stage at install/reconfigure time
+
+Project application must select a KAS KAB adoption stage before the first
+Kkachi-governed run. The selected stage controls which planner/implementer
+lane the shared KAS phase skills use:
+
+- `stage1_direct_codex_app_server_baseline` — direct Codex app-server baseline;
+  record no-KAB-Codex rationale for plan/implementation/fix/docs lanes.
+- `stage2_kab_codex_first` — KAB Codex-first through `native_codex`; do not
+  broaden implementation backend selection beyond Codex.
+- `stage3_kab_backend_selected` — KAB backend selection among eligible backends
+  after project policy and capability gates.
+
+KAH does not need to interpret these stages semantically: graph state, run
+state, gates, events, and artifact validation remain the same helper mechanics
+across all three stages. KAS owns the stage policy and records the selected
+stage in the installed/project-specific KAS guidance first. Preferred installed
+markers live under the project skill suite, such as
+`skills/kan-plugin/kan-plugin-kas/references/kab-adoption-stage.md` or
+`skills/kan-control/kan-control-kas/references/kab-adoption-stage.md`, with the
+umbrella project skill pointing to that reference. Mirror the stage into the
+project's backend policy or generated project overlay/reference only when KAH
+project state is being initialized or project-local persistence is needed, and
+include the selected stage in every run's task contract or phase-plan evidence.
+Existing projects change stage through an explicit KAS reconfiguration record;
+use `kkachi-agent-helper project init ... --force` only when the persisted KAH
+project overlay/backend-policy must be rewritten, preserve the old stage and
+reason in the report, then rerun `project doctor` and the next-run backend/stage
+evidence checks. Missing or ambiguous stage selection fails closed to Stage 1
+semantics: no KAB Codex execution claim is allowed unless Stage 2 or Stage 3 is
+explicitly selected and evidenced.
 
 After initialization, create and run Kkachi work through KAH artifacts and gates:
 

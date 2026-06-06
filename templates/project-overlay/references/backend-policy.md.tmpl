@@ -10,6 +10,7 @@ This backend summary is advisory. If it conflicts with `kkachi-agent-bridge/docs
 
 ## Project-specific constraints
 
+- KAS KAB adoption stage: `<stage1_direct_codex_app_server_baseline|stage2_kab_codex_first|stage3_kab_backend_selected>`
 - default production-write backend set: `claude`, `glm`, `codex`, `gemini`, `opencode`
 - forbidden backend states:
 - required capabilities:
@@ -19,5 +20,11 @@ This backend summary is advisory. If it conflicts with `kkachi-agent-bridge/docs
 - observability constraints:
 
 ## Notes
+
+The adoption stage controls KAS planner/implementer lane selection. Stage 1
+records direct Codex app-server evidence and no-KAB-Codex rationale; Stage 2
+uses KAB Codex-first through `native_codex`; Stage 3 enables KAB backend
+selection after project policy and capability gates. Official GLM Octo review is
+independent of this implementation-stage setting.
 
 Keep volatile backend maturity details here, not in the main `SKILL.md`.

@@ -16,14 +16,22 @@ Plan from durable authority, not chat-only instruction. Path A plans prepare imp
 
 ## 주군 development-pipeline preference
 
-When 주군 asks to run KAS/Kkachi development work and the task is classified as `development`, treat the preferred default as a Codex app-server/KAB-backed plan-first loop unless project policy, capability evidence, or explicit instruction says otherwise:
+When 주군 asks to run KAS/Kkachi development work and the task is classified as `development`, treat the preferred default as a Codex-led plan-first loop, with the transport determined by the current KAS KAB adoption stage:
+
+- **Stage 1:** direct Codex app-server planner, with direct Codex evidence and no-KAB-Codex rationale.
+- **Stage 2:** KAB Codex-first planner through `native_codex`; this replaces direct Codex app-server calls without changing the KAS/KAH phase or review scenario.
+- **Stage 3:** KAB backend-selected planner after backend selection chooses an eligible backend from task requirements, project policy, capability evidence, and user preference after gates.
+
+Official GLM Octo review is independent of these planning stages. It remains a KAB GLM feedback lane when required or requested; it does not change the plan/implementation backend and is not satisfied by selecting GLM as an implementation backend.
+
+Plan-first loop requirements:
 
 1. refresh CodeGraph evidence before planning;
-2. ask Codex app-server/KAB planner for a plan-only response; do not allow implementation before plan capture;
+2. ask the Stage 1 direct Codex app-server planner, Stage 2 KAB Codex planner, or Stage 3 selected KAB planner for a plan-only response; do not allow implementation before plan capture;
 3. copy the fixed plan into `.kkachi/runs/<run_id>/plan.md` and normalize `checklist.md` from the plan plus KHS phase contract;
-4. Blue vets the Codex plan for SOT alignment, acceptance criteria, evidence, phase rows, and verification clarity, but must not directly author or rewrite the substantive implementation plan in place of Codex app-server/KAB planner output unless 주군 explicitly requests direct Blue planning or the work is outside the roadmap/KAS+KAH path;
+4. Blue vets the backend-produced plan for SOT alignment, acceptance criteria, evidence, phase rows, and verification clarity, but must not directly author or rewrite the substantive implementation plan in place of the Stage 1 direct Codex app-server planner, Stage 2 KAB Codex planner, or Stage 3 selected KAB planner output unless 주군 explicitly requests direct Blue planning or the work is outside the roadmap/KAS+KAH path;
 5. require Red plan vet/approval from 하후연 before implementation when the work is KAS/Kkachi code-development or another risk-bearing project run;
-6. route Blue or Red `REQUEST_CHANGES` back to Codex app-server/KAB planner for a revised plan, then repeat Blue/Red vetting;
+6. route Blue or Red `REQUEST_CHANGES` back to the same planner lane for a revised plan, then repeat Blue/Red vetting;
 7. only after Blue+Red approval, approve/start the implementer backend.
 
 Render planner prompts so every command example uses the real user home, for example `HOME=<real-user-home> <command>` in reusable artifacts. This includes Git commands because commit-time global `user.name`, `user.email`, signing, hooks, and credential helpers must come from the user's real home.

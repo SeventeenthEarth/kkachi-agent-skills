@@ -51,6 +51,7 @@ Before starting, identify:
 - Bun required for the KAB OpenCode TypeScript plugin build
 - Rust/Cargo required for the KAB Codex wrapper build
 - backend CLI availability: `claude`, `glm`, `codex`, `opencode`, `gemini` as needed for selected KAB lanes
+- KAS KAB adoption stage for the target project/profile: `stage1_direct_codex_app_server_baseline`, `stage2_kab_codex_first`, or `stage3_kab_backend_selected`
 - network access: GitHub, Go module proxy, Bun/TypeScript package resolution when dependencies are missing
 - existing installations: check `kkachi-agent-helper` and `kkachi-agent-bridge` binaries
 
@@ -173,13 +174,22 @@ kkachi-agent-helper project init \
   --docs-map-todo-dir <path> \
   --docs-map-spec-dir <path> \
   --test-commands "<command1>,<command2>" \
-  --backend-policy "<allowed-backends>" \
+  --backend-policy "stage=<stage1_direct_codex_app_server_baseline|stage2_kab_codex_first|stage3_kab_backend_selected>; allowed=<allowed-backends>" \
   --execution-mode <mode> \
   --sot-policy <policy> \
   --json
 ```
 
 Use `--force` only for non-destructive reconfiguration of existing KAH bootstrap files.
+Changing the KAS KAB adoption stage is a KAS policy change, not a KAH graph/state
+semantic change. Report the current stage, target stage, reason, and evidence
+plan first. Use `project init ... --force` only when the persisted KAH project
+overlay/backend-policy must be rewritten; otherwise record the new stage in the
+installed/project-specific KAS guidance and next run's task/phase evidence. KAH
+does not need to interpret the stage beyond carrying the backend-policy text and
+project overlay/reference state. Missing or ambiguous stage selection fails
+closed to Stage 1 direct Codex app-server baseline behavior; do not claim KAB
+Codex execution unless Stage 2 or Stage 3 is explicitly selected and evidenced.
 
 After project init, update repository ignores for local runtime/tool state before verification:
 
@@ -227,7 +237,20 @@ When 주군 asks to apply or update KAS for a specific project, distinguish thre
 - **KAS source repository**: `kkachi-hermes-skills/skills/...`. Update this when promoting the installed/profile-local learning back into canonical KAS.
 - **Project repository state**: `<project>/.kkachi/`, `<project>/.kkachi-workflow.yaml`, project docs/config. Do not create `<project>/skills/` as a stand-in for KAS unless the user explicitly asks for a project-local Hermes skill package.
 
+The preferred place for the active KAS KAB adoption stage is the installed
+project-specific KAS suite, for example
+`~/.hermes/profiles/hwangchung/skills/kan-plugin/kan-plugin-kas/references/kab-adoption-stage.md`
+or
+`~/.hermes/profiles/hwangchung/skills/kan-control/kan-control-kas/references/kab-adoption-stage.md`.
+The umbrella project skill should point to that reference and load it before
+selecting planner/implementer lanes. Mirror the stage into KAH project
+overlay/backend-policy only when project-local persistence or multi-operator
+visibility is needed.
+
 Pitfall: phrases like “apply to the kan-plugin KAS first, promote to KAS later” usually mean “patch the installed Hermes-profile KAS guidance for kan-plugin now, then later promote that change to the KAS repo.” They do **not** by themselves authorize creating a new `skills/` directory inside `kkachi-agent-network-plugin`.
+
+Reference: `references/kas-kab-adoption-stage-boundary.md` captures the Stage
+1/2/3 marker pattern, preferred installed-profile location, and KAH boundary.
 
 ## Report format
 
@@ -239,6 +262,7 @@ Report to master in Korean:
 - KAH (helper): ✅ v0.x.x / ❌ 미설치 (자동 설치 시도: 성공/실패)
 - KAB (bridge+plugins): ✅ 설치됨 / ❌ 미설치 (bridge/opencode/codex 빌드 상태 포함)
 - 프로젝트 적용: KAH project init 실행 준비됨 / 추가 정보 필요
+- KAS KAB adoption stage: Stage 1 / Stage 2 / Stage 3 선택됨 또는 변경 필요
 
 다음 단계:
 - [구체적인 다음 작업]
