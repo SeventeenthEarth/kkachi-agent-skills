@@ -21,12 +21,43 @@ const (
 	ManifestVersion    = "0.1"
 	ManifestKind       = "kas_profile_skill_manifest"
 	KABBoundaryMessage = "KAB is not required for the minimum install dry-run; execution-runtime work remains KAB-gated."
+
+	KABAdoptionMarkerRelativePath = "references/kab-adoption-stage.md"
+	KABStage1Canonical            = "stage1_direct_codex_app_server_baseline"
+	KABStage2Canonical            = "stage2_kab_codex_first"
+	kabStage3Canonical            = "stage3_kab_backend_selected"
 )
 
 type Options struct {
-	Profile     string
-	PackIDs     []string
-	ProfileRoot string
+	Profile           string
+	PackIDs           []string
+	ProfileRoot       string
+	KABStageSelection StageSelectionInput
+}
+
+type StageSelectionInput struct {
+	Numeric   string
+	Canonical string
+	Source    string
+}
+
+type KABAdoptionStageMarker struct {
+	PackID string `json:"pack_id,omitempty"`
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+}
+
+type KABAdoptionStage struct {
+	Applicable   bool                     `json:"applicable"`
+	Numeric      int                      `json:"numeric,omitempty"`
+	Canonical    string                   `json:"canonical,omitempty"`
+	Source       string                   `json:"source,omitempty"`
+	HashBound    bool                     `json:"hash_bound"`
+	MarkerPath   string                   `json:"marker_path,omitempty"`
+	MarkerPaths  []string                 `json:"marker_paths,omitempty"`
+	MarkerSHA256 string                   `json:"marker_sha256,omitempty"`
+	Markers      []KABAdoptionStageMarker `json:"markers,omitempty"`
+	State        string                   `json:"state,omitempty"`
 }
 
 type ChangedPath struct {
@@ -82,27 +113,28 @@ type Recovery struct {
 }
 
 type Result struct {
-	OK              bool                    `json:"ok"`
-	Command         string                  `json:"command"`
-	Mode            string                  `json:"mode"`
-	CLIVersion      string                  `json:"cli_version"`
-	SourceRepo      discovery.SourceRepo    `json:"source_repo"`
-	TargetProfile   discovery.TargetProfile `json:"target_profile"`
-	Requested       Requested               `json:"requested"`
-	Summary         Summary                 `json:"summary"`
-	DryRunPlanHash  string                  `json:"dry_run_plan_hash"`
-	CanonicalPlan   map[string]any          `json:"canonical_plan"`
-	Packs           []map[string]any        `json:"packs"`
-	ChangedPaths    []ChangedPath           `json:"changed_paths"`
-	BackupPlan      []BackupEntry           `json:"backup_plan"`
-	ApprovalRequest ApprovalRequest         `json:"approval_request"`
-	Approval        ApprovalEvidence        `json:"approval,omitempty"`
-	InstallID       string                  `json:"install_id,omitempty"`
-	ManifestPath    string                  `json:"manifest_path,omitempty"`
-	BackupPath      string                  `json:"backup_path,omitempty"`
-	Recovery        *Recovery               `json:"recovery,omitempty"`
-	Diagnostics     []discovery.Diagnostic  `json:"diagnostics"`
-	NextAction      string                  `json:"next_action"`
+	OK               bool                    `json:"ok"`
+	Command          string                  `json:"command"`
+	Mode             string                  `json:"mode"`
+	CLIVersion       string                  `json:"cli_version"`
+	SourceRepo       discovery.SourceRepo    `json:"source_repo"`
+	TargetProfile    discovery.TargetProfile `json:"target_profile"`
+	Requested        Requested               `json:"requested"`
+	KABAdoptionStage KABAdoptionStage        `json:"kab_adoption_stage"`
+	Summary          Summary                 `json:"summary"`
+	DryRunPlanHash   string                  `json:"dry_run_plan_hash"`
+	CanonicalPlan    map[string]any          `json:"canonical_plan"`
+	Packs            []map[string]any        `json:"packs"`
+	ChangedPaths     []ChangedPath           `json:"changed_paths"`
+	BackupPlan       []BackupEntry           `json:"backup_plan"`
+	ApprovalRequest  ApprovalRequest         `json:"approval_request"`
+	Approval         ApprovalEvidence        `json:"approval,omitempty"`
+	InstallID        string                  `json:"install_id,omitempty"`
+	ManifestPath     string                  `json:"manifest_path,omitempty"`
+	BackupPath       string                  `json:"backup_path,omitempty"`
+	Recovery         *Recovery               `json:"recovery,omitempty"`
+	Diagnostics      []discovery.Diagnostic  `json:"diagnostics"`
+	NextAction       string                  `json:"next_action"`
 }
 
 type sourceFile struct {
@@ -112,7 +144,152 @@ type sourceFile struct {
 	Mode         string
 }
 
+func ResolveKABAdoptionStage(input StageSelectionInput) (KABAdoptionStage, error) {
+	numeric, hasNumeric, err := parseKABStageNumeric(input.Numeric)
+	if err != nil {
+		return KABAdoptionStage{}, err
+	}
+	canonicalNumeric, hasCanonical, err := parseKABStageCanonical(input.Canonical)
+	if err != nil {
+		return KABAdoptionStage{}, err
+	}
+	if hasNumeric && hasCanonical && numeric != canonicalNumeric {
+		return KABAdoptionStage{}, fmt.Errorf("conflicting KAB adoption stage flags: --kab-stage %s and --kab-adoption-stage %s", input.Numeric, input.Canonical)
+	}
+	if !hasNumeric && hasCanonical {
+		numeric = canonicalNumeric
+	}
+	source := input.Source
+	if source == "" {
+		switch {
+		case hasNumeric:
+			source = "explicit_numeric"
+		case hasCanonical:
+			source = "explicit_canonical"
+		default:
+			source = "default_stage1"
+		}
+	}
+	if !hasNumeric && !hasCanonical {
+		numeric = 1
+	}
+	return KABAdoptionStage{
+		Applicable: true,
+		Numeric:    numeric,
+		Canonical:  canonicalForKABStage(numeric),
+		Source:     source,
+		HashBound:  true,
+	}, nil
+}
+
+func parseKABStageNumeric(value string) (int, bool, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false, nil
+	}
+	switch value {
+	case "1":
+		return 1, true, nil
+	case "2":
+		return 2, true, nil
+	case "3":
+		return 0, true, fmt.Errorf("KAB adoption Stage 3 is reserved and is not accepted by this selector")
+	default:
+		return 0, true, fmt.Errorf("unknown KAB adoption stage numeric value: %q", value)
+	}
+}
+
+func parseKABStageCanonical(value string) (int, bool, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false, nil
+	}
+	switch value {
+	case KABStage1Canonical:
+		return 1, true, nil
+	case KABStage2Canonical:
+		return 2, true, nil
+	case kabStage3Canonical:
+		return 0, true, fmt.Errorf("KAB adoption Stage 3 is reserved and is not accepted by this selector")
+	default:
+		return 0, true, fmt.Errorf("unknown KAB adoption stage canonical value: %q", value)
+	}
+}
+
+func canonicalForKABStage(numeric int) string {
+	if numeric == 2 {
+		return KABStage2Canonical
+	}
+	return KABStage1Canonical
+}
+
+func KABAdoptionStageMarkerContent(stage KABAdoptionStage) string {
+	return kabAdoptionStageMarkerContent(
+		stage,
+		"approved install records install_id in the KAS manifest",
+		"approved install records approval_evidence_ref in the KAS manifest",
+	)
+}
+
+func KABAdoptionStageApprovedMarkerContent(stage KABAdoptionStage, installID string, evidenceRef string) string {
+	selectedAt := "approved install records install_id in the KAS manifest"
+	if installID != "" {
+		selectedAt = installID
+	}
+	approvalEvidence := "approved install records approval_evidence_ref in the KAS manifest"
+	if evidenceRef != "" {
+		approvalEvidence = evidenceRef
+	}
+	return kabAdoptionStageMarkerContent(stage, selectedAt, approvalEvidence)
+}
+
+func kabAdoptionStageMarkerContent(stage KABAdoptionStage, selectedAt string, approvalEvidence string) string {
+	policy := "Future KAS/KAH development runs for this project use the direct Codex app-server baseline unless a later approved reconfiguration changes this marker to Stage 2."
+	if stage.Numeric == 2 {
+		policy = "Future KAS/KAH implementation, fix, and docs-bound execution for this project uses KAB native_codex after required preflight/session evidence; direct Codex fallback requires a recorded break-glass approval and rationale."
+	}
+	return fmt.Sprintf(`# KAB adoption stage
+
+Numeric stage: %d
+Canonical stage: %s
+Selection source: %s
+Selected at: %s
+Approval evidence: %s
+
+## Execution policy
+
+%s
+
+This marker is operating-policy guidance only. It is not Stage 2 activation by itself and is not KAB execution evidence.
+`, stage.Numeric, stage.Canonical, hashBoundKABStageSource(stage), selectedAt, approvalEvidence, policy)
+}
+
+func ParseKABAdoptionStageMarker(data []byte) (KABAdoptionStage, bool) {
+	lines := strings.Split(string(data), "\n")
+	numeric := ""
+	canonical := ""
+	source := ""
+	for _, line := range lines {
+		if value, ok := strings.CutPrefix(line, "Numeric stage:"); ok {
+			numeric = strings.TrimSpace(value)
+		}
+		if value, ok := strings.CutPrefix(line, "Canonical stage:"); ok {
+			canonical = strings.TrimSpace(value)
+		}
+		if value, ok := strings.CutPrefix(line, "Selection source:"); ok {
+			source = strings.TrimSpace(value)
+		}
+	}
+	stage, err := ResolveKABAdoptionStage(StageSelectionInput{Numeric: numeric, Canonical: canonical, Source: source})
+	return stage, err == nil && numeric != "" && canonical != ""
+}
+
 func BuildDryRun(repo string, opts Options) (Result, error) {
+	kabStage, err := ResolveKABAdoptionStage(opts.KABStageSelection)
+	if err != nil {
+		return Result{}, err
+	}
+	markerContent := KABAdoptionStageMarkerContent(kabStage)
 	sourceRepo, err := discovery.FindSourceRepo(repo)
 	if err != nil {
 		return Result{}, err
@@ -146,7 +323,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 			message := "unknown Hermes profile: " + opts.Profile
 			diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: "unknown_profile", Message: message}}, diagnostics...)
 			changedPaths = append(changedPaths, changedPath("error", ".", "", nil, "", nil, "unknown_profile", message))
-			return buildResult(false, sourceInfo, target, requestedPackIDs, packPayloads, changedPaths, backupPlan, diagnostics), nil
+			return buildResult(false, sourceInfo, target, requestedPackIDs, kabStage, packPayloads, changedPaths, backupPlan, diagnostics), nil
 		}
 	}
 
@@ -166,7 +343,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 		}
 		diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: manifestErr.Code, Message: manifestErr.Message}}, diagnostics...)
 		changedPaths = append(changedPaths, changedPath("error", ".kas/skill-pack-manifest.json", "", nil, "", nil, manifestErr.Code, manifestErr.Message))
-		return buildResult(false, sourceInfo, target, requestedPackIDs, packPayloads, changedPaths, backupPlan, diagnostics), nil
+		return buildResult(false, sourceInfo, target, requestedPackIDs, kabStage, packPayloads, changedPaths, backupPlan, diagnostics), nil
 	}
 
 	for _, packID := range requestedPackIDs {
@@ -177,7 +354,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 			changedPaths = append(changedPaths, changedPath("error", "skills/"+packID, packID, nil, "", nil, "unknown_pack_id", message))
 			continue
 		}
-		payload, paths, backups := planPack(sourceRepo, root, pack, manifestEntries[packID])
+		payload, paths, backups := planPack(sourceRepo, root, pack, manifestEntries[packID], kabStage, markerContent)
 		packPayloads = append(packPayloads, payload)
 		changedPaths = append(changedPaths, paths...)
 		backupPlan = append(backupPlan, backups...)
@@ -203,7 +380,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 			break
 		}
 	}
-	return buildResult(ok, sourceInfo, target, requestedPackIDs, packPayloads, changedPaths, backupPlan, diagnostics), nil
+	return buildResult(ok, sourceInfo, target, requestedPackIDs, kabStage, packPayloads, changedPaths, backupPlan, diagnostics), nil
 }
 
 func RenderHumanDryRun(result Result) string {
@@ -222,6 +399,7 @@ func RenderHumanDryRun(result Result) string {
 			result.Summary.CountsByAction["conflict"],
 			result.Summary.CountsByAction["error"],
 		),
+		fmt.Sprintf("KAB adoption stage: %d (%s), source %s; marker %s.", result.KABAdoptionStage.Numeric, result.KABAdoptionStage.Canonical, result.KABAdoptionStage.Source, result.KABAdoptionStage.MarkerPath),
 		"plan hash: " + result.DryRunPlanHash,
 	}
 	for _, diagnostic := range result.Diagnostics {
@@ -289,23 +467,35 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 		if entry.Action != "create" && entry.Action != "update" {
 			continue
 		}
-		sourceRel, ok := sourceRelativeForChangedPath(dryRun.Packs, entry)
-		if !ok {
-			return approvedFailure(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, "source_mapping_failed", "could not map target path to source file: "+entry.Path), nil
-		}
-		sourcePath := filepath.Join(dryRun.SourceRepo.Path, filepath.FromSlash(sourceRel))
 		targetPath, err := safeProfileWritePath(dryRun.TargetProfile.Root, entry.Path)
 		if err != nil {
 			return approvedFailure(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, "unsafe_target_path", err.Error()), nil
 		}
-		if err := copyFile(sourcePath, targetPath); err != nil {
-			return approvedFailure(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, "copy_failed", err.Error()), nil
+		markerBytes := 0
+		if isKABAdoptionMarkerPath(entry.Path) {
+			markerContent := []byte(KABAdoptionStageApprovedMarkerContent(dryRun.KABAdoptionStage, installID, evidenceRef))
+			markerBytes = len(markerContent)
+			if err := writeFileAtomic(targetPath, markerContent, 0o644); err != nil {
+				return approvedFailure(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, "generated_marker_write_failed", err.Error()), nil
+			}
+		} else {
+			sourceRel, ok := sourceRelativeForChangedPath(dryRun.Packs, entry)
+			if !ok {
+				return approvedFailure(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, "source_mapping_failed", "could not map target path to source file: "+entry.Path), nil
+			}
+			sourcePath := filepath.Join(dryRun.SourceRepo.Path, filepath.FromSlash(sourceRel))
+			if err := copyFile(sourcePath, targetPath); err != nil {
+				return approvedFailure(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, "copy_failed", err.Error()), nil
+			}
 		}
 		sum, err := checksumFile(targetPath)
 		if err != nil {
 			return approvedFailure(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, "checksum_verify_failed", err.Error()), nil
 		}
-		if sum != entry.NewSHA256 {
+		if isKABAdoptionMarkerPath(entry.Path) {
+			entry.NewSHA256 = sum
+			entry.Bytes = &markerBytes
+		} else if sum != entry.NewSHA256 {
 			return approvedFailure(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, "checksum_mismatch_after_copy", "copied file checksum does not match source checksum: "+entry.Path), nil
 		}
 		if backupRel := actualBackupByPath[entry.Path]; backupRel != "" {
@@ -365,6 +555,7 @@ func RenderHumanApproved(result Result) string {
 			result.Summary.CountsByAction["conflict"],
 			result.Summary.CountsByAction["error"],
 		),
+		fmt.Sprintf("KAB adoption stage: %d (%s); marker %s.", result.KABAdoptionStage.Numeric, result.KABAdoptionStage.Canonical, result.KABAdoptionStage.MarkerPath),
 		"manifest: " + result.ManifestPath,
 		"복구: " + result.BackupPath,
 	}
@@ -375,18 +566,22 @@ func RenderHumanApproved(result Result) string {
 	return strings.Join(lines, "\n")
 }
 
-func planPack(sourceRepo string, profileRoot string, pack discovery.SourcePack, manifestEntry map[string]any) (map[string]any, []ChangedPath, []BackupEntry) {
+func planPack(sourceRepo string, profileRoot string, pack discovery.SourcePack, manifestEntry map[string]any, kabStage KABAdoptionStage, markerContent string) (map[string]any, []ChangedPath, []BackupEntry) {
 	sourcePackPath := filepath.Join(sourceRepo, filepath.FromSlash(pack.SourcePath))
 	targetPackPath := filepath.ToSlash(filepath.Join("skills", filepath.FromSlash(pack.PackID)))
+	markerPath := filepath.ToSlash(filepath.Join(targetPackPath, KABAdoptionMarkerRelativePath))
+	markerSHA := shaBytes([]byte(markerContent))
 	changedPaths := []ChangedPath{}
 	backupPlan := []BackupEntry{}
 	filesPayload := []map[string]any{}
+	packStage := kabStageForMarkerPath(kabStage, pack.PackID, markerPath, markerSHA)
 	payload := map[string]any{
 		"pack_id":                 pack.PackID,
 		"category":                pack.Category,
 		"name":                    pack.Name,
 		"source_path":             pack.SourcePath,
 		"target_path":             targetPackPath,
+		"kab_adoption_stage":      packStage,
 		"pack_checksum":           pack.Checksum,
 		"pack_checksum_algorithm": "sha256",
 		"installed_state":         "not_installed",
@@ -405,6 +600,15 @@ func planPack(sourceRepo string, profileRoot string, pack discovery.SourcePack, 
 		payload["installed_state"] = "error"
 		return payload, changedPaths, backupPlan
 	}
+	for _, sourceFile := range sourceFiles {
+		if sourceFile.RelativePath == KABAdoptionMarkerRelativePath {
+			message := "source pack already owns references/kab-adoption-stage.md; generated KAB adoption marker cannot be merged with source-owned marker"
+			changedPaths = append(changedPaths, changedPath("error", markerPath, pack.PackID, nil, "", nil, "source_kab_adoption_marker_conflict", message))
+			payload["installed_state"] = "error"
+			return payload, changedPaths, backupPlan
+		}
+	}
+	sourceFiles = append(sourceFiles, sourceFile{RelativePath: KABAdoptionMarkerRelativePath, SHA256: markerSHA, Bytes: len([]byte(markerContent)), Mode: "0644"})
 
 	manifestFiles := manifestFiles(manifestEntry)
 	packHasUpdate := false
@@ -451,7 +655,7 @@ func planPack(sourceRepo string, profileRoot string, pack discovery.SourcePack, 
 			}
 		}
 		changedPaths = append(changedPaths, changed)
-		filesPayload = append(filesPayload, map[string]any{
+		filePayload := map[string]any{
 			"relative_path":   sourceFile.RelativePath,
 			"action":          changed.Action,
 			"bytes":           sourceFile.Bytes,
@@ -459,7 +663,11 @@ func planPack(sourceRepo string, profileRoot string, pack discovery.SourcePack, 
 			"new_sha256":      sourceFile.SHA256,
 			"sha256":          sourceFile.SHA256,
 			"mode":            sourceFile.Mode,
-		})
+		}
+		if sourceFile.RelativePath == KABAdoptionMarkerRelativePath {
+			filePayload["generated"] = true
+		}
+		filesPayload = append(filesPayload, filePayload)
 	}
 	payload["files"] = filesPayload
 	if packHasConflict {
@@ -476,7 +684,7 @@ func planPack(sourceRepo string, profileRoot string, pack discovery.SourcePack, 
 	return payload, changedPaths, backupPlan
 }
 
-func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discovery.TargetProfile, requestedPackIDs []string, packs []map[string]any, changedPaths []ChangedPath, backupPlan []BackupEntry, diagnostics []discovery.Diagnostic) Result {
+func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discovery.TargetProfile, requestedPackIDs []string, kabStage KABAdoptionStage, packs []map[string]any, changedPaths []ChangedPath, backupPlan []BackupEntry, diagnostics []discovery.Diagnostic) Result {
 	sort.Slice(changedPaths, func(i, j int) bool {
 		if changedPaths[i].Action == changedPaths[j].Action {
 			return changedPaths[i].Path < changedPaths[j].Path
@@ -502,6 +710,8 @@ func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discove
 		})
 	}
 	canonicalChanged := canonicalChangedPaths(changedPaths)
+	kabStage = kabStageWithMarkers(kabStage, changedPaths)
+	hashBoundKABStage := kabStageForPlanHash(kabStage)
 	conflicts := []map[string]any{}
 	errors := []map[string]any{}
 	for _, entry := range canonicalChanged {
@@ -524,6 +734,7 @@ func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discove
 		},
 		"source_pack_checksums":    sourceChecksums,
 		"target_profile":           map[string]any{"name": targetProfile.Name, "root": targetProfile.Root, "manifest_path": targetProfile.ManifestPath},
+		"kab_adoption_stage":       hashBoundKABStage,
 		"normalized_packs":         normalizedPacks,
 		"changed_paths":            canonicalChanged,
 		"conflicts":                conflicts,
@@ -540,19 +751,20 @@ func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discove
 		}
 	}
 	return Result{
-		OK:             ok,
-		Command:        "install",
-		Mode:           "dry_run",
-		CLIVersion:     CLIVersion,
-		SourceRepo:     sourceRepo,
-		TargetProfile:  targetProfile,
-		Requested:      Requested{PackIDs: requestedPackIDs, CategoryExpansions: map[string][]any{}},
-		Summary:        Summary{TotalPacks: len(packs), TotalFiles: totalFiles, CountsByAction: counts, ConflictCount: counts["conflict"]},
-		DryRunPlanHash: planHash,
-		CanonicalPlan:  canonicalPlan,
-		Packs:          packs,
-		ChangedPaths:   changedPaths,
-		BackupPlan:     backupPlan,
+		OK:               ok,
+		Command:          "install",
+		Mode:             "dry_run",
+		CLIVersion:       CLIVersion,
+		SourceRepo:       sourceRepo,
+		TargetProfile:    targetProfile,
+		Requested:        Requested{PackIDs: requestedPackIDs, CategoryExpansions: map[string][]any{}},
+		KABAdoptionStage: kabStage,
+		Summary:          Summary{TotalPacks: len(packs), TotalFiles: totalFiles, CountsByAction: counts, ConflictCount: counts["conflict"]},
+		DryRunPlanHash:   planHash,
+		CanonicalPlan:    canonicalPlan,
+		Packs:            packs,
+		ChangedPaths:     changedPaths,
+		BackupPlan:       backupPlan,
 		ApprovalRequest: ApprovalRequest{
 			Required:       ok,
 			Summary:        fmt.Sprintf("Approve copying %d pack / %d file changes into profile %s.", len(packs), counts["create"]+counts["update"], targetProfile.Name),
@@ -560,7 +772,7 @@ func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discove
 			DryRunPlanHash: planHash,
 		},
 		Diagnostics: diagnostics,
-		NextAction:  "Review changed_paths. KAB is not required for minimum dry-run; execution-runtime remains KAB-gated. Approved copy install is deferred to CLIMVP-004.",
+		NextAction:  fmt.Sprintf("Review changed_paths and approve the current dry_run_plan_hash (%s) with --approve dry-run:%s using the same explicit/defaulted KAB adoption stage selection; KAB is not required for minimum dry-run and execution-runtime remains KAB-gated.", planHash, planHash),
 	}
 }
 
@@ -778,6 +990,63 @@ func changedPath(action, path, packID string, previousSHA *string, newSHA string
 	return entry
 }
 
+func kabStageForPlanHash(stage KABAdoptionStage) KABAdoptionStage {
+	stage.Source = hashBoundKABStageSource(stage)
+	return stage
+}
+
+func hashBoundKABStageSource(stage KABAdoptionStage) string {
+	switch stage.Source {
+	case "explicit_numeric", "explicit_canonical":
+		return "explicit_stage_selection"
+	default:
+		return stage.Source
+	}
+}
+
+func kabStageWithMarkers(stage KABAdoptionStage, changedPaths []ChangedPath) KABAdoptionStage {
+	markers := []KABAdoptionStageMarker{}
+	paths := []string{}
+	for _, entry := range changedPaths {
+		if !isKABAdoptionMarkerPath(entry.Path) || entry.PackID == "" {
+			continue
+		}
+		markers = append(markers, KABAdoptionStageMarker{PackID: entry.PackID, Path: entry.Path, SHA256: entry.NewSHA256})
+		paths = append(paths, entry.Path)
+	}
+	sort.Slice(markers, func(i, j int) bool { return markers[i].Path < markers[j].Path })
+	sort.Strings(paths)
+	stage.Markers = markers
+	stage.MarkerPaths = paths
+	if len(markers) > 0 {
+		stage.MarkerPath = markers[0].Path
+		stage.MarkerSHA256 = markers[0].SHA256
+	}
+	return stage
+}
+
+func kabStageForMarkerPath(stage KABAdoptionStage, packID string, markerPath string, markerSHA string) KABAdoptionStage {
+	stage.MarkerPath = markerPath
+	stage.MarkerPaths = []string{markerPath}
+	stage.MarkerSHA256 = markerSHA
+	stage.Markers = []KABAdoptionStageMarker{{PackID: packID, Path: markerPath, SHA256: markerSHA}}
+	return stage
+}
+
+func kabStageForPack(stage KABAdoptionStage, packID string) KABAdoptionStage {
+	for _, marker := range stage.Markers {
+		if marker.PackID == packID {
+			return kabStageForMarkerPath(stage, marker.PackID, marker.Path, marker.SHA256)
+		}
+	}
+	markerPath := filepath.ToSlash(filepath.Join("skills", filepath.FromSlash(packID), KABAdoptionMarkerRelativePath))
+	return kabStageForMarkerPath(stage, packID, markerPath, stage.MarkerSHA256)
+}
+
+func isKABAdoptionMarkerPath(path string) bool {
+	return strings.HasSuffix(path, "/"+KABAdoptionMarkerRelativePath)
+}
+
 func canonicalChangedPaths(changedPaths []ChangedPath) []map[string]any {
 	canonical := []map[string]any{}
 	for _, entry := range changedPaths {
@@ -843,20 +1112,22 @@ func buildApprovedResult(dryRun Result, evidenceRef string, approvedHash string,
 	if diagnostics == nil {
 		diagnostics = dryRun.Diagnostics
 	}
+	kabStage := kabStageWithMarkers(dryRun.KABAdoptionStage, changed)
 	return Result{
-		OK:             ok,
-		Command:        "install",
-		Mode:           "approved_copy",
-		CLIVersion:     dryRun.CLIVersion,
-		SourceRepo:     dryRun.SourceRepo,
-		TargetProfile:  dryRun.TargetProfile,
-		Requested:      dryRun.Requested,
-		Summary:        Summary{TotalPacks: dryRun.Summary.TotalPacks, TotalFiles: counts["create"] + counts["update"], CountsByAction: counts, ConflictCount: counts["conflict"]},
-		DryRunPlanHash: dryRun.DryRunPlanHash,
-		CanonicalPlan:  dryRun.CanonicalPlan,
-		Packs:          dryRun.Packs,
-		ChangedPaths:   changed,
-		BackupPlan:     dryRun.BackupPlan,
+		OK:               ok,
+		Command:          "install",
+		Mode:             "approved_copy",
+		CLIVersion:       dryRun.CLIVersion,
+		SourceRepo:       dryRun.SourceRepo,
+		TargetProfile:    dryRun.TargetProfile,
+		Requested:        dryRun.Requested,
+		KABAdoptionStage: kabStage,
+		Summary:          Summary{TotalPacks: dryRun.Summary.TotalPacks, TotalFiles: counts["create"] + counts["update"], CountsByAction: counts, ConflictCount: counts["conflict"]},
+		DryRunPlanHash:   dryRun.DryRunPlanHash,
+		CanonicalPlan:    dryRun.CanonicalPlan,
+		Packs:            dryRun.Packs,
+		ChangedPaths:     changed,
+		BackupPlan:       dryRun.BackupPlan,
 		Approval: ApprovalEvidence{
 			EvidenceRef:        evidenceRef,
 			DryRunPlanHash:     dryRun.DryRunPlanHash,
@@ -945,6 +1216,7 @@ func buildUpdatedManifest(dryRun Result, evidenceRef string, approvedHash string
 
 func manifestEntryForPack(dryRun Result, pack map[string]any, evidenceRef string, approvedHash string, installID string, backupRoot string, previousManifestPath string, changed []ChangedPath) (map[string]any, error) {
 	packID := pack["pack_id"].(string)
+	kabStage := kabStageWithMarkers(dryRun.KABAdoptionStage, changed)
 	files := []any{}
 	for _, raw := range pack["files"].([]map[string]any) {
 		action, _ := raw["action"].(string)
@@ -954,18 +1226,29 @@ func manifestEntryForPack(dryRun Result, pack map[string]any, evidenceRef string
 		rel := raw["relative_path"].(string)
 		changedPath := changedEntryForPackFile(changed, packID, rel)
 		backupRel := any(nil)
+		newSHA := raw["new_sha256"]
+		bytes := raw["bytes"]
 		if changedPath != nil && changedPath.BackupPath != "" {
 			backupRel = changedPath.BackupPath
+		}
+		if changedPath != nil {
+			if changedPath.NewSHA256 != "" {
+				newSHA = changedPath.NewSHA256
+			}
+			if changedPath.Bytes != nil {
+				bytes = *changedPath.Bytes
+			}
 		}
 		files = append(files, map[string]any{
 			"relative_path":        rel,
 			"action":               action,
-			"bytes":                raw["bytes"],
+			"bytes":                bytes,
 			"previous_sha256":      raw["previous_sha256"],
-			"new_sha256":           raw["new_sha256"],
-			"sha256":               raw["sha256"],
+			"new_sha256":           newSHA,
+			"sha256":               newSHA,
 			"backup_relative_path": backupRel,
 			"mode":                 raw["mode"],
+			"generated":            raw["generated"],
 		})
 	}
 	category, _ := pack["category"].(string)
@@ -988,6 +1271,7 @@ func manifestEntryForPack(dryRun Result, pack map[string]any, evidenceRef string
 		"name":                  name,
 		"source_path":           pack["source_path"],
 		"target_path":           pack["target_path"],
+		"kab_adoption_stage":    kabStageForPack(kabStage, packID),
 		"checksum_algorithm":    "sha256",
 		"pack_checksum":         pack["pack_checksum"],
 		"backup": map[string]any{
@@ -1089,10 +1373,14 @@ func writeJSONFile(path string, value any) error {
 		return err
 	}
 	data = append(data, '\n')
+	return writeFileAtomic(path, data, 0o644)
+}
+
+func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".kas-manifest-*")
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".kas-write-*")
 	if err != nil {
 		return err
 	}
@@ -1107,7 +1395,7 @@ func writeJSONFile(path string, value any) error {
 		_ = tmp.Close()
 		return err
 	}
-	if err := tmp.Chmod(0o644); err != nil {
+	if err := tmp.Chmod(mode); err != nil {
 		_ = tmp.Close()
 		return err
 	}

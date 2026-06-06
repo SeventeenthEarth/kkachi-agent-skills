@@ -57,14 +57,15 @@ type Manifest struct {
 }
 
 type InstalledPack struct {
-	PackID          string   `json:"pack_id"`
-	State           string   `json:"state"`
-	TargetPath      string   `json:"target_path"`
-	FilesChecked    int      `json:"files_checked"`
-	Missing         []string `json:"missing,omitempty"`
-	Drifted         []string `json:"drifted,omitempty"`
-	Conflicts       []string `json:"conflicts,omitempty"`
-	ChecksumSummary string   `json:"checksum_summary"`
+	PackID           string                   `json:"pack_id"`
+	State            string                   `json:"state"`
+	TargetPath       string                   `json:"target_path"`
+	KABAdoptionStage install.KABAdoptionStage `json:"kab_adoption_stage"`
+	FilesChecked     int                      `json:"files_checked"`
+	Missing          []string                 `json:"missing,omitempty"`
+	Drifted          []string                 `json:"drifted,omitempty"`
+	Conflicts        []string                 `json:"conflicts,omitempty"`
+	ChecksumSummary  string                   `json:"checksum_summary"`
 }
 
 type KAH struct {
@@ -84,16 +85,17 @@ type KAB struct {
 }
 
 type Result struct {
-	OK             bool                   `json:"ok"`
-	Command        string                 `json:"command"`
-	SourceRepo     SourceRepo             `json:"source_repo"`
-	TargetProfile  TargetProfile          `json:"target_profile"`
-	Manifest       Manifest               `json:"manifest"`
-	InstalledPacks []InstalledPack        `json:"installed_packs"`
-	KAH            KAH                    `json:"kah"`
-	KAB            KAB                    `json:"kab"`
-	Diagnostics    []discovery.Diagnostic `json:"diagnostics"`
-	NextAction     string                 `json:"next_action"`
+	OK               bool                     `json:"ok"`
+	Command          string                   `json:"command"`
+	SourceRepo       SourceRepo               `json:"source_repo"`
+	TargetProfile    TargetProfile            `json:"target_profile"`
+	Manifest         Manifest                 `json:"manifest"`
+	KABAdoptionStage install.KABAdoptionStage `json:"kab_adoption_stage"`
+	InstalledPacks   []InstalledPack          `json:"installed_packs"`
+	KAH              KAH                      `json:"kah"`
+	KAB              KAB                      `json:"kab"`
+	Diagnostics      []discovery.Diagnostic   `json:"diagnostics"`
+	NextAction       string                   `json:"next_action"`
 }
 
 func Build(repo string, opts Options) (Result, error) {
@@ -133,7 +135,8 @@ func Build(repo string, opts Options) (Result, error) {
 			State:        "ok",
 			ManifestPath: manifestPath,
 		},
-		Manifest: Manifest{Path: manifestPath, State: "ok"},
+		Manifest:         Manifest{Path: manifestPath, State: "ok"},
+		KABAdoptionStage: install.KABAdoptionStage{Applicable: false, State: "not_applicable"},
 		KAB: KAB{
 			RequiredForMinimumCLI:       false,
 			RequiredForExecutionRuntime: true,
@@ -184,6 +187,7 @@ func RenderHuman(result Result) string {
 		fmt.Sprintf("상태: %s — profile %s doctor.", state, result.TargetProfile.Name),
 		fmt.Sprintf("요약: 건강 %d, 경고 %d, 오류 %d.", healthyCount(result), countLevel(result.Diagnostics, "warning"), countLevel(result.Diagnostics, "error")),
 		"manifest: " + result.Manifest.State + " (" + result.Manifest.Path + ")",
+		"KAB adoption marker: " + result.KABAdoptionStage.State,
 		fmt.Sprintf("KAH: %s", kahHuman(result.KAH)),
 		"KAB: " + result.KAB.Message,
 	}
@@ -296,6 +300,7 @@ func validateInstalls(result *Result, manifest map[string]any, profileRoot strin
 		if !ok {
 			pack.State = worstState(pack.State, "manifest_error")
 			addDiag(result, "error", "manifest_files_invalid", "KAS manifest files must be an array for pack: "+packID)
+			pack.KABAdoptionStage = inspectKABAdoptionMarker(result, profileRoot, packID, targetPath)
 			installed = append(installed, pack)
 			continue
 		}
@@ -345,11 +350,80 @@ func validateInstalls(result *Result, manifest map[string]any, profileRoot strin
 				addDiag(result, "error", "installed_file_checksum_mismatch", "installed file checksum differs from KAS manifest: "+filepath.ToSlash(filepath.Join(targetPath, rel)))
 			}
 		}
+		pack.KABAdoptionStage = inspectKABAdoptionMarker(result, profileRoot, packID, targetPath)
 		installed = append(installed, pack)
 	}
 	sort.Slice(installed, func(i, j int) bool { return installed[i].PackID < installed[j].PackID })
+	result.KABAdoptionStage = aggregateKABAdoptionStage(installed)
 	_ = seen
 	return installed
+}
+
+func inspectKABAdoptionMarker(result *Result, profileRoot string, packID string, targetPath string) install.KABAdoptionStage {
+	markerRel := filepath.ToSlash(filepath.Join(targetPath, install.KABAdoptionMarkerRelativePath))
+	stage := install.KABAdoptionStage{Applicable: true, HashBound: true, MarkerPath: markerRel, MarkerPaths: []string{markerRel}, State: "marker_missing"}
+	if packID != "" {
+		stage.Markers = []install.KABAdoptionStageMarker{{PackID: packID, Path: markerRel}}
+	}
+	markerPath, safe := safeJoin(profileRoot, markerRel)
+	if !safe {
+		stage.State = "unsupported_stage"
+		addDiag(result, "error", "kab_adoption_marker_unsafe_path", "KAB adoption marker path escapes profile root: "+markerRel)
+		return stage
+	}
+	data, err := os.ReadFile(markerPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			addDiag(result, "error", "kab_adoption_marker_missing", "KAB adoption marker is missing: "+markerRel)
+			return stage
+		}
+		stage.State = "marker_unreadable"
+		addDiag(result, "error", "kab_adoption_marker_unreadable", "KAB adoption marker is unreadable: "+err.Error())
+		return stage
+	}
+	stage.MarkerSHA256 = shaBytes(data)
+	stage.Markers = []install.KABAdoptionStageMarker{{PackID: packID, Path: markerRel, SHA256: stage.MarkerSHA256}}
+	parsed, ok := install.ParseKABAdoptionStageMarker(data)
+	if !ok {
+		stage.State = "unsupported_stage"
+		addDiag(result, "error", "kab_adoption_marker_unsupported_stage", "KAB adoption marker has an unsupported or malformed stage: "+markerRel)
+		return stage
+	}
+	parsed.State = "marker_present"
+	parsed.MarkerPath = markerRel
+	parsed.MarkerPaths = []string{markerRel}
+	parsed.MarkerSHA256 = stage.MarkerSHA256
+	parsed.Markers = stage.Markers
+	return parsed
+}
+
+func aggregateKABAdoptionStage(installed []InstalledPack) install.KABAdoptionStage {
+	if len(installed) == 0 {
+		return install.KABAdoptionStage{Applicable: false, State: "not_applicable"}
+	}
+	aggregate := install.KABAdoptionStage{Applicable: true, HashBound: true, State: "marker_present"}
+	for _, pack := range installed {
+		stage := pack.KABAdoptionStage
+		if aggregate.Numeric == 0 && stage.Numeric != 0 {
+			aggregate.Numeric = stage.Numeric
+			aggregate.Canonical = stage.Canonical
+			aggregate.Source = stage.Source
+		}
+		if stage.State != "" && stage.State != "marker_present" && aggregate.State == "marker_present" {
+			aggregate.State = stage.State
+		}
+		for _, marker := range stage.Markers {
+			aggregate.Markers = append(aggregate.Markers, marker)
+			aggregate.MarkerPaths = append(aggregate.MarkerPaths, marker.Path)
+		}
+	}
+	sort.Slice(aggregate.Markers, func(i, j int) bool { return aggregate.Markers[i].Path < aggregate.Markers[j].Path })
+	sort.Strings(aggregate.MarkerPaths)
+	if len(aggregate.Markers) > 0 {
+		aggregate.MarkerPath = aggregate.Markers[0].Path
+		aggregate.MarkerSHA256 = aggregate.Markers[0].SHA256
+	}
+	return aggregate
 }
 
 func warnUnknownProfileSkillDirs(result *Result, profileRoot string, installed []InstalledPack) {

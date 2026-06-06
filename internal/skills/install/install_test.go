@@ -77,6 +77,13 @@ func TestCreatePlanIsNoWriteAndHashIncludesSOTFields(t *testing.T) {
 	if result.ChangedPaths[0].Action != "create" || result.ChangedPaths[0].Path != "skills/alpha/SKILL.md" || result.ChangedPaths[0].PreviousSHA256 != nil || result.ChangedPaths[0].NewSHA256 == "" {
 		t.Fatalf("unexpected changed path: %+v", result.ChangedPaths[0])
 	}
+	marker := changedPathByPath(result.ChangedPaths, "skills/alpha/references/kab-adoption-stage.md")
+	if marker == nil || marker.Action != "create" || marker.NewSHA256 == "" {
+		t.Fatalf("missing generated marker changed path: %+v", result.ChangedPaths)
+	}
+	if result.KABAdoptionStage.Numeric != 1 || result.KABAdoptionStage.Canonical != KABStage1Canonical || result.KABAdoptionStage.Source != "default_stage1" || !result.KABAdoptionStage.HashBound {
+		t.Fatalf("unexpected KAB adoption stage: %+v", result.KABAdoptionStage)
+	}
 	if len(result.BackupPlan) != 0 || !result.ApprovalRequest.Required || result.ApprovalRequest.DryRunPlanHash != result.DryRunPlanHash {
 		t.Fatalf("unexpected approval/backup: %+v %+v", result.BackupPlan, result.ApprovalRequest)
 	}
@@ -90,8 +97,18 @@ func TestCreatePlanIsNoWriteAndHashIncludesSOTFields(t *testing.T) {
 	if result.DryRunPlanHash != expected {
 		t.Fatalf("hash = %s, want %s", result.DryRunPlanHash, expected)
 	}
+	repeated, err := BuildDryRun(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repeated.DryRunPlanHash != result.DryRunPlanHash {
+		t.Fatalf("dry-run hash changed across identical dry-runs: %s != %s", repeated.DryRunPlanHash, result.DryRunPlanHash)
+	}
 	if !contains(result.NextAction, "KAB is not required") || !contains(result.NextAction, "KAB-gated") {
 		t.Fatalf("missing KAB boundary: %s", result.NextAction)
+	}
+	if !contains(result.NextAction, "approve the current dry_run_plan_hash") || contains(result.NextAction, "CLIMVP-004") {
+		t.Fatalf("unexpected approval guidance: %s", result.NextAction)
 	}
 }
 
@@ -122,7 +139,7 @@ func TestChangedPathsAreSortedByActionThenPath(t *testing.T) {
 	}
 	want := append([]string{}, got...)
 	sort.Strings(want)
-	if jsonString(got) != jsonString(want) || jsonString(got) != jsonString([]string{"conflict skills/beta/SKILL.md", "create skills/alpha/SKILL.md"}) {
+	if jsonString(got) != jsonString(want) || jsonString(got) != jsonString([]string{"conflict skills/beta/SKILL.md", "create skills/alpha/SKILL.md", "create skills/alpha/references/kab-adoption-stage.md", "create skills/beta/references/kab-adoption-stage.md"}) {
 		t.Fatalf("unexpected order: %v", got)
 	}
 }
@@ -155,7 +172,8 @@ func TestManifestSkipUpdateConflictAndPathValidation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !result.OK || result.Packs[0]["installed_state"] != "installed_current" || result.ChangedPaths[0].Action != "skip" {
+		skill := changedPathByPath(result.ChangedPaths, "skills/alpha/SKILL.md")
+		if !result.OK || result.Packs[0]["installed_state"] != "installed_drifted" || skill == nil || skill.Action != "skip" || changedPathByPath(result.ChangedPaths, "skills/alpha/references/kab-adoption-stage.md") == nil {
 			t.Fatalf("unexpected skip result: %+v", result)
 		}
 	})
@@ -186,7 +204,8 @@ func TestManifestSkipUpdateConflictAndPathValidation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !result.OK || result.Packs[0]["installed_state"] != "installed_drifted" || result.ChangedPaths[0].Action != "update" || len(result.BackupPlan) != 1 {
+		skill := changedPathByPath(result.ChangedPaths, "skills/alpha/SKILL.md")
+		if !result.OK || result.Packs[0]["installed_state"] != "installed_drifted" || skill == nil || skill.Action != "update" || len(result.BackupPlan) != 1 {
 			t.Fatalf("unexpected update result: %+v", result)
 		}
 	})
@@ -323,6 +342,135 @@ func TestApprovedInstallRejectsWrongHashAndWritesNothing(t *testing.T) {
 	}
 	if _, err := os.Stat(profileRoot); !os.IsNotExist(err) {
 		t.Fatalf("wrong approval wrote profile root: %v", err)
+	}
+}
+
+func TestKABAdoptionStageParsingHashBindingAndSourceMarkerConflict(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		input     StageSelectionInput
+		numeric   int
+		canonical string
+		source    string
+		wantErr   bool
+	}{
+		{name: "default", input: StageSelectionInput{}, numeric: 1, canonical: KABStage1Canonical, source: "default_stage1"},
+		{name: "numeric2", input: StageSelectionInput{Numeric: "2"}, numeric: 2, canonical: KABStage2Canonical, source: "explicit_numeric"},
+		{name: "canonical1", input: StageSelectionInput{Canonical: KABStage1Canonical}, numeric: 1, canonical: KABStage1Canonical, source: "explicit_canonical"},
+		{name: "matching aliases", input: StageSelectionInput{Numeric: "2", Canonical: KABStage2Canonical}, numeric: 2, canonical: KABStage2Canonical, source: "explicit_numeric"},
+		{name: "conflict", input: StageSelectionInput{Numeric: "1", Canonical: KABStage2Canonical}, wantErr: true},
+		{name: "stage3 numeric", input: StageSelectionInput{Numeric: "3"}, wantErr: true},
+		{name: "stage3 canonical", input: StageSelectionInput{Canonical: kabStage3Canonical}, wantErr: true},
+		{name: "malformed", input: StageSelectionInput{Numeric: "stage2"}, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stage, err := ResolveKABAdoptionStage(tc.input)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got %+v", stage)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if stage.Numeric != tc.numeric || stage.Canonical != tc.canonical || stage.Source != tc.source || !stage.HashBound {
+				t.Fatalf("unexpected stage: %+v", stage)
+			}
+		})
+	}
+
+	base := t.TempDir()
+	repo := filepath.Join(base, "repo")
+	profileRoot := filepath.Join(base, "profile")
+	writeSkill(t, filepath.Join(repo, "skills", "alpha"), "")
+	stage1, err := BuildDryRun(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot, KABStageSelection: StageSelectionInput{Numeric: "1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stage2, err := BuildDryRun(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot, KABStageSelection: StageSelectionInput{Canonical: KABStage2Canonical}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stage1.DryRunPlanHash == stage2.DryRunPlanHash {
+		t.Fatalf("stage hash did not change: %s", stage1.DryRunPlanHash)
+	}
+	if !contains(KABAdoptionStageMarkerContent(stage2.KABAdoptionStage), "operating-policy guidance only") || !contains(KABAdoptionStageMarkerContent(stage2.KABAdoptionStage), "not KAB execution evidence") {
+		t.Fatalf("marker text is missing boundary language")
+	}
+
+	conflictRepo := filepath.Join(base, "conflict-repo")
+	writeSkill(t, filepath.Join(conflictRepo, "skills", "alpha"), "")
+	if err := os.MkdirAll(filepath.Join(conflictRepo, "skills", "alpha", "references"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(conflictRepo, "skills", "alpha", "references", "kab-adoption-stage.md"), []byte("source-owned\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	conflict, err := BuildDryRun(conflictRepo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: filepath.Join(base, "conflict-profile")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conflict.OK || conflict.Diagnostics[0].Code != "source_kab_adoption_marker_conflict" {
+		t.Fatalf("expected source marker conflict, got %+v", conflict)
+	}
+}
+
+func TestApprovedInstallWritesKABMarkerManifestAndRejectsDifferentStage(t *testing.T) {
+	base := t.TempDir()
+	repo := filepath.Join(base, "repo")
+	profileRoot := filepath.Join(base, "profile")
+	writeSkill(t, filepath.Join(repo, "skills", "alpha"), "# Skill\n\nstage\n")
+	dryRun, err := BuildDryRun(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot, KABStageSelection: StageSelectionInput{Numeric: "2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mismatch, err := ApplyApprovedInstall(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot, KABStageSelection: StageSelectionInput{Numeric: "1"}}, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mismatch.OK || mismatch.Diagnostics[0].Code != "approval_plan_hash_mismatch" {
+		t.Fatalf("expected stage mismatch rejection, got %+v", mismatch)
+	}
+	if _, err := os.Stat(profileRoot); !os.IsNotExist(err) {
+		t.Fatalf("stage mismatch wrote profile root: %v", err)
+	}
+
+	result, err := ApplyApprovedInstall(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot, KABStageSelection: StageSelectionInput{Canonical: KABStage2Canonical}}, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK {
+		t.Fatalf("approved install failed: %+v", result)
+	}
+	markerPath := filepath.Join(profileRoot, "skills", "alpha", "references", "kab-adoption-stage.md")
+	marker := string(mustRead(t, markerPath))
+	if !contains(marker, "Numeric stage: 2") || !contains(marker, KABStage2Canonical) || !contains(marker, "not Stage 2 activation") || !contains(marker, "not KAB execution evidence") {
+		t.Fatalf("unexpected marker content:\n%s", marker)
+	}
+	if !contains(marker, "Selected at: "+result.InstallID) || !contains(marker, "Approval evidence: "+dryRun.ApprovalRequest.EvidenceRef) {
+		t.Fatalf("marker is missing actual approved-install evidence:\n%s", marker)
+	}
+	if contains(marker, "approved install records install_id") || contains(marker, "approved install records approval_evidence_ref") {
+		t.Fatalf("approved marker kept dry-run placeholder evidence:\n%s", marker)
+	}
+	markerSHA := shaFile(t, markerPath)
+	markerChange := changedPathByPath(result.ChangedPaths, "skills/alpha/references/kab-adoption-stage.md")
+	if markerChange == nil || markerChange.NewSHA256 != markerSHA || result.KABAdoptionStage.MarkerSHA256 != markerSHA {
+		t.Fatalf("approved marker checksum not reflected in result: change=%+v stage=%+v actual=%s", markerChange, result.KABAdoptionStage, markerSHA)
+	}
+	var manifest map[string]any
+	readJSONFile(t, result.ManifestPath, &manifest)
+	entry := manifest["installs"].([]any)[0].(map[string]any)
+	stage := entry["kab_adoption_stage"].(map[string]any)
+	if stage["canonical"] != KABStage2Canonical || stage["marker_path"] != "skills/alpha/references/kab-adoption-stage.md" || stage["marker_sha256"] != markerSHA {
+		t.Fatalf("manifest missing marker metadata: %+v", entry)
+	}
+	for _, raw := range entry["files"].([]any) {
+		file := raw.(map[string]any)
+		if file["relative_path"] == KABAdoptionMarkerRelativePath && file["sha256"] != markerSHA {
+			t.Fatalf("manifest marker file checksum did not use approved marker content: %+v", file)
+		}
 	}
 }
 
@@ -542,6 +690,15 @@ func hashCanonical(t *testing.T, value any) string {
 func jsonString(value any) string {
 	data, _ := json.Marshal(value)
 	return string(data)
+}
+
+func changedPathByPath(paths []ChangedPath, path string) *ChangedPath {
+	for i := range paths {
+		if paths[i].Path == path {
+			return &paths[i]
+		}
+	}
+	return nil
 }
 
 func contains(value, needle string) bool {

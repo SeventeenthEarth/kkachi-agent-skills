@@ -252,3 +252,77 @@ func TestInstallApprovedCopyJSON(t *testing.T) {
 		t.Fatalf("missing manifest/recovery payload: %+v", payload)
 	}
 }
+
+func TestInstallKABAdoptionStageFlagsDefaultsAndInteractive(t *testing.T) {
+	repo := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "alpha"), "Alpha")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"install", "--repo", repo, "--profile", "demo", "alpha", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("default dry-run code=%d stderr=%s", code, stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	stage := payload["kab_adoption_stage"].(map[string]any)
+	if stage["numeric"].(float64) != 1 || stage["canonical"] != "stage1_direct_codex_app_server_baseline" || stage["source"] != "default_stage1" {
+		t.Fatalf("unexpected default stage: %+v", stage)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install", "--repo", repo, "--profile", "demo", "alpha", "--dry-run", "--profile-root", profileRoot, "--kab-stage", "2", "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("stage2 dry-run code=%d stderr=%s", code, stderr.String())
+	}
+	payload = map[string]any{}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	stage = payload["kab_adoption_stage"].(map[string]any)
+	if stage["numeric"].(float64) != 2 || stage["canonical"] != "stage2_kab_codex_first" || stage["source"] != "explicit_numeric" {
+		t.Fatalf("unexpected numeric stage: %+v", stage)
+	}
+
+	for _, args := range [][]string{
+		{"install", "--repo", repo, "--profile", "demo", "alpha", "--dry-run", "--profile-root", profileRoot, "--kab-stage", "1", "--kab-adoption-stage", "stage2_kab_codex_first", "--json"},
+		{"install", "--repo", repo, "--profile", "demo", "alpha", "--dry-run", "--profile-root", profileRoot, "--kab-stage", "3", "--json"},
+		{"install", "--repo", repo, "--profile", "demo", "alpha", "--dry-run", "--profile-root", profileRoot, "--kab-adoption-stage", "unknown", "--json"},
+	} {
+		stdout.Reset()
+		stderr.Reset()
+		code = Main(args, &stdout, &stderr, env)
+		if code != 2 {
+			t.Fatalf("expected selector failure for %v, got %d stdout=%s stderr=%s", args, code, stdout.String(), stderr.String())
+		}
+		payload = map[string]any{}
+		if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload["diagnostics"].([]any)[0].(map[string]any)["code"] != "kab_adoption_stage_invalid" {
+			t.Fatalf("unexpected selector failure payload: %+v", payload)
+		}
+	}
+
+	oldInput := installPromptInput
+	oldInteractive := installPromptInteractive
+	defer func() {
+		installPromptInput = oldInput
+		installPromptInteractive = oldInteractive
+	}()
+	installPromptInput = strings.NewReader("\n")
+	installPromptInteractive = func() bool { return true }
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install", "--repo", repo, "--profile", "demo", "alpha", "--dry-run", "--profile-root", profileRoot}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("interactive dry-run code=%d stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Choice [1]:") || !strings.Contains(stdout.String(), "source interactive") {
+		t.Fatalf("interactive output did not prompt/default: %q", stdout.String())
+	}
+}

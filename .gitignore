@@ -9,3 +9,6 @@ __pycache__/
 .kkachi/
 .codegraph/
 .kkachi-workflow.yaml
+.omc/
+.claude/
+feedback.md

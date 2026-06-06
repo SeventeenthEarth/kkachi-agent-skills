@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,6 +13,16 @@ import (
 	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/doctor"
 	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/install"
 )
+
+var installPromptInput io.Reader = os.Stdin
+var installPromptInteractive = func() bool {
+	file, ok := installPromptInput.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := file.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
 
 func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
 	if stdout == nil {
@@ -79,6 +90,8 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
 	dryRun := fs.Bool("dry-run", false, "report planned changes without writing")
 	approve := fs.String("approve", "", "approval evidence ref for future approved copy install")
+	kabStage := fs.String("kab-stage", "", "KAB adoption stage numeric selector (1 or 2)")
+	kabAdoptionStage := fs.String("kab-adoption-stage", "", "KAB adoption stage canonical selector")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
 	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
 	if hasHelpArg(argv) {
@@ -104,13 +117,16 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 	if len(packIDs) == 0 {
 		return emitError(stderr, "pack_id_required", "install requires at least one pack id.", "install", *jsonOutput, "")
 	}
+	stageInput, err := resolveInstallStageInput(*kabStage, *kabAdoptionStage, *jsonOutput, stdout, env)
+	if err != nil {
+		return emitError(stderr, "kab_adoption_stage_invalid", err.Error(), "install", *jsonOutput, "")
+	}
 
 	var result install.Result
-	var err error
 	if *approve != "" {
-		result, err = install.ApplyApprovedInstall(*repo, install.Options{Profile: *profile, PackIDs: packIDs, ProfileRoot: *profileRoot}, *approve)
+		result, err = install.ApplyApprovedInstall(*repo, install.Options{Profile: *profile, PackIDs: packIDs, ProfileRoot: *profileRoot, KABStageSelection: stageInput}, *approve)
 	} else {
-		result, err = install.BuildDryRun(*repo, install.Options{Profile: *profile, PackIDs: packIDs, ProfileRoot: *profileRoot})
+		result, err = install.BuildDryRun(*repo, install.Options{Profile: *profile, PackIDs: packIDs, ProfileRoot: *profileRoot, KABStageSelection: stageInput})
 	}
 	if err != nil {
 		return emitError(stderr, "discovery_failed", err.Error(), "install", *jsonOutput, "")
@@ -178,7 +194,7 @@ func normalizeInstallArgs(argv []string) []string {
 	for i := 0; i < len(argv); i++ {
 		arg := argv[i]
 		switch arg {
-		case "--repo", "--profile", "--profile-root", "--approve":
+		case "--repo", "--profile", "--profile-root", "--approve", "--kab-stage", "--kab-adoption-stage":
 			rewritten = append(rewritten, arg)
 			if i+1 < len(argv) {
 				i++
@@ -198,12 +214,44 @@ func normalizeInstallArgs(argv []string) []string {
 }
 
 func hasInstallFlagValue(arg string) bool {
-	for _, name := range []string{"--repo=", "--profile=", "--profile-root=", "--approve=", "--dry-run=", "--json=", "--no-color="} {
+	for _, name := range []string{"--repo=", "--profile=", "--profile-root=", "--approve=", "--kab-stage=", "--kab-adoption-stage=", "--dry-run=", "--json=", "--no-color="} {
 		if strings.HasPrefix(arg, name) {
 			return true
 		}
 	}
 	return false
+}
+
+func resolveInstallStageInput(numeric string, canonical string, jsonOutput bool, stdout io.Writer, env map[string]string) (install.StageSelectionInput, error) {
+	input := install.StageSelectionInput{Numeric: numeric, Canonical: canonical}
+	if numeric != "" || canonical != "" {
+		if _, err := install.ResolveKABAdoptionStage(input); err != nil {
+			return input, err
+		}
+		return input, nil
+	}
+	if jsonOutput || envValue(env, "CI") != "" || !installPromptInteractive() {
+		input.Numeric = "1"
+		input.Source = "default_stage1"
+		return input, nil
+	}
+	fmt.Fprint(stdout, "KAB adoption stage for this KAS/KAH project pack:\n  [1] Stage 1 — direct Codex app-server baseline (default)\n  [2] Stage 2 — KAB Codex-first via native_codex\nChoice [1]: ")
+	line, err := bufio.NewReader(installPromptInput).ReadString('\n')
+	if err != nil && len(line) == 0 {
+		input.Numeric = "1"
+		input.Source = "default_stage1"
+		return input, nil
+	}
+	choice := strings.TrimSpace(line)
+	if choice == "" {
+		choice = "1"
+	}
+	input.Numeric = choice
+	input.Source = "interactive"
+	if _, err := install.ResolveKABAdoptionStage(input); err != nil {
+		return input, err
+	}
+	return input, nil
 }
 
 func hasHelpArg(argv []string) bool {
