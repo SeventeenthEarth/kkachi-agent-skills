@@ -3,7 +3,7 @@
 Date: 2026-05-26
 Owner: KAS workflow/policy layer
 Confirming role: Kkachi-team review accepted; 주유 harness review accepted; 사마의 final Red review accepted
-Status: accepted SOT for `CLIMVP-001`; not implemented until later CLIMVP tasks provide code and tests
+Status: accepted SOT for `CLIMVP-001` and KABADOPT-001 stage-selector closure; implemented surfaces remain bounded by their roadmap evidence
 Authority level: command-surface and manifest/checksum contract for the KHS+KAH minimum/pilot CLI lane
 Scope: `kkachi-hermes-skills` / KAS profile-scoped skill-pack `list`, `install --dry-run`, approved copy install, and `doctor`; no KAB runtime, KHC command/control, Doksuri integration, or KAH install-command expansion
 Related docs: `docs/sot/minimum-pilot-cli-lane.md`, `docs/sot/interface-contract.md`, `docs/sot/khs-architecture-and-integration.md`, `docs/README.md`, `docs/roadmap.md`, repository `README.md`
@@ -194,6 +194,13 @@ Marker output:
 - The marker is an operating-policy reference, not KAH state and not KAB execution evidence.
 - Stage 2 markers must state that future implementation/fix/docs-bound execution uses KAB `native_codex` and that falling back to direct Codex requires a recorded break-glass approval/rationale.
 - If the marker is absent or unreadable for a project-specific KAS pack, KAS must fail closed to Stage 1 claims: it may record direct Codex evidence, but it must not claim KAB Codex execution.
+
+Plan/review fallback audit:
+
+- Any Codex or KAB-authored plan for KAS/KAH development must include a fallback audit note before Blue/Red plan review. The note must identify proposed fallback paths, explain whether each is necessary, and prefer fail-closed behavior when the system lacks capability, evidence, approval, or safe state.
+- Blue and Red plan review, first color review, GLM/Octo review when run, and post-review closure must explicitly check for unnecessary fallback paths. The normal requested change is to remove the fallback and fail closed with operator-readable diagnostics and KAH/KAB evidence.
+- A fallback may be accepted only when there is no safe direct handling, the fallback is explicitly bounded and evidenced, and the implementation/docs delta is genuinely small. The fallback must not bypass KAH gates, approval checks, KAB evidence requirements, auth/token safety, or the selected KAB adoption stage.
+- If handling the condition without a fallback is impossible and the fallback would require broad code, new state machinery, or unclear policy, the run must stop and report options to 주군 instead of quietly adding the fallback.
 
 Minimum marker content:
 

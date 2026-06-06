@@ -199,6 +199,8 @@ KAS owns the operating policy for applying KAB to KAS/KAH development runs. KAH 
 
 Stage 2 is a transport migration from direct Codex app-server to KAB Codex. Stage 3 is a backend orchestration policy. Do not collapse these stages: proving KAB Codex-first execution is the prerequisite for safely expanding backend selection.
 
+Fallback posture is fail-closed by default across the KAS/KAH development loop. Codex or KAB-authored plans must surface proposed fallback paths for Blue/Red review; Blue, Red, Orange, Gray, and optional GLM/Octo review must request removal of unnecessary fallback paths rather than preserve convenience behavior. A fallback is acceptable only when there is no safe direct handling, the fallback is narrowly bounded, evidence-backed, approval-safe, and very small to implement. If avoiding fallback is impossible and the required fallback would add broad code or new policy/state complexity, the run reports options to 주군 instead of quietly implementing it.
+
 Official GLM Octo review is an independent feedback/review lane. It remains KAB GLM `/octo:review` with its existing trigger policy, preflight, prompt-confirmation, watcher/readback, feedback artifact, and post-Octo re-review requirements. Selecting GLM as a possible Stage 3 implementation backend does not satisfy or replace official GLM Octo review, and running official GLM Octo review does not imply GLM was the implementation backend.
 
 The active stage is a project/profile operating setting, not just prose in a

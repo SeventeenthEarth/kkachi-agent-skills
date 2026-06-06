@@ -34,6 +34,8 @@ Plan-first loop requirements:
 6. route Blue or Red `REQUEST_CHANGES` back to the same planner lane for a revised plan, then repeat Blue/Red vetting;
 7. only after Blue+Red approval, approve/start the implementer backend.
 
+Plan drafts must include a fallback audit note before Blue/Red review. Ask the planner to identify any fallback paths it proposes, remove unnecessary fallback behavior, and prefer fail-closed handling when capability, evidence, approval, or safe state is missing. Allow a fallback only when no safe direct handling exists, the fallback is tightly bounded/evidenced, and the required code/docs delta is genuinely small. If the only viable fallback would add broad code, new state machinery, or unclear policy, stop and report options to 주군 instead of letting the planner quietly add it.
+
 Render planner prompts so every command example uses the real user home, for example `HOME=<real-user-home> <command>` in reusable artifacts. This includes Git commands because commit-time global `user.name`, `user.email`, signing, hooks, and credential helpers must come from the user's real home.
 
 Record deviations in `phase-plan.yaml`, `checklist.md`, and the final report instead of silently using a lighter path. For `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`, use the selected light spine from `task-contract.yaml`; do not manufacture implementation/test/optimize phases unless the classification changes to `development`.
@@ -63,6 +65,7 @@ Required planner prompt clause:
 
 ```text
 Include a section titled "KHS Checklist Seed" with unchecked markdown tasks. Each task must include phase, expected evidence artifact, and verification/check condition. Do not start implementation.
+Include a section titled "Fallback Audit" that lists every proposed fallback path, says whether it should be removed or retained, and explains any retained fallback using the KAS fail-closed/default-no-fallback policy.
 ```
 
 Then read the plan:

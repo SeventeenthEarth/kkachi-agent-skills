@@ -22,10 +22,11 @@ For KAS/KAH roadmap-task work, feedback-driven code, test, build, or task-bound 
 2. Enumerate every finding and assign a disposition before making changes: valid, partially valid, invalid, already handled, deferred, or out of scope.
 3. If the master asks only for review/triage, write a proposal artifact with dispositions, evidence checked, and recommended patch set; do not silently implement until requested or until the active KHS phase contract already authorizes handle-feedback changes.
 4. For each valid or partially valid item, route the smallest in-scope change that addresses the durable issue to the selected implementer lane; in Stage 1 direct Codex app-server applies the change, in Stage 2 KAB Codex applies it, and in Stage 3 the selected KAB backend applies it while Blue records the disposition/evidence.
-5. For each rejected, deferred, or out-of-scope item, record the exact scope/evidence reason in the triage artifact.
-6. After applying changes, rerun the verification gates affected by the feedback and capture raw logs.
-7. Refresh the run diff/evidence artifacts and record KAH phase events.
-8. Leave review-ready work uncommitted until the appropriate review/final gate or explicit 주군 commit approval.
+5. For fallback-related feedback, prefer removal plus fail-closed diagnostics/evidence. Retain or add a fallback only when no safe direct handling exists, the fallback is narrowly bounded/evidenced, and the required code/docs delta is genuinely small. If the fallback requires broad code, new state machinery, or unclear policy, stop and report options to 주군.
+6. For each rejected, deferred, or out-of-scope item, record the exact scope/evidence reason in the triage artifact.
+7. After applying changes, rerun the verification gates affected by the feedback and capture raw logs.
+8. Refresh the run diff/evidence artifacts and record KAH phase events.
+9. Leave review-ready work uncommitted until the appropriate review/final gate or explicit 주군 commit approval.
 
 ## Outputs
 
