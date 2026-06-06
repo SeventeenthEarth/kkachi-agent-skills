@@ -46,6 +46,7 @@ INITDOC-003
   -> CLIMVP-001..005
   -> GRAPHMVP-001..004
   -> STALECLEAN-001..004
+  -> KABADOPT-001..004
 ```
 
 INITDOC is closed before implementation begins so the temporary transition SOT does not become new legacy. `BOOTSTRAP` should happen first because it gives later KAS work a deterministic KAH project state and doctor evidence. `STALECLEAN` may run in parallel with late CLIMVP/GRAPHMVP tasks only when the touched surfaces do not overlap.
@@ -111,11 +112,26 @@ Deferred from GRAPHMVP unless separately approved: graph `apply` automation, dec
 | STALECLEAN-003 | Preserve KAB-later and runtime boundaries | Completed | Active guidance no longer blocks scoped CLIMVP/GRAPHMVP/KAS docs or CLI work on KAB, but still marks backend execution, automated review-by-different-tool transport, KAB plan lifecycle, and bridge evidence as KAB-dependent when required. | Completed by updates to the README, phase contracts, orchestration/plan/implement guidance, run-artifact templates, phase-orchestration SOT, and docs-contract tests; verification includes forbidden overbroad KAB-prerequisite searches, YAML parse, docs-contract tests, and full `make test`. |
 | STALECLEAN-004 | Verify active KAS guidance no longer treats KAH 0.1.4 graph/configurable-feedback as absent | Completed | Final stale-clean verification proves active guidance either uses capability-checked KAH 0.1.4 graph/configurable-feedback support or explicitly marks remaining work as `kas-integration-pending`, `kab_later`, `candidate`, `historical`, or `unsupported`. | Completed by KAH 0.1.4 capability/help evidence, graph validate/explain readback, active-guidance scan, cleanup of stale concept/template/status-index wording, and docs-contract tests. Remaining operator report/e2e adoption stays `kas-integration-pending`; KAB runtime/automated review transport stays `kab_later`. |
 
+
+### EPIC: KABADOPT — KAS KAB adoption stage selector and Stage 2 migration path
+
+> Goal: make the KAS/KAH development KAB adoption stage an explicit installed/project-specific operating policy before any Stage 2 migration. This epic records the selector and marker contract first, then implements it, then pilots Stage 2 only with evidence. The roadmap entry itself is not implementation authorization and does not activate Stage 2 for any project.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| KABADOPT-001 | Specify KAS CLI KAB adoption stage selector | Planned | `docs/sot/kas-cli-contract.md` defines numeric stage choices, canonical values, default Stage 1 behavior, non-interactive no-prompt behavior, invalid/Stage 3 fail-closed handling, JSON output, marker path/content, and dry-run plan-hash binding. `docs/sot/khs-architecture-and-integration.md` cross-references the selector without duplicating CLI detail, and `docs/kkachi-docs-map.yaml` registers the CLI SOT. | Docs readback, `git diff --check`, `make test`, KAH docs/roadmap evidence, and Red/Orange/Gray color review acceptance. No code implementation or Stage 2 activation is authorized by this task. |
+| KABADOPT-002 | Implement numeric stage selection in KAS CLI | Planned | Stage-capable install/dry-run accepts `--kab-stage 1|2` and canonical `--kab-adoption-stage`; interactive TTY defaults blank input to Stage 1; JSON/CI/non-interactive mode never prompts and defaults to Stage 1; explicit invalid/conflicting/Stage 3 values fail closed; selected stage is included in changed paths and approval plan hash. | Go unit/CLI/e2e tests for defaults, explicit values, conflicts, Stage 3 rejection, marker generation, doctor marker reporting, and approval hash mismatch; `make test`; Blue plus Red/Orange/Gray review before commit. |
+| KABADOPT-003 | Add project-specific KAS stage marker/runbook references | Planned | Project-specific KAS packs/install outputs include `references/kab-adoption-stage.md` and stage runbook references. Stage 1 runbook records direct Codex app-server evidence/no-KAB-Codex rationale. Stage 2 runbook requires KAB `native_codex` preflight/session/read/status evidence and break-glass rationale for any direct Codex fallback. | Skill/reference readback, stale-term sweep, docs-contract tests if affected, and color review that confirms no Stage 2 overclaim. |
+| KABADOPT-004 | Pilot Stage 2 KAB Codex-first on one approved project | Planned | One explicitly selected project changes the marker to `stage2_kab_codex_first`; implementation/fix/docs-bound execution uses KAB `native_codex`; evidence records selected CLI/capability, session id, plan/read/status/wait or retained stream events, bridge events, final snapshot, and any rejected fallback. | 주군 project choice/approval, KAB preflight, KAH run artifacts, first color review, official GLM Octo when required by task class/policy, post-fix re-review, final verification, and commit approval. |
+
+KABADOPT deferrals unless separately approved: Stage 3 backend-selected implementation, Antigravity lane work, non-Codex KAB implementation backends for KAS/KAH development, silent fallback from Stage 2 to direct Codex, and mutation of auth/tokens/gateway/model/provider config.
+
 ## Deferred / non-MVP work
 
 - KAS `sync` write behavior after dry-run/diff/approval/recovery spec and Red/operator review.
 - Broad `proposal` CLI mapping across profile install ledgers, project overlays, KAH graph proposals, run-local improvement notes, and shared KAS promotion gates.
 - KAB context/prompt alignment with applied graph version/checksum.
+- KAS/KAH development Stage 2 KAB Codex-first adoption remains planned under KABADOPT until selector implementation, marker/runbook references, and one approved pilot provide evidence.
 - Automated review-by-different-tool transport and evidence; this remains `kab_later`.
 - KHC/Doksuri integration and command/control surfaces.
 - Repo-root Hermes multi-skill-pack install claims until Hermes behavior is verified.
@@ -157,4 +173,4 @@ Implementation remains gated by each later task's responsible approver authoriza
 
 ## Next record action
 
-INITDOC, BOOTSTRAP, `CLIMVP-001` through `CLIMVP-005`, `GRAPHMVP-001` through `GRAPHMVP-004`, and `STALECLEAN-001` through `STALECLEAN-004` are completed with the Go module path `github.com/SeventeenthEarth/kkachi-hermes-skills`. No further STALECLEAN task is listed; any epic-level closure statement still requires the responsible review/closure gate rather than this roadmap line alone.
+INITDOC, BOOTSTRAP, `CLIMVP-001` through `CLIMVP-005`, `GRAPHMVP-001` through `GRAPHMVP-004`, and `STALECLEAN-001` through `STALECLEAN-004` are completed with the Go module path `github.com/SeventeenthEarth/kkachi-hermes-skills`. The next planned roadmap lane is `KABADOPT-001` through `KABADOPT-004`; all KABADOPT tasks remain `Planned` until their own evidence/review gates pass. No further STALECLEAN task is listed; any epic-level closure statement still requires the responsible review/closure gate rather than this roadmap line alone.

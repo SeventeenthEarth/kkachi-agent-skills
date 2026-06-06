@@ -13,6 +13,7 @@ Related docs:
 - `docs/sot/phase-orchestration-policy.md`
 - `docs/sot/workflow-graph-integration.md`
 - `docs/sot/minimum-pilot-cli-lane.md`
+- `docs/sot/kas-cli-contract.md`
 - `docs/roadmap.md`
 Evidence/source paths:
 - Kanban parent readiness and scope decision: `t_5d35ee82`
@@ -215,6 +216,12 @@ project state is initialized through KAH, and must record it in run-local
 task/phase evidence. If the stage is missing or ambiguous, KAS must fail closed
 to Stage 1 behavior: direct Codex evidence may be recorded, but KAB Codex
 execution must not be claimed.
+
+The detailed KAS CLI selector contract lives in `docs/sot/kas-cli-contract.md`.
+That SOT owns numeric/operator UX, non-interactive defaults, canonical stage
+names, dry-run hash binding, JSON fields, marker file shape, and fail-closed
+rules. This architecture SOT owns only the layer boundary and adoption-stage
+semantics.
 
 ## 9. Repository structure and artifact roles
 

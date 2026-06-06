@@ -85,11 +85,13 @@ Operator UX decision:
 All commands should support:
 
 ```text
---json                 emit machine-readable JSON
---repo <path>          source KAS repo path; default is the current repo when run inside it
---profile <profile>   Hermes target profile name where relevant
---profile-root <path>  explicit profile root override for tests/harness only
---no-color             disable color in human output
+--json                              emit machine-readable JSON
+--repo <path>                       source KAS repo path; default is the current repo when run inside it
+--profile <profile>                Hermes target profile name where relevant
+--profile-root <path>               explicit profile root override for tests/harness only
+--kab-stage <1|2>                   select KAS/KAH development KAB adoption stage by numeric operator choice
+--kab-adoption-stage <canonical>    select the same stage by canonical stage name
+--no-color                          disable color in human output
 ```
 
 Rules:
@@ -97,6 +99,7 @@ Rules:
 - `--profile-root` is for tests/harness and must be rejected in normal production use unless paired with an explicit test/harness mode or documented environment guard.
 - Human output must be Korean-friendly in summaries, but JSON field names stay stable English.
 - JSON output must include `ok`, `command`, `source_repo`, `target_profile` when applicable, `changed_paths` when applicable, `diagnostics`, and `next_action`.
+- When a command accepts or resolves a KAB adoption stage, JSON output must include `kab_adoption_stage` with the numeric value, canonical value, source (`explicit_numeric`, `explicit_canonical`, `interactive`, or `default_stage1`), and whether the value is hash-bound.
 
 ### 6.2 Minimum human output examples
 
@@ -139,6 +142,89 @@ KAH: 사용 가능, install_command=false 확인.
 KAB: minimum CLI에는 필요 없음. 코드 변경/백엔드 실행 KAS run에는 KAB가 필요합니다.
 다음: 실행-runtime 작업은 KAS+KAH+KAB 경로로 시작하세요.
 ```
+
+
+### 6.2.1 KAB adoption stage selector
+
+Scope:
+
+- The stage selector applies to KAS/KAH development project packs or project-specific KAS overlays that need to record whether future KAS/KAH implementation work uses Stage 1 direct Codex app-server or Stage 2 KAB Codex-first execution.
+- The selector does not make the minimum CLI a KAB runner and does not authorize Stage 2 migration by itself. It records the operating policy that later KAS runs must obey.
+- Stage 3 backend-selected execution is intentionally not exposed by this CLI selector until a separate SOT/roadmap task authorizes it.
+
+Canonical stage values:
+
+| Numeric choice | Canonical value | Meaning | Current exposure |
+|---|---|---|---|
+| `1` | `stage1_direct_codex_app_server_baseline` | KAS/KAH development continues through the direct Codex app-server lane and records no-KAB-Codex rationale. | default and selectable |
+| `2` | `stage2_kab_codex_first` | KAS/KAH development replaces direct Codex calls with KAB `native_codex` while preserving the same KAS/KAH phase and review structure. | selectable only after operator chooses it |
+| `3` | `stage3_kab_backend_selected` | KAS/KAH development selects among eligible KAB backends after capability and policy gates. | reserved; not shown or accepted by this selector |
+
+Flags:
+
+```bash
+kkachi-hermes-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-stage 1
+kkachi-hermes-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-stage 2
+kkachi-hermes-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-adoption-stage stage1_direct_codex_app_server_baseline
+kkachi-hermes-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-adoption-stage stage2_kab_codex_first
+```
+
+Rules:
+
+- `--kab-stage` and `--kab-adoption-stage` are aliases for the same selection and must not conflict. Supplying both with different meanings fails closed.
+- Explicit `--kab-stage 3` or `--kab-adoption-stage stage3_kab_backend_selected` fails closed until Stage 3 is separately authorized.
+- Explicit unknown, malformed, or ambiguous stage values fail closed with operator-readable diagnostics.
+- When the selector is relevant and no explicit stage is supplied in an interactive TTY, human output asks:
+
+```text
+KAB adoption stage for this KAS/KAH project pack:
+  [1] Stage 1 — direct Codex app-server baseline (default)
+  [2] Stage 2 — KAB Codex-first via native_codex
+Choice [1]:
+```
+
+- Blank interactive input selects Stage 1.
+- Non-interactive mode, `--json`, CI, or unavailable stdin must not prompt. Missing stage in those modes resolves to Stage 1 with source `default_stage1`.
+- Human output must clearly state when Stage 1 was defaulted so the operator does not mistake a silent default for Stage 2 migration.
+
+Marker output:
+
+- The selected/defaulted stage is recorded in installed project-specific KAS guidance, preferably as `references/kab-adoption-stage.md` under the installed umbrella project skill, for example `skills/<project>/<project>-kas/references/kab-adoption-stage.md`.
+- The marker must include the numeric choice, canonical value, selection source, selected-at/install id when available, responsible approval evidence when available, and the required evidence posture for future runs.
+- The marker is an operating-policy reference, not KAH state and not KAB execution evidence.
+- Stage 2 markers must state that future implementation/fix/docs-bound execution uses KAB `native_codex` and that falling back to direct Codex requires a recorded break-glass approval/rationale.
+- If the marker is absent or unreadable for a project-specific KAS pack, KAS must fail closed to Stage 1 claims: it may record direct Codex evidence, but it must not claim KAB Codex execution.
+
+Minimum marker content:
+
+```markdown
+# KAB adoption stage
+
+Numeric stage: 1
+Canonical stage: stage1_direct_codex_app_server_baseline
+Selection source: default_stage1
+Selected at: <install-id-or-timestamp>
+Approval evidence: <approval-ref-or-not_applicable>
+
+## Execution policy
+
+Future KAS/KAH development runs for this project use the direct Codex app-server baseline unless a later approved reconfiguration changes this marker to Stage 2.
+```
+
+JSON shape extension for dry-run, approved install, and doctor where relevant:
+
+```json
+"kab_adoption_stage": {
+  "applicable": true,
+  "numeric": 1,
+  "canonical": "stage1_direct_codex_app_server_baseline",
+  "source": "default_stage1",
+  "hash_bound": true,
+  "marker_path": "skills/<project>/<project>-kas/references/kab-adoption-stage.md"
+}
+```
+
+`doctor --profile <profile> [--project <path>] --json` should report the installed marker state for project-specific KAS packs when discoverable. It must distinguish `not_applicable`, `marker_present`, `marker_missing`, `marker_unreadable`, and `unsupported_stage`.
 
 ### 6.3 `list`
 
@@ -248,6 +334,7 @@ Minimum JSON shape:
   "mode": "dry_run",
   "source_repo": {"path": "/repo", "git_commit": "<sha>", "dirty": false},
   "target_profile": {"name": "hwangchung", "root": "/profile"},
+  "kab_adoption_stage": {"applicable": true, "numeric": 1, "canonical": "stage1_direct_codex_app_server_baseline", "source": "default_stage1", "hash_bound": true, "marker_path": "skills/<project>/<project>-kas/references/kab-adoption-stage.md"},
   "summary": {
     "total_packs": 1,
     "total_files": 1,
@@ -331,6 +418,7 @@ Minimum JSON shape:
   "mode": "approved_copy",
   "source_repo": {"path": "/repo", "git_commit": "<sha>", "dirty": false},
   "target_profile": {"name": "hwangchung", "root": "/profile"},
+  "kab_adoption_stage": {"applicable": true, "numeric": 1, "canonical": "stage1_direct_codex_app_server_baseline", "source": "default_stage1", "hash_bound": true, "marker_path": "skills/<project>/<project>-kas/references/kab-adoption-stage.md"},
   "approval": {
     "evidence_ref": "dry-run:<hash>",
     "dry_run_plan_hash": "sha256:<canonical-plan-json-hash>",
@@ -423,6 +511,13 @@ Minimum JSON shape:
     "required_for_execution_runtime": true,
     "message": "KAB is required before KAS-governed backend/code-change runs, not for profile-scoped list/install/doctor."
   },
+  "kab_adoption_stage": {
+    "applicable": true,
+    "marker_state": "marker_present",
+    "numeric": 1,
+    "canonical": "stage1_direct_codex_app_server_baseline",
+    "marker_path": "skills/<project>/<project>-kas/references/kab-adoption-stage.md"
+  },
   "diagnostics": [],
   "next_action": "Profile install state is healthy. Use full KAS+KAH+KAB path for execution-runtime work."
 }
@@ -470,6 +565,13 @@ Minimum manifest fields:
       "name": "kas-codex-roadmap-development",
       "source_path": "skills/software-development/kas-codex-roadmap-development",
       "target_path": "skills/software-development/kas-codex-roadmap-development",
+      "kab_adoption_stage": {
+        "applicable": true,
+        "numeric": 1,
+        "canonical": "stage1_direct_codex_app_server_baseline",
+        "source": "default_stage1",
+        "marker_path": "skills/<project>/<project>-kas/references/kab-adoption-stage.md"
+      },
       "checksum_algorithm": "sha256",
       "pack_checksum": "<sha256-hex>",
       "backup": {
@@ -520,6 +622,7 @@ The canonical JSON plan must include, with deterministic key ordering and determ
 - requested pack ids and any category expansion results;
 - source repo path, git commit, dirty flag, and source pack checksums;
 - target profile name and resolved profile root;
+- selected KAB adoption stage, selection source, and marker path when the stage selector is applicable;
 - normalized pack source/target paths;
 - changed-path entries including action, path, previous checksum when present, new checksum when present, and bytes;
 - conflict/error states;
@@ -539,6 +642,7 @@ Every dry-run and approved install must report:
 - per-path action: `create`, `update`, `skip`, `conflict`, `error`, `backup`, `manifest_update`;
 - checksum before/after when applicable;
 - approval requirement and evidence ref;
+- KAB adoption stage and marker path when applicable;
 - recovery/rollback path for approved writes.
 
 Human output must be concise and operator-oriented. JSON output is the stable harness contract.
@@ -553,6 +657,8 @@ Separate status fields must use distinct vocabularies so harness checks do not c
 | `pack.installed_state` | `not_installed`, `installed_current`, `installed_drifted`, `installed_unknown`, `conflict`, `error` | Relation between a source pack and target profile install. |
 | `file.action` / `changed_paths[].action` | `create`, `update`, `skip`, `conflict`, `error`, `backup`, `manifest_update` | Planned or actual per-path action. |
 | `doctor.state` | `ok`, `warning`, `failed`, `skipped` | Health-check result. |
+| `kab_adoption_stage.canonical` | `stage1_direct_codex_app_server_baseline`, `stage2_kab_codex_first`, `stage3_kab_backend_selected` | KAS/KAH development stage name; Stage 3 is reserved and unsupported by this selector until separately authorized. |
+| `kab_adoption_stage.marker_state` | `not_applicable`, `marker_present`, `marker_missing`, `marker_unreadable`, `unsupported_stage` | Installed project-specific KAS marker status. |
 | roadmap task status | `Planned`, `In Progress`, `Blocked`, `Completed`, `Deferred` | Roadmap state only; never use it as file/install state. |
 
 ## 10. Failure modes
@@ -565,6 +671,7 @@ The CLI must fail closed for:
 - path traversal, absolute target paths, or symlink escape;
 - missing `--dry-run` and missing `--approve` for install writes;
 - approval evidence that does not match the current changed-path plan;
+- invalid, conflicting, unsupported, or Stage 3 KAB adoption selector values;
 - checksum mismatch after copy;
 - manifest parse error or version unsupported;
 - existing target files not recorded in a trusted manifest;
@@ -595,7 +702,8 @@ Later implementation tasks must provide tests or harness fixtures for:
 - KAB boundary messaging for minimum vs execution-runtime lanes;
 - JSON schema stability for `list`, `install --dry-run`, approved install, and `doctor`;
 - `--profile-root` production rejection fixture, per 하후연 Red condition C1;
-- evidence-ref replay/reuse prevention design review before CLIMVP-004 write mode, per 하후연 Red condition C2.
+- evidence-ref replay/reuse prevention design review before CLIMVP-004 write mode, per 하후연 Red condition C2;
+- KAB adoption stage selector defaults, explicit numeric/canonical forms, conflicting flags, Stage 3 fail-closed behavior, non-interactive no-prompt behavior, marker generation, doctor marker reporting, and dry-run hash mismatch after stage changes.
 
 ## 12. Review questions for CLIMVP-001
 

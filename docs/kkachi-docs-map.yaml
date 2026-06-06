@@ -4,6 +4,7 @@ roadmap: "docs/roadmap.md"
 sot_docs:
   - "docs/sot/interface-contract.md"
   - "docs/sot/khs-architecture-and-integration.md"
+  - "docs/sot/kas-cli-contract.md"
 adr_dir: "docs/adr"
 todo_dir: "docs/todo"
 spec_dir: "docs/sot"
