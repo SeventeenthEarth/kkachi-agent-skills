@@ -6,7 +6,7 @@ Confirming role: Kkachi-team review accepted; 주유 harness review accepted; �
 Status: accepted SOT for `CLIMVP-001` and KABADOPT-001 stage-selector closure; implemented surfaces remain bounded by their roadmap evidence
 Authority level: command-surface and manifest/checksum contract for the KHS+KAH minimum/pilot CLI lane
 Scope: `kkachi-hermes-skills` / KAS profile-scoped skill-pack `list`, `install --dry-run`, approved copy install, and `doctor`; no KAB runtime, KHC command/control, Doksuri integration, or KAH install-command expansion
-Related docs: `docs/sot/minimum-pilot-cli-lane.md`, `docs/sot/interface-contract.md`, `docs/sot/khs-architecture-and-integration.md`, `docs/README.md`, `docs/roadmap.md`, repository `README.md`
+Related docs: `docs/sot/minimum-pilot-cli-lane.md`, `docs/sot/interface-contract.md`, `docs/sot/khs-architecture-and-integration.md`, `docs/sot/project-specific-kas-install-contract.md`, `docs/README.md`, `docs/roadmap.md`, repository `README.md`
 Evidence/source paths: KAH run `run-20260525T161641Z-4160f06cf1be`; populated artifacts include `intake-classification.md`, `sot-basis.md`, `plan.md`, `context-pack.md`, `docs-update.md`, `sot-update.md`, `roadmap-update.md`, `verification.md`, `review.md`, and `final-report.md`; review tasks are 하후연 `t_2fd07174`, 여몽 `t_e04116b6` plus re-review `t_abc30909`, 진궁 `t_b8db3ead` plus re-review `t_e652a24c`, 주유 `t_6cc40c59`, and 사마의 `t_e479171c`
 
 ## 1. Decision summary
@@ -58,6 +58,22 @@ The KAS minimum CLI must not:
 - **Target install path:** copy destination under `~/.hermes/profiles/<profile>/skills/<category>/<skill>/`.
 - **Install manifest:** KAS-owned profile metadata recording what was copied, where it came from, and checksums.
 - **Approval evidence:** explicit user/approver reference that authorizes writes after reviewing dry-run changed paths.
+
+Project-specific KAS install vocabulary is defined canonically by `docs/sot/project-specific-kas-install-contract.md` for KASPROJ-001 and later tasks:
+
+- **Project:** concrete project suite id, for example `doksuri-server`, used in `skills/<project>/`.
+- **Source pack:** upstream KAS pack/template input used to render a tailored project suite.
+- **Installed skill:** project-prefixed skill id such as `doksuri-server-plan`; generic ids such as `kkachi-plan` are invalid for project suites.
+- **Target path:** profile-relative project-suite destination such as `skills/doksuri-server/doksuri-server-plan/SKILL.md`.
+- **Drift policy:** fail-closed/manual-review/semantic-port/repair-after-approval policy for source/profile language and checksum drift.
+
+For project-specific suite installs, the target path must use:
+
+```text
+skills/<project>/<project>-<phase-or-skill>/SKILL.md
+```
+
+This extends the profile-scoped manifest vocabulary only as a contract. The current implemented CLIMVP CLI must not be described as already installing, repairing, or migrating project-specific suites until KASPROJ-002 through KASPROJ-004 provide implementation evidence.
 
 ## 5. First-run operator path
 
@@ -688,6 +704,43 @@ Minimum JSON shape:
 }
 ```
 
+
+### 6.7 Future project-specific install, doctor, repair, and migration extensions
+
+`docs/sot/project-specific-kas-install-contract.md` is the detailed SOT for the
+KASPROJ project-specific install layout. This CLI contract reserves vocabulary
+and command intent for later PRs without claiming current implementation.
+
+Reserved later command intents may include equivalent names to these forms after
+KASPROJ implementation review:
+
+```bash
+kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --dry-run [--json]
+kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --approve dry-run:<hash> [--json]
+kkachi-hermes-skills doctor --profile <profile> --project <project> --project-suite [--json]
+kkachi-hermes-skills repair-project-kas --profile <profile> --project <project> --dry-run [--json]
+kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run [--json]
+```
+
+Contractual rules for those later commands:
+
+- dry-run planner behavior belongs to KASPROJ-002 and must perform no profile writes;
+- approved project-specific install belongs to KASPROJ-003 and must require approval evidence matching the dry-run plan hash;
+- doctor/repair/migrate behavior belongs to KASPROJ-004 and must use the severity semantics from the project-specific install SOT;
+- repair and migration must be dry-run-first, approval-gated, backup-aware, and must not silently convert generic skills into project-tailored skills;
+- all project-suite writes must use `target_path` values under `skills/<project>/<project>-<phase-or-skill>/SKILL.md`;
+- umbrella-only installs are incomplete/invalid and must not be treated as healthy;
+- duplicate generic installed skill names such as `kkachi-plan` are invalid for one-profile multi-project suites;
+- no later command may mutate auth, tokens, secrets, gateway, provider/model config, KAH project state, or KAB runtime state.
+
+Doctor severity names reserved for KASPROJ are `error` and `warning` with these
+required conditions: missing project suite, umbrella-only, missing file, and
+checksum mismatch are `error`; unknown profile skill dir is `warning` unless it
+shadows or ambiguates a required project skill; profile/source language drift is
+`warning` unless it invalidates required behavior or verification, in which case
+it escalates to `error`.
+
+
 ## 7. Manifest/checksum contract
 
 ### 7.1 Manifest path
@@ -822,9 +875,10 @@ Separate status fields must use distinct vocabularies so harness checks do not c
 | `pack.installed_state` | `not_installed`, `installed_current`, `installed_drifted`, `installed_unknown`, `conflict`, `error` | Relation between a source pack and target profile install. |
 | `file.action` / `changed_paths[].action` | `create`, `update`, `skip`, `conflict`, `error`, `backup`, `manifest_update` | Planned or actual per-path action. |
 | `doctor.state` | `ok`, `warning`, `failed`, `skipped` | Health-check result. |
+| `doctor.project_suite_diagnostic.severity` | `error`, `warning` | KASPROJ project-specific suite diagnostic severity for missing project suite, umbrella-only, missing file, checksum mismatch, unknown profile skill dir, and profile/source language drift. |
 | `kab_adoption_stage.canonical` | `stage1_direct_codex_app_server_baseline`, `stage2_kab_codex_first`, `stage3_kab_backend_selected` | KAS/KAH development stage name; Stage 3 is reserved and unsupported by this selector until separately authorized. |
 | `kab_adoption_stage.marker_state` | `not_applicable`, `marker_present`, `marker_missing`, `marker_unreadable`, `unsupported_stage` | Installed project-specific KAS marker status. |
-| roadmap task status | `Planned`, `In Progress`, `Blocked`, `Completed`, `Deferred` | Roadmap state only; never use it as file/install state. |
+| roadmap task status | `Planned`, `In Progress`, `In Review`, `Blocked`, `Completed`, `Deferred` | Roadmap state only; never use it as file/install state. |
 
 ## 10. Failure modes
 
@@ -840,6 +894,8 @@ The CLI must fail closed for:
 - checksum mismatch after copy;
 - manifest parse error or version unsupported;
 - existing target files not recorded in a trusted manifest;
+- project-specific suite plans that use generic installed skill names instead of `<project>-<phase-or-skill>`;
+- umbrella-only project-specific installs that omit required suite skills;
 - missing backup/recovery plan for an update;
 - attempt to mutate `skills.external_dirs`, symlink default, gateway config, auth/tokens, model/provider config, KAH project state, or KAB runtime config;
 - KAH/KAB capability uncertainty when a command tries to claim KAH/KAB-backed status.

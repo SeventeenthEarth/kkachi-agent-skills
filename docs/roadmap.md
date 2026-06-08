@@ -6,7 +6,7 @@ Confirming role: Responsible approver / governance evidence record; INITDOC post
 Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced; KAS integration work remains separately gated
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -36,7 +36,7 @@ The MVP target is a usable KAS skill/process pack that can:
 
 ## Status values
 
-`Planned`, `In Progress`, `Blocked`, `Completed`, `Deferred`.
+`Planned`, `In Progress`, `In Review`, `Blocked`, `Completed`, `Deferred`.
 
 ## MVP delivery order
 
@@ -50,6 +50,7 @@ INITDOC-003
   -> KABADOPT-001..004
   -> KASUPD-001..004
   -> KASREL-001..004
+  -> KASPROJ-001..005
 ```
 
 INITDOC is closed before implementation begins so the temporary transition SOT does not become new legacy. `BOOTSTRAP` should happen first because it gives later KAS work a deterministic KAH project state and doctor evidence. `STALECLEAN` may run in parallel with late CLIMVP/GRAPHMVP tasks only when the touched surfaces do not overlap.
@@ -157,6 +158,21 @@ KASREL-001 closure boundary phrase preserved for the accepted docs/spec-only con
 
 KASREL deferrals unless separately approved: automatic profile repair, binary rebuild/install execution, write-capable install approval, broad project-specific KAS sync, KAB Stage 2/Stage 3 activation, auth/token/gateway/provider/model mutation, and any fallback path for removed Hermes bundle skills.
 
+
+### EPIC: KASPROJ — project-specific KAS install suites per Hermes profile
+
+> Goal: when one general/profile installs KAS for multiple concrete projects, each project receives its own project-tailored KAS skill suite under `skills/<project>/` with project-prefixed skill names. This epic prevents a single global generic KAS suite from being reused across unrelated projects and keeps later install/doctor/repair/migration behavior approval-gated.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| KASPROJ-001 | Specify project-specific KAS install layout SOT | In Review | `docs/sot/project-specific-kas-install-contract.md` defines canonical target layout `skills/<project>/<project>-<phase-or-skill>/SKILL.md`; includes kwanwoo Doksuri examples for `doksuri-server`, `doksuri-daemon`, `doksuri-client`, and `doksuri-cli`; requires project-prefix skill names; declares duplicate generic names invalid; marks umbrella-only installs incomplete/invalid; defines manifest vocabulary (`project`, `source_pack`, `installed_skill`, `target_path`, `drift_policy`); defines doctor severity semantics; and updates docs registration plus CLI-contract references without implementing CLI behavior. | Commit-ready only after docs readback, docs-contract coverage, `gofmt`, `go test ./tests/docs_contract`, and `git diff --check`. Do not mark Completed until the docs/spec PR receives the responsible review/commit gate. No profile, auth, gateway, provider/model, KAH, KAB, or source install mutation is authorized. |
+| KASPROJ-002 | Implement project-specific dry-run planner | Planned | A future CLI surface renders project-specific suite plans without writes, validates project-prefix skill names, reports full `target_path` changes, detects umbrella-only/generic-name conflicts, emits manifest/checksum/plan-hash evidence, and preserves project language/runtime/test-command tailoring. | Requires approved KASPROJ-001 SOT, focused unit/CLI/e2e no-write tests, docs updates, and review. Must not write profile skills or mutate auth/token/gateway/provider/model/KAH/KAB state. |
+| KASPROJ-003 | Implement approved project-specific install | Planned | Approved install copies the full project-specific suite only after approval evidence matches the dry-run plan hash; writes KAS-owned manifest metadata; rejects umbrella-only, duplicate generic skill names, conflicts, checksum mismatches, unknown profiles, and ambiguous target paths. | Requires KASPROJ-002 evidence, approval-hash tests, backup/recovery tests, no-write-before-approval tests, docs update, and review. |
+| KASPROJ-004 | Implement doctor/repair/migrate for project suites | Planned | Doctor reports the KASPROJ severity semantics for missing project suite, umbrella-only, missing file, checksum mismatch, unknown profile skill dir, and profile/source language drift. Repair/migrate remain dry-run-first and approval-gated, with backups and no generic fallback. | Requires fixtures for every severity, repair/migrate dry-run and approval gates, migration-from-generic diagnostics, docs update, and review. No automatic profile rewrite or semantic-port guesswork without approval. |
+| KASPROJ-005 | Apply project-specific KAS install to one approved operational profile/project set | Planned | One 주군-approved general/profile and concrete project set, such as `kwanwoo` plus the Doksuri projects, uses the implemented dry-run/approved-install/doctor path to create and verify project-tailored suites. | Requires explicit operational approval, dry-run artifact review, approved install evidence, doctor evidence, profile mutation boundary review, rollback path, and final report. This is the first operational application step, not a broad rollout. |
+
+KASPROJ deferrals unless separately approved: broad migration of all existing profile skills, automatic rewrite of generic KAS installs, shared global `skills.external_dirs` behavior, Stage 2/Stage 3 KAB activation, KAH project-state writes, auth/token/gateway/provider/model mutation, and any fallback from a missing project-specific suite to generic global skills.
+
 ## Deferred / non-MVP work
 
 - KAS write-capable sync behavior after KASUPD dry-run/state/semantic-port evidence, approval, recovery spec, and Red/operator review.
@@ -201,10 +217,11 @@ Implementation remains gated by each later task's responsible approver authoriza
 - Approved profile install backup/recovery behavior is implemented for CLIMVP; future `sync` recovery behavior remains separately gated.
 - KAS graph template registry schema and default `kas-default` template content are defined by `docs/sot/graph-template-registry.md`, `registries/graph-template-registry.yaml`, and `templates/workflow-graphs/kas-default.yaml`.
 - Exact KAS artifact mapping for KAH proposal, semantic diff, validation/explain, approval/audit, checksum/version, event-id, and capability-check evidence is defined by GRAPHMVP-004 in `templates/run-artifacts/graph-evidence.md.tmpl` and the graph SOTs.
+- Project-specific KAS install layout/naming is tracked by KASPROJ; KASPROJ-001 is In Review/commit-ready as a docs/spec SOT after local verification, while KASPROJ-002 dry-run planner, KASPROJ-003 approved install, KASPROJ-004 doctor/repair/migrate, and KASPROJ-005 operational application remain planned and separately gated.
 - Project-specific KAS sync/update is now tracked by KASUPD; implementation still requires a separately approved KASUPD task.
 - Hermes release compatibility, skill provenance, shadowing, and dependency audit vocabulary are now defined by accepted SOT `docs/sot/kasrel-hermes-v016-provenance-contract.md`; KASREL-002 is completed/pre-commit-ready after the in-tree provenance inventory pass, Gray fix, official KAB GLM Octo PASS, post-Octo color ACCEPT, `git diff --check`, and `make test`; KASREL-003 is Completed by commit `75d0361`, KAH commit event `evt-001339`, and run close `evt-001340`; KASREL-004 is In Progress for guidance/docs-contract work and is not Completed until its own verification/review/final gates pass.
 - KAB alignment requires a separately assigned KAB docs/update task.
 
 ## Next record action
 
-INITDOC, BOOTSTRAP, `CLIMVP-001` through `CLIMVP-005`, `GRAPHMVP-001` through `GRAPHMVP-004`, `STALECLEAN-001` through `STALECLEAN-004`, `KABADOPT-001` through `KABADOPT-003`, and KASUPD-001 through KASUPD-003 are completed with the Go module path `github.com/SeventeenthEarth/kkachi-hermes-skills`. KABADOPT-004 remains `Planned` until its own Stage 2 pilot evidence/review gates pass. KASUPD-004 remains `Planned` until its own write-capable sync/pilot evidence gates pass. KASREL-001 is `Completed` as the accepted release-compatibility contract; KASREL-002 is `Completed` and pre-commit-ready after implementation/tests, Gray fix acceptance, official KAB GLM Octo PASS, post-Octo color ACCEPT, `git diff --check`, and `make test`; final KAH gate and commit approval remain separate pre-commit gates. KASREL-003 is `Completed` by commit `75d0361`, KAH commit event `evt-001339`, and run close `evt-001340`; KASREL-004 is `In Progress` and must not be marked `Completed` until its skill-guidance docs-contract, search, review, final verification, and commit-approval gates pass. No further STALECLEAN task is listed; any epic-level closure needs a dedicated review/update task.
+INITDOC, BOOTSTRAP, `CLIMVP-001` through `CLIMVP-005`, `GRAPHMVP-001` through `GRAPHMVP-004`, `STALECLEAN-001` through `STALECLEAN-004`, `KABADOPT-001` through `KABADOPT-003`, and KASUPD-001 through KASUPD-003 are completed with the Go module path `github.com/SeventeenthEarth/kkachi-hermes-skills`. KABADOPT-004 remains `Planned` until its own Stage 2 pilot evidence/review gates pass. KASUPD-004 remains `Planned` until its own write-capable sync/pilot evidence gates pass. KASREL-001 is `Completed` as the accepted release-compatibility contract; KASREL-002 is `Completed` and pre-commit-ready after implementation/tests, Gray fix acceptance, official KAB GLM Octo PASS, post-Octo color ACCEPT, `git diff --check`, and `make test`; final KAH gate and commit approval remain separate pre-commit gates. KASREL-003 is `Completed` by commit `75d0361`, KAH commit event `evt-001339`, and run close `evt-001340`; KASREL-004 is `In Progress` and must not be marked `Completed` until its skill-guidance docs-contract, search, review, final verification, and commit-approval gates pass. KASPROJ-001 is `In Review`/commit-ready only for the docs/spec contract after local verification; KASPROJ-002 through KASPROJ-005 remain `Planned` and must not be treated as implemented CLI/profile behavior. No further STALECLEAN task is listed; any epic-level closure needs a dedicated review/update task.
