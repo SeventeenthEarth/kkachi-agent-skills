@@ -24,6 +24,10 @@ Default review order for KAS/KAH runs:
 6. For `development` / implementation tasks, run official GLM Octo after the first color review and feedback handling unless 주군 explicitly waives Octo before start. For non-implementation durable-change runs, run Octo only when explicitly requested by 주군, required by a project-local workflow, or opted in by a recorded high-risk policy gate. After Octo feedback is triaged/applied/rejected, perform a second Blue + Red/Orange/Gray re-review before final/pre-commit reporting.
 7. Synthesize every finding as reflected, rejected, deferred, or blocked with evidence. Do not treat a vague summary as sufficient review evidence.
 
+## KASREL provenance/dependency evidence gate
+
+Apply the shared KASREL-004 evidence gate in `docs/sot/kasrel-hermes-v016-provenance-contract.md` before this skill claims install health, readiness, release compatibility, orchestration safety, review PASS, verification PASS, or final completion for KAS skills. The local claim must directly cite current non-secret KASREL evidence fields as applicable: `provenance_contract_version`, `source_class_evidence`, `dependency_audit`, `skill_dependencies`, `command_surface_dependencies`, `deleted_bundle_reference`, and `deleted_bundle_diagnostics`. Missing, ambiguous, or stale provenance/dependency evidence fails closed; deleted-bundle references remain cleanup/blocking diagnostics, not fallback lookup or substitution authority.
+
 ## Outputs
 
 - `review.md`

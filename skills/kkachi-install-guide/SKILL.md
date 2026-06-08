@@ -71,6 +71,10 @@ If KHS skills are not listed, install via:
 hermes skills install SeventeenthEarth/kkachi-hermes-skills/skills/kkachi-install-guide --category kkachi --yes
 ```
 
+## KASREL provenance/dependency evidence gate
+
+Apply the shared KASREL-004 evidence gate in `docs/sot/kasrel-hermes-v016-provenance-contract.md` before this skill claims install health, readiness, release compatibility, orchestration safety, review PASS, verification PASS, or final completion for KAS skills. The local claim must directly cite current non-secret KASREL evidence fields as applicable: `provenance_contract_version`, `source_class_evidence`, `dependency_audit`, `skill_dependencies`, `command_surface_dependencies`, `deleted_bundle_reference`, and `deleted_bundle_diagnostics`. Missing, ambiguous, or stale provenance/dependency evidence fails closed; deleted-bundle references remain cleanup/blocking diagnostics, not fallback lookup or substitution authority.
+
 ### Step 2: Install KAH
 
 Check if KAH is already installed:

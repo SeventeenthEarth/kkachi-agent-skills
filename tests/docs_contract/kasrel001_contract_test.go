@@ -39,7 +39,7 @@ func TestKASREL001AcceptedSOTPreservesBoundariesAndNoFallbackPolicy(t *testing.T
 		"invent fallback candidates",
 		"Command surfaces must not be represented as fake skill dependencies.",
 		"KASREL does not activate KAB.",
-		"no production CLI changes under `internal/skills/**` unless the specific future implementation task authorizes them",
+		"no production CLI changes under `internal/skills/**` unless the specific later implementation task authorizes them",
 	})
 
 	content := readRepoFile(t, kasrel001SOT)
@@ -56,15 +56,15 @@ func TestKASREL001AcceptedSOTPreservesBoundariesAndNoFallbackPolicy(t *testing.T
 	}
 }
 
-func TestKASREL001AcceptedSOTKeepsFutureTasksAndMutationBoundariesPlanned(t *testing.T) {
+func TestKASREL001AcceptedSOTKeepsTaskStatusAndMutationBoundaries(t *testing.T) {
 	requireContainsAll(t, kasrel001SOT, []string{
 		"not implementation authorization and not installed-profile mutation approval",
 		"profile install, profile repair, approved copy install, or other profile mutation",
 		"binary rebuild/install or installed-binary parity repair",
 		"auth, token, gateway, provider, model, credential, or profile configuration mutation",
-		"KASREL-002 remains the future implementation task for skill inventory and provenance classification.",
-		"KASREL-003 remains the future implementation task for dependency audit behavior.",
-		"KASREL-004 remains the future guidance-update task for install/readiness/orchestration/review/final-verification behavior.",
+		"KASREL-002 is the completed implementation task for skill inventory and provenance classification.",
+		"KASREL-003 is the completed implementation task for dependency audit behavior",
+		"KASREL-004 is the in-progress guidance-update task for install/readiness/orchestration/review/final-verification behavior",
 		"no KASUPD write-capable sync behavior unless a separate KASUPD task authorizes it",
 	})
 
@@ -83,13 +83,13 @@ func TestKASREL001AcceptedSOTKeepsFutureTasksAndMutationBoundariesPlanned(t *tes
 		"auth/token/gateway/provider/model mutation",
 		"fallback path for removed Hermes bundle skills",
 		"KASREL-001 is `Completed`",
-		"KASREL-002 through KASREL-004 remain `Planned`",
+		"Current task rows supersede that historical status only after their own implementation evidence and review gates",
 	})
 }
 
-func TestKASREL001AcceptedSOTFutureJSONFieldsAreExplicitlyIllustrative(t *testing.T) {
+func TestKASREL001AcceptedSOTJSONFieldsRemainIllustrative(t *testing.T) {
 	requireContainsAll(t, kasrel001SOT, []string{
-		"future-facing contract fields",
+		"KASREL contract fields implemented by KASREL-002 and KASREL-003",
 		"Concrete JSON values and examples below are illustrative only.",
 		"provenance_contract_version",
 		"source_inventory_summary",
@@ -131,15 +131,15 @@ func TestKASREL001DocsIndexAndRoadmapPointToAcceptedSOT(t *testing.T) {
 
 	requireRoadmapTaskStatus(t, "KASREL-001", "Completed")
 	requireRoadmapTaskStatus(t, "KASREL-002", "Completed")
-	requireRoadmapTaskStatus(t, "KASREL-003", "In Progress")
-	requireRoadmapTaskStatus(t, "KASREL-004", "Planned")
+	requireRoadmapTaskStatus(t, "KASREL-003", "Completed")
+	requireRoadmapTaskStatus(t, "KASREL-004", "In Progress")
 }
 
 func TestKASREL002DocsReflectCompletedImplementationWithPreCommitBoundary(t *testing.T) {
 	requireContainsAll(t, "docs/README.md", []string{
 		"KASREL-002 implementation is completed/pre-commit-ready",
-		"KASREL-003 dependency-audit implementation is evidenced/in-review",
-		"KASREL-004 remains planned",
+		"KASREL-003 dependency-audit implementation is completed",
+		"KASREL-004 guidance work is in progress",
 		"required review gates",
 	})
 
@@ -151,7 +151,8 @@ func TestKASREL002DocsReflectCompletedImplementationWithPreCommitBoundary(t *tes
 		"official KAB GLM Octo review passed with 0 blocking findings",
 		"post-Octo Red/Orange/Gray re-review accepted with 0 blocking findings",
 		"Final KAH gate and commit approval remain separate pre-commit gates.",
-		"KASREL-003 is `In Progress` with implementation/test/no-write smoke evidence pending final review/KAH final gate",
+		"KASREL-003 is `Completed` by commit `75d0361`",
+		"KASREL-004 is `In Progress` and must not be marked `Completed`",
 	})
 }
 

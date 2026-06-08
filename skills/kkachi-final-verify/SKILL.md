@@ -43,6 +43,10 @@ Final verification must reject any run where the only bridge proof is `send` suc
 
 Final verification must also reject graph-managed workflow claims when the run lacks effective-binary evidence for `kkachi-agent-helper graph`, lacks `graph validate/explain` evidence for the graph file used, uses `kah graph` as if it were implemented, or describes manual `.kkachi-workflow.yaml` edits as graph repair. Missing graph capability is acceptable only when `graph-evidence.md` and the final report record a gap and state that the run used run-local phase evidence only.
 
+## KASREL provenance/dependency evidence gate
+
+Apply the shared KASREL-004 evidence gate in `docs/sot/kasrel-hermes-v016-provenance-contract.md` before this skill claims install health, readiness, release compatibility, orchestration safety, review PASS, verification PASS, or final completion for KAS skills. The local claim must directly cite current non-secret KASREL evidence fields as applicable: `provenance_contract_version`, `source_class_evidence`, `dependency_audit`, `skill_dependencies`, `command_surface_dependencies`, `deleted_bundle_reference`, and `deleted_bundle_diagnostics`. Missing, ambiguous, or stale provenance/dependency evidence fails closed; deleted-bundle references remain cleanup/blocking diagnostics, not fallback lookup or substitution authority.
+
 When graph state affected the run, final verification must check `graph-evidence.md` and the final report `kah_graph_evidence` section for the canonical GRAPHMVP-004 fields: `template_id`, `template_path`, `template_version`, `proposal_id`, `proposal_path`, `semantic_diff_output_path`, `validation_report_path`, `explain_report_path`, `approval_evidence_ref`, `audit_evidence_path`, `graph_checksum`, `graph_version`, `kah_graph_audit_event_ids`, and `capability_check_evidence`.
 
 Final verification must also confirm selected backend caveats were handled:

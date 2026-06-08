@@ -21,6 +21,10 @@ For KAB-backed work, do not treat `send` success as completion. Completion evide
 
 If stream evidence is used, record that retained events are bridge-owned public events and may not be durable across daemon restart.
 
+## KASREL provenance/dependency evidence gate
+
+Apply the shared KASREL-004 evidence gate in `docs/sot/kasrel-hermes-v016-provenance-contract.md` before this skill claims install health, readiness, release compatibility, orchestration safety, review PASS, verification PASS, or final completion for KAS skills. The local claim must directly cite current non-secret KASREL evidence fields as applicable: `provenance_contract_version`, `source_class_evidence`, `dependency_audit`, `skill_dependencies`, `command_surface_dependencies`, `deleted_bundle_reference`, and `deleted_bundle_diagnostics`. Missing, ambiguous, or stale provenance/dependency evidence fails closed; deleted-bundle references remain cleanup/blocking diagnostics, not fallback lookup or substitution authority.
+
 Backend-specific verification requirements:
 
 - Codex stream evidence must use Kkachi-stable wrapper-derived public event kinds, not raw Codex app-server messages.
