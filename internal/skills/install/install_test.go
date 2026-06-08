@@ -87,8 +87,17 @@ func TestCreatePlanIsNoWriteAndHashIncludesSOTFields(t *testing.T) {
 	if len(result.BackupPlan) != 0 || !result.ApprovalRequest.Required || result.ApprovalRequest.DryRunPlanHash != result.DryRunPlanHash {
 		t.Fatalf("unexpected approval/backup: %+v %+v", result.BackupPlan, result.ApprovalRequest)
 	}
+	if !result.ApprovalRequest.HashIncludesProvenance {
+		t.Fatalf("approval request must declare provenance hash binding: %+v", result.ApprovalRequest)
+	}
+	if result.ProvenanceContractVersion == "" || result.SourceInventorySnapshot.Summary.CountsBySourceClass == nil || result.TargetProfileInventory.Summary.CountsBySourceClass == nil {
+		t.Fatalf("missing provenance inventory fields: %+v %+v", result.SourceInventorySnapshot, result.TargetProfileInventory)
+	}
 	if result.CanonicalPlan["command_mode"] != "install:dry_run" || result.CanonicalPlan["cli_version"] != "0.1.0" {
 		t.Fatalf("unexpected canonical plan: %+v", result.CanonicalPlan)
+	}
+	if result.CanonicalPlan["source_inventory_snapshot"] == nil || result.CanonicalPlan["target_profile_inventory"] == nil {
+		t.Fatalf("canonical plan missing provenance hash inputs: %+v", result.CanonicalPlan)
 	}
 	if _, ok := result.CanonicalPlan["source_repo"].(map[string]any)["git_commit"]; !ok {
 		t.Fatalf("canonical plan missing git_commit: %+v", result.CanonicalPlan)
@@ -103,6 +112,14 @@ func TestCreatePlanIsNoWriteAndHashIncludesSOTFields(t *testing.T) {
 	}
 	if repeated.DryRunPlanHash != result.DryRunPlanHash {
 		t.Fatalf("dry-run hash changed across identical dry-runs: %s != %s", repeated.DryRunPlanHash, result.DryRunPlanHash)
+	}
+	writeSkill(t, filepath.Join(profileRoot, "skills", "personal"), "profile personal skill")
+	withProfileSkill, err := BuildDryRun(repo, Options{Profile: "demo", PackIDs: []string{"alpha"}, ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withProfileSkill.DryRunPlanHash == result.DryRunPlanHash {
+		t.Fatal("dry-run hash did not change after provenance-relevant profile inventory changed")
 	}
 	if !contains(result.NextAction, "KAB is not required") || !contains(result.NextAction, "KAB-gated") {
 		t.Fatalf("missing KAB boundary: %s", result.NextAction)

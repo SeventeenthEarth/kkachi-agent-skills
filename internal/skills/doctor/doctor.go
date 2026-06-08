@@ -57,15 +57,24 @@ type Manifest struct {
 }
 
 type InstalledPack struct {
-	PackID           string                   `json:"pack_id"`
-	State            string                   `json:"state"`
-	TargetPath       string                   `json:"target_path"`
-	KABAdoptionStage install.KABAdoptionStage `json:"kab_adoption_stage"`
-	FilesChecked     int                      `json:"files_checked"`
-	Missing          []string                 `json:"missing,omitempty"`
-	Drifted          []string                 `json:"drifted,omitempty"`
-	Conflicts        []string                 `json:"conflicts,omitempty"`
-	ChecksumSummary  string                   `json:"checksum_summary"`
+	PackID                     string                          `json:"pack_id"`
+	State                      string                          `json:"state"`
+	TargetPath                 string                          `json:"target_path"`
+	KABAdoptionStage           install.KABAdoptionStage        `json:"kab_adoption_stage"`
+	FilesChecked               int                             `json:"files_checked"`
+	Missing                    []string                        `json:"missing,omitempty"`
+	Drifted                    []string                        `json:"drifted,omitempty"`
+	Conflicts                  []string                        `json:"conflicts,omitempty"`
+	ChecksumSummary            string                          `json:"checksum_summary"`
+	SourceClass                discovery.SourceClass           `json:"source_class"`
+	SourceClassEvidence        []discovery.SourceClassEvidence `json:"source_class_evidence"`
+	ProvenanceState            string                          `json:"provenance_state"`
+	ManagedByKAS               bool                            `json:"managed_by_kas"`
+	ChecksumState              string                          `json:"checksum_state,omitempty"`
+	Shadowing                  []discovery.ShadowingRecord     `json:"shadowing"`
+	DeletedBundleReference     any                             `json:"deleted_bundle_reference"`
+	SkillDependencies          []any                           `json:"skill_dependencies"`
+	CommandSurfaceDependencies []any                           `json:"command_surface_dependencies"`
 }
 
 type KAH struct {
@@ -85,17 +94,21 @@ type KAB struct {
 }
 
 type Result struct {
-	OK               bool                     `json:"ok"`
-	Command          string                   `json:"command"`
-	SourceRepo       SourceRepo               `json:"source_repo"`
-	TargetProfile    TargetProfile            `json:"target_profile"`
-	Manifest         Manifest                 `json:"manifest"`
-	KABAdoptionStage install.KABAdoptionStage `json:"kab_adoption_stage"`
-	InstalledPacks   []InstalledPack          `json:"installed_packs"`
-	KAH              KAH                      `json:"kah"`
-	KAB              KAB                      `json:"kab"`
-	Diagnostics      []discovery.Diagnostic   `json:"diagnostics"`
-	NextAction       string                   `json:"next_action"`
+	OK                        bool                              `json:"ok"`
+	Command                   string                            `json:"command"`
+	ProvenanceContractVersion string                            `json:"provenance_contract_version"`
+	SourceRepo                SourceRepo                        `json:"source_repo"`
+	TargetProfile             TargetProfile                     `json:"target_profile"`
+	Manifest                  Manifest                          `json:"manifest"`
+	KABAdoptionStage          install.KABAdoptionStage          `json:"kab_adoption_stage"`
+	SourceInventorySummary    discovery.SourceInventorySummary  `json:"source_inventory_summary"`
+	ProvenanceAudit           discovery.SourceInventorySnapshot `json:"provenance_audit"`
+	DependencyAudit           discovery.DependencyAudit         `json:"dependency_audit"`
+	InstalledPacks            []InstalledPack                   `json:"installed_packs"`
+	KAH                       KAH                               `json:"kah"`
+	KAB                       KAB                               `json:"kab"`
+	Diagnostics               []discovery.Diagnostic            `json:"diagnostics"`
+	NextAction                string                            `json:"next_action"`
 }
 
 func Build(repo string, opts Options) (Result, error) {
@@ -126,9 +139,10 @@ func Build(repo string, opts Options) (Result, error) {
 	profileRoot := resolveProfileRoot(opts.Profile, opts.ProfileRoot)
 	manifestPath := filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")
 	result := Result{
-		OK:         true,
-		Command:    "doctor",
-		SourceRepo: source,
+		OK:                        true,
+		Command:                   "doctor",
+		ProvenanceContractVersion: discovery.ProvenanceContractVersion,
+		SourceRepo:                source,
 		TargetProfile: TargetProfile{
 			Name:         opts.Profile,
 			Root:         profileRoot,
@@ -137,6 +151,7 @@ func Build(repo string, opts Options) (Result, error) {
 		},
 		Manifest:         Manifest{Path: manifestPath, State: "ok"},
 		KABAdoptionStage: install.KABAdoptionStage{Applicable: false, State: "not_applicable"},
+		DependencyAudit:  discovery.EmptyDependencyAudit(),
 		KAB: KAB{
 			RequiredForMinimumCLI:       false,
 			RequiredForExecutionRuntime: true,
@@ -161,11 +176,17 @@ func Build(repo string, opts Options) (Result, error) {
 	}
 
 	manifest, manifestBytes, manifestOK := readManifest(&result, manifestPath)
+	manifestEntries := map[string]map[string]any{}
 	if manifestOK {
+		manifestEntries = manifestInstallsForProvenance(manifest)
 		installed := validateInstalls(&result, manifest, profileRoot, packsByID)
 		result.InstalledPacks = installed
 		warnUnknownProfileSkillDirs(&result, profileRoot, installed)
 	}
+	discoveryProfile := &discovery.TargetProfile{Name: opts.Profile, Root: profileRoot, ManifestPath: manifestPath, ManifestState: manifestStateForInventory(result.Manifest.State)}
+	inventory := discovery.BuildSourceInventory(sourcePacks, discoveryProfile, manifestEntries)
+	result.SourceInventorySummary = inventory.Summary
+	result.ProvenanceAudit = inventory
 
 	result.KAH = probeKAH(opts.Runner, opts.Project)
 	result.Diagnostics = append(result.Diagnostics, kahDiagnostics(result.KAH, opts.Project)...)
@@ -256,7 +277,6 @@ func readManifest(result *Result, path string) (map[string]any, []byte, bool) {
 func validateInstalls(result *Result, manifest map[string]any, profileRoot string, sourcePacks map[string]discovery.SourcePack) []InstalledPack {
 	rawInstalls, _ := manifest["installs"].([]any)
 	installed := make([]InstalledPack, 0, len(rawInstalls))
-	seen := map[string]bool{}
 	for _, raw := range rawInstalls {
 		entry, ok := raw.(map[string]any)
 		if !ok {
@@ -276,9 +296,6 @@ func validateInstalls(result *Result, manifest map[string]any, profileRoot strin
 			pack.State = "unknown_pack"
 			pack.Conflicts = append(pack.Conflicts, packID)
 			addDiag(result, "error", "unknown_manifest_pack", "KAS manifest references an unknown source pack: "+packID)
-		}
-		if packID != "" {
-			seen[packID] = true
 		}
 		expectedTarget := filepath.ToSlash(filepath.Join("skills", filepath.FromSlash(packID)))
 		if discovery.IsInvalidRelativePath(targetPath) || !strings.HasPrefix(targetPath, "skills/") {
@@ -301,6 +318,7 @@ func validateInstalls(result *Result, manifest map[string]any, profileRoot strin
 			pack.State = worstState(pack.State, "manifest_error")
 			addDiag(result, "error", "manifest_files_invalid", "KAS manifest files must be an array for pack: "+packID)
 			pack.KABAdoptionStage = inspectKABAdoptionMarker(result, profileRoot, packID, targetPath)
+			applyInstalledPackProvenance(&pack, entry, profileRoot)
 			installed = append(installed, pack)
 			continue
 		}
@@ -351,12 +369,57 @@ func validateInstalls(result *Result, manifest map[string]any, profileRoot strin
 			}
 		}
 		pack.KABAdoptionStage = inspectKABAdoptionMarker(result, profileRoot, packID, targetPath)
+		applyInstalledPackProvenance(&pack, entry, profileRoot)
 		installed = append(installed, pack)
 	}
 	sort.Slice(installed, func(i, j int) bool { return installed[i].PackID < installed[j].PackID })
 	result.KABAdoptionStage = aggregateKABAdoptionStage(installed)
-	_ = seen
 	return installed
+}
+
+func applyInstalledPackProvenance(pack *InstalledPack, manifestEntry map[string]any, profileRoot string) {
+	record := discovery.ProfileManifestProvenance(pack.TargetPath, manifestEntry, discovery.ManifestPackChecksumState(manifestEntry, profileRoot))
+	if pack.State == "manifest_error" || pack.State == "unknown_pack" {
+		record.SourceClass = discovery.SourceUnknownUnclassified
+		record.ProvenanceState = discovery.ProvenanceStateAmbiguous
+		record.ManagedByKAS = false
+	}
+	pack.SourceClass = record.SourceClass
+	pack.SourceClassEvidence = record.SourceClassEvidence
+	pack.ProvenanceState = record.ProvenanceState
+	pack.ManagedByKAS = record.ManagedByKAS
+	pack.ChecksumState = record.ChecksumState
+	pack.Shadowing = record.Shadowing
+	pack.DeletedBundleReference = record.DeletedBundleReference
+	pack.SkillDependencies = record.SkillDependencies
+	pack.CommandSurfaceDependencies = record.CommandSurfaceDependencies
+}
+
+func manifestInstallsForProvenance(manifest map[string]any) map[string]map[string]any {
+	installs := map[string]map[string]any{}
+	rawInstalls, _ := manifest["installs"].([]any)
+	for _, raw := range rawInstalls {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		packID, _ := entry["pack_id"].(string)
+		if packID != "" {
+			installs[packID] = entry
+		}
+	}
+	return installs
+}
+
+func manifestStateForInventory(state string) string {
+	switch state {
+	case "ok":
+		return "manifest_present"
+	case "missing":
+		return "manifest_missing"
+	default:
+		return "manifest_unreadable"
+	}
 }
 
 func inspectKABAdoptionMarker(result *Result, profileRoot string, packID string, targetPath string) install.KABAdoptionStage {

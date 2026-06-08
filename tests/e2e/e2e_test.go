@@ -55,6 +55,9 @@ func TestRealRepoListAndInstallDryRunDoNotWriteProfile(t *testing.T) {
 	if listPayload["ok"] != true || len(listPayload["packs"].([]any)) == 0 {
 		t.Fatalf("unexpected list payload: %+v", listPayload)
 	}
+	if listPayload["provenance_contract_version"] != discovery.ProvenanceContractVersion || listPayload["source_inventory_summary"] == nil {
+		t.Fatalf("list payload missing provenance fields: %+v", listPayload)
+	}
 
 	install := exec.Command(binary, "install", "--repo", root, "--profile", "e2e", "kkachi-plan", "--dry-run", "--profile-root", profileRoot, "--json")
 	install.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
@@ -73,6 +76,9 @@ func TestRealRepoListAndInstallDryRunDoNotWriteProfile(t *testing.T) {
 	counts := summary["counts_by_action"].(map[string]any)
 	if installPayload["ok"] != true || installPayload["mode"] != "dry_run" || counts["create"].(float64) != summary["total_files"].(float64) {
 		t.Fatalf("unexpected install payload: %+v", installPayload)
+	}
+	if installPayload["provenance_contract_version"] != discovery.ProvenanceContractVersion || installPayload["source_inventory_snapshot"] == nil || installPayload["approval_request"].(map[string]any)["hash_includes_provenance"] != true {
+		t.Fatalf("install payload missing hash-bound provenance fields: %+v", installPayload)
 	}
 }
 
@@ -154,6 +160,9 @@ func TestRealRepoDoctorReportsApprovedTempProfileReadOnly(t *testing.T) {
 	}
 	if payload["ok"] != true || payload["command"] != "doctor" || payload["manifest"].(map[string]any)["state"] != "ok" {
 		t.Fatalf("unexpected doctor payload: %+v", payload)
+	}
+	if payload["provenance_contract_version"] != discovery.ProvenanceContractVersion || payload["provenance_audit"] == nil {
+		t.Fatalf("doctor payload missing provenance audit: %+v", payload)
 	}
 	kab := payload["kab"].(map[string]any)
 	if kab["required_for_minimum_cli"] != false || kab["required_for_execution_runtime"] != true {

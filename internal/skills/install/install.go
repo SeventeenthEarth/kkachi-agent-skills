@@ -92,10 +92,11 @@ type Summary struct {
 }
 
 type ApprovalRequest struct {
-	Required       bool   `json:"required"`
-	Summary        string `json:"summary"`
-	EvidenceRef    string `json:"evidence_ref"`
-	DryRunPlanHash string `json:"dry_run_plan_hash"`
+	Required               bool   `json:"required"`
+	Summary                string `json:"summary"`
+	EvidenceRef            string `json:"evidence_ref"`
+	DryRunPlanHash         string `json:"dry_run_plan_hash"`
+	HashIncludesProvenance bool   `json:"hash_includes_provenance"`
 }
 
 type ApprovalEvidence struct {
@@ -113,28 +114,36 @@ type Recovery struct {
 }
 
 type Result struct {
-	OK               bool                    `json:"ok"`
-	Command          string                  `json:"command"`
-	Mode             string                  `json:"mode"`
-	CLIVersion       string                  `json:"cli_version"`
-	SourceRepo       discovery.SourceRepo    `json:"source_repo"`
-	TargetProfile    discovery.TargetProfile `json:"target_profile"`
-	Requested        Requested               `json:"requested"`
-	KABAdoptionStage KABAdoptionStage        `json:"kab_adoption_stage"`
-	Summary          Summary                 `json:"summary"`
-	DryRunPlanHash   string                  `json:"dry_run_plan_hash"`
-	CanonicalPlan    map[string]any          `json:"canonical_plan"`
-	Packs            []map[string]any        `json:"packs"`
-	ChangedPaths     []ChangedPath           `json:"changed_paths"`
-	BackupPlan       []BackupEntry           `json:"backup_plan"`
-	ApprovalRequest  ApprovalRequest         `json:"approval_request"`
-	Approval         ApprovalEvidence        `json:"approval,omitempty"`
-	InstallID        string                  `json:"install_id,omitempty"`
-	ManifestPath     string                  `json:"manifest_path,omitempty"`
-	BackupPath       string                  `json:"backup_path,omitempty"`
-	Recovery         *Recovery               `json:"recovery,omitempty"`
-	Diagnostics      []discovery.Diagnostic  `json:"diagnostics"`
-	NextAction       string                  `json:"next_action"`
+	OK                        bool                              `json:"ok"`
+	Command                   string                            `json:"command"`
+	Mode                      string                            `json:"mode"`
+	CLIVersion                string                            `json:"cli_version"`
+	ProvenanceContractVersion string                            `json:"provenance_contract_version"`
+	SourceRepo                discovery.SourceRepo              `json:"source_repo"`
+	TargetProfile             discovery.TargetProfile           `json:"target_profile"`
+	Requested                 Requested                         `json:"requested"`
+	KABAdoptionStage          KABAdoptionStage                  `json:"kab_adoption_stage"`
+	Summary                   Summary                           `json:"summary"`
+	SourceInventorySummary    discovery.SourceInventorySummary  `json:"source_inventory_summary"`
+	SourceInventorySnapshot   discovery.SourceInventorySnapshot `json:"source_inventory_snapshot"`
+	TargetProfileInventory    discovery.SourceInventorySnapshot `json:"target_profile_inventory"`
+	ProvenanceConflicts       []discovery.ProvenanceRecord      `json:"provenance_conflicts"`
+	ShadowingConflicts        []discovery.ShadowingRecord       `json:"shadowing_conflicts"`
+	DependencyAudit           discovery.DependencyAudit         `json:"dependency_audit"`
+	DeletedBundleDiagnostics  []discovery.Diagnostic            `json:"deleted_bundle_diagnostics"`
+	DryRunPlanHash            string                            `json:"dry_run_plan_hash"`
+	CanonicalPlan             map[string]any                    `json:"canonical_plan"`
+	Packs                     []map[string]any                  `json:"packs"`
+	ChangedPaths              []ChangedPath                     `json:"changed_paths"`
+	BackupPlan                []BackupEntry                     `json:"backup_plan"`
+	ApprovalRequest           ApprovalRequest                   `json:"approval_request"`
+	Approval                  ApprovalEvidence                  `json:"approval,omitempty"`
+	InstallID                 string                            `json:"install_id,omitempty"`
+	ManifestPath              string                            `json:"manifest_path,omitempty"`
+	BackupPath                string                            `json:"backup_path,omitempty"`
+	Recovery                  *Recovery                         `json:"recovery,omitempty"`
+	Diagnostics               []discovery.Diagnostic            `json:"diagnostics"`
+	NextAction                string                            `json:"next_action"`
 }
 
 type sourceFile struct {
@@ -330,13 +339,15 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 	packPayloads := []map[string]any{}
 	backupPlan := []BackupEntry{}
 	requestedPackIDs := append([]string{}, opts.PackIDs...)
+	var inventory discovery.SourceInventorySnapshot
 
 	if opts.ProfileRoot == "" {
 		if _, err := os.Stat(root); errors.Is(err, os.ErrNotExist) {
 			message := "unknown Hermes profile: " + opts.Profile
+			inventory = discovery.BuildSourceInventory(sourcePacks, &target, nil)
 			diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: "unknown_profile", Message: message}}, diagnostics...)
 			changedPaths = append(changedPaths, changedPath("error", ".", "", nil, "", nil, "unknown_profile", message))
-			return buildResult(false, sourceInfo, target, requestedPackIDs, kabStage, packPayloads, changedPaths, backupPlan, diagnostics), nil
+			return buildResult(false, sourceInfo, target, requestedPackIDs, kabStage, inventory, packPayloads, changedPaths, backupPlan, diagnostics), nil
 		}
 	}
 
@@ -354,10 +365,12 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 		if manifestErr.SHA256 != "" {
 			target.PreviousManifestSHA256 = &manifestErr.SHA256
 		}
+		inventory = discovery.BuildSourceInventory(sourcePacks, &target, manifestEntries)
 		diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: manifestErr.Code, Message: manifestErr.Message}}, diagnostics...)
 		changedPaths = append(changedPaths, changedPath("error", ".kas/skill-pack-manifest.json", "", nil, "", nil, manifestErr.Code, manifestErr.Message))
-		return buildResult(false, sourceInfo, target, requestedPackIDs, kabStage, packPayloads, changedPaths, backupPlan, diagnostics), nil
+		return buildResult(false, sourceInfo, target, requestedPackIDs, kabStage, inventory, packPayloads, changedPaths, backupPlan, diagnostics), nil
 	}
+	inventory = discovery.BuildSourceInventory(sourcePacks, &target, manifestEntries)
 
 	for _, packID := range requestedPackIDs {
 		pack, ok := allPacks[packID]
@@ -368,6 +381,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 			continue
 		}
 		payload, paths, backups := planPack(sourceRepo, root, pack, manifestEntries[packID], kabStage, markerContent)
+		discovery.ApplyProvenance(payload, discovery.PackProvenance(pack, inventory))
 		packPayloads = append(packPayloads, payload)
 		changedPaths = append(changedPaths, paths...)
 		backupPlan = append(backupPlan, backups...)
@@ -393,7 +407,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 			break
 		}
 	}
-	return buildResult(ok, sourceInfo, target, requestedPackIDs, kabStage, packPayloads, changedPaths, backupPlan, diagnostics), nil
+	return buildResult(ok, sourceInfo, target, requestedPackIDs, kabStage, inventory, packPayloads, changedPaths, backupPlan, diagnostics), nil
 }
 
 func RenderHumanDryRun(result Result) string {
@@ -697,7 +711,7 @@ func planPack(sourceRepo string, profileRoot string, pack discovery.SourcePack, 
 	return payload, changedPaths, backupPlan
 }
 
-func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discovery.TargetProfile, requestedPackIDs []string, kabStage KABAdoptionStage, packs []map[string]any, changedPaths []ChangedPath, backupPlan []BackupEntry, diagnostics []discovery.Diagnostic) Result {
+func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discovery.TargetProfile, requestedPackIDs []string, kabStage KABAdoptionStage, inventory discovery.SourceInventorySnapshot, packs []map[string]any, changedPaths []ChangedPath, backupPlan []BackupEntry, diagnostics []discovery.Diagnostic) Result {
 	sort.Slice(changedPaths, func(i, j int) bool {
 		if changedPaths[i].Action == changedPaths[j].Action {
 			return changedPaths[i].Path < changedPaths[j].Path
@@ -745,16 +759,18 @@ func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discove
 			"git_commit": sourceRepo.GitCommit,
 			"dirty":      sourceRepo.Dirty,
 		},
-		"source_pack_checksums":    sourceChecksums,
-		"target_profile":           map[string]any{"name": targetProfile.Name, "root": targetProfile.Root, "manifest_path": targetProfile.ManifestPath},
-		"kab_adoption_stage":       hashBoundKABStage,
-		"normalized_packs":         normalizedPacks,
-		"changed_paths":            canonicalChanged,
-		"conflicts":                conflicts,
-		"errors":                   errors,
-		"backup_plan":              backupPlan,
-		"manifest_path":            targetProfile.ManifestPath,
-		"previous_manifest_sha256": targetProfile.PreviousManifestSHA256,
+		"source_pack_checksums":     sourceChecksums,
+		"target_profile":            map[string]any{"name": targetProfile.Name, "root": targetProfile.Root, "manifest_path": targetProfile.ManifestPath},
+		"kab_adoption_stage":        hashBoundKABStage,
+		"normalized_packs":          normalizedPacks,
+		"changed_paths":             canonicalChanged,
+		"conflicts":                 conflicts,
+		"errors":                    errors,
+		"backup_plan":               backupPlan,
+		"manifest_path":             targetProfile.ManifestPath,
+		"previous_manifest_sha256":  targetProfile.PreviousManifestSHA256,
+		"source_inventory_snapshot": inventory,
+		"target_profile_inventory":  inventory,
 	}
 	planHash := "sha256:" + canonicalHash(canonicalPlan)
 	totalFiles := 0
@@ -764,25 +780,34 @@ func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discove
 		}
 	}
 	return Result{
-		OK:               ok,
-		Command:          "install",
-		Mode:             "dry_run",
-		CLIVersion:       CLIVersion,
-		SourceRepo:       sourceRepo,
-		TargetProfile:    targetProfile,
-		Requested:        Requested{PackIDs: requestedPackIDs, CategoryExpansions: map[string][]any{}},
-		KABAdoptionStage: kabStage,
-		Summary:          Summary{TotalPacks: len(packs), TotalFiles: totalFiles, CountsByAction: counts, ConflictCount: counts["conflict"]},
-		DryRunPlanHash:   planHash,
-		CanonicalPlan:    canonicalPlan,
-		Packs:            packs,
-		ChangedPaths:     changedPaths,
-		BackupPlan:       backupPlan,
+		OK:                        ok,
+		Command:                   "install",
+		Mode:                      "dry_run",
+		CLIVersion:                CLIVersion,
+		ProvenanceContractVersion: discovery.ProvenanceContractVersion,
+		SourceRepo:                sourceRepo,
+		TargetProfile:             targetProfile,
+		Requested:                 Requested{PackIDs: requestedPackIDs, CategoryExpansions: map[string][]any{}},
+		KABAdoptionStage:          kabStage,
+		Summary:                   Summary{TotalPacks: len(packs), TotalFiles: totalFiles, CountsByAction: counts, ConflictCount: counts["conflict"]},
+		SourceInventorySummary:    inventory.Summary,
+		SourceInventorySnapshot:   inventory,
+		TargetProfileInventory:    inventory,
+		ProvenanceConflicts:       discovery.ProvenanceConflictRecords(inventory),
+		ShadowingConflicts:        discovery.ShadowingConflicts(inventory),
+		DependencyAudit:           discovery.EmptyDependencyAudit(),
+		DeletedBundleDiagnostics:  []discovery.Diagnostic{},
+		DryRunPlanHash:            planHash,
+		CanonicalPlan:             canonicalPlan,
+		Packs:                     packs,
+		ChangedPaths:              changedPaths,
+		BackupPlan:                backupPlan,
 		ApprovalRequest: ApprovalRequest{
-			Required:       ok,
-			Summary:        fmt.Sprintf("Approve copying %d pack / %d file changes into profile %s.", len(packs), counts["create"]+counts["update"], targetProfile.Name),
-			EvidenceRef:    "dry-run:" + planHash,
-			DryRunPlanHash: planHash,
+			Required:               ok,
+			Summary:                fmt.Sprintf("Approve copying %d pack / %d file changes into profile %s.", len(packs), counts["create"]+counts["update"], targetProfile.Name),
+			EvidenceRef:            "dry-run:" + planHash,
+			DryRunPlanHash:         planHash,
+			HashIncludesProvenance: true,
 		},
 		Diagnostics: diagnostics,
 		NextAction:  fmt.Sprintf("Review changed_paths and approve the current dry_run_plan_hash (%s) with --approve dry-run:%s using the same explicit/defaulted KAB adoption stage selection; KAB is not required for minimum dry-run and execution-runtime remains KAB-gated.", planHash, planHash),

@@ -83,6 +83,12 @@ func TestBuildHealthyInstalledProfileWithFakeKAH(t *testing.T) {
 	if len(result.InstalledPacks) != 1 || result.InstalledPacks[0].State != "ok" || result.InstalledPacks[0].FilesChecked == 0 {
 		t.Fatalf("unexpected installed packs: %+v", result.InstalledPacks)
 	}
+	if result.ProvenanceContractVersion == "" || result.ProvenanceAudit.Summary.CountsBySourceClass == nil {
+		t.Fatalf("missing provenance audit: %+v", result.ProvenanceAudit)
+	}
+	if result.InstalledPacks[0].SourceClass != "kas_managed_profile" || result.InstalledPacks[0].ProvenanceState != "classified" || len(result.InstalledPacks[0].SkillDependencies) != 0 || len(result.InstalledPacks[0].CommandSurfaceDependencies) != 0 {
+		t.Fatalf("unexpected installed pack provenance: %+v", result.InstalledPacks[0])
+	}
 	if !result.KAH.Available || result.KAH.InstallCommand == nil || *result.KAH.InstallCommand {
 		t.Fatalf("unexpected KAH payload: %+v", result.KAH)
 	}

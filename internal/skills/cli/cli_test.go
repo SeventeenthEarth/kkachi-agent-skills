@@ -297,6 +297,9 @@ func TestDoctorJSONHumanAndProfileRootGuard(t *testing.T) {
 	if payload["command"] != "doctor" || payload["ok"] != true || payload["manifest"].(map[string]any)["state"] != "ok" {
 		t.Fatalf("unexpected doctor payload: %+v", payload)
 	}
+	if payload["provenance_contract_version"] != discovery.ProvenanceContractVersion || payload["provenance_audit"] == nil {
+		t.Fatalf("missing doctor provenance payload: %+v", payload)
+	}
 	kab := payload["kab"].(map[string]any)
 	if kab["required_for_minimum_cli"] != false || kab["required_for_execution_runtime"] != true {
 		t.Fatalf("unexpected KAB payload: %+v", payload)
@@ -343,9 +346,15 @@ func TestListJSONShapeAndProfileRootGuard(t *testing.T) {
 	if payload["ok"] != true || payload["command"] != "list" {
 		t.Fatalf("unexpected payload: %+v", payload)
 	}
+	if payload["provenance_contract_version"] != discovery.ProvenanceContractVersion || payload["source_inventory_summary"] == nil {
+		t.Fatalf("missing list provenance payload: %+v", payload)
+	}
 	packs := payload["packs"].([]any)
 	if packs[0].(map[string]any)["pack_id"] != "alpha" {
 		t.Fatalf("unexpected packs: %+v", packs)
+	}
+	if packs[0].(map[string]any)["source_class"] != "unknown_or_unclassified" || packs[0].(map[string]any)["provenance_state"] != "not_applicable" {
+		t.Fatalf("source-only list row missing provenance defaults: %+v", packs[0])
 	}
 
 	stdout.Reset()
@@ -387,6 +396,12 @@ func TestInstallDryRunJSONAndFailClosedGuards(t *testing.T) {
 	}
 	if payload["dry_run_plan_hash"] == "" || !strings.Contains(payload["next_action"].(string), "KAB is not required") {
 		t.Fatalf("unexpected dry-run payload: %+v", payload)
+	}
+	if payload["provenance_contract_version"] != discovery.ProvenanceContractVersion || payload["source_inventory_snapshot"] == nil || payload["target_profile_inventory"] == nil {
+		t.Fatalf("missing dry-run provenance payload: %+v", payload)
+	}
+	if payload["approval_request"].(map[string]any)["hash_includes_provenance"] != true {
+		t.Fatalf("approval request does not hash-bind provenance: %+v", payload["approval_request"])
 	}
 
 	stdout.Reset()

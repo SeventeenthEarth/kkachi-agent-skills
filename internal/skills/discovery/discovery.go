@@ -51,13 +51,16 @@ type ListOptions struct {
 }
 
 type ListResult struct {
-	OK            bool             `json:"ok"`
-	Command       string           `json:"command"`
-	SourceRepo    SourceRepo       `json:"source_repo"`
-	TargetProfile *TargetProfile   `json:"target_profile,omitempty"`
-	Packs         []map[string]any `json:"packs"`
-	Diagnostics   []Diagnostic     `json:"diagnostics"`
-	NextAction    string           `json:"next_action"`
+	OK                        bool                    `json:"ok"`
+	Command                   string                  `json:"command"`
+	ProvenanceContractVersion string                  `json:"provenance_contract_version"`
+	SourceRepo                SourceRepo              `json:"source_repo"`
+	TargetProfile             *TargetProfile          `json:"target_profile,omitempty"`
+	SourceInventorySummary    SourceInventorySummary  `json:"source_inventory_summary"`
+	SourceInventorySnapshot   SourceInventorySnapshot `json:"source_inventory_snapshot"`
+	Packs                     []map[string]any        `json:"packs"`
+	Diagnostics               []Diagnostic            `json:"diagnostics"`
+	NextAction                string                  `json:"next_action"`
 }
 
 type manifestInstall struct {
@@ -187,18 +190,22 @@ func BuildListResult(repo string, opts ListOptions) (ListResult, error) {
 	}
 
 	targetProfile, installs := loadProfile(opts.Profile, opts.ProfileRoot)
+	inventory := BuildSourceInventory(packs, targetProfile, installs)
 	payloads := make([]map[string]any, 0, len(packs))
 	for _, pack := range packs {
-		payloads = append(payloads, packPayload(pack, installs, targetProfile))
+		payloads = append(payloads, packPayload(pack, installs, targetProfile, inventory))
 	}
 	return ListResult{
-		OK:            true,
-		Command:       "list",
-		SourceRepo:    SourceRepoInfo(sourceRepo),
-		TargetProfile: targetProfile,
-		Packs:         payloads,
-		Diagnostics:   diagnostics,
-		NextAction:    NextListAction,
+		OK:                        true,
+		Command:                   "list",
+		ProvenanceContractVersion: ProvenanceContractVersion,
+		SourceRepo:                SourceRepoInfo(sourceRepo),
+		TargetProfile:             targetProfile,
+		SourceInventorySummary:    inventory.Summary,
+		SourceInventorySnapshot:   inventory,
+		Packs:                     payloads,
+		Diagnostics:               diagnostics,
+		NextAction:                NextListAction,
 	}, nil
 }
 
@@ -356,8 +363,9 @@ func ComputePackChecksum(packDir string) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-func packPayload(pack SourcePack, installs map[string]map[string]any, profile *TargetProfile) map[string]any {
+func packPayload(pack SourcePack, installs map[string]map[string]any, profile *TargetProfile, inventory SourceInventorySnapshot) map[string]any {
 	payload := PackPayload(pack)
+	ApplyProvenance(payload, PackProvenance(pack, inventory))
 	if profile == nil {
 		return payload
 	}
