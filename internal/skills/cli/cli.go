@@ -13,6 +13,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/doctor"
 	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/install"
 	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/kasstate"
+	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/projectinstall"
 )
 
 var installPromptInput io.Reader = os.Stdin
@@ -33,7 +34,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, doctor, or sync-project-kas command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, doctor, sync-project-kas, or install-project-kas command", "", false, "")
 	}
 	if isHelpArg(argv[0]) {
 		printRootHelp(stdout)
@@ -48,8 +49,10 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runDoctor(argv[1:], stdout, stderr, env)
 	case "sync-project-kas":
 		return runSyncProjectKAS(argv[1:], stdout, stderr, env)
+	case "install-project-kas":
+		return runInstallProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, doctor, and sync-project-kas commands are implemented", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, doctor, sync-project-kas, and install-project-kas commands are implemented", argv[0], false, "")
 	}
 }
 
@@ -235,6 +238,65 @@ func runSyncProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env ma
 	return code
 }
 
+func runInstallProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("install-project-kas", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	repo := fs.String("repo", "", "source KAS repo path")
+	profile := fs.String("profile", "", "Hermes target profile name")
+	project := fs.String("project", "", "project-specific KAS id")
+	sourcePack := fs.String("source-pack", "", "project source suite id")
+	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
+	dryRun := fs.Bool("dry-run", false, "render project-specific install plan without writing")
+	fs.String("approve", "", "unsupported until KASPROJ-003")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if hasProjectInstallApproveFlag(argv) {
+		return emitError(stderr, "project_install_approve_unsupported", "install-project-kas --approve belongs to KASPROJ-003 and is not supported by this dry-run planner.", "install-project-kas", wantsJSON(argv), "Rerun with --dry-run and review the plan hash; approved install remains KASPROJ-003.")
+	}
+	if writeFlag := unsupportedProjectInstallWriteFlag(argv); writeFlag != "" {
+		return emitError(stderr, "project_install_write_form_unsupported", "install-project-kas is dry-run only for KASPROJ-002; unsupported write/approval flag: "+writeFlag, "install-project-kas", wantsJSON(argv), "Rerun with install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run.")
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
+		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "install-project-kas", *jsonOutput, "")
+	}
+	if !*dryRun {
+		return emitError(stderr, "project_install_requires_dry_run", "install-project-kas requires --dry-run for KASPROJ-002.", "install-project-kas", *jsonOutput, "Rerun with install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run.")
+	}
+	if *profile == "" {
+		return emitError(stderr, "profile_required", "install-project-kas requires --profile <profile>.", "install-project-kas", *jsonOutput, "")
+	}
+	if *project == "" {
+		return emitError(stderr, "project_required", "install-project-kas requires --project <project>.", "install-project-kas", *jsonOutput, "")
+	}
+	if *sourcePack == "" {
+		return emitError(stderr, "source_pack_required", "install-project-kas requires --source-pack <source_pack>.", "install-project-kas", *jsonOutput, "")
+	}
+	result, err := projectinstall.BuildDryRun(*repo, projectinstall.Options{Profile: *profile, Project: *project, SourcePack: *sourcePack, ProfileRoot: *profileRoot, DryRun: *dryRun})
+	if err != nil {
+		return emitError(stderr, "project_install_planner_failed", err.Error(), "install-project-kas", *jsonOutput, "")
+	}
+	out := stdout
+	code := 0
+	if !result.OK {
+		out = stderr
+		code = 2
+	}
+	if *jsonOutput {
+		_ = writeJSON(out, result)
+	} else {
+		fmt.Fprintln(out, projectinstall.RenderHumanDryRun(result))
+	}
+	return code
+}
+
 func normalizeInstallArgs(argv []string) []string {
 	rewritten := []string{}
 	positionals := []string{}
@@ -322,6 +384,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  install  Plan a profile-scoped KAS skill-pack install")
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS skill-pack install")
 	fmt.Fprintln(w, "  sync-project-kas  Validate project-specific KAS state without writing")
+	fmt.Fprintln(w, "  install-project-kas  Plan a project-specific KAS suite install without writing")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Use \"kkachi-hermes-skills <command> --help\" for command options.")
 }
@@ -360,4 +423,40 @@ func envValue(env map[string]string, key string) string {
 		return env[key]
 	}
 	return os.Getenv(key)
+}
+
+func unsupportedProjectInstallWriteFlag(argv []string) string {
+	for _, arg := range argv {
+		name := arg
+		if before, _, ok := strings.Cut(arg, "="); ok {
+			name = before
+		}
+		switch name {
+		case "--write", "--force", "--yes", "--repair", "--migrate", "--from-generic":
+			return name
+		}
+	}
+	return ""
+}
+
+func hasProjectInstallApproveFlag(argv []string) bool {
+	for _, arg := range argv {
+		name := arg
+		if before, _, ok := strings.Cut(arg, "="); ok {
+			name = before
+		}
+		if name == "--approve" {
+			return true
+		}
+	}
+	return false
+}
+
+func wantsJSON(argv []string) bool {
+	for _, arg := range argv {
+		if arg == "--json" || arg == "--json=true" {
+			return true
+		}
+	}
+	return false
 }

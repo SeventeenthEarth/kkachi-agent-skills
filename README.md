@@ -74,6 +74,7 @@ kkachi-hermes-skills list [--repo <path>] [--profile <profile>] [--category <nam
 kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --dry-run [--json]
 kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --approve dry-run:<hash> [--json]
 kkachi-hermes-skills doctor [--repo <path>] --profile <profile> [--project <path>] [--json]
+kkachi-hermes-skills install-project-kas [--repo <path>] --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run [--json]
 ```
 
 `list` discovers source KAS packs from `skills/`, reports direct-layout packs
@@ -88,6 +89,8 @@ a deterministic `dry_run_plan_hash`, and performs no profile writes. Approved
 copy install requires `--approve dry-run:<hash>`, recomputes the plan, fails
 closed on hash mismatch, copies selected packs into the target profile, records
 manifest/checksum evidence, and prints recovery guidance.
+
+`install-project-kas --dry-run` is the KASPROJ-002 read-only planner for project-specific KAS suites. It renders project-prefixed planned skill names and `skills/<project>/<project>-.../SKILL.md` target paths, emits no-write/checksum/plan-hash evidence, and does not create profile roots, manifests, KAH state, KAB runtime state, or approved installs. KASPROJ-003 remains required for any write-capable project install.
 
 `doctor` verifies source pack integrity, installed profile state,
 manifest/checksum consistency, KAH availability/version/capabilities, optional

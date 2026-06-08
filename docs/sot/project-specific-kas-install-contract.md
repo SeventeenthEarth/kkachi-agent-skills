@@ -3,9 +3,9 @@
 Date: 2026-06-09
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / PR1 docs-contract evidence
-Status: canonical SOT for `KASPROJ-001`; docs/spec-only contract is in review/commit-ready after local docs-contract verification; CLI dry-run, approved install, doctor/repair, and migration behavior remain later KASPROJ tasks
+Status: canonical SOT for `KASPROJ-001`; `KASPROJ-002` read-only dry-run planner is implemented/pre-commit-ready after accepted plan review, while approved install, doctor/repair, and migration behavior remain later KASPROJ tasks
 Authority level: source of truth for project-specific KAS install layout, naming, manifest vocabulary, and doctor severity semantics
-Scope: project-specific KAS skill suites installed under one Hermes profile; no CLI implementation, profile mutation, repair, migration, auth/token/gateway/provider/model config mutation, KAH state mutation, or KAB runtime activation is authorized by this document alone
+Scope: project-specific KAS skill suites installed under one Hermes profile; KASPROJ-002 authorizes only read-only dry-run planning evidence. No approved install, profile mutation, repair, migration, auth/token/gateway/provider/model config mutation, KAH state mutation, or KAB runtime activation is authorized by this document alone
 Related docs: `docs/sot/kas-cli-contract.md`, `docs/sot/project-kas-sync-state.md`, `docs/sot/minimum-pilot-cli-lane.md`, `docs/README.md`, `docs/roadmap.md`, `docs/kkachi-docs-map.yaml`
 
 ## 1. Decision
@@ -180,15 +180,41 @@ repair, or migration behavior.
 Diagnostic records must include `project`, `installed_skill` when applicable,
 `target_path` when applicable, `severity`, `condition`, and `next_action`.
 
-## 7. Later dry-run, approval, repair, and migration contract
+## 7. Dry-run, approval, repair, and migration contract
 
-KASPROJ-001 is docs/spec-only. Later PRs may implement the following behavior
-only after their own acceptance criteria and verification gates are approved.
+KASPROJ-002 implements the read-only dry-run planner surface:
 
-- `KASPROJ-002` dry-run planner: discovers source packs, renders the planned
-  project-specific suite, validates project-prefix names, reports all
-  `target_path` changes, computes plan/checksum evidence, and performs no
-  profile writes.
+```bash
+kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run [--json]
+```
+
+The KASPROJ-002 planner discovers current source skills under repo `skills/` through the virtual source suite `kas-default-project-suite`, renders project-prefixed installed names and target paths, reports all `target_path` changes, computes checksum and `plan_hash` evidence, and performs no profile writes. Source skill `kkachi-plan` renders to installed skill `<project>-plan` and target path `skills/<project>/<project>-plan/SKILL.md`; other source skills strip a leading `kkachi-` when present before applying the project prefix. This virtual suite must be formalized before KASPROJ-003 write-capable install.
+
+KASPROJ-002 tailoring is dry-run prefix-render only. JSON evidence must emit preservation posture and `semantic_port_required_before_approved_install`, but must not claim semantic language/runtime/test-command adaptation and must not add language/runtime/test-command write behavior. Public checksums and `plan_hash` use `sha256:<hex>` strings; the canonical plan hash binds no-write evidence plus conflicts and diagnostics.
+
+Generic installed skill names, missing project prefix, unsafe/escaping target paths, unknown source pack, and umbrella-only suite examples are fail-closed conflicts: JSON output is `ok:false` and the CLI exits 2, not `ok:true` with warnings. Example conflict shape:
+
+```json
+{
+  "ok": false,
+  "command": "install-project-kas",
+  "mode": "project_dry_run",
+  "dry_run": true,
+  "conflicts": [
+    {
+      "severity": "error",
+      "condition": "umbrella_only",
+      "project": "doksuri-server",
+      "installed_skill": "doksuri-server-kas",
+      "target_path": "skills/doksuri-server/doksuri-server-kas/SKILL.md",
+      "next_action": "Install the full project-specific suite after KASPROJ-003 approval evidence."
+    }
+  ],
+  "plan_hash": "sha256:<hex>"
+}
+```
+
+Later PRs may implement the remaining behavior only after their own acceptance criteria and verification gates are approved.
 - `KASPROJ-003` approved install: copies the full project-specific suite only
   after approval evidence matches the dry-run plan hash. It must reject
   umbrella-only, generic-name, ambiguous-profile, conflict, or checksum-mismatch
@@ -207,8 +233,9 @@ rather than installing a generic fallback.
 
 - `docs/sot/kas-cli-contract.md` owns the existing CLIMVP profile-scoped
   list/install/doctor contract. KASPROJ extends that contract for
-  project-specific suite identity and target layout; it does not retroactively
-  claim the current CLI implements project-suite install/repair/migration.
+  project-specific suite identity and target layout. The current CLI implements
+  only KASPROJ-002 project-suite dry-run planning; it does not implement
+  project-suite approved install/repair/migration.
 - `docs/sot/project-kas-sync-state.md` owns upstream sync state after a
   project-specific suite exists. This document owns initial install layout,
   naming, manifest vocabulary, and doctor severity for suite presence/identity.
@@ -232,5 +259,5 @@ rather than installing a generic fallback.
 4. `gofmt`, `go test ./tests/docs_contract`, and `git diff --check` pass.
 
 It must not be marked `Completed` until the responsible commit/review gate for
-this docs/spec PR is satisfied. Later CLI install, doctor, repair, and migration
-work must remain under KASPROJ-002 through KASPROJ-004 or later explicit tasks.
+this docs/spec PR is satisfied. Approved install, doctor, repair, and migration
+work must remain under KASPROJ-003 through KASPROJ-004 or later explicit tasks.

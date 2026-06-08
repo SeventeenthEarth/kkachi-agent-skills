@@ -82,6 +82,47 @@ func TestRealRepoListAndInstallDryRunDoNotWriteProfile(t *testing.T) {
 	}
 }
 
+func TestRealRepoInstallProjectKASDryRunWritesNothing(t *testing.T) {
+	root := repoRoot(t)
+	binary := buildBinary(t)
+	profileRoot := filepath.Join(t.TempDir(), "profiles", "e2e")
+
+	cmd := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--dry-run", "--profile-root", profileRoot, "--json")
+	cmd.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("install-project-kas dry-run failed: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(profileRoot); !os.IsNotExist(err) {
+		t.Fatalf("install-project-kas dry-run created profile root: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["command"] != "install-project-kas" || payload["mode"] != "project_dry_run" || payload["dry_run"] != true {
+		t.Fatalf("unexpected install-project-kas payload: %+v", payload)
+	}
+	noWrite := payload["no_write"].(map[string]any)
+	if noWrite["guaranteed"] != true || noWrite["profile_write_count"] != float64(0) || noWrite["manifest_write_count"] != float64(0) || noWrite["kah_state_write_count"] != float64(0) || noWrite["kab_runtime_mutation_count"] != float64(0) {
+		t.Fatalf("unexpected no-write evidence: %+v", noWrite)
+	}
+	planned := payload["planned_skills"].([]any)
+	if len(planned) == 0 {
+		t.Fatalf("expected planned project skills: %+v", payload)
+	}
+	foundPlan := false
+	for _, raw := range planned {
+		skill := raw.(map[string]any)
+		if skill["source_pack_id"] == "kkachi-plan" && skill["installed_skill"] == "doksuri-server-plan" && skill["target_path"] == "skills/doksuri-server/doksuri-server-plan/SKILL.md" {
+			foundPlan = true
+		}
+	}
+	if !foundPlan || !strings.HasPrefix(payload["plan_hash"].(string), "sha256:") {
+		t.Fatalf("missing project plan/hash evidence: %+v", payload)
+	}
+}
+
 func TestRealRepoApprovedCopyWritesTempProfileOnly(t *testing.T) {
 	root := repoRoot(t)
 	binary := buildBinary(t)

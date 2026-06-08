@@ -73,7 +73,7 @@ For project-specific suite installs, the target path must use:
 skills/<project>/<project>-<phase-or-skill>/SKILL.md
 ```
 
-This extends the profile-scoped manifest vocabulary only as a contract. The current implemented CLIMVP CLI must not be described as already installing, repairing, or migrating project-specific suites until KASPROJ-002 through KASPROJ-004 provide implementation evidence.
+This extends the profile-scoped manifest vocabulary. The current CLI implements KASPROJ-002 read-only project-suite dry-run planning, but must not be described as already performing approved install, repair, or migration for project-specific suites until KASPROJ-003 through KASPROJ-004 provide implementation evidence.
 
 ## 5. First-run operator path
 
@@ -705,26 +705,54 @@ Minimum JSON shape:
 ```
 
 
-### 6.7 Future project-specific install, doctor, repair, and migration extensions
+### 6.7 Project-specific dry-run install planner and later extensions
 
 `docs/sot/project-specific-kas-install-contract.md` is the detailed SOT for the
-KASPROJ project-specific install layout. This CLI contract reserves vocabulary
-and command intent for later PRs without claiming current implementation.
+KASPROJ project-specific install layout. KASPROJ-002 implements this dry-run-only
+planner command:
+
+```bash
+kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --dry-run [--json]
+```
+
+The implemented source pack for KASPROJ-002 is the virtual `kas-default-project-suite`, resolved read-only from current discovered source skills under repo `skills/`. The command also accepts `--repo` and harness-only `--profile-root` when `KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1`. Missing `--dry-run`, missing required flags, `--approve`, and write/approval forms fail closed with exit 2 and `ok:false` JSON when `--json` is requested.
+
+Dry-run JSON evidence includes `ok`, `command`, `mode`, `cli_version`, `dry_run`, `no_write`, `project`, `source_pack`, `project_tailoring`, `summary`, `planned_manifest`, `planned_skills`, `changed_paths`, `checksums`, `plan_hash`, `conflicts`, `diagnostics`, and `next_action`. The `plan_hash` binds canonical no-write evidence, conflicts, diagnostics, planned manifest, planned skills, changed paths, and checksums. The planner performs no profile writes and does not create profile roots, skill directories, manifest files, `.kas` directories, KAH state, KAB runtime state, auth paths, token files, gateway config, provider config, or model config.
+
+KASPROJ-002 conflict example:
+
+```json
+{
+  "ok": false,
+  "command": "install-project-kas",
+  "mode": "project_dry_run",
+  "dry_run": true,
+  "conflicts": [
+    {
+      "severity": "error",
+      "condition": "generic_installed_skill_name",
+      "project": "doksuri-server",
+      "installed_skill": "kkachi-plan",
+      "target_path": "skills/doksuri-server/kkachi-plan/SKILL.md"
+    }
+  ],
+  "plan_hash": "sha256:<hex>"
+}
+```
 
 Reserved later command intents may include equivalent names to these forms after
 KASPROJ implementation review:
 
 ```bash
-kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --dry-run [--json]
 kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --approve dry-run:<hash> [--json]
 kkachi-hermes-skills doctor --profile <profile> --project <project> --project-suite [--json]
 kkachi-hermes-skills repair-project-kas --profile <profile> --project <project> --dry-run [--json]
 kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run [--json]
 ```
 
-Contractual rules for those later commands:
+Contractual rules for those commands:
 
-- dry-run planner behavior belongs to KASPROJ-002 and must perform no profile writes;
+- dry-run planner behavior belongs to KASPROJ-002 and performs no profile writes;
 - approved project-specific install belongs to KASPROJ-003 and must require approval evidence matching the dry-run plan hash;
 - doctor/repair/migrate behavior belongs to KASPROJ-004 and must use the severity semantics from the project-specific install SOT;
 - repair and migration must be dry-run-first, approval-gated, backup-aware, and must not silently convert generic skills into project-tailored skills;

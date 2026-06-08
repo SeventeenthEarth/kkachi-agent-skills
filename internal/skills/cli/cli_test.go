@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/projectinstall"
 )
 
 func writeCLITestSkill(t *testing.T, dir string, name string) {
@@ -22,6 +23,21 @@ func writeCLITestSkill(t *testing.T, dir string, name string) {
 	}
 }
 
+func assertCLIErrorCode(t *testing.T, data []byte, code string) {
+	t.Helper()
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != false {
+		t.Fatalf("expected ok:false payload: %+v", payload)
+	}
+	diagnostics := payload["diagnostics"].([]any)
+	if diagnostics[0].(map[string]any)["code"] != code {
+		t.Fatalf("expected diagnostic %s, got %+v", code, payload)
+	}
+}
+
 func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 	for _, arg := range []string{"--help", "-h"} {
 		t.Run(arg, func(t *testing.T) {
@@ -31,7 +47,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := stdout.String()
-			if !strings.Contains(out, "list") || !strings.Contains(out, "install") || !strings.Contains(out, "doctor") || !strings.Contains(out, "sync-project-kas") {
+			if !strings.Contains(out, "list") || !strings.Contains(out, "install") || !strings.Contains(out, "doctor") || !strings.Contains(out, "sync-project-kas") || !strings.Contains(out, "install-project-kas") {
 				t.Fatalf("root help did not list available commands: %q", out)
 			}
 			if stderr.Len() != 0 {
@@ -42,7 +58,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 }
 
 func TestSubcommandHelpExitsZero(t *testing.T) {
-	for _, command := range []string{"list", "install", "doctor", "sync-project-kas"} {
+	for _, command := range []string{"list", "install", "doctor", "sync-project-kas", "install-project-kas"} {
 		t.Run(command, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			code := Main([]string{command, "--help"}, &stdout, &stderr, nil)
@@ -56,6 +72,136 @@ func TestSubcommandHelpExitsZero(t *testing.T) {
 				t.Fatalf("expected help on stdout only, got stderr=%q", stderr.String())
 			}
 		})
+	}
+}
+
+func TestInstallProjectKASJSONShapeAndNoWrite(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-final-verify"), "kkachi-final-verify")
+	profileRoot := filepath.Join(dir, "profiles", "kwanwoo")
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%s", code, stderr.String())
+	}
+	if _, err := os.Stat(profileRoot); !os.IsNotExist(err) {
+		t.Fatalf("install-project-kas dry-run created profile root: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["command"] != "install-project-kas" || payload["mode"] != "project_dry_run" || payload["dry_run"] != true {
+		t.Fatalf("unexpected project dry-run payload: %+v", payload)
+	}
+	if payload["cli_version"] == "" || payload["planned_manifest"] == nil || payload["planned_skills"] == nil || payload["changed_paths"] == nil || payload["checksums"] == nil || payload["plan_hash"] == "" {
+		t.Fatalf("missing required JSON evidence: %+v", payload)
+	}
+	noWrite := payload["no_write"].(map[string]any)
+	if noWrite["guaranteed"] != true || noWrite["profile_write_count"] != float64(0) || noWrite["manifest_write_count"] != float64(0) || noWrite["kah_state_write_count"] != float64(0) || noWrite["kab_runtime_mutation_count"] != float64(0) {
+		t.Fatalf("unexpected no-write evidence: %+v", noWrite)
+	}
+	project := payload["project"].(map[string]any)
+	if project["id"] != "doksuri-server" || project["target_suite_path"] != "skills/doksuri-server" {
+		t.Fatalf("unexpected project evidence: %+v", project)
+	}
+	sourcePack := payload["source_pack"].(map[string]any)
+	if sourcePack["id"] != projectinstall.VirtualSourcePackID || sourcePack["formal_registry"] != "not_added_for_kasproj_002" {
+		t.Fatalf("unexpected source pack evidence: %+v", sourcePack)
+	}
+}
+
+func TestInstallProjectKASFailClosedGuards(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan")
+	profileRoot := filepath.Join(dir, "profile")
+	base := []string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--profile-root", profileRoot, "--json"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main(base, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 2 {
+		t.Fatalf("expected missing dry-run exit 2, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "project_install_requires_dry_run")
+
+	for name, args := range map[string][]string{
+		"profile":     {"install-project-kas", "--repo", repo, "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--json"},
+		"project":     {"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--json"},
+		"source-pack": {"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--json"},
+	} {
+		t.Run("missing-"+name, func(t *testing.T) {
+			stdout.Reset()
+			stderr.Reset()
+			code := Main(args, &stdout, &stderr, nil)
+			if code != 2 {
+				t.Fatalf("expected exit 2, got %d", code)
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload["ok"] != false {
+				t.Fatalf("expected ok:false error payload: %+v", payload)
+			}
+		})
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main(append(base, "--dry-run"), &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected profile-root guard failure, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "profile_root_override_rejected")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main(append(base, "--dry-run", "--approve", "dry-run:sha256:abc"), &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 2 {
+		t.Fatalf("expected approve rejection, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "project_install_approve_unsupported")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main(append(base, "--dry-run", "--approve"), &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 2 {
+		t.Fatalf("expected valueless approve rejection, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "project_install_approve_unsupported")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main(append(base, "--dry-run", "--write"), &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 2 {
+		t.Fatalf("expected write form rejection, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "project_install_write_form_unsupported")
+}
+
+func TestInstallProjectKASConflictJSONExitsTwo(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-kas"), "kkachi-kas")
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected umbrella-only exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != false || payload["conflicts"] == nil || payload["plan_hash"] == "" {
+		t.Fatalf("conflict payload did not include ok:false/hash-bound evidence: %+v", payload)
+	}
+	conflicts := payload["conflicts"].([]any)
+	if conflicts[0].(map[string]any)["condition"] != "umbrella_only" {
+		t.Fatalf("unexpected conflicts: %+v", conflicts)
 	}
 }
 

@@ -12,7 +12,7 @@ test-prepare:
 	go test ./tests/docs_contract
 
 test-unit:
-	go test ./internal/skills/discovery ./internal/skills/install ./internal/skills/doctor ./internal/skills/kasstate
+	go test ./internal/skills/discovery ./internal/skills/install ./internal/skills/doctor ./internal/skills/kasstate ./internal/skills/projectinstall
 
 test-int:
 	go test ./internal/skills/cli
