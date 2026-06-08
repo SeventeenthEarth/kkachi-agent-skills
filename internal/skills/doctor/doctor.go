@@ -57,24 +57,24 @@ type Manifest struct {
 }
 
 type InstalledPack struct {
-	PackID                     string                          `json:"pack_id"`
-	State                      string                          `json:"state"`
-	TargetPath                 string                          `json:"target_path"`
-	KABAdoptionStage           install.KABAdoptionStage        `json:"kab_adoption_stage"`
-	FilesChecked               int                             `json:"files_checked"`
-	Missing                    []string                        `json:"missing,omitempty"`
-	Drifted                    []string                        `json:"drifted,omitempty"`
-	Conflicts                  []string                        `json:"conflicts,omitempty"`
-	ChecksumSummary            string                          `json:"checksum_summary"`
-	SourceClass                discovery.SourceClass           `json:"source_class"`
-	SourceClassEvidence        []discovery.SourceClassEvidence `json:"source_class_evidence"`
-	ProvenanceState            string                          `json:"provenance_state"`
-	ManagedByKAS               bool                            `json:"managed_by_kas"`
-	ChecksumState              string                          `json:"checksum_state,omitempty"`
-	Shadowing                  []discovery.ShadowingRecord     `json:"shadowing"`
-	DeletedBundleReference     any                             `json:"deleted_bundle_reference"`
-	SkillDependencies          []any                           `json:"skill_dependencies"`
-	CommandSurfaceDependencies []any                           `json:"command_surface_dependencies"`
+	PackID                     string                                     `json:"pack_id"`
+	State                      string                                     `json:"state"`
+	TargetPath                 string                                     `json:"target_path"`
+	KABAdoptionStage           install.KABAdoptionStage                   `json:"kab_adoption_stage"`
+	FilesChecked               int                                        `json:"files_checked"`
+	Missing                    []string                                   `json:"missing,omitempty"`
+	Drifted                    []string                                   `json:"drifted,omitempty"`
+	Conflicts                  []string                                   `json:"conflicts,omitempty"`
+	ChecksumSummary            string                                     `json:"checksum_summary"`
+	SourceClass                discovery.SourceClass                      `json:"source_class"`
+	SourceClassEvidence        []discovery.SourceClassEvidence            `json:"source_class_evidence"`
+	ProvenanceState            string                                     `json:"provenance_state"`
+	ManagedByKAS               bool                                       `json:"managed_by_kas"`
+	ChecksumState              string                                     `json:"checksum_state,omitempty"`
+	Shadowing                  []discovery.ShadowingRecord                `json:"shadowing"`
+	DeletedBundleReference     any                                        `json:"deleted_bundle_reference"`
+	SkillDependencies          []discovery.SkillDependencyRecord          `json:"skill_dependencies"`
+	CommandSurfaceDependencies []discovery.CommandSurfaceDependencyRecord `json:"command_surface_dependencies"`
 }
 
 type KAH struct {
@@ -187,8 +187,10 @@ func Build(repo string, opts Options) (Result, error) {
 	inventory := discovery.BuildSourceInventory(sourcePacks, discoveryProfile, manifestEntries)
 	result.SourceInventorySummary = inventory.Summary
 	result.ProvenanceAudit = inventory
+	result.DependencyAudit = discovery.BuildDependencyAudit(sourceRepoPath, sourcePacks, inventory)
 
 	result.KAH = probeKAH(opts.Runner, opts.Project)
+	discovery.MarkCommandSurfaceEvidence(&result.DependencyAudit, "KAH", "kkachi-agent-helper", result.KAH.Available)
 	result.Diagnostics = append(result.Diagnostics, kahDiagnostics(result.KAH, opts.Project)...)
 	if manifestBytes != nil {
 		result.Manifest.SHA256 = shaBytes(manifestBytes)

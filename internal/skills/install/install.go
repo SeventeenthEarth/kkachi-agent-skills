@@ -345,9 +345,10 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 		if _, err := os.Stat(root); errors.Is(err, os.ErrNotExist) {
 			message := "unknown Hermes profile: " + opts.Profile
 			inventory = discovery.BuildSourceInventory(sourcePacks, &target, nil)
+			dependencyAudit := discovery.BuildDependencyAudit(sourceRepo, sourcePacks, inventory)
 			diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: "unknown_profile", Message: message}}, diagnostics...)
 			changedPaths = append(changedPaths, changedPath("error", ".", "", nil, "", nil, "unknown_profile", message))
-			return buildResult(false, sourceInfo, target, requestedPackIDs, kabStage, inventory, packPayloads, changedPaths, backupPlan, diagnostics), nil
+			return buildResult(false, sourceInfo, target, requestedPackIDs, kabStage, inventory, dependencyAudit, packPayloads, changedPaths, backupPlan, diagnostics), nil
 		}
 	}
 
@@ -366,11 +367,13 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 			target.PreviousManifestSHA256 = &manifestErr.SHA256
 		}
 		inventory = discovery.BuildSourceInventory(sourcePacks, &target, manifestEntries)
+		dependencyAudit := discovery.BuildDependencyAudit(sourceRepo, sourcePacks, inventory)
 		diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: manifestErr.Code, Message: manifestErr.Message}}, diagnostics...)
 		changedPaths = append(changedPaths, changedPath("error", ".kas/skill-pack-manifest.json", "", nil, "", nil, manifestErr.Code, manifestErr.Message))
-		return buildResult(false, sourceInfo, target, requestedPackIDs, kabStage, inventory, packPayloads, changedPaths, backupPlan, diagnostics), nil
+		return buildResult(false, sourceInfo, target, requestedPackIDs, kabStage, inventory, dependencyAudit, packPayloads, changedPaths, backupPlan, diagnostics), nil
 	}
 	inventory = discovery.BuildSourceInventory(sourcePacks, &target, manifestEntries)
+	dependencyAudit := discovery.BuildDependencyAudit(sourceRepo, sourcePacks, inventory)
 
 	for _, packID := range requestedPackIDs {
 		pack, ok := allPacks[packID]
@@ -407,7 +410,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 			break
 		}
 	}
-	return buildResult(ok, sourceInfo, target, requestedPackIDs, kabStage, inventory, packPayloads, changedPaths, backupPlan, diagnostics), nil
+	return buildResult(ok, sourceInfo, target, requestedPackIDs, kabStage, inventory, dependencyAudit, packPayloads, changedPaths, backupPlan, diagnostics), nil
 }
 
 func RenderHumanDryRun(result Result) string {
@@ -711,7 +714,7 @@ func planPack(sourceRepo string, profileRoot string, pack discovery.SourcePack, 
 	return payload, changedPaths, backupPlan
 }
 
-func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discovery.TargetProfile, requestedPackIDs []string, kabStage KABAdoptionStage, inventory discovery.SourceInventorySnapshot, packs []map[string]any, changedPaths []ChangedPath, backupPlan []BackupEntry, diagnostics []discovery.Diagnostic) Result {
+func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discovery.TargetProfile, requestedPackIDs []string, kabStage KABAdoptionStage, inventory discovery.SourceInventorySnapshot, dependencyAudit discovery.DependencyAudit, packs []map[string]any, changedPaths []ChangedPath, backupPlan []BackupEntry, diagnostics []discovery.Diagnostic) Result {
 	sort.Slice(changedPaths, func(i, j int) bool {
 		if changedPaths[i].Action == changedPaths[j].Action {
 			return changedPaths[i].Path < changedPaths[j].Path
@@ -771,6 +774,7 @@ func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discove
 		"previous_manifest_sha256":  targetProfile.PreviousManifestSHA256,
 		"source_inventory_snapshot": inventory,
 		"target_profile_inventory":  inventory,
+		"dependency_audit":          dependencyAudit,
 	}
 	planHash := "sha256:" + canonicalHash(canonicalPlan)
 	totalFiles := 0
@@ -795,8 +799,8 @@ func buildResult(ok bool, sourceRepo discovery.SourceRepo, targetProfile discove
 		TargetProfileInventory:    inventory,
 		ProvenanceConflicts:       discovery.ProvenanceConflictRecords(inventory),
 		ShadowingConflicts:        discovery.ShadowingConflicts(inventory),
-		DependencyAudit:           discovery.EmptyDependencyAudit(),
-		DeletedBundleDiagnostics:  []discovery.Diagnostic{},
+		DependencyAudit:           dependencyAudit,
+		DeletedBundleDiagnostics:  dependencyAudit.DeletedBundleDiagnostics,
 		DryRunPlanHash:            planHash,
 		CanonicalPlan:             canonicalPlan,
 		Packs:                     packs,

@@ -38,11 +38,207 @@ func TestProvenanceSourceClassVocabularyAndSourceOnlyListDefaults(t *testing.T) 
 	if pack["source_class"] != string(SourceUnknownUnclassified) || pack["provenance_state"] != ProvenanceStateNotApplicable {
 		t.Fatalf("source-only pack should be unknown/not_applicable: %+v", pack)
 	}
-	if deps, ok := pack["skill_dependencies"].([]any); !ok || len(deps) != 0 {
-		t.Fatalf("KASREL-002 must leave skill_dependencies empty: %#v", pack["skill_dependencies"])
+	if deps, ok := pack["skill_dependencies"].([]SkillDependencyRecord); !ok || len(deps) != 0 {
+		t.Fatalf("KASREL-003 must expose typed empty skill_dependencies: %#v", pack["skill_dependencies"])
 	}
-	if deps, ok := pack["command_surface_dependencies"].([]any); !ok || len(deps) != 0 {
-		t.Fatalf("KASREL-002 must leave command_surface_dependencies empty: %#v", pack["command_surface_dependencies"])
+	if deps, ok := pack["command_surface_dependencies"].([]CommandSurfaceDependencyRecord); !ok || len(deps) != 0 {
+		t.Fatalf("KASREL-003 must expose typed empty command_surface_dependencies: %#v", pack["command_surface_dependencies"])
+	}
+}
+
+func TestDependencyAuditUsesSkillPackRequiresAsCommandSurfaces(t *testing.T) {
+	repo := t.TempDir()
+	writeSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "Plan", "")
+	writeSkill(t, filepath.Join(repo, "skills", "kkachi-implement"), "Implement", "")
+	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(`name: kkachi-hermes-skills
+requires:
+  kkachi-agent-helper: "latest"
+  kkachi-agent-bridge: "latest"
+skills:
+  - kkachi-plan
+  - kkachi-implement
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(repo, "registries"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "registries", "phase-contracts.yaml"), []byte("canonical_spine:\n  - plan\n  - implement\n  - ambiguous_phase\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	packs, err := DiscoverSourcePacks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inventory := BuildSourceInventory(packs, nil, nil)
+	audit := BuildDependencyAudit(repo, packs, inventory)
+
+	if audit.State != "complete" {
+		t.Fatalf("audit state = %q", audit.State)
+	}
+	for _, dep := range audit.SkillDependencies {
+		if dep.Name == "kkachi-agent-helper" || dep.Name == "kkachi-agent-bridge" {
+			t.Fatalf("command surface appeared as fake skill dependency: %+v", dep)
+		}
+	}
+	skills := map[string]SkillDependencyRecord{}
+	for _, dep := range audit.SkillDependencies {
+		skills[dep.Name] = dep
+	}
+	if skills["kkachi-plan"].ResolutionState != "resolved" || skills["kkachi-implement"].ResolutionState != "resolved" {
+		t.Fatalf("phase skill dependencies not resolved: %+v", audit.SkillDependencies)
+	}
+	commands := map[string]CommandSurfaceDependencyRecord{}
+	for _, dep := range audit.CommandSurfaceDependencies {
+		commands[dep.Surface] = dep
+	}
+	if commands["kkachi-agent-helper"].Owner != "KAH" || !commands["kkachi-agent-helper"].NotASkillDependency {
+		t.Fatalf("KAH require not reported as command surface: %+v", commands["kkachi-agent-helper"])
+	}
+	if commands["kkachi-agent-bridge"].Owner != "KAB" || commands["kkachi-agent-bridge"].EvidenceState != "required_later" {
+		t.Fatalf("KAB require not safely deferred: %+v", commands["kkachi-agent-bridge"])
+	}
+}
+
+func TestResolveKASPackDependencyPrefersManagedProfileInventoryEvidence(t *testing.T) {
+	sourcePacks := []SourcePack{{
+		PackID:     "kkachi-plan",
+		Name:       "Plan",
+		SourcePath: "skills/kkachi-plan",
+	}}
+	dep := SkillDependencyRecord{
+		Name:            "kkachi-plan",
+		Kind:            "kas_pack",
+		Required:        true,
+		ResolutionState: "not_checked",
+		Diagnostics:     []Diagnostic{},
+	}
+	inventory := SourceInventorySnapshot{
+		ProfileSkills: []ProvenanceRecord{{
+			SkillID:         "kkachi-plan",
+			PackID:          "kkachi-plan",
+			EffectivePath:   "skills/kkachi-plan",
+			SourceClass:     SourceKASManagedProfile,
+			ProvenanceState: ProvenanceStateClassified,
+			ManagedByKAS:    true,
+		}},
+	}
+
+	resolved := resolveSkillDependency(dep, sourcePacks, inventory)
+
+	if resolved.ResolutionState != "resolved" {
+		t.Fatalf("resolution state = %q", resolved.ResolutionState)
+	}
+	if resolved.ResolvedSourceClass != SourceKASManagedProfile || !resolved.ManagedByKAS {
+		t.Fatalf("managed profile evidence not reflected: %+v", resolved)
+	}
+	if resolved.ResolvedPath != "skills/kkachi-plan" {
+		t.Fatalf("effective profile path not preferred: %+v", resolved)
+	}
+}
+
+func TestResolveKASPackDependencyKeepsSourceAvailabilityWhenProfileCopyAbsent(t *testing.T) {
+	sourcePacks := []SourcePack{{
+		PackID:     "kkachi-plan",
+		Name:       "Plan",
+		SourcePath: "skills/kkachi-plan",
+	}}
+	dep := SkillDependencyRecord{
+		Name:            "kkachi-plan",
+		Kind:            "kas_pack",
+		Required:        true,
+		ResolutionState: "not_checked",
+		Diagnostics:     []Diagnostic{},
+	}
+
+	resolved := resolveSkillDependency(dep, sourcePacks, SourceInventorySnapshot{})
+
+	if resolved.ResolutionState != "resolved" || resolved.ResolvedPath != "skills/kkachi-plan" {
+		t.Fatalf("source repo availability should remain enough for planning: %+v", resolved)
+	}
+	if len(resolved.Diagnostics) != 0 {
+		t.Fatalf("absent profile inventory should not create diagnostics: %+v", resolved.Diagnostics)
+	}
+}
+
+func TestDeletedBundleHandlingStaysDiagnosticsOnlyWithoutFallback(t *testing.T) {
+	repo := t.TempDir()
+	writeSkill(t, filepath.Join(repo, "skills", "alpha"), "Alpha", "")
+
+	packs, err := DiscoverSourcePacks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inventory := BuildSourceInventory(packs, nil, nil)
+	audit := BuildDependencyAudit(repo, packs, inventory)
+
+	if !hasInventoryDiagnostic(inventory, "info", "bundle_root_unavailable") {
+		t.Fatalf("missing bundle-root diagnostic: %+v", inventory.Diagnostics)
+	}
+	if inventory.Summary.DeletedBundleReferenceCount != 0 {
+		t.Fatalf("deleted bundle references must not be synthesized: %+v", inventory.Summary)
+	}
+	for _, record := range inventory.ProfileSkills {
+		if record.DeletedBundleReference != nil {
+			t.Fatalf("source-only record gained deleted-bundle fallback reference: %+v", record)
+		}
+		if record.SourceClass == SourceBundleBuiltin || record.SourceClass == SourceHubInstalled {
+			t.Fatalf("bundle/hub fallback classification must not be inferred: %+v", record)
+		}
+	}
+	if len(audit.DeletedBundleDiagnostics) != 0 {
+		t.Fatalf("dependency audit must not synthesize deleted-bundle fallback diagnostics: %+v", audit.DeletedBundleDiagnostics)
+	}
+}
+
+func TestFrontmatterDependencyListsParseOnlyKnownSimpleLists(t *testing.T) {
+	repo := t.TempDir()
+	packDir := filepath.Join(repo, "skills", "alpha")
+	if err := os.MkdirAll(packDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `---
+name: Alpha
+required_skills:
+  - beta
+related_skills:
+  - gamma
+required_commands:
+  - kkachi-agent-helper graph validate
+required_env:
+  - KAS_HOME
+unknown_dependencies:
+  - should-not-parse
+---
+# Alpha
+`
+	if err := os.WriteFile(filepath.Join(packDir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	packs, err := DiscoverSourcePacks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(packs) != 1 {
+		t.Fatalf("packs len = %d", len(packs))
+	}
+	if len(packs[0].SkillDependencies) != 2 {
+		t.Fatalf("unexpected skill deps: %+v", packs[0].SkillDependencies)
+	}
+	if packs[0].SkillDependencies[0].Name != "beta" || !packs[0].SkillDependencies[0].Required {
+		t.Fatalf("required skill list not parsed narrowly: %+v", packs[0].SkillDependencies)
+	}
+	if len(packs[0].CommandSurfaceDependencies) != 2 {
+		t.Fatalf("unexpected command deps: %+v", packs[0].CommandSurfaceDependencies)
+	}
+	for _, dep := range packs[0].CommandSurfaceDependencies {
+		if !dep.NotASkillDependency {
+			t.Fatalf("frontmatter command/env dependency must not be a skill: %+v", dep)
+		}
+		if dep.Surface == "KAS_HOME" && dep.Owner != "environment" {
+			t.Fatalf("environment dependency owner should name the actual layer: %+v", dep)
+		}
 	}
 }
 

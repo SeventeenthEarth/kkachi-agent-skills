@@ -16,12 +16,15 @@ import (
 const NextListAction = "Run install --dry-run before any profile writes."
 
 type SourcePack struct {
-	PackID      string
-	Category    string
-	Name        string
-	SourcePath  string
-	Description string
-	Checksum    string
+	PackID                     string
+	Category                   string
+	Name                       string
+	SourcePath                 string
+	Description                string
+	Checksum                   string
+	SkillDependencies          []SkillDependencyRecord
+	CommandSurfaceDependencies []CommandSurfaceDependencyRecord
+	DependencyDiagnostics      []Diagnostic
 }
 
 type SourceRepo struct {
@@ -285,7 +288,8 @@ func readPack(sourceRepo string, packDir string, category string, packID string)
 	if err != nil {
 		return SourcePack{}, fmt.Errorf("cannot read pack metadata: %s", skillPath)
 	}
-	metadata := parseFrontmatter(string(data))
+	frontmatter := parseFrontmatterValues(string(data), knownFrontmatterKeys())
+	metadata := frontmatterMetadata(frontmatter)
 	rel, err := filepath.Rel(sourceRepo, packDir)
 	if err != nil {
 		return SourcePack{}, err
@@ -298,13 +302,17 @@ func readPack(sourceRepo string, packDir string, category string, packID string)
 	if err != nil {
 		return SourcePack{}, err
 	}
+	skillRelPath := filepath.ToSlash(filepath.Join(rel, "SKILL.md"))
 	return SourcePack{
-		PackID:      packID,
-		Category:    category,
-		Name:        name,
-		Description: metadata["description"],
-		SourcePath:  filepath.ToSlash(rel),
-		Checksum:    checksum,
+		PackID:                     packID,
+		Category:                   category,
+		Name:                       name,
+		Description:                metadata["description"],
+		SourcePath:                 filepath.ToSlash(rel),
+		Checksum:                   checksum,
+		SkillDependencies:          frontmatterSkillDependencies(frontmatter, skillRelPath),
+		CommandSurfaceDependencies: frontmatterCommandSurfaceDependencies(frontmatter, skillRelPath),
+		DependencyDiagnostics:      []Diagnostic{},
 	}, nil
 }
 
@@ -450,24 +458,68 @@ func loadProfile(profile string, profileRoot string) (*TargetProfile, map[string
 }
 
 func parseFrontmatter(text string) map[string]string {
+	values := parseFrontmatterValues(text, map[string]bool{"name": true, "description": true})
+	return frontmatterMetadata(values)
+}
+
+func frontmatterMetadata(values map[string][]string) map[string]string {
+	metadata := map[string]string{}
+	for key, entries := range values {
+		if len(entries) > 0 {
+			metadata[key] = entries[0]
+		}
+	}
+	return metadata
+}
+
+func knownFrontmatterKeys() map[string]bool {
+	return map[string]bool{
+		"name":              true,
+		"description":       true,
+		"related_skills":    true,
+		"required_skills":   true,
+		"required_commands": true,
+		"required_env":      true,
+	}
+}
+
+func parseFrontmatterValues(text string, allowed map[string]bool) map[string][]string {
 	lines := strings.Split(text, "\n")
 	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
-		return map[string]string{}
+		return map[string][]string{}
 	}
-	metadata := map[string]string{}
+	metadata := map[string][]string{}
+	currentListKey := ""
 	for _, line := range lines[1:] {
-		if strings.TrimSpace(line) == "---" {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "---" {
 			break
 		}
+		if currentListKey != "" && strings.HasPrefix(trimmed, "- ") {
+			value := cleanScalar(strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")))
+			if value != "" {
+				metadata[currentListKey] = append(metadata[currentListKey], value)
+			}
+			continue
+		}
+		currentListKey = ""
 		before, after, ok := strings.Cut(line, ":")
 		if !ok {
 			continue
 		}
 		key := strings.TrimSpace(before)
-		if key != "name" && key != "description" {
+		if !allowed[key] {
 			continue
 		}
-		metadata[key] = cleanScalar(strings.TrimSpace(after))
+		value := cleanScalar(strings.TrimSpace(after))
+		if value == "" {
+			currentListKey = key
+			if metadata[key] == nil {
+				metadata[key] = []string{}
+			}
+			continue
+		}
+		metadata[key] = []string{value}
 	}
 	return metadata
 }

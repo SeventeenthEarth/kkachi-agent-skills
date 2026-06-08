@@ -48,19 +48,19 @@ type ShadowingRecord struct {
 }
 
 type ProvenanceRecord struct {
-	SkillID                    string                `json:"skill_id,omitempty"`
-	PackID                     string                `json:"pack_id,omitempty"`
-	EffectivePath              string                `json:"effective_path,omitempty"`
-	SourceClass                SourceClass           `json:"source_class"`
-	SourceClassEvidence        []SourceClassEvidence `json:"source_class_evidence"`
-	ProvenanceState            string                `json:"provenance_state"`
-	ManagedByKAS               bool                  `json:"managed_by_kas"`
-	ChecksumState              string                `json:"checksum_state,omitempty"`
-	Shadowing                  []ShadowingRecord     `json:"shadowing"`
-	DeletedBundleReference     any                   `json:"deleted_bundle_reference"`
-	Diagnostics                []Diagnostic          `json:"diagnostics"`
-	SkillDependencies          []any                 `json:"skill_dependencies"`
-	CommandSurfaceDependencies []any                 `json:"command_surface_dependencies"`
+	SkillID                    string                           `json:"skill_id,omitempty"`
+	PackID                     string                           `json:"pack_id,omitempty"`
+	EffectivePath              string                           `json:"effective_path,omitempty"`
+	SourceClass                SourceClass                      `json:"source_class"`
+	SourceClassEvidence        []SourceClassEvidence            `json:"source_class_evidence"`
+	ProvenanceState            string                           `json:"provenance_state"`
+	ManagedByKAS               bool                             `json:"managed_by_kas"`
+	ChecksumState              string                           `json:"checksum_state,omitempty"`
+	Shadowing                  []ShadowingRecord                `json:"shadowing"`
+	DeletedBundleReference     any                              `json:"deleted_bundle_reference"`
+	Diagnostics                []Diagnostic                     `json:"diagnostics"`
+	SkillDependencies          []SkillDependencyRecord          `json:"skill_dependencies"`
+	CommandSurfaceDependencies []CommandSurfaceDependencyRecord `json:"command_surface_dependencies"`
 }
 
 type SourceRepoPackRecord struct {
@@ -87,19 +87,494 @@ type SourceInventorySnapshot struct {
 	Summary         SourceInventorySummary `json:"summary"`
 }
 
+type DependencyEvidenceSourceClass string
+
+const (
+	DependencyEvidenceExplicitMetadata DependencyEvidenceSourceClass = "explicit_metadata"
+	DependencyEvidenceDerivedGuidance  DependencyEvidenceSourceClass = "derived_guidance"
+	DependencyEvidenceRegistry         DependencyEvidenceSourceClass = "registry"
+	DependencyEvidenceManifest         DependencyEvidenceSourceClass = "manifest"
+)
+
+type DependencyDeclarationEvidence struct {
+	DeclaredBy  string                        `json:"declared_by"`
+	Path        string                        `json:"path,omitempty"`
+	Field       string                        `json:"field,omitempty"`
+	SourceClass DependencyEvidenceSourceClass `json:"source_class"`
+	Detail      string                        `json:"detail,omitempty"`
+}
+
+type SkillDependencyRecord struct {
+	Name                string                          `json:"name"`
+	Kind                string                          `json:"kind"`
+	Required            bool                            `json:"required"`
+	DeclaredBy          string                          `json:"declared_by,omitempty"`
+	DeclarationEvidence []DependencyDeclarationEvidence `json:"declaration_evidence"`
+	ResolutionState     string                          `json:"resolution_state"`
+	ResolvedSourceClass SourceClass                     `json:"resolved_source_class,omitempty"`
+	ResolvedPath        string                          `json:"resolved_path,omitempty"`
+	ManagedByKAS        bool                            `json:"managed_by_kas,omitempty"`
+	Diagnostics         []Diagnostic                    `json:"diagnostics"`
+}
+
+type CommandSurfaceDependencyRecord struct {
+	Surface             string                          `json:"surface"`
+	Owner               string                          `json:"owner"`
+	Command             string                          `json:"command,omitempty"`
+	Runtime             string                          `json:"runtime,omitempty"`
+	Required            bool                            `json:"required,omitempty"`
+	RequiredWhen        string                          `json:"required_when,omitempty"`
+	EvidenceState       string                          `json:"evidence_state"`
+	NotASkillDependency bool                            `json:"not_a_skill_dependency"`
+	DeclarationEvidence []DependencyDeclarationEvidence `json:"declaration_evidence"`
+	Diagnostics         []Diagnostic                    `json:"diagnostics"`
+}
+
 type DependencyAudit struct {
-	State                      string       `json:"state"`
-	SkillDependencies          []any        `json:"skill_dependencies"`
-	CommandSurfaceDependencies []any        `json:"command_surface_dependencies"`
-	Diagnostics                []Diagnostic `json:"diagnostics"`
+	State                      string                           `json:"state"`
+	SkillDependencies          []SkillDependencyRecord          `json:"skill_dependencies"`
+	CommandSurfaceDependencies []CommandSurfaceDependencyRecord `json:"command_surface_dependencies"`
+	DeletedBundleDiagnostics   []Diagnostic                     `json:"deleted_bundle_diagnostics"`
+	Diagnostics                []Diagnostic                     `json:"diagnostics"`
 }
 
 func EmptyDependencyAudit() DependencyAudit {
 	return DependencyAudit{
-		State:                      "not_implemented_kasrel_003",
-		SkillDependencies:          []any{},
-		CommandSurfaceDependencies: []any{},
+		State:                      "complete",
+		SkillDependencies:          []SkillDependencyRecord{},
+		CommandSurfaceDependencies: []CommandSurfaceDependencyRecord{},
+		DeletedBundleDiagnostics:   []Diagnostic{},
 		Diagnostics:                []Diagnostic{},
+	}
+}
+
+func BuildDependencyAudit(sourceRepo string, sourcePacks []SourcePack, inventory SourceInventorySnapshot) DependencyAudit {
+	audit := EmptyDependencyAudit()
+	skillDependenciesByName := map[string]SkillDependencyRecord{}
+	commandDependenciesBySurface := map[string]CommandSurfaceDependencyRecord{}
+
+	for _, pack := range sourcePacks {
+		for _, dep := range pack.SkillDependencies {
+			addSkillDependency(skillDependenciesByName, dep)
+		}
+		for _, dep := range pack.CommandSurfaceDependencies {
+			addCommandSurfaceDependency(commandDependenciesBySurface, dep)
+		}
+		audit.Diagnostics = append(audit.Diagnostics, pack.DependencyDiagnostics...)
+	}
+
+	packSet, requires, packDiagnostics := readSkillPackManifest(sourceRepo)
+	audit.Diagnostics = append(audit.Diagnostics, packDiagnostics...)
+	for _, dep := range commandDependenciesFromRequires(requires) {
+		addCommandSurfaceDependency(commandDependenciesBySurface, dep)
+	}
+	for _, dep := range phaseSkillDependencies(sourceRepo, packSet) {
+		addSkillDependency(skillDependenciesByName, dep)
+	}
+	for _, dep := range graphCommandSurfaceDependencies(sourceRepo) {
+		addCommandSurfaceDependency(commandDependenciesBySurface, dep)
+	}
+
+	for _, dep := range skillDependenciesByName {
+		resolved := resolveSkillDependency(dep, sourcePacks, inventory)
+		audit.SkillDependencies = append(audit.SkillDependencies, resolved)
+		audit.Diagnostics = append(audit.Diagnostics, resolved.Diagnostics...)
+	}
+	for _, dep := range commandDependenciesBySurface {
+		audit.CommandSurfaceDependencies = append(audit.CommandSurfaceDependencies, dep)
+		audit.Diagnostics = append(audit.Diagnostics, dep.Diagnostics...)
+	}
+	sort.Slice(audit.SkillDependencies, func(i, j int) bool { return audit.SkillDependencies[i].Name < audit.SkillDependencies[j].Name })
+	sort.Slice(audit.CommandSurfaceDependencies, func(i, j int) bool {
+		if audit.CommandSurfaceDependencies[i].Owner == audit.CommandSurfaceDependencies[j].Owner {
+			return audit.CommandSurfaceDependencies[i].Surface < audit.CommandSurfaceDependencies[j].Surface
+		}
+		return audit.CommandSurfaceDependencies[i].Owner < audit.CommandSurfaceDependencies[j].Owner
+	})
+	return audit
+}
+
+func frontmatterSkillDependencies(values map[string][]string, path string) []SkillDependencyRecord {
+	records := []SkillDependencyRecord{}
+	for _, spec := range []struct {
+		field    string
+		required bool
+	}{
+		{field: "required_skills", required: true},
+		{field: "related_skills", required: false},
+	} {
+		for _, name := range values[spec.field] {
+			records = append(records, SkillDependencyRecord{
+				Name:       name,
+				Kind:       "unknown_skill",
+				Required:   spec.required,
+				DeclaredBy: "SKILL.md",
+				DeclarationEvidence: []DependencyDeclarationEvidence{{
+					DeclaredBy:  "SKILL.md",
+					Path:        path,
+					Field:       spec.field,
+					SourceClass: DependencyEvidenceExplicitMetadata,
+				}},
+				ResolutionState: "not_checked",
+				Diagnostics:     []Diagnostic{},
+			})
+		}
+	}
+	return records
+}
+
+func frontmatterCommandSurfaceDependencies(values map[string][]string, path string) []CommandSurfaceDependencyRecord {
+	records := []CommandSurfaceDependencyRecord{}
+	for _, command := range values["required_commands"] {
+		records = append(records, commandSurfaceDependency(command, commandOwner(command), "not_checked", true, "", DependencyDeclarationEvidence{
+			DeclaredBy:  "SKILL.md",
+			Path:        path,
+			Field:       "required_commands",
+			SourceClass: DependencyEvidenceExplicitMetadata,
+		}))
+	}
+	for _, env := range values["required_env"] {
+		records = append(records, CommandSurfaceDependencyRecord{
+			Surface:             env,
+			Owner:               "environment",
+			Runtime:             "environment",
+			Required:            true,
+			EvidenceState:       "not_checked",
+			NotASkillDependency: true,
+			DeclarationEvidence: []DependencyDeclarationEvidence{{
+				DeclaredBy:  "SKILL.md",
+				Path:        path,
+				Field:       "required_env",
+				SourceClass: DependencyEvidenceExplicitMetadata,
+			}},
+			Diagnostics: []Diagnostic{},
+		})
+	}
+	return records
+}
+
+func addSkillDependency(records map[string]SkillDependencyRecord, dep SkillDependencyRecord) {
+	if dep.Name == "" {
+		return
+	}
+	dep.Diagnostics = append([]Diagnostic{}, dep.Diagnostics...)
+	existing, ok := records[dep.Name]
+	if !ok {
+		records[dep.Name] = dep
+		return
+	}
+	existing.Required = existing.Required || dep.Required
+	existing.DeclarationEvidence = append(existing.DeclarationEvidence, dep.DeclarationEvidence...)
+	records[dep.Name] = existing
+}
+
+func addCommandSurfaceDependency(records map[string]CommandSurfaceDependencyRecord, dep CommandSurfaceDependencyRecord) {
+	if dep.Surface == "" {
+		return
+	}
+	dep.NotASkillDependency = true
+	dep.Diagnostics = append([]Diagnostic{}, dep.Diagnostics...)
+	existing, ok := records[dep.Surface]
+	if !ok {
+		records[dep.Surface] = dep
+		return
+	}
+	existing.Required = existing.Required || dep.Required
+	existing.DeclarationEvidence = append(existing.DeclarationEvidence, dep.DeclarationEvidence...)
+	if evidenceStateRank(dep.EvidenceState) > evidenceStateRank(existing.EvidenceState) {
+		existing.EvidenceState = dep.EvidenceState
+	}
+	records[dep.Surface] = existing
+}
+
+func evidenceStateRank(state string) int {
+	switch state {
+	case "available", "missing":
+		return 4
+	case "required_later":
+		return 3
+	case "declared":
+		return 2
+	default:
+		return 1
+	}
+}
+
+func resolveSkillDependency(dep SkillDependencyRecord, sourcePacks []SourcePack, inventory SourceInventorySnapshot) SkillDependencyRecord {
+	var sourcePack SourcePack
+	sourceAvailable := false
+	for _, pack := range sourcePacks {
+		if dep.Name == pack.PackID || dep.Name == pack.Name {
+			sourcePack = pack
+			sourceAvailable = true
+			break
+		}
+	}
+	if sourceAvailable {
+		dep.Kind = "kas_pack"
+		dep.ResolutionState = "resolved"
+		dep.ResolvedPath = sourcePack.SourcePath
+	}
+	if record, ok := matchingInventoryRecord(dep.Name, inventory); ok {
+		dep = mergeSkillDependencyInventoryEvidence(dep, record, sourceAvailable)
+		return dep
+	}
+	if sourceAvailable {
+		return dep
+	}
+	dep.ResolutionState = "missing"
+	if dep.Kind == "" || dep.Kind == "unknown_skill" {
+		dep.Kind = "unknown_skill"
+	}
+	level := "warning"
+	if dep.Required {
+		level = "error"
+	}
+	dep.Diagnostics = append(dep.Diagnostics, Diagnostic{Level: level, Code: "skill_dependency_missing", Message: "skill dependency is not resolvable from KAS source pack or safe profile inventory: " + dep.Name})
+	return dep
+}
+
+func matchingInventoryRecord(name string, inventory SourceInventorySnapshot) (ProvenanceRecord, bool) {
+	if record, ok := matchingInventorySliceRecord(name, inventory.ProfileSkills); ok {
+		return record, true
+	}
+	return matchingInventorySliceRecord(name, inventory.ExternalSkills)
+}
+
+func matchingInventorySliceRecord(name string, records []ProvenanceRecord) (ProvenanceRecord, bool) {
+	for _, record := range records {
+		if record.ProvenanceState == ProvenanceStateNotApplicable {
+			continue
+		}
+		if name == record.SkillID || name == record.PackID {
+			return record, true
+		}
+	}
+	return ProvenanceRecord{}, false
+}
+
+func mergeSkillDependencyInventoryEvidence(dep SkillDependencyRecord, record ProvenanceRecord, sourceAvailable bool) SkillDependencyRecord {
+	dep.ResolvedSourceClass = record.SourceClass
+	if record.EffectivePath != "" {
+		dep.ResolvedPath = record.EffectivePath
+	}
+	dep.ManagedByKAS = record.ManagedByKAS
+	if record.ManagedByKAS {
+		dep.Kind = "kas_pack"
+	} else if record.SourceClass == SourceUnknownUnclassified {
+		dep.Kind = "unknown_skill"
+		if !sourceAvailable {
+			dep.ResolutionState = "source_unclassified"
+		}
+	} else {
+		dep.Kind = "external_skill"
+	}
+	if dep.ResolutionState == "" || dep.ResolutionState == "not_checked" {
+		dep.ResolutionState = "resolved"
+	}
+	if record.SourceClass == SourceUnknownUnclassified {
+		dep.Diagnostics = append(dep.Diagnostics, Diagnostic{Level: "warning", Code: "skill_dependency_source_unclassified", Message: "skill dependency source class is unknown or unclassified: " + dep.Name})
+	}
+	if record.ProvenanceState == ProvenanceStateAmbiguous {
+		dep.Diagnostics = append(dep.Diagnostics, Diagnostic{Level: "warning", Code: "skill_dependency_source_ambiguous", Message: "skill dependency profile/external source is ambiguous: " + dep.Name})
+	}
+	return dep
+}
+
+func readSkillPackManifest(sourceRepo string) (map[string]bool, map[string]string, []Diagnostic) {
+	packSet := map[string]bool{}
+	requires := map[string]string{}
+	data, err := os.ReadFile(filepath.Join(sourceRepo, "skill-pack.yaml"))
+	if err != nil {
+		return packSet, requires, []Diagnostic{{Level: "warning", Code: "skill_pack_manifest_unreadable", Message: "skill-pack.yaml was not readable; dependency audit failed closed for manifest-derived dependencies: " + err.Error()}}
+	}
+	section := ""
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch trimmed {
+		case "requires:":
+			section = "requires"
+			continue
+		case "skills:":
+			section = "skills"
+			continue
+		}
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if !strings.HasPrefix(line, " ") && strings.Contains(trimmed, ":") {
+			section = ""
+			continue
+		}
+		if section == "skills" && strings.HasPrefix(trimmed, "- ") {
+			packSet[cleanScalar(strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")))] = true
+		}
+		if section == "requires" {
+			key, value, ok := strings.Cut(trimmed, ":")
+			if ok {
+				requires[strings.TrimSpace(key)] = cleanScalar(strings.TrimSpace(value))
+			}
+		}
+	}
+	return packSet, requires, nil
+}
+
+func commandDependenciesFromRequires(requires map[string]string) []CommandSurfaceDependencyRecord {
+	records := []CommandSurfaceDependencyRecord{}
+	for command := range requires {
+		owner := commandOwner(command)
+		state := "not_checked"
+		requiredWhen := ""
+		if owner == "KAB" {
+			state = "required_later"
+			requiredWhen = "selected KHS lane requires backend runtime/session evidence"
+		}
+		records = append(records, commandSurfaceDependency(command, owner, state, true, requiredWhen, DependencyDeclarationEvidence{
+			DeclaredBy:  "skill-pack.yaml",
+			Path:        "skill-pack.yaml",
+			Field:       "requires",
+			SourceClass: DependencyEvidenceManifest,
+		}))
+	}
+	return records
+}
+
+func phaseSkillDependencies(sourceRepo string, packSet map[string]bool) []SkillDependencyRecord {
+	path := filepath.Join(sourceRepo, "registries", "phase-contracts.yaml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	records := []SkillDependencyRecord{}
+	inSpine := false
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "canonical_spine:" {
+			inSpine = true
+			continue
+		}
+		if inSpine && !strings.HasPrefix(line, " ") && trimmed != "" {
+			break
+		}
+		if !inSpine || !strings.HasPrefix(trimmed, "- ") {
+			continue
+		}
+		phase := cleanScalar(strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")))
+		skill := skillForPhase(phase)
+		if skill == "" || !packSet[skill] {
+			continue
+		}
+		records = append(records, SkillDependencyRecord{
+			Name:       skill,
+			Kind:       "kas_pack",
+			Required:   true,
+			DeclaredBy: "registries/phase-contracts.yaml",
+			DeclarationEvidence: []DependencyDeclarationEvidence{{
+				DeclaredBy:  "registries/phase-contracts.yaml",
+				Path:        "registries/phase-contracts.yaml",
+				Field:       "canonical_spine",
+				SourceClass: DependencyEvidenceRegistry,
+				Detail:      "deterministic phase-to-KAS-skill mapping for phase " + phase,
+			}},
+			ResolutionState: "not_checked",
+			Diagnostics:     []Diagnostic{},
+		})
+	}
+	return records
+}
+
+func skillForPhase(phase string) string {
+	switch phase {
+	case "plan", "ask", "implement", "optimize", "improve":
+		return "kkachi-" + phase
+	case "enhance_test":
+		return "kkachi-enhance-test"
+	case "update_docs":
+		return "kkachi-docs-update"
+	case "request_feedback":
+		return "kkachi-request-feedback"
+	case "handle_feedback":
+		return "kkachi-handle-feedback"
+	case "final_verify":
+		return "kkachi-final-verify"
+	default:
+		return ""
+	}
+}
+
+func graphCommandSurfaceDependencies(sourceRepo string) []CommandSurfaceDependencyRecord {
+	path := filepath.Join(sourceRepo, "registries", "graph-template-registry.yaml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	records := []CommandSurfaceDependencyRecord{}
+	inRequiredCommands := false
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "required_commands:" {
+			inRequiredCommands = true
+			continue
+		}
+		if inRequiredCommands && !strings.HasPrefix(line, " ") && trimmed != "" {
+			break
+		}
+		if !inRequiredCommands || !strings.HasPrefix(trimmed, "- ") {
+			continue
+		}
+		command := cleanScalar(strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")))
+		records = append(records, commandSurfaceDependency(command, "KAH", "required_later", true, "KAH graph workflow validation is claimed", DependencyDeclarationEvidence{
+			DeclaredBy:  "registries/graph-template-registry.yaml",
+			Path:        "registries/graph-template-registry.yaml",
+			Field:       "kah_validation_expectations.required_commands",
+			SourceClass: DependencyEvidenceRegistry,
+		}))
+	}
+	return records
+}
+
+func commandSurfaceDependency(surface string, owner string, evidenceState string, required bool, requiredWhen string, evidence DependencyDeclarationEvidence) CommandSurfaceDependencyRecord {
+	return CommandSurfaceDependencyRecord{
+		Surface:             surface,
+		Owner:               owner,
+		Command:             surface,
+		Required:            required,
+		RequiredWhen:        requiredWhen,
+		EvidenceState:       evidenceState,
+		NotASkillDependency: true,
+		DeclarationEvidence: []DependencyDeclarationEvidence{evidence},
+		Diagnostics:         []Diagnostic{},
+	}
+}
+
+func commandOwner(command string) string {
+	switch {
+	case strings.HasPrefix(command, "kkachi-agent-helper"):
+		return "KAH"
+	case strings.HasPrefix(command, "kkachi-agent-bridge"):
+		return "KAB"
+	case strings.HasPrefix(command, "hermes kanban"):
+		return "Kanban"
+	case strings.HasPrefix(command, "hermes"):
+		return "Hermes"
+	default:
+		return "system_command"
+	}
+}
+
+func MarkCommandSurfaceEvidence(audit *DependencyAudit, owner string, commandPrefix string, available bool) {
+	if audit == nil {
+		return
+	}
+	state := "missing"
+	if available {
+		state = "available"
+	}
+	for i := range audit.CommandSurfaceDependencies {
+		dep := &audit.CommandSurfaceDependencies[i]
+		if dep.Owner == owner && (commandPrefix == "" || dep.Surface == commandPrefix) {
+			dep.EvidenceState = state
+		}
 	}
 }
 
@@ -153,8 +628,8 @@ func SourceOnlyProvenance(pack SourcePack) ProvenanceRecord {
 		Shadowing:                  []ShadowingRecord{},
 		DeletedBundleReference:     nil,
 		Diagnostics:                []Diagnostic{},
-		SkillDependencies:          []any{},
-		CommandSurfaceDependencies: []any{},
+		SkillDependencies:          append([]SkillDependencyRecord{}, pack.SkillDependencies...),
+		CommandSurfaceDependencies: append([]CommandSurfaceDependencyRecord{}, pack.CommandSurfaceDependencies...),
 	}
 }
 
@@ -180,8 +655,8 @@ func ProfileManifestProvenance(targetPath string, manifestEntry map[string]any, 
 		Shadowing:                  []ShadowingRecord{},
 		DeletedBundleReference:     nil,
 		Diagnostics:                []Diagnostic{},
-		SkillDependencies:          []any{},
-		CommandSurfaceDependencies: []any{},
+		SkillDependencies:          []SkillDependencyRecord{},
+		CommandSurfaceDependencies: []CommandSurfaceDependencyRecord{},
 	}
 }
 
@@ -325,8 +800,8 @@ func profileRecord(targetPath string, manifestEntry map[string]any) ProvenanceRe
 		Shadowing:                  []ShadowingRecord{},
 		DeletedBundleReference:     nil,
 		Diagnostics:                []Diagnostic{},
-		SkillDependencies:          []any{},
-		CommandSurfaceDependencies: []any{},
+		SkillDependencies:          []SkillDependencyRecord{},
+		CommandSurfaceDependencies: []CommandSurfaceDependencyRecord{},
 	}
 	if manifestEntry != nil {
 		return ProfileManifestProvenance(targetPath, manifestEntry, checksumStateFromManifest(manifestEntry))
@@ -402,8 +877,8 @@ func walkExternalDir(root string) ([]ProvenanceRecord, []Diagnostic) {
 			Shadowing:                  []ShadowingRecord{},
 			DeletedBundleReference:     nil,
 			Diagnostics:                []Diagnostic{},
-			SkillDependencies:          []any{},
-			CommandSurfaceDependencies: []any{},
+			SkillDependencies:          []SkillDependencyRecord{},
+			CommandSurfaceDependencies: []CommandSurfaceDependencyRecord{},
 		}
 		records = append(records, record)
 		return filepath.SkipDir
@@ -631,8 +1106,8 @@ func unknownRecord(skillID string, effectivePath string, kind string, state stri
 		Shadowing:                  []ShadowingRecord{},
 		DeletedBundleReference:     nil,
 		Diagnostics:                []Diagnostic{{Level: "warning", Code: "source_class_ambiguous", Message: message}},
-		SkillDependencies:          []any{},
-		CommandSurfaceDependencies: []any{},
+		SkillDependencies:          []SkillDependencyRecord{},
+		CommandSurfaceDependencies: []CommandSurfaceDependencyRecord{},
 	}
 }
 

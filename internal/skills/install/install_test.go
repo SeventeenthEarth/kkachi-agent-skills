@@ -99,6 +99,9 @@ func TestCreatePlanIsNoWriteAndHashIncludesSOTFields(t *testing.T) {
 	if result.CanonicalPlan["source_inventory_snapshot"] == nil || result.CanonicalPlan["target_profile_inventory"] == nil {
 		t.Fatalf("canonical plan missing provenance hash inputs: %+v", result.CanonicalPlan)
 	}
+	if result.CanonicalPlan["dependency_audit"] == nil || result.DependencyAudit.State != "complete" {
+		t.Fatalf("canonical plan missing dependency audit hash input: %+v", result.CanonicalPlan)
+	}
 	if _, ok := result.CanonicalPlan["source_repo"].(map[string]any)["git_commit"]; !ok {
 		t.Fatalf("canonical plan missing git_commit: %+v", result.CanonicalPlan)
 	}

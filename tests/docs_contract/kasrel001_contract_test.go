@@ -131,14 +131,15 @@ func TestKASREL001DocsIndexAndRoadmapPointToAcceptedSOT(t *testing.T) {
 
 	requireRoadmapTaskStatus(t, "KASREL-001", "Completed")
 	requireRoadmapTaskStatus(t, "KASREL-002", "Completed")
-	requireRoadmapTaskStatus(t, "KASREL-003", "Planned")
+	requireRoadmapTaskStatus(t, "KASREL-003", "In Progress")
 	requireRoadmapTaskStatus(t, "KASREL-004", "Planned")
 }
 
 func TestKASREL002DocsReflectCompletedImplementationWithPreCommitBoundary(t *testing.T) {
 	requireContainsAll(t, "docs/README.md", []string{
 		"KASREL-002 implementation is completed/pre-commit-ready",
-		"KASREL-003/004 remain planned",
+		"KASREL-003 dependency-audit implementation is evidenced/in-review",
+		"KASREL-004 remains planned",
 		"required review gates",
 	})
 
@@ -150,7 +151,7 @@ func TestKASREL002DocsReflectCompletedImplementationWithPreCommitBoundary(t *tes
 		"official KAB GLM Octo review passed with 0 blocking findings",
 		"post-Octo Red/Orange/Gray re-review accepted with 0 blocking findings",
 		"Final KAH gate and commit approval remain separate pre-commit gates.",
-		"KASREL-003 and KASREL-004 remain `Planned`",
+		"KASREL-003 is `In Progress` with implementation/test/no-write smoke evidence pending final review/KAH final gate",
 	})
 }
 

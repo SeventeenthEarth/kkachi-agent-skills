@@ -64,6 +64,9 @@ func TestBuildHealthyInstalledProfileWithFakeKAH(t *testing.T) {
 	repo := t.TempDir()
 	profileRoot := filepath.Join(t.TempDir(), "profile")
 	writeSkill(t, filepath.Join(repo, "skills", "alpha"), "Alpha", "healthy")
+	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte("requires:\n  kkachi-agent-helper: latest\n  kkachi-agent-bridge: latest\nskills:\n  - alpha\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	installProfile(t, repo, profileRoot, "alpha")
 	runner := FakeRunner{
 		"--version":           {Stdout: []byte("kkachi-agent-helper 0.9.0\n")},
@@ -92,8 +95,71 @@ func TestBuildHealthyInstalledProfileWithFakeKAH(t *testing.T) {
 	if !result.KAH.Available || result.KAH.InstallCommand == nil || *result.KAH.InstallCommand {
 		t.Fatalf("unexpected KAH payload: %+v", result.KAH)
 	}
+	kahSeen := false
+	kabSeen := false
+	for _, dep := range result.DependencyAudit.CommandSurfaceDependencies {
+		if dep.Surface == "kkachi-agent-helper" {
+			kahSeen = true
+			if dep.Owner != "KAH" || dep.EvidenceState != "available" || !dep.NotASkillDependency {
+				t.Fatalf("unexpected KAH dependency audit record: %+v", dep)
+			}
+		}
+		if dep.Surface == "kkachi-agent-bridge" {
+			kabSeen = true
+			if dep.Owner != "KAB" || dep.EvidenceState != "required_later" || !dep.NotASkillDependency {
+				t.Fatalf("unexpected KAB dependency audit record: %+v", dep)
+			}
+		}
+	}
+	if !kahSeen || !kabSeen {
+		t.Fatalf("missing KAH/KAB command-surface audit records: %+v", result.DependencyAudit.CommandSurfaceDependencies)
+	}
+	for _, dep := range result.DependencyAudit.SkillDependencies {
+		if dep.Name == "kkachi-agent-helper" || dep.Name == "kkachi-agent-bridge" {
+			t.Fatalf("command surface appeared as fake skill dependency: %+v", dep)
+		}
+	}
 	if result.KAB.RequiredForMinimumCLI || !result.KAB.RequiredForExecutionRuntime || !strings.Contains(result.KAB.Message, "execution-runtime") {
 		t.Fatalf("unexpected KAB payload: %+v", result.KAB)
+	}
+}
+
+func TestBuildDependencyAuditReflectsKASManagedProfileSkillInventory(t *testing.T) {
+	repo := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "Plan", "healthy")
+	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte("requires:\n  kkachi-agent-helper: latest\nskills:\n  - kkachi-plan\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(repo, "registries"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "registries", "phase-contracts.yaml"), []byte("canonical_spine:\n  - plan\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	installProfile(t, repo, profileRoot, "kkachi-plan")
+	runner := FakeRunner{
+		"--version":           {Stdout: []byte("kkachi-agent-helper 0.9.0\n")},
+		"capabilities --json": {Stdout: []byte(`{"install_command":false,"commands":["project status","project doctor"]}`)},
+	}
+
+	result, err := Build(repo, Options{Profile: "demo", ProfileRoot: profileRoot, Runner: runner.Run})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := false
+	for _, dep := range result.DependencyAudit.SkillDependencies {
+		if dep.Name != "kkachi-plan" {
+			continue
+		}
+		found = true
+		if dep.ResolvedSourceClass != "kas_managed_profile" || !dep.ManagedByKAS || dep.ResolvedPath != "skills/kkachi-plan" {
+			t.Fatalf("KAS-managed profile inventory not reflected in dependency resolution: %+v", dep)
+		}
+	}
+	if !found {
+		t.Fatalf("missing kkachi-plan dependency audit record: %+v", result.DependencyAudit.SkillDependencies)
 	}
 }
 
