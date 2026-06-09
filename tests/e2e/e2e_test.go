@@ -123,6 +123,68 @@ func TestRealRepoInstallProjectKASDryRunWritesNothing(t *testing.T) {
 	}
 }
 
+func TestRealRepoApprovedProjectKASInstallAndWrongHashNoWrite(t *testing.T) {
+	root := repoRoot(t)
+	binary := buildBinary(t)
+	profileRoot := filepath.Join(t.TempDir(), "profiles", "e2e")
+
+	wrong := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--approve", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json")
+	wrong.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	wrongOut, err := wrong.CombinedOutput()
+	if err == nil {
+		t.Fatalf("wrong hash approved project install unexpectedly succeeded: %s", wrongOut)
+	}
+	var wrongPayload map[string]any
+	if err := json.Unmarshal(wrongOut, &wrongPayload); err != nil {
+		t.Fatal(err)
+	}
+	if wrongPayload["ok"] != false || wrongPayload["diagnostics"].([]any)[0].(map[string]any)["code"] != "approval_plan_hash_mismatch" {
+		t.Fatalf("unexpected wrong-hash payload: %+v", wrongPayload)
+	}
+	if _, err := os.Stat(profileRoot); !os.IsNotExist(err) {
+		t.Fatalf("wrong hash created profile root: %v", err)
+	}
+
+	dryRun := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--dry-run", "--profile-root", profileRoot, "--json")
+	dryRun.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	dryRunOut, err := dryRun.CombinedOutput()
+	if err != nil {
+		t.Fatalf("project dry-run failed: %v\n%s", err, dryRunOut)
+	}
+	var dryRunPayload map[string]any
+	if err := json.Unmarshal(dryRunOut, &dryRunPayload); err != nil {
+		t.Fatal(err)
+	}
+	evidence := dryRunPayload["approval_request"].(map[string]any)["evidence_ref"].(string)
+	approve := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--approve", evidence, "--profile-root", profileRoot, "--json")
+	approve.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	approveOut, err := approve.CombinedOutput()
+	if err != nil {
+		t.Fatalf("approved project install failed: %v\n%s", err, approveOut)
+	}
+	var approvePayload map[string]any
+	if err := json.Unmarshal(approveOut, &approvePayload); err != nil {
+		t.Fatal(err)
+	}
+	if approvePayload["ok"] != true || approvePayload["mode"] != "project_approved_copy" || approvePayload["install_id"] == "" {
+		t.Fatalf("unexpected approved project payload: %+v", approvePayload)
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); err != nil {
+		t.Fatalf("approved project install did not write expected project skill: %v", err)
+	}
+	manifestBytes, err := os.ReadFile(filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json"))
+	if err != nil {
+		t.Fatalf("approved project install did not write manifest: %v", err)
+	}
+	var manifest map[string]any
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest["kind"] != "kas_profile_skill_manifest" || len(manifest["project_suites"].([]any)) != 1 {
+		t.Fatalf("unexpected project manifest: %+v", manifest)
+	}
+}
+
 func TestRealRepoApprovedCopyWritesTempProfileOnly(t *testing.T) {
 	root := repoRoot(t)
 	binary := buildBinary(t)

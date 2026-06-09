@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ const (
 	VirtualSourcePackID = "kas-default-project-suite"
 	ManifestVersion     = "0.1"
 	ManifestKind        = "kas_project_skill_manifest"
+	ProfileManifestKind = install.ManifestKind
 )
 
 var validProjectID = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`)
@@ -94,6 +96,40 @@ type ChangedPath struct {
 	Bytes          int     `json:"bytes,omitempty"`
 	ErrorCode      string  `json:"error_code,omitempty"`
 	ErrorMessage   string  `json:"error_message,omitempty"`
+	BackupPath     string  `json:"backup_path,omitempty"`
+}
+
+type BackupEntry struct {
+	Path           string `json:"path"`
+	BackupPath     string `json:"backup_path"`
+	PreviousSHA256 string `json:"previous_sha256"`
+	Bytes          int    `json:"bytes"`
+}
+
+type ApprovalRequest struct {
+	Required                      bool   `json:"required"`
+	EvidenceRef                   string `json:"evidence_ref"`
+	DryRunPlanHash                string `json:"dry_run_plan_hash"`
+	HashIncludesProfile           bool   `json:"hash_includes_profile"`
+	HashIncludesManifestState     bool   `json:"hash_includes_manifest_state"`
+	HashIncludesSourceSuite       bool   `json:"hash_includes_source_suite"`
+	HashIncludesNoWriteEvidence   bool   `json:"hash_includes_no_write_evidence"`
+	HashIncludesBackupPlan        bool   `json:"hash_includes_backup_plan"`
+	HashIncludesConflictsAndDiags bool   `json:"hash_includes_conflicts_and_diagnostics"`
+}
+
+type ApprovalEvidence struct {
+	EvidenceRef        string `json:"evidence_ref"`
+	DryRunPlanHash     string `json:"dry_run_plan_hash"`
+	ApprovedPlanHash   string `json:"approved_plan_hash"`
+	MatchedCurrentPlan bool   `json:"matched_current_plan"`
+}
+
+type Recovery struct {
+	RollbackSupported      bool     `json:"rollback_supported"`
+	BackupPath             string   `json:"backup_path"`
+	PreviousManifestSHA256 *string  `json:"previous_manifest_sha256,omitempty"`
+	Instructions           []string `json:"instructions"`
 }
 
 type Checksums struct {
@@ -129,8 +165,15 @@ type Result struct {
 	PlannedManifest  map[string]any          `json:"planned_manifest"`
 	PlannedSkills    []PlannedSkill          `json:"planned_skills"`
 	ChangedPaths     []ChangedPath           `json:"changed_paths"`
+	BackupPlan       []BackupEntry           `json:"backup_plan"`
 	Checksums        Checksums               `json:"checksums"`
 	PlanHash         string                  `json:"plan_hash"`
+	ApprovalRequest  ApprovalRequest         `json:"approval_request"`
+	Approval         ApprovalEvidence        `json:"approval,omitempty"`
+	InstallID        string                  `json:"install_id,omitempty"`
+	ManifestPath     string                  `json:"manifest_path,omitempty"`
+	BackupPath       string                  `json:"backup_path,omitempty"`
+	Recovery         *Recovery               `json:"recovery,omitempty"`
 	Conflicts        []Conflict              `json:"conflicts"`
 	Diagnostics      []discovery.Diagnostic  `json:"diagnostics"`
 	NextAction       string                  `json:"next_action"`
@@ -145,9 +188,25 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 	result := baseResult(sourceRepo, profileRoot, opts)
 
 	if !opts.DryRun {
-		addDiagnostic(&result, "error", "dry_run_required", "install-project-kas requires --dry-run and performs no writes.")
+		addDiagnostic(&result, "error", "dry_run_or_approve_required", "install-project-kas requires --dry-run or --approve dry-run:<hash>.")
 		finalize(&result)
 		return result, nil
+	}
+	if opts.ProfileRoot == "" {
+		if st, err := os.Stat(profileRoot); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				addConflict(&result, "unknown_profile", "", ".", "unknown Hermes profile: "+opts.Profile, "Create or select a Hermes profile before project install.")
+				finalize(&result)
+				return result, nil
+			}
+			addConflict(&result, "profile_unreadable", "", ".", "Hermes profile is not readable: "+err.Error(), "Fix profile permissions and rerun dry-run.")
+			finalize(&result)
+			return result, nil
+		} else if !st.IsDir() {
+			addConflict(&result, "profile_not_directory", "", ".", "Hermes profile root is not a directory: "+profileRoot, "Use a valid Hermes profile root.")
+			finalize(&result)
+			return result, nil
+		}
 	}
 	if !validProjectID.MatchString(opts.Project) {
 		addConflict(&result, "invalid_project_id", "", "", fmt.Sprintf("project id %q is not a safe project suite id", opts.Project), "Use lowercase letters, digits, and hyphens without path separators.")
@@ -160,13 +219,21 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 		return result, nil
 	}
 
-	packs, err := discovery.DiscoverSourcePacks(sourceRepo)
+	packs, registryChecksum, err := discoverDefaultProjectSuite(sourceRepo)
 	if err != nil {
-		return Result{}, err
+		addConflict(&result, "source_suite_unreadable", "", "", err.Error(), "Fix skill-pack.yaml/source suite discovery before approved install.")
+		finalize(&result)
+		return result, nil
 	}
-	planned, changed, conflicts := planVirtualSuite(sourceRepo, profileRoot, opts.Project, packs)
+	trust, manifestConflicts, manifestChecksum := trustedProjectSuite(profileRoot, opts.Project, opts.SourcePack)
+	for _, c := range manifestConflicts {
+		result.Conflicts = append(result.Conflicts, c)
+		result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: c.Condition, Message: c.Message})
+	}
+	planned, changed, conflicts, backups := planVirtualSuite(sourceRepo, profileRoot, opts.Project, packs, trust)
 	result.PlannedSkills = planned
 	result.ChangedPaths = changed
+	result.BackupPlan = backups
 	for _, conflict := range conflicts {
 		result.Conflicts = append(result.Conflicts, conflict)
 		result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: conflict.Condition, Message: conflict.Message})
@@ -176,7 +243,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 		packChecksums[pack.PackID] = sha256String(pack.Checksum)
 	}
 	result.SourcePack.PackChecksums = packChecksums
-	result.SourcePack.SuiteChecksum = checksumAny(packChecksums)
+	result.SourcePack.SuiteChecksum = checksumAny(map[string]any{"registry_sha256": registryChecksum, "pack_checksums": packChecksums})
 
 	nonUmbrella := 0
 	for _, skill := range result.PlannedSkills {
@@ -188,6 +255,9 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 		addConflict(&result, "umbrella_only", opts.Project+"-kas", "skills/"+opts.Project+"/"+opts.Project+"-kas/SKILL.md", "source suite produced no non-umbrella project-prefixed skills", "Select a full source suite with project phase skills before approved install.")
 	}
 	scanProfileConflicts(&result, profileRoot, opts.Project)
+	if manifestChecksum != nil {
+		result.TargetProfile.PreviousManifestSHA256 = manifestChecksum
+	}
 	result.PlannedManifest = plannedManifest(opts, result.SourcePack.SuiteChecksum, result.PlannedSkills)
 	finalize(&result)
 	return result, nil
@@ -203,6 +273,7 @@ func RenderHumanDryRun(result Result) string {
 		fmt.Sprintf("소스 팩: %s", result.SourcePack.ID),
 		fmt.Sprintf("계획: skills %d, conflicts %d, plan_hash %s", result.Summary.TotalSkills, result.Summary.ConflictCount, result.PlanHash),
 		"쓰기: dry-run only; profile/manifest/KAH/KAB writes 0.",
+		"승인 증거: " + result.ApprovalRequest.EvidenceRef,
 	}
 	for _, conflict := range result.Conflicts {
 		lines = append(lines, "충돌: "+conflict.Condition+" — "+conflict.Message)
@@ -223,24 +294,36 @@ func baseResult(sourceRepo string, profileRoot string, opts Options) Result {
 		SourceRepo:       discovery.SourceRepoInfo(sourceRepo),
 		TargetProfile:    discovery.TargetProfile{Name: opts.Profile, Root: profileRoot, ManifestPath: manifestPath, ManifestState: manifestState(manifestPath)},
 		Project:          Project{ID: opts.Project, TargetSuitePath: "skills/" + opts.Project},
-		SourcePack:       SourcePack{ID: opts.SourcePack, ResolvedFrom: "repo_discovery", SourceRepo: discovery.SourceRepoInfo(sourceRepo), PackChecksums: map[string]string{}, FormalRegistry: "not_added_for_kasproj_002"},
-		ProjectTailoring: ProjectTailoring{Mode: "dry_run_prefix_render_only", Preserves: []string{"project_language", "project_runtime", "project_test_commands", "project_authority_ladder"}, Source: "source_pack_metadata_and_project_id", SemanticPortRequiredBeforeApprovedInstall: true, SemanticAdaptationClaimed: false},
+		SourcePack:       SourcePack{ID: opts.SourcePack, ResolvedFrom: "skill-pack.yaml", SourceRepo: discovery.SourceRepoInfo(sourceRepo), PackChecksums: map[string]string{}, FormalRegistry: "skill-pack.yaml"},
+		ProjectTailoring: ProjectTailoring{Mode: "prefix_render_only", Preserves: []string{"project_language", "project_runtime", "project_test_commands", "project_authority_ladder"}, Source: "skill-pack.yaml_and_project_id", SemanticPortRequiredBeforeApprovedInstall: false, SemanticAdaptationClaimed: false},
 		PlannedSkills:    []PlannedSkill{},
 		ChangedPaths:     []ChangedPath{},
+		BackupPlan:       []BackupEntry{},
 		Conflicts:        []Conflict{},
 		Diagnostics:      []discovery.Diagnostic{},
-		NextAction:       "Review this dry-run plan hash. Approved project install remains KASPROJ-003.",
+		NextAction:       "Review changed_paths and approve with install-project-kas --approve dry-run:<plan_hash>; project doctor/repair remains KASPROJ-004.",
 	}
 }
 
-func planVirtualSuite(sourceRepo string, profileRoot string, project string, packs []discovery.SourcePack) ([]PlannedSkill, []ChangedPath, []Conflict) {
+func planVirtualSuite(sourceRepo string, profileRoot string, project string, packs []discovery.SourcePack, trust map[string]manifestSkillRecord) ([]PlannedSkill, []ChangedPath, []Conflict, []BackupEntry) {
 	planned := []PlannedSkill{}
 	changed := []ChangedPath{}
 	conflicts := []Conflict{}
+	backups := []BackupEntry{}
+	seenSkills := map[string]bool{}
+	seenTargets := map[string]bool{}
 	for _, pack := range packs {
 		sourceSkill := sourceSkillID(pack.PackID)
 		installed := renderInstalledSkill(project, sourceSkill)
 		target := filepath.ToSlash(filepath.Join("skills", project, installed, "SKILL.md"))
+		if seenSkills[installed] {
+			conflicts = append(conflicts, conflict("duplicate_installed_skill", project, installed, target, "source suite maps multiple skills to the same installed skill", "Fix kas-default-project-suite mapping before approved install."))
+		}
+		if seenTargets[target] {
+			conflicts = append(conflicts, conflict("duplicate_target_path", project, installed, target, "source suite maps multiple skills to the same target path", "Fix kas-default-project-suite mapping before approved install."))
+		}
+		seenSkills[installed] = true
+		seenTargets[target] = true
 		if isGenericInstalledSkill(installed, project) {
 			conflicts = append(conflicts, conflict("generic_installed_skill_name", project, installed, target, "planned installed skill is generic or lacks the project prefix", "Fix the source suite mapping so every installed skill starts with "+project+"-."))
 		}
@@ -253,16 +336,24 @@ func planVirtualSuite(sourceRepo string, profileRoot string, project string, pac
 			content = []byte{}
 		}
 		newSHA := sha256Bytes(content)
-		action, prev, errCode, errMessage := targetAction(profileRoot, target, newSHA)
+		action, prev, errCode, errMessage := targetAction(profileRoot, target, newSHA, trust[target])
 		if errCode != "" {
 			conflicts = append(conflicts, conflict(errCode, project, installed, target, errMessage, "Resolve the existing profile target before approved install."))
 		}
-		planned = append(planned, PlannedSkill{SourcePackID: pack.PackID, SourceSkill: sourceSkill, InstalledSkill: installed, TargetPath: target, DriftPolicy: "manual_review_required", Checksum: newSHA, Action: action, Bytes: len(content), TailoringMode: "dry_run_prefix_render_only"})
-		changed = append(changed, ChangedPath{Path: target, Action: action, InstalledSkill: installed, SourcePackID: pack.PackID, PreviousSHA256: prev, NewSHA256: newSHA, Bytes: len(content), ErrorCode: errCode, ErrorMessage: errMessage})
+		tailoringMode := "prefix_render_only"
+		planned = append(planned, PlannedSkill{SourcePackID: pack.PackID, SourceSkill: sourceSkill, InstalledSkill: installed, TargetPath: target, DriftPolicy: "manual_review_required", Checksum: newSHA, Action: action, Bytes: len(content), TailoringMode: tailoringMode})
+		entry := ChangedPath{Path: target, Action: action, InstalledSkill: installed, SourcePackID: pack.PackID, PreviousSHA256: prev, NewSHA256: newSHA, Bytes: len(content), ErrorCode: errCode, ErrorMessage: errMessage}
+		if action == "update" && prev != nil {
+			backup := BackupEntry{Path: target, BackupPath: filepath.ToSlash(filepath.Join(".kas", "backups", "dry-run", filepath.FromSlash(target))), PreviousSHA256: *prev, Bytes: len(content)}
+			entry.BackupPath = backup.BackupPath
+			backups = append(backups, backup)
+		}
+		changed = append(changed, entry)
 	}
 	sort.Slice(planned, func(i, j int) bool { return planned[i].TargetPath < planned[j].TargetPath })
 	sort.Slice(changed, func(i, j int) bool { return changed[i].Path < changed[j].Path })
-	return planned, changed, conflicts
+	sort.Slice(backups, func(i, j int) bool { return backups[i].Path < backups[j].Path })
+	return planned, changed, conflicts, backups
 }
 
 func plannedSkillContent(sourceRepo string, pack discovery.SourcePack, sourceSkill string, installed string) ([]byte, error) {
@@ -281,7 +372,7 @@ func plannedSkillContent(sourceRepo string, pack discovery.SourcePack, sourceSki
 	return []byte(content), nil
 }
 
-func targetAction(profileRoot string, target string, newSHA string) (string, *string, string, string) {
+func targetAction(profileRoot string, target string, newSHA string, trusted manifestSkillRecord) (string, *string, string, string) {
 	abs := filepath.Join(profileRoot, filepath.FromSlash(target))
 	info, err := os.Lstat(abs)
 	if err != nil {
@@ -298,10 +389,22 @@ func targetAction(profileRoot string, target string, newSHA string) (string, *st
 		return "error", nil, "target_read_failed", err.Error()
 	}
 	prev := sha256Bytes(data)
-	if prev == newSHA {
-		return "skip", &prev, "existing_target_not_manifested", "existing target exists but no KASPROJ manifest is trusted in KASPROJ-002 dry-run"
+	if trusted.TargetPath == "" {
+		if prev == newSHA {
+			return "conflict", &prev, "existing_target_not_manifested", "existing target exists but no trusted project suite manifest entry owns it"
+		}
+		return "conflict", &prev, "existing_target_not_manifested", "existing target exists but is not trusted by a KAS project suite manifest"
 	}
-	return "conflict", &prev, "existing_target_not_manifested", "existing target exists but is not trusted by a KASPROJ manifest"
+	if trusted.Checksum == "" {
+		return "error", &prev, "manifest_checksum_missing", "trusted project suite manifest entry is missing checksum"
+	}
+	if prev != trusted.Checksum {
+		return "conflict", &prev, "profile_local_modification", "existing target differs from the trusted project suite manifest checksum"
+	}
+	if prev == newSHA {
+		return "skip", &prev, "", ""
+	}
+	return "update", &prev, "", ""
 }
 
 func scanProfileConflicts(result *Result, profileRoot string, project string) {
@@ -340,29 +443,34 @@ func plannedManifest(opts Options, sourceChecksum string, skills []PlannedSkill)
 	}
 	return map[string]any{
 		"version": ManifestVersion,
-		"kind":    ManifestKind,
-		"profile": opts.Profile,
+		"kind":    ProfileManifestKind,
+		"profile": map[string]any{"name": opts.Profile},
 		"project_suites": []map[string]any{{
-			"project":          opts.Project,
-			"source_pack":      map[string]any{"id": opts.SourcePack, "repo": "kkachi-hermes-skills", "checksum": sourceChecksum, "language_profile": "project-specific-prefix-render-only", "formal_registry": "not_added_for_kasproj_002"},
-			"drift_policy":     "manual_review_required",
-			"installed_skills": installed,
+			"kind":                        ManifestKind,
+			"project":                     opts.Project,
+			"source_pack":                 map[string]any{"id": opts.SourcePack, "repo": "kkachi-hermes-skills", "checksum": sourceChecksum, "language_profile": "project-specific-prefix-render-only", "formal_registry": "skill-pack.yaml"},
+			"drift_policy":                "manual_review_required",
+			"semantic_adaptation_claimed": false,
+			"installed_skills":            installed,
 		}},
+		"installs": []any{},
 	}
 }
 
 func finalize(result *Result) {
-	counts := map[string]int{"create": 0, "update": 0, "skip": 0, "conflict": 0, "error": 0}
+	counts := map[string]int{"create": 0, "update": 0, "skip": 0, "conflict": 0, "error": 0, "backup": 0, "manifest_update": 0}
 	for _, changed := range result.ChangedPaths {
 		counts[changed.Action]++
 	}
 	result.Summary = Summary{TotalSkills: len(result.PlannedSkills), TotalFiles: len(result.ChangedPaths), CountsByAction: counts, ConflictCount: len(result.Conflicts), DiagnosticCount: len(result.Diagnostics)}
 	result.Checksums = Checksums{SourcePack: result.SourcePack.SuiteChecksum, PlannedManifest: checksumAny(result.PlannedManifest), PlannedSkills: checksumAny(result.PlannedSkills), ChangedPaths: checksumAny(result.ChangedPaths)}
-	canonical := map[string]any{"command": result.Command, "mode": result.Mode, "dry_run": result.DryRun, "no_write": result.NoWrite, "project": result.Project, "source_pack": result.SourcePack, "project_tailoring": result.ProjectTailoring, "summary": result.Summary, "planned_manifest": result.PlannedManifest, "planned_skills": result.PlannedSkills, "changed_paths": result.ChangedPaths, "checksums": result.Checksums, "conflicts": result.Conflicts, "diagnostics": result.Diagnostics}
+	canonical := map[string]any{"command": result.Command, "mode": result.Mode, "cli_version": result.CLIVersion, "dry_run": result.DryRun, "no_write": result.NoWrite, "source_repo": result.SourceRepo, "target_profile": result.TargetProfile, "manifest_path": result.TargetProfile.ManifestPath, "manifest_state": result.TargetProfile.ManifestState, "previous_manifest_sha256": result.TargetProfile.PreviousManifestSHA256, "project": result.Project, "source_pack": result.SourcePack, "project_tailoring": result.ProjectTailoring, "summary": result.Summary, "planned_manifest": result.PlannedManifest, "planned_skills": result.PlannedSkills, "changed_paths": result.ChangedPaths, "backup_plan": result.BackupPlan, "checksums": result.Checksums, "conflicts": result.Conflicts, "diagnostics": result.Diagnostics}
 	result.PlanHash = checksumAny(canonical)
+	result.ApprovalRequest = ApprovalRequest{Required: result.OK, EvidenceRef: "dry-run:" + result.PlanHash, DryRunPlanHash: result.PlanHash, HashIncludesProfile: true, HashIncludesManifestState: true, HashIncludesSourceSuite: true, HashIncludesNoWriteEvidence: true, HashIncludesBackupPlan: true, HashIncludesConflictsAndDiags: true}
 	result.OK = len(result.Conflicts) == 0 && noErrorDiagnostics(result.Diagnostics)
 	if !result.OK {
-		result.NextAction = "Resolve project-suite conflicts and rerun dry-run. Approved project install remains KASPROJ-003."
+		result.ApprovalRequest.Required = false
+		result.NextAction = "Resolve project-suite conflicts and rerun dry-run; approved install fails closed until the current plan is ok:true."
 	}
 }
 

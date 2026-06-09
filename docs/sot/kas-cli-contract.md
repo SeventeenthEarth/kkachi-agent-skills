@@ -73,7 +73,7 @@ For project-specific suite installs, the target path must use:
 skills/<project>/<project>-<phase-or-skill>/SKILL.md
 ```
 
-This extends the profile-scoped manifest vocabulary. The current CLI implements KASPROJ-002 read-only project-suite dry-run planning, but must not be described as already performing approved install, repair, or migration for project-specific suites until KASPROJ-003 through KASPROJ-004 provide implementation evidence.
+This extends the profile-scoped manifest vocabulary. The current CLI implements KASPROJ-002 read-only project-suite dry-run planning and KASPROJ-003 approval-hash-bound project-suite install, but must not be described as performing project-suite doctor, repair, migration, semantic-port completion, operational rollout, or KAB runtime activation until later gated tasks provide implementation evidence.
 
 ## 5. First-run operator path
 
@@ -705,19 +705,18 @@ Minimum JSON shape:
 ```
 
 
-### 6.7 Project-specific dry-run install planner and later extensions
+### 6.7 Project-specific dry-run and approved install
 
 `docs/sot/project-specific-kas-install-contract.md` is the detailed SOT for the
-KASPROJ project-specific install layout. KASPROJ-002 implements this dry-run-only
-planner command:
+KASPROJ project-specific install layout. KASPROJ-002 implements the dry-run planner and KASPROJ-003 implements approval-hash-bound install:
 
 ```bash
 kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --dry-run [--json]
 ```
 
-The implemented source pack for KASPROJ-002 is the virtual `kas-default-project-suite`, resolved read-only from current discovered source skills under repo `skills/`. The command also accepts `--repo` and harness-only `--profile-root` when `KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1`. Missing `--dry-run`, missing required flags, `--approve`, and write/approval forms fail closed with exit 2 and `ok:false` JSON when `--json` is requested.
+The implemented source pack is `kas-default-project-suite`, resolved from repository `skill-pack.yaml` plus current discovered source skills under repo `skills/`. The command also accepts `--repo` and harness-only `--profile-root` when `KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1`. Missing both `--dry-run`/`--approve`, using both together, malformed `--approve`, missing required flags, unsupported write/force/repair/migrate/from-generic flags, and unguarded profile-root overrides fail closed with exit 2 and `ok:false` JSON when `--json` is requested.
 
-Dry-run JSON evidence includes `ok`, `command`, `mode`, `cli_version`, `dry_run`, `no_write`, `project`, `source_pack`, `project_tailoring`, `summary`, `planned_manifest`, `planned_skills`, `changed_paths`, `checksums`, `plan_hash`, `conflicts`, `diagnostics`, and `next_action`. The `plan_hash` binds canonical no-write evidence, conflicts, diagnostics, planned manifest, planned skills, changed paths, and checksums. The planner performs no profile writes and does not create profile roots, skill directories, manifest files, `.kas` directories, KAH state, KAB runtime state, auth paths, token files, gateway config, provider config, or model config.
+Dry-run JSON evidence includes `ok`, `command`, `mode`, `cli_version`, `dry_run`, `no_write`, `project`, `source_pack`, `project_tailoring`, `summary`, `planned_manifest`, `planned_skills`, `changed_paths`, `backup_plan`, `checksums`, `plan_hash`, `approval_request`, `conflicts`, `diagnostics`, and `next_action`. The `plan_hash` binds CLI version, target profile/root, manifest path/state/previous manifest sha, source repo commit/dirty, formal source suite checksum, planned manifest/skills, changed paths, conflicts/diagnostics, backup plan, and no-write evidence. The planner performs no profile writes and does not create profile roots, skill directories, manifest files, `.kas` directories, KAH state, KAB runtime state, auth paths, token files, gateway config, provider config, or model config.
 
 KASPROJ-002 conflict example:
 
@@ -740,26 +739,33 @@ KASPROJ-002 conflict example:
 }
 ```
 
-Reserved later command intents may include equivalent names to these forms after
-KASPROJ implementation review:
+Approved install form:
 
 ```bash
-kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --approve dry-run:<hash> [--json]
+kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --approve dry-run:<hash> [--json]
+```
+
+Approved install recomputes the current dry-run, compares the approval evidence to the recomputed `plan_hash`, and writes nothing unless the hash matches and the plan has no conflicts/errors. It preflights all targets and source checksums, rejects unsafe/path-traversing/symlink-escaping/ambiguous/duplicate/local-modified targets, backs up trusted replacements under `.kas/backups/<install_id>/`, atomically writes project skill files, verifies checksums, and writes `.kas/skill-pack-manifest.json` last. Output includes approval evidence, `install_id`, `manifest_path`, backup/recovery evidence, changed path counts/actions, and a next action noting KASPROJ-004 project doctor/repair remains separate.
+
+Reserved later command intents may include equivalent names to these forms after KASPROJ-004 implementation review:
+
+```bash
 kkachi-hermes-skills doctor --profile <profile> --project <project> --project-suite [--json]
 kkachi-hermes-skills repair-project-kas --profile <profile> --project <project> --dry-run [--json]
 kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run [--json]
 ```
 
-Contractual rules for those commands:
+Contractual rules for project commands:
 
 - dry-run planner behavior belongs to KASPROJ-002 and performs no profile writes;
-- approved project-specific install belongs to KASPROJ-003 and must require approval evidence matching the dry-run plan hash;
+- approved project-specific install belongs to KASPROJ-003 and requires approval evidence matching the recomputed dry-run plan hash;
 - doctor/repair/migrate behavior belongs to KASPROJ-004 and must use the severity semantics from the project-specific install SOT;
 - repair and migration must be dry-run-first, approval-gated, backup-aware, and must not silently convert generic skills into project-tailored skills;
 - all project-suite writes must use `target_path` values under `skills/<project>/<project>-<phase-or-skill>/SKILL.md`;
 - umbrella-only installs are incomplete/invalid and must not be treated as healthy;
 - duplicate generic installed skill names such as `kkachi-plan` are invalid for one-profile multi-project suites;
-- no later command may mutate auth, tokens, secrets, gateway, provider/model config, KAH project state, or KAB runtime state.
+- no project command may mutate auth, tokens, secrets, gateway, provider/model config, KAH project state, or KAB runtime state;
+- KASPROJ-003 is prefix-render-only: it records `semantic_adaptation_claimed:false`, preserves `drift_policy: manual_review_required`, and must not claim semantic-port completion or operational rollout.
 
 Doctor severity names reserved for KASPROJ are `error` and `warning` with these
 required conditions: missing project suite, umbrella-only, missing file, and

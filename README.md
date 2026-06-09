@@ -75,6 +75,7 @@ kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --
 kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --approve dry-run:<hash> [--json]
 kkachi-hermes-skills doctor [--repo <path>] --profile <profile> [--project <path>] [--json]
 kkachi-hermes-skills install-project-kas [--repo <path>] --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run [--json]
+kkachi-hermes-skills install-project-kas [--repo <path>] --profile <profile> --project <project> --source-pack kas-default-project-suite --approve dry-run:<hash> [--json]
 ```
 
 `list` discovers source KAS packs from `skills/`, reports direct-layout packs
@@ -90,7 +91,7 @@ copy install requires `--approve dry-run:<hash>`, recomputes the plan, fails
 closed on hash mismatch, copies selected packs into the target profile, records
 manifest/checksum evidence, and prints recovery guidance.
 
-`install-project-kas --dry-run` is the KASPROJ-002 read-only planner for project-specific KAS suites. It renders project-prefixed planned skill names and `skills/<project>/<project>-.../SKILL.md` target paths, emits no-write/checksum/plan-hash evidence, and does not create profile roots, manifests, KAH state, KAB runtime state, or approved installs. KASPROJ-003 remains required for any write-capable project install.
+`install-project-kas --dry-run` is the KASPROJ-002 read-only planner for project-specific KAS suites. It renders project-prefixed planned skill names and `skills/<project>/<project>-.../SKILL.md` target paths, emits no-write/checksum/plan-hash evidence, and does not create profile roots, manifests, KAH state, KAB runtime state, or approved installs. `install-project-kas --approve dry-run:<hash>` is the KASPROJ-003 approved install path: it recomputes the current dry-run, fails closed unless the approval hash matches, writes only the selected profile project suite, backs up trusted replacements, updates the compatible KAS profile manifest `project_suites[]` last, records `semantic_adaptation_claimed:false`, and does not claim semantic-port completion, KAB activation, or operational rollout. Project doctor/repair remains KASPROJ-004.
 
 `doctor` verifies source pack integrity, installed profile state,
 manifest/checksum consistency, KAH availability/version/capabilities, optional

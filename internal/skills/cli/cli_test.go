@@ -23,6 +23,17 @@ func writeCLITestSkill(t *testing.T, dir string, name string) {
 	}
 }
 
+func writeCLITestSkillPackYAML(t *testing.T, repo string, skills ...string) {
+	t.Helper()
+	content := "name: fixture\nversion: 0.1.0\nskills:\n"
+	for _, skill := range skills {
+		content += "  - " + skill + "\n"
+	}
+	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func assertCLIErrorCode(t *testing.T, data []byte, code string) {
 	t.Helper()
 	var payload map[string]any
@@ -80,6 +91,7 @@ func TestInstallProjectKASJSONShapeAndNoWrite(t *testing.T) {
 	repo := filepath.Join(dir, "repo")
 	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan")
 	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-final-verify"), "kkachi-final-verify")
+	writeCLITestSkillPackYAML(t, repo, "kkachi-plan", "kkachi-final-verify")
 	profileRoot := filepath.Join(dir, "profiles", "kwanwoo")
 
 	var stdout, stderr bytes.Buffer
@@ -109,15 +121,16 @@ func TestInstallProjectKASJSONShapeAndNoWrite(t *testing.T) {
 		t.Fatalf("unexpected project evidence: %+v", project)
 	}
 	sourcePack := payload["source_pack"].(map[string]any)
-	if sourcePack["id"] != projectinstall.VirtualSourcePackID || sourcePack["formal_registry"] != "not_added_for_kasproj_002" {
+	if sourcePack["id"] != projectinstall.VirtualSourcePackID || sourcePack["formal_registry"] != "skill-pack.yaml" {
 		t.Fatalf("unexpected source pack evidence: %+v", sourcePack)
 	}
 }
 
-func TestInstallProjectKASFailClosedGuards(t *testing.T) {
+func TestInstallProjectKASApprovedInstallAndFailClosedGuards(t *testing.T) {
 	dir := t.TempDir()
 	repo := filepath.Join(dir, "repo")
 	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan")
+	writeCLITestSkillPackYAML(t, repo, "kkachi-plan")
 	profileRoot := filepath.Join(dir, "profile")
 	base := []string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--profile-root", profileRoot, "--json"}
 
@@ -126,7 +139,7 @@ func TestInstallProjectKASFailClosedGuards(t *testing.T) {
 	if code != 2 {
 		t.Fatalf("expected missing dry-run exit 2, got %d", code)
 	}
-	assertCLIErrorCode(t, stderr.Bytes(), "project_install_requires_dry_run")
+	assertCLIErrorCode(t, stderr.Bytes(), "project_install_requires_dry_run_or_approve")
 
 	for name, args := range map[string][]string{
 		"profile":     {"install-project-kas", "--repo", repo, "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--json"},
@@ -162,17 +175,33 @@ func TestInstallProjectKASFailClosedGuards(t *testing.T) {
 	stderr.Reset()
 	code = Main(append(base, "--dry-run", "--approve", "dry-run:sha256:abc"), &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
 	if code != 2 {
-		t.Fatalf("expected approve rejection, got %d", code)
+		t.Fatalf("expected ambiguous mode rejection, got %d", code)
 	}
-	assertCLIErrorCode(t, stderr.Bytes(), "project_install_approve_unsupported")
+	assertCLIErrorCode(t, stderr.Bytes(), "project_install_mode_ambiguous")
 
 	stdout.Reset()
 	stderr.Reset()
-	code = Main(append(base, "--dry-run", "--approve"), &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	code = Main(append(base, "--approve", "not-a-dry-run-hash"), &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 2 {
+		t.Fatalf("expected malformed approve rejection, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "approval_evidence_malformed")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main(append(base, "--approve", "--json"), &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
 	if code != 2 {
 		t.Fatalf("expected valueless approve rejection, got %d", code)
 	}
-	assertCLIErrorCode(t, stderr.Bytes(), "project_install_approve_unsupported")
+	assertCLIErrorCode(t, stderr.Bytes(), "approval_evidence_malformed")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main(append(base, "--approve", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000"), &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 2 {
+		t.Fatalf("expected wrong hash rejection, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "approval_plan_hash_mismatch")
 
 	stdout.Reset()
 	stderr.Reset()
@@ -181,14 +210,44 @@ func TestInstallProjectKASFailClosedGuards(t *testing.T) {
 		t.Fatalf("expected write form rejection, got %d", code)
 	}
 	assertCLIErrorCode(t, stderr.Bytes(), "project_install_write_form_unsupported")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main(append(base, "--dry-run"), &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 0 {
+		t.Fatalf("dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var dryRun map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &dryRun); err != nil {
+		t.Fatal(err)
+	}
+	evidence := dryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
+	stdout.Reset()
+	stderr.Reset()
+	code = Main(append(base, "--approve", evidence), &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 0 {
+		t.Fatalf("approved install failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var approved map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &approved); err != nil {
+		t.Fatal(err)
+	}
+	if approved["ok"] != true || approved["mode"] != "project_approved_copy" || approved["install_id"] == "" {
+		t.Fatalf("unexpected approved payload: %+v", approved)
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); err != nil {
+		t.Fatalf("approved install did not write project skill: %v", err)
+	}
 }
 
 func TestInstallProjectKASConflictJSONExitsTwo(t *testing.T) {
 	dir := t.TempDir()
 	repo := filepath.Join(dir, "repo")
 	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-kas"), "kkachi-kas")
+	writeCLITestSkillPackYAML(t, repo, "kkachi-kas")
+	profileRoot := filepath.Join(dir, "profile")
 	var stdout, stderr bytes.Buffer
-	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--json"}, &stdout, &stderr, nil)
+	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
 	if code != 2 {
 		t.Fatalf("expected umbrella-only exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
 	}
