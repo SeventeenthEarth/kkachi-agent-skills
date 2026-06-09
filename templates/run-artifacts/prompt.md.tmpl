@@ -15,6 +15,22 @@ Prompt profile: `{{ prompt_profile }}@{{ prompt_profile_version }}`
 - `context-pack.md`
 - project overlay: `{{ project_overlay_path }}`
 
+## Output policy
+
+Product/backend output must be English for both direct Codex app-server and KAB-mediated backend lanes. Console output must stay compact:
+
+```text
+Status: <pass|fail|blocked|in_progress|not_applicable>
+Summary: <1-5 bullets>
+Files: <changed/inspected paths only>
+Verification: <commands/checks and short result>
+Risks/blockers: <only actionable remaining issues>
+Detailed artifact: <path or not_applicable reason>
+Next action requested: <approval/review/none>
+```
+
+Detailed plans, logs, diffs, reviews, findings, and file excerpts belong in `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md` or the concrete phase artifact requested by KHS. Do not paste long plans, full diffs, full logs, full file contents, long reviews, or exhaustive checklist text into chat. If the detailed artifact cannot be written, report `Status: blocked` with the artifact-write blocker and do not dump the full detail into chat.
+
 ## Prompt body
 
 ```text
@@ -37,3 +53,5 @@ KHS will parse and normalize that seed into `checklist.md`; the backend's seed i
 - constraints preserved from task contract: `<yes|no>`
 - non-goals preserved from task contract: `<yes|no>`
 - verification contract preserved from task contract: `<yes|no>`
+- English compact output policy preserved: `<yes|no>`
+- artifact-first detail policy preserved: `<yes|no>`

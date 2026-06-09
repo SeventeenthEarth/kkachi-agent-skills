@@ -72,6 +72,11 @@ task_classification_policy:
     - simple_command_report
     - bootstrap_config
     - collaboration_review
+  aliases:
+    simple_report: simple_command_report
+    investigation: research_evidence
+    review: collaboration_review
+    docs_only: docs_only
   rules:
     - "Do not classify every chat turn; first decide whether KHS mode is active for this project/run."
     - "Do not apply the full development spine to read-only research, evidence collection, simple command/report, or pure docs tasks."
@@ -80,6 +85,8 @@ task_classification_policy:
     - "Long-lived team-member collaboration uses Kanban evidence; temporary subagents do not count as team-member delegation."
     - "State investigation that only reports current facts maps to research_evidence; changing spec/SOT/roadmap/handoff from that evidence maps to docs_only + Path B unless it also changes executable behavior or execution policy."
     - "If a docs-only task changes architecture, process policy, contracts, roadmap status, or examples that tests validate, require docs validation and consider CodeGraph refresh."
+    - "SOT aliases are accepted only through the explicit mapping simple_report/simple_command_report, investigation/research_evidence, review/collaboration_review, and docs_only/docs_only."
+    - "Simple report/status, investigation/research evidence, and docs-only paths must not inherit implementation, enhance_test, optimize, or broad review loops unless the task contract records a classification change and reason."
   default_spines:
     development_full:
       phases: [codegraph_refresh, plan, ask, implement, enhance_test, optimize, update_docs, request_feedback, handle_feedback, final_verify, improve]
@@ -93,6 +100,22 @@ task_classification_policy:
       phases: [task_contract, preflight, configure, verification, final_verify]
     review_light:
       phases: [task_contract, review_request, feedback_evidence, final_verify]
+
+output_policy:
+  language: english_product_and_backend_output
+  compact_console_schema:
+    - "Status: <pass|fail|blocked|in_progress|not_applicable>"
+    - "Summary: <1-5 bullets>"
+    - "Files: <changed/inspected paths only>"
+    - "Verification: <commands/checks and short result>"
+    - "Risks/blockers: <only actionable remaining issues>"
+    - "Detailed artifact: <path or not_applicable reason>"
+    - "Next action requested: <approval/review/none>"
+  artifact_first_detail_path: ".kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md"
+  fail_closed_rule: "If a backend cannot write the detailed artifact, report Status: blocked with the artifact-write blocker and do not dump long plans, logs, diffs, files, reviews, or checklists into chat."
+  applies_to:
+    - direct_codex_app_server
+    - kab_mediated_backend_lanes
 
 codegraph_policy:
   first_task_completion_command: "codegraph init -i"

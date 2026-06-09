@@ -13,7 +13,10 @@ KAB does not own this file. KAB supplies the backend-authored plan text and sour
 - Every canonical KHS phase must have a row.
 - Required phases must not be removed.
 - Skipped or not-applicable phases must keep a row with an explicit reason.
+- Simple reports/status checks, investigations/research evidence, and docs-only tasks must not inherit implementation, enhance-test, optimize, or broad review loops unless the task contract records a classification change.
 - Each row must name the expected artifact or evidence used to prove completion.
+- Backend console summaries must stay English and compact: Status, Summary, Files, Verification, Risks/blockers, Detailed artifact, Next action requested.
+- Detailed backend output must be artifact-first under `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md`; artifact-write blockers fail closed instead of triggering full chat dumps.
 - Code-change and process-changing runs must include CodeGraph refresh evidence before backend planning.
 - Code-change runs must record `make test` evidence after implementation, test enhancement, AI slop cleanup, and optimization whenever those stages change files.
 - Hermes updates `State` after each phase and uses this file during `final_verify`.

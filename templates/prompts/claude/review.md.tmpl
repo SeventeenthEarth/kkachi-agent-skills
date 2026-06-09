@@ -10,3 +10,10 @@ Return:
 - evidence
 - verification gaps
 - scope or docs drift
+
+Output policy:
+- Product/backend output must be English.
+- Keep console output compact with: Status, Summary, Files, Verification, Risks/blockers, Detailed artifact, Next action requested.
+- Write detailed review findings to `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md` or the requested review artifact.
+- Do not paste long reviews, full diffs, full logs, full file contents, long plans, or exhaustive checklists into chat.
+- If the detailed artifact cannot be written or updated, report Status: blocked and the artifact-write blocker instead of dumping the detail into chat.

@@ -44,6 +44,8 @@ Render planner prompts so every command example uses the real user home, for exa
 
 Record deviations in `phase-plan.yaml`, `checklist.md`, and the final report instead of silently using a lighter path. For `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`, use the selected light spine from `task-contract.yaml`; do not manufacture implementation/test/optimize phases unless the classification changes to `development`.
 
+Planner product output for both Stage 1 direct Codex app-server and KAB-mediated lanes must be English and compact: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Write detailed planning content to `plan.md` and, when backend-authored phase detail is needed, `.kkachi/runs/<run_id>/artifacts/plan/backend-plan.md` or the equivalent requested phase artifact. If the artifact cannot be written, report `Status: blocked` with the artifact-write blocker; do not paste full plans, logs, diffs, files, reviews, or exhaustive checklists into chat.
+
 Before backend planning for a code-changing or process-changing task, refresh CodeGraph evidence for the target repository. If `.codegraph/` already exists, run `codegraph index <repo>` and preserve `codegraph status <repo>` output. If CodeGraph is due for first initialization after the first completed task and `.codegraph/` is missing, run `codegraph init -i <repo>` and preserve status evidence. If CodeGraph is unavailable, record the missing capability as a blocker or degraded-evidence reason instead of silently planning from stale code context.
 
 ## Inputs

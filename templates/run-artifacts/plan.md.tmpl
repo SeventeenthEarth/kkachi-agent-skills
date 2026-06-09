@@ -17,6 +17,8 @@ Approved after capture: `<yes|no>`
 
 When a KAB planner lane is used, copy KAB response field `plan.plan_text` into this artifact before implementation starts. For explicitly authorized KAS/KAH-local planning, record the non-KAB plan source here and do not claim KAB plan lifecycle evidence.
 
+Planner console output must use the English compact schema: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Detailed plans belong in this artifact, `.kkachi/runs/<run_id>/artifacts/plan/backend-plan.md`, or the general phase pattern `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md`; if the artifact cannot be written, the planner must report the blocker compactly and must not dump the full plan into chat.
+
 For Claude, GLM, and Codex, `plan approve` starts implementation immediately, so capture must happen while the session is in `plan_pending_approval` and before approval.
 
 For Gemini and OpenCode, capture is valid in `plan_pending_approval` or `plan_approved_waiting_for_start`; implementation must not start until the plan is preserved here and checklist.md is created/updated.
@@ -38,6 +40,8 @@ If OpenCode reports `PLAN_AMBIGUOUS`, stop and resolve the `.sisyphus/plans/*.md
 ## KHS Checklist Seed Capture
 
 KHS should request this section from the planner backend, then use it as input for `checklist.md`. This seed is not itself the normalized KHS checklist; KHS/Hermes must validate and normalize it against `registries/phase-contracts.yaml`.
+
+The seed must include explicit skipped-phase reasons for `simple_report`/`simple_command_report`, `investigation`/`research_evidence`, and `docs_only` runs so those task classes do not inherit implementation, enhance-test, optimize, or broad review loops unless classification changes.
 
 Expected seed shape inside `plan.plan_text`:
 
@@ -64,6 +68,14 @@ Link or summarize `acceptance-criteria.md`.
 ## Verification Strategy
 
 List exact checks expected before final verification.
+
+TOKEN-002 verification hooks:
+
+- compact schema present in SOT, registries, templates, and skills;
+- artifact-first/fail-closed policy present in active prompt and run-artifact surfaces;
+- task-class gating and aliases present for `simple_report`/`simple_command_report`, `investigation`/`research_evidence`, `review`/`collaboration_review`, and `docs_only`;
+- scoped Korean product-output check over backend prompts, run artifacts, and relevant registries;
+- forbidden broad long-output dumping wording search.
 
 ## Implementation Boundary
 

@@ -41,6 +41,12 @@ Before selecting phases or creating backend prompts, classify the request using 
 
 Record the classification reason and every skipped phase reason. Do not silently apply the development spine to research, docs-only, simple-command, bootstrap, or review tasks.
 
+## Output policy
+
+KHS product output for generated prompts, backend reports, console schemas, and run artifacts is English for both Stage 1 direct Codex app-server and KAB-mediated lanes. Commander chat reports to 주군 may remain Korean, but backend prompt/product output must preserve the compact schema: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`.
+
+Detailed phase content is artifact-first. Use `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md` or the concrete requested phase artifact for plans, logs, diffs, reviews, findings, and file excerpts. If that artifact cannot be written, report a compact `Status: blocked` artifact-write blocker and do not dump the full detail into chat.
+
 ## Default phase spine
 
 ```text

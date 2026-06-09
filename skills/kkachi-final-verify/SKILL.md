@@ -41,6 +41,8 @@ For KAB-backed phases, final evidence must include the selected bridge observati
 
 Final verification must reject any run where the only bridge proof is `send` success.
 
+Final product output from generated backend/report artifacts must be English and compact for direct Codex app-server and KAB-mediated lanes: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Detailed final evidence belongs in `final-report.md` or `.kkachi/runs/<run_id>/artifacts/final-verify/backend-final-verify.md`; if the detailed artifact cannot be written, report `Status: blocked` with the artifact-write blocker instead of dumping full logs, diffs, plans, files, reviews, or checklists into chat. The separate commander-facing Korean report to 주군 may summarize those English artifacts.
+
 Final verification must also reject graph-managed workflow claims when the run lacks effective-binary evidence for `kkachi-agent-helper graph`, lacks `graph validate/explain` evidence for the graph file used, uses `kah graph` as if it were implemented, or describes manual `.kkachi-workflow.yaml` edits as graph repair. Missing graph capability is acceptable only when `graph-evidence.md` and the final report record a gap and state that the run used run-local phase evidence only.
 
 ## KASREL provenance/dependency evidence gate

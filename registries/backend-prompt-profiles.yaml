@@ -1,10 +1,41 @@
 version: 0.1.0
 purpose: "Backend-specific prompt style profiles used to render KAB prompts from the same AI-neutral task contract."
 
+output_policy:
+  language: english_product_and_backend_output
+  applies_to:
+    - direct_codex_app_server
+    - kab_mediated_backend_lanes
+  console_schema:
+    - "Status: <pass|fail|blocked|in_progress|not_applicable>"
+    - "Summary: <1-5 bullets>"
+    - "Files: <changed/inspected paths only>"
+    - "Verification: <commands/checks and short result>"
+    - "Risks/blockers: <only actionable remaining issues>"
+    - "Detailed artifact: <path or not_applicable reason>"
+    - "Next action requested: <approval/review/none>"
+  detailed_artifact_policy:
+    default_path: ".kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md"
+    examples:
+      - ".kkachi/runs/<run_id>/artifacts/plan/backend-plan.md"
+      - ".kkachi/runs/<run_id>/artifacts/implement/backend-implement.md"
+      - ".kkachi/runs/<run_id>/artifacts/verify/backend-verify.md"
+    rule: "Write detailed plans, logs, diffs, reviews, findings, and file excerpts to the concrete run artifact path instead of raw chat."
+    fail_closed_on_write_blocker: "If the backend cannot write or update the requested artifact, return the compact console schema with Status: blocked and the artifact-write blocker; do not dump the full detail into chat."
+  forbidden_console_output:
+    - raw_long_plans
+    - full_diffs
+    - full_logs
+    - full_file_contents
+    - long_reviews
+    - exhaustive_checklists
+  preserve_commander_reporting: "Hermes/team-member reports to the Korean-speaking operator may remain Korean; backend product output, prompt output, and generated artifacts remain English."
+
 profiles:
   claude-stepwise-directive:
     backend_type: claude
     style: "explicit stepwise directions, structured sections, clear checkpoints"
+    output_policy_ref: output_policy
     use_when:
       - planning
       - careful implementation
@@ -21,6 +52,7 @@ profiles:
   codex-desired-state:
     backend_type: codex
     style: "desired state, constraints, autonomy boundary, evidence and verification contract"
+    output_policy_ref: output_policy
     use_when:
       - autonomous implementation
       - codebase gap filling
@@ -39,6 +71,7 @@ profiles:
   gemini-structured-context:
     backend_type: gemini
     style: "structured context, task, constraints, output format, and explicit boundaries"
+    output_policy_ref: output_policy
     default_lane: production_write_when_project_policy_allows
     preserve:
       - acceptance_criteria
@@ -55,6 +88,7 @@ profiles:
   glm-agentic-coding:
     backend_type: glm
     style: "concise agentic coding directive with explicit artifacts and verification"
+    output_policy_ref: output_policy
     preserve:
       - acceptance_criteria
       - constraints
@@ -65,6 +99,7 @@ profiles:
   opencode-control-plane-aware:
     backend_type: opencode
     style: "prompt includes approval/session/control-plane caveats and exact artifact return requirements"
+    output_policy_ref: output_policy
     preserve:
       - acceptance_criteria
       - constraints

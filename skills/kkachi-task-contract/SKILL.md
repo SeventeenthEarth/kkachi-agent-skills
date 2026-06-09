@@ -14,6 +14,8 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 The task contract is backend-neutral. Do not include Claude, Codex, Gemini, GLM, or OpenCode prompt style in acceptance criteria, constraints, or non-goals.
 
+Task contracts must record output-policy and phase-gating facts without turning them into backend style. Use the registry aliases `simple_report`/`simple_command_report`, `investigation`/`research_evidence`, `review`/`collaboration_review`, and `docs_only`/`docs_only`; non-development classes must include skipped-phase reasons for implementation, enhance-test, optimize, and broad review loops unless classification changes. Record that direct Codex app-server and KAB-mediated backend product output is English, compact (`Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, `Next action requested`), and artifact-first, with detailed phase paths such as `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md`.
+
 ## Inputs
 
 - master request

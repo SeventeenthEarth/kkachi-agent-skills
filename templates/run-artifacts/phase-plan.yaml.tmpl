@@ -59,6 +59,30 @@ kab_usage:
   rationale: "{{ kab_usage_rationale }}"
   no_kab_exception: "{{ no_kab_exception_reason }}"
 
+output_policy:
+  language: english_product_and_backend_output
+  applies_to:
+    - direct_codex_app_server
+    - kab_mediated_backend_lanes
+  compact_console_schema:
+    - "Status: <pass|fail|blocked|in_progress|not_applicable>"
+    - "Summary: <1-5 bullets>"
+    - "Files: <changed/inspected paths only>"
+    - "Verification: <commands/checks and short result>"
+    - "Risks/blockers: <only actionable remaining issues>"
+    - "Detailed artifact: <path or not_applicable reason>"
+    - "Next action requested: <approval/review/none>"
+  detailed_artifact_path: ".kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md"
+  fail_closed_rule: "If a backend cannot write the detailed artifact, record Status: blocked and the blocker; do not dump long plans, logs, diffs, files, reviews, or checklists into chat."
+
+task_class_gating:
+  aliases:
+    simple_report: simple_command_report
+    investigation: research_evidence
+    review: collaboration_review
+    docs_only: docs_only
+  rule: "Simple report/status, investigation/research evidence, and docs-only paths do not inherit implementation, enhance_test, optimize, or broad review loops unless the task contract records a classification change and reason."
+
 kab_adoption_stage:
   selected_stage: "{{ kab_adoption_stage }}"
   marker_path: "{{ kab_adoption_marker_path }}"
@@ -92,6 +116,12 @@ verification_commands:
   unit: "make test-unit"
   integration: "make test-int"
   e2e: "make test-e2e"
+  token_002_hooks:
+    - "compact schema present in docs/sot, registries, templates, and skills"
+    - "artifact-first/fail-closed policy present"
+    - "task-class gating and aliases present"
+    - "Korean product-output check scoped to backend prompts, run artifacts, and relevant registries"
+    - "forbidden broad long-output dumping wording search"
 
 phases:
   - phase: plan
@@ -104,6 +134,7 @@ phases:
       - checklist.md
       - acceptance-criteria.md
       - codegraph_status_evidence_when_required
+      - backend-plan-artifact-when_backend_used
     check: "kkachi-agent-helper gate check {{ run_id }} plan --json"
     skip_reason: ""
   - phase: ask
@@ -126,6 +157,7 @@ phases:
       - impl-log.md
       - cli-output.md
       - make-test-after-implementation
+      - ".kkachi/runs/<run_id>/artifacts/implement/backend-implement.md"
     check: "Implementation matches approved plan and acceptance criteria; aggregate verification passes after implementation changes."
     skip_reason: "{{ implement_skip_reason }}"
   - phase: enhance_test

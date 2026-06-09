@@ -23,4 +23,17 @@ Preserve every acceptance criterion, constraint, and non-goal from `task-contrac
 5. Report files changed, rationale, tests run or proposed, risks, and blockers.
 </steps>
 
+<output_policy>
+Product/backend output must be English. Keep console output compact using exactly this schema:
+Status: <pass|fail|blocked|in_progress|not_applicable>
+Summary: <1-5 bullets>
+Files: <changed/inspected paths only>
+Verification: <commands/checks and short result>
+Risks/blockers: <only actionable remaining issues>
+Detailed artifact: <path or not_applicable reason>
+Next action requested: <approval/review/none>
+
+Write detailed plans, logs, diffs, reviews, findings, and file excerpts to `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md` or the concrete phase artifact requested by KHS. Do not paste long plans, full diffs, full logs, full file contents, long reviews, or exhaustive checklists into chat. If the detailed artifact cannot be written or updated, report Status: blocked with the artifact-write blocker and do not dump the full detail into chat.
+</output_policy>
+
 Do not produce user-facing Korean.

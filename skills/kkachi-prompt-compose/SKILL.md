@@ -14,6 +14,8 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 KHS renders a backend-specific prompt, and KAH stores that rendered prompt in the canonical run artifact `prompt.md`. The prompt may adapt instruction style to the selected backend, but it must preserve the same desired state, acceptance criteria, constraints, non-goals, and verification contract from `task-contract.yaml`.
 
+Rendered prompts must preserve the TOKEN-002 output policy for both Stage 1 direct Codex app-server and KAB-mediated lanes: backend product output is English; console summaries use `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`; detailed backend reasoning goes to `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md` or the requested phase artifact. If the backend cannot write that artifact, the prompt must require a compact `Status: blocked` artifact-write blocker instead of a full chat dump.
+
 ## Inputs
 
 - `task-contract.yaml`

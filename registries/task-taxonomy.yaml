@@ -17,6 +17,20 @@ activation_scope:
     - non_project_chat
   project_directory_scope: "Project-local policy applies to the selected Kkachi project directory and its governed artifacts; it is not a global personality or all-chat constraint."
 
+vocabulary_aliases:
+  simple_report:
+    registry_class: simple_command_report
+    rule: "SOT `simple_report` maps to registry `simple_command_report`; keep it bounded to command/status evidence and final_report only unless the task is reclassified."
+  investigation:
+    registry_class: research_evidence
+    rule: "SOT `investigation` maps to registry `research_evidence`; keep it read-only and artifact-backed unless the task is reclassified."
+  review:
+    registry_class: collaboration_review
+    rule: "SOT `review` maps to registry `collaboration_review`; keep it read-only unless accepted feedback is separately authorized for mutation."
+  docs_only:
+    registry_class: docs_only
+    rule: "SOT and registry `docs_only` are the same durable docs class; require docs validation and explicit skipped-phase reasons."
+
 task_classes:
   development:
     description: "Code, test, build, architecture, or process-contract change that can affect executable behavior or future execution policy."
@@ -56,6 +70,7 @@ task_classes:
       - implement
       - enhance_test
       - optimize
+      - request_feedback_broad_review_loop_unless_required_by_durable_artifact_change
   docs_only:
     description: "Durable documentation authoring, spec/SOT shaping, roadmap shaping, or synchronization that does not change executable behavior or execution policy."
     default_work_path: B_discovery_shaping
@@ -74,6 +89,7 @@ task_classes:
       - implement
       - enhance_test
       - optimize
+      - broad_review_loop_unless_project_policy_or_durable_change_requires_review
   simple_command_report:
     description: "Bounded command execution or status check with no durable project change."
     default_work_path: B_discovery_shaping
@@ -86,6 +102,12 @@ task_classes:
     required_phases:
       - command_evidence
       - final_report
+    skipped_by_default:
+      - plan
+      - implement
+      - enhance_test
+      - optimize
+      - broad_review_loop
   bootstrap_config:
     description: "Repository, KAH project, profile, manifest, tooling, or local test-bed setup/configuration."
     default_work_path: A_development_execution
@@ -168,3 +190,11 @@ task_contract_fields:
     - related_artifacts
     - task_classification_reason
     - skipped_phase_reasons
+
+gating_rules:
+  - "Classify before selecting phases; missing or ambiguous task class fails closed into clarification or a bounded task-contract blocker."
+  - "Do not apply the full development spine to `simple_report`/`simple_command_report`, `investigation`/`research_evidence`, or `docs_only` unless the task is explicitly reclassified to `development` with a reason."
+  - "Simple report/status paths use command_evidence plus final_report only when kept inside KHS; they do not inherit implementation, enhance_test, optimize, or broad review loops."
+  - "Investigation/research evidence paths remain read-only and write compact findings to artifacts; they do not inherit implementation, enhance_test, optimize, or broad review loops unless evidence changes the classification."
+  - "Docs-only paths update durable docs and run docs validation; implementation, enhance_test, and optimize stay skipped with explicit reasons unless executable behavior or execution policy changes."
+  - "Collaboration review/review paths stay read-only unless accepted feedback is authorized for mutation and the task contract records the new class or phase."
