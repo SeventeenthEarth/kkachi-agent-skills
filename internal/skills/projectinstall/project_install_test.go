@@ -336,15 +336,39 @@ func TestBuildDryRunRejectsUmbrellaOnlySourceSuite(t *testing.T) {
 }
 
 func TestPlannerSourceContainsNoWriteAPIs(t *testing.T) {
-	data, err := os.ReadFile("project_install.go")
+	assertSourceContainsNoWriteAPIs(t, "project_install.go", "")
+	assertSourceContainsNoWriteAPIs(t, "kasproj004.go", sourceSection(t, "kasproj004.go", "func buildProjectActionDryRun", "func applyApprovedProjectAction"))
+}
+
+func assertSourceContainsNoWriteAPIs(t *testing.T, path string, source string) {
+	t.Helper()
+	if source == "" {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		source = string(data)
+	}
+	for _, forbidden := range []string{"os.WriteFile", "os.MkdirAll", "os.Remove", "os.Rename", "writeFileAtomic", "writeJSONFile", "copyProfileFile"} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("projectinstall planner source %s must stay read-only; found %s", path, forbidden)
+		}
+	}
+}
+
+func sourceSection(t *testing.T, path string, startMarker string, endMarker string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, forbidden := range []string{"os.WriteFile", "os.MkdirAll", "os.Remove", "os.Rename"} {
-		if strings.Contains(string(data), forbidden) {
-			t.Fatalf("projectinstall planner must stay read-only; found %s", forbidden)
-		}
+	source := string(data)
+	start := strings.Index(source, startMarker)
+	end := strings.Index(source, endMarker)
+	if start < 0 || end < 0 || end <= start {
+		t.Fatalf("could not find guarded source section %s..%s in %s", startMarker, endMarker, path)
 	}
+	return source[start:end]
 }
 
 func makeProjectInstallRepo(t *testing.T, skills map[string]string) string {
@@ -435,4 +459,247 @@ func firstDiagnosticCode(result Result) string {
 		return ""
 	}
 	return result.Diagnostics[0].Code
+}
+
+func TestProjectSuiteDoctorDetectsHealthyMissingUmbrellaChecksumAndUnknownDirs(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{
+		"kkachi-plan":         "---\nname: kkachi-plan\n---\n# kkachi-plan\n",
+		"kkachi-final-verify": "---\nname: kkachi-final-verify\n---\n# kkachi-final-verify\n",
+	})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	dryRun, err := BuildDryRun(repo, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approved, err := ApplyApprovedInstall(repo, opts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil || !approved.OK {
+		t.Fatalf("approved install failed: result=%+v err=%v", approved, err)
+	}
+
+	healthy, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !healthy.OK || healthy.Mode != modeProjectSuiteDoctor || healthy.SourcePack.ID != VirtualSourcePackID || healthy.ProjectSuite.InstalledSkillCount != 2 {
+		t.Fatalf("expected healthy project-suite doctor, got %+v", healthy)
+	}
+
+	writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-extra", "SKILL.md"), "extra")
+	warning, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !warning.OK || !hasProjectSuiteDiag(warning.ProjectSuiteDiagnostics, "unknown_profile_skill_dir", "warning") {
+		t.Fatalf("expected unknown project-prefixed dir warning, got %+v", warning.ProjectSuiteDiagnostics)
+	}
+
+	if err := os.WriteFile(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md"), []byte("local edit\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mismatch, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mismatch.OK || !hasProjectSuiteDiag(mismatch.ProjectSuiteDiagnostics, "checksum_mismatch", "error") {
+		t.Fatalf("expected checksum mismatch error, got %+v", mismatch.ProjectSuiteDiagnostics)
+	}
+
+	missingRoot := filepath.Join(t.TempDir(), "profile")
+	missing, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: missingRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missing.OK || !hasProjectSuiteDiag(missing.ProjectSuiteDiagnostics, "missing_project_suite", "error") {
+		t.Fatalf("expected missing suite error, got %+v", missing.ProjectSuiteDiagnostics)
+	}
+
+	umbrellaRoot := filepath.Join(t.TempDir(), "profile")
+	writeProjectInstallFile(t, filepath.Join(umbrellaRoot, "skills", "doksuri-server", "doksuri-server-kas", "SKILL.md"), "umbrella")
+	umbrella, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: umbrellaRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if umbrella.OK || !hasProjectSuiteDiag(umbrella.ProjectSuiteDiagnostics, "umbrella_only", "error") {
+		t.Fatalf("expected umbrella-only error, got %+v", umbrella.ProjectSuiteDiagnostics)
+	}
+}
+
+func TestProjectRepairHumanOutputShowsSuiteDiagnosticsAndActions(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	repairDryRun, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !repairDryRun.OK || !repairDryRun.ApprovalRequest.Required {
+		t.Fatalf("missing suite repair should remain approvable, got %+v", repairDryRun)
+	}
+	human := RenderHumanProjectAction(repairDryRun)
+	for _, want := range []string{
+		"project-suite 진단: error/missing_project_suite",
+		"no trusted project_suites[] entry exists",
+		"next_action: Install or repair the project-specific suite",
+		"path skills/doksuri-server",
+		"액션: create skills/doksuri-server/doksuri-server-plan/SKILL.md",
+		"restore_missing_project_suite_file",
+		"승인 필요: true",
+	} {
+		if !strings.Contains(human, want) {
+			t.Fatalf("human repair output missing %q:\n%s", want, human)
+		}
+	}
+}
+
+func TestProjectRepairBlocksErrorUnknownProfileSkillDirButAllowsWarning(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	installOpts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	dryRun, err := BuildDryRun(repo, installOpts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approved, err := ApplyApprovedInstall(repo, installOpts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil || !approved.OK {
+		t.Fatalf("approved install failed: result=%+v err=%v", approved, err)
+	}
+
+	writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-extra", "SKILL.md"), "extra")
+	warning, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !warning.OK || warning.ApprovalRequest.Required || !hasProjectSuiteDiag(warning.ProjectSuiteDiagnostics, "unknown_profile_skill_dir", "warning") {
+		t.Fatalf("project-prefixed unknown dir warning should remain non-blocking, got %+v", warning)
+	}
+
+	writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", "doksuri-server", "kkachi-plan", "SKILL.md"), "rogue")
+	blocked, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if blocked.OK || blocked.ApprovalRequest.Required || !hasProjectSuiteDiag(blocked.ProjectSuiteDiagnostics, "unknown_profile_skill_dir", "error") || !hasProjectActionDiagnostic(blocked, "unknown_profile_skill_dir") {
+		t.Fatalf("rogue unknown dir must block repair approval, got %+v", blocked)
+	}
+}
+
+func TestProjectRepairDefaultsSourcePackDryRunApprovalAndUnknownExplicit(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	installOpts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	dryRun, err := BuildDryRun(repo, installOpts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approved, err := ApplyApprovedInstall(repo, installOpts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil || !approved.OK {
+		t.Fatalf("approved install failed: result=%+v err=%v", approved, err)
+	}
+	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")
+	if err := os.Remove(target); err != nil {
+		t.Fatal(err)
+	}
+
+	repairDryRun, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !repairDryRun.OK || repairDryRun.SourcePack.ID != VirtualSourcePackID || repairDryRun.SourcePack.Source != "default" || !repairDryRun.NoWrite.Guaranteed || len(repairDryRun.PlannedActions) == 0 {
+		t.Fatalf("unexpected repair dry-run: %+v", repairDryRun)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("repair dry-run wrote missing skill: %v", err)
+	}
+	wrong, err := ApplyApprovedRepair(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot}, "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wrong.OK || firstProjectActionDiagnosticCode(wrong) != "approval_plan_hash_mismatch" {
+		t.Fatalf("wrong hash should fail closed: %+v", wrong)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("wrong repair approval wrote skill: %v", err)
+	}
+	repaired, err := ApplyApprovedRepair(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot}, repairDryRun.ApprovalRequest.EvidenceRef)
+	if err != nil || !repaired.OK || repaired.RepairID == "" || repaired.Recovery == nil {
+		t.Fatalf("approved repair failed: result=%+v err=%v", repaired, err)
+	}
+	if _, err := os.Stat(target); err != nil {
+		t.Fatalf("approved repair did not restore skill: %v", err)
+	}
+
+	unknown, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: "missing-suite", SourcePackExplicit: true, ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unknown.OK || firstProjectActionDiagnosticCode(unknown) != "unknown_source_pack" {
+		t.Fatalf("unknown explicit source-pack must fail closed: %+v", unknown)
+	}
+}
+
+func TestProjectMigrationCleanGenericAndManualTaskForUnmanifested(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	generic := "---\nname: kkachi-plan\n---\n# kkachi-plan\n"
+	writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", "kkachi-plan", "SKILL.md"), generic)
+	writeJSON(t, filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json"), map[string]any{
+		"version": ManifestVersion,
+		"kind":    ProfileManifestKind,
+		"profile": map[string]any{"name": "kwanwoo", "root": profileRoot},
+		"installs": []any{map[string]any{
+			"pack_id": "kkachi-plan", "target_path": "skills/kkachi-plan", "files": []any{map[string]any{"relative_path": "SKILL.md", "sha256": sha256Bytes([]byte(generic))}},
+		}},
+	})
+	migration, err := BuildProjectMigrationDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot, FromGeneric: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !migration.OK || migration.SourcePack.Source != "default" || len(migration.PlannedActions) == 0 || len(migration.ManualSemanticPortTasks) != 0 {
+		t.Fatalf("expected clean generic migration plan, got %+v", migration)
+	}
+	approved, err := ApplyApprovedMigration(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot, FromGeneric: true}, migration.ApprovalRequest.EvidenceRef)
+	if err != nil || !approved.OK || approved.MigrationID == "" {
+		t.Fatalf("approved migration failed: result=%+v err=%v", approved, err)
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "kkachi-plan", "SKILL.md")); err != nil {
+		t.Fatalf("migration must retain generic source skill, got stat error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); err != nil {
+		t.Fatalf("migration did not create project skill: %v", err)
+	}
+
+	manualRoot := filepath.Join(t.TempDir(), "profile")
+	writeProjectInstallFile(t, filepath.Join(manualRoot, "skills", "kkachi-plan", "SKILL.md"), "locally modified\n")
+	manual, err := BuildProjectMigrationDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: manualRoot, FromGeneric: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !manual.OK || len(manual.ManualSemanticPortTasks) == 0 || manual.ApprovalRequest.Required {
+		t.Fatalf("expected manual task without approvable write: %+v", manual)
+	}
+}
+
+func hasProjectSuiteDiag(diags []ProjectSuiteDiagnostic, condition string, severity string) bool {
+	for _, diag := range diags {
+		if diag.Condition == condition && diag.Severity == severity {
+			return true
+		}
+	}
+	return false
+}
+
+func firstProjectActionDiagnosticCode(result ProjectActionResult) string {
+	if len(result.Diagnostics) == 0 {
+		return ""
+	}
+	return result.Diagnostics[0].Code
+}
+
+func hasProjectActionDiagnostic(result ProjectActionResult, code string) bool {
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.Code == code {
+			return true
+		}
+	}
+	return false
 }

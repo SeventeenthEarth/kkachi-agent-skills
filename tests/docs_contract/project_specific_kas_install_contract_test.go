@@ -83,7 +83,9 @@ func TestProjectSpecificKASInstallSOTDefinesDoctorSeveritiesAndApprovalBoundary(
 		"drift_policy: manual_review_required",
 		"approval evidence to the recomputed `plan_hash`",
 		"backup/recovery evidence",
-		"project doctor/repair remains KASPROJ-004",
+		"project-suite doctor should be rerun",
+		"Repair and migration default `source_pack` to `kas-default-project-suite`",
+		"manual_semantic_port_tasks[]",
 		"JSON output is `ok:false` and the CLI exits 2",
 		"\"condition\": \"umbrella_only\"",
 		"\"plan_hash\": \"sha256:<hex>\"",
@@ -97,7 +99,7 @@ func TestProjectSpecificKASInstallDocsRegistrationAndRoadmap(t *testing.T) {
 		"requires `skills/<project>/<project>-<phase-or-skill>/SKILL.md`",
 		"generic duplicate skill names such as `kkachi-plan` are invalid",
 		"umbrella-only installs are incomplete",
-		"KASPROJ-002 read-only dry-run planning and KASPROJ-003 approval-hash-bound install are implemented/in-review",
+		"KASPROJ-002 read-only dry-run planning, KASPROJ-003 approval-hash-bound install, and KASPROJ-004 doctor/repair/migrate are implemented/in-review",
 	})
 	requireContainsAll(t, "docs/kkachi-docs-map.yaml", []string{
 		"docs/sot/project-specific-kas-install-contract.md",
@@ -107,14 +109,14 @@ func TestProjectSpecificKASInstallDocsRegistrationAndRoadmap(t *testing.T) {
 		"| KASPROJ-001 | Specify project-specific KAS install layout SOT | In Review |",
 		"KASPROJ-002 | Implement project-specific dry-run planner | In Review",
 		"KASPROJ-003 | Implement approved project-specific install | In Review",
-		"KASPROJ-004 | Implement doctor/repair/migrate for project suites | Planned",
+		"KASPROJ-004 | Implement doctor/repair/migrate for project suites | In Review",
 		"KASPROJ-005 | Apply project-specific KAS install to one approved operational profile/project set | Planned",
 		"In review pending post-implementation gates",
 	})
 	requireRoadmapTaskStatus(t, "KASPROJ-001", "In Review")
 	requireRoadmapTaskStatus(t, "KASPROJ-002", "In Review")
 	requireRoadmapTaskStatus(t, "KASPROJ-003", "In Review")
-	requireRoadmapTaskStatus(t, "KASPROJ-004", "Planned")
+	requireRoadmapTaskStatus(t, "KASPROJ-004", "In Review")
 	requireRoadmapTaskStatus(t, "KASPROJ-005", "Planned")
 }
 
@@ -126,8 +128,8 @@ func TestProjectSpecificKASCLIContractDefinesApprovedInstallWithoutRolloutClaim(
 		"Installed skill",
 		"Target path",
 		"Drift policy",
-		"The current CLI implements KASPROJ-002 read-only project-suite dry-run planning and KASPROJ-003 approval-hash-bound project-suite install",
-		"must not be described as performing project-suite doctor, repair, migration, semantic-port completion, operational rollout, or KAB runtime activation",
+		"The current CLI implements KASPROJ-002 read-only project-suite dry-run planning, KASPROJ-003 approval-hash-bound project-suite install, and KASPROJ-004 project-suite doctor/repair/migrate",
+		"must not be described as performing semantic-port completion, operational rollout, generic fallback, or KAB runtime activation",
 		"install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --dry-run",
 		"install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --approve dry-run:<hash>",
 		"`kas-default-project-suite`, resolved from repository `skill-pack.yaml`",
@@ -136,8 +138,12 @@ func TestProjectSpecificKASCLIContractDefinesApprovedInstallWithoutRolloutClaim(
 		"backup/recovery evidence",
 		"semantic_adaptation_claimed:false",
 		"\"condition\": \"generic_installed_skill_name\"",
+		"doctor --profile <profile> --project <project> --project-suite",
 		"repair-project-kas --profile <profile> --project <project> --dry-run",
+		"repair-project-kas --profile <profile> --project <project> --approve dry-run:<hash>",
 		"migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run",
+		"migrate-project-kas --profile <profile> --project <project> --from-generic --approve dry-run:<hash>",
+		"Repair and migration default `source_pack` to `kas-default-project-suite`",
 		"umbrella-only installs are incomplete/invalid",
 		"duplicate generic installed skill names such as `kkachi-plan` are invalid",
 	})

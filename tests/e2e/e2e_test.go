@@ -183,6 +183,74 @@ func TestRealRepoApprovedProjectKASInstallAndWrongHashNoWrite(t *testing.T) {
 	if manifest["kind"] != "kas_profile_skill_manifest" || len(manifest["project_suites"].([]any)) != 1 {
 		t.Fatalf("unexpected project manifest: %+v", manifest)
 	}
+
+	doctor := exec.Command(binary, "doctor", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--project-suite", "--profile-root", profileRoot, "--json")
+	doctor.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	doctorOut, err := doctor.CombinedOutput()
+	if err != nil {
+		t.Fatalf("project-suite doctor after install failed: %v\n%s", err, doctorOut)
+	}
+	var doctorPayload map[string]any
+	if err := json.Unmarshal(doctorOut, &doctorPayload); err != nil {
+		t.Fatal(err)
+	}
+	if doctorPayload["ok"] != true || doctorPayload["mode"] != "project_suite_doctor" {
+		t.Fatalf("unexpected project-suite doctor payload: %+v", doctorPayload)
+	}
+
+	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")
+	if err := os.Remove(target); err != nil {
+		t.Fatal(err)
+	}
+	brokenDoctor := exec.Command(binary, "doctor", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--project-suite", "--profile-root", profileRoot, "--json")
+	brokenDoctor.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	brokenOut, err := brokenDoctor.CombinedOutput()
+	if err == nil {
+		t.Fatalf("broken project-suite doctor unexpectedly succeeded: %s", brokenOut)
+	}
+	var brokenPayload map[string]any
+	if err := json.Unmarshal(brokenOut, &brokenPayload); err != nil {
+		t.Fatal(err)
+	}
+	if brokenPayload["ok"] != false || brokenPayload["project_suite_diagnostics"] == nil {
+		t.Fatalf("unexpected broken doctor payload: %+v", brokenPayload)
+	}
+
+	repairDryRun := exec.Command(binary, "repair-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot, "--json")
+	repairDryRun.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	repairDryRunOut, err := repairDryRun.CombinedOutput()
+	if err != nil {
+		t.Fatalf("repair dry-run failed: %v\n%s", err, repairDryRunOut)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("repair dry-run wrote target: %v", err)
+	}
+	var repairPayload map[string]any
+	if err := json.Unmarshal(repairDryRunOut, &repairPayload); err != nil {
+		t.Fatal(err)
+	}
+	if repairPayload["ok"] != true || repairPayload["source_pack"].(map[string]any)["id"] != "kas-default-project-suite" {
+		t.Fatalf("unexpected repair dry-run payload: %+v", repairPayload)
+	}
+	repairWrong := exec.Command(binary, "repair-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--approve", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json")
+	repairWrong.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	repairWrongOut, err := repairWrong.CombinedOutput()
+	if err == nil {
+		t.Fatalf("wrong repair hash unexpectedly succeeded: %s", repairWrongOut)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("wrong repair hash wrote target: %v", err)
+	}
+	evidence = repairPayload["approval_request"].(map[string]any)["evidence_ref"].(string)
+	repairApprove := exec.Command(binary, "repair-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--approve", evidence, "--profile-root", profileRoot, "--json")
+	repairApprove.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	repairApproveOut, err := repairApprove.CombinedOutput()
+	if err != nil {
+		t.Fatalf("approved repair failed: %v\n%s", err, repairApproveOut)
+	}
+	if _, err := os.Stat(target); err != nil {
+		t.Fatalf("approved repair did not restore target: %v", err)
+	}
 }
 
 func TestRealRepoApprovedCopyWritesTempProfileOnly(t *testing.T) {

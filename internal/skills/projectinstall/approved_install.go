@@ -135,7 +135,7 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 	actualChanged = append(actualChanged, ChangedPath{Path: ".kas/skill-pack-manifest.json", Action: "manifest_update", PreviousSHA256: dryRun.TargetProfile.PreviousManifestSHA256})
 
 	result := buildApprovedResult(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, true, nil)
-	result.NextAction = "설치 완료. 다음: project doctor/repair remains KASPROJ-004; do not claim operational rollout from KASPROJ-003."
+	result.NextAction = "설치 완료. 다음: doctor --project-suite로 검증하세요; do not claim operational rollout from KASPROJ-003."
 	return result, nil
 }
 

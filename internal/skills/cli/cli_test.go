@@ -751,3 +751,93 @@ func TestInstallKABAdoptionStageFlagsDefaultsAndInteractive(t *testing.T) {
 		t.Fatalf("interactive output did not prompt/default: %q", stdout.String())
 	}
 }
+
+func TestProjectSuiteDoctorRepairAndMigrateCLIForms(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan")
+	writeCLITestSkillPackYAML(t, repo, "kkachi-plan")
+	profileRoot := filepath.Join(dir, "profile")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"doctor", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--project-suite", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected missing project suite exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["mode"] != "project_suite_doctor" || payload["project"].(map[string]any)["id"] != "doksuri-server" {
+		t.Fatalf("doctor --project-suite did not interpret --project as suite id: %+v", payload)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("repair dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	payload = map[string]any{}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["command"] != "repair-project-kas" || payload["mode"] != "project_repair_dry_run" || payload["source_pack"].(map[string]any)["id"] != projectinstall.VirtualSourcePackID || payload["source_pack"].(map[string]any)["source"] != "default" {
+		t.Fatalf("unexpected repair dry-run payload: %+v", payload)
+	}
+	noWrite := payload["no_write"].(map[string]any)
+	if noWrite["guaranteed"] != true || noWrite["kah_state_write_count"] != float64(0) || noWrite["kab_runtime_mutation_count"] != float64(0) || noWrite["auth_provider_config_write_count"] != float64(0) {
+		t.Fatalf("unexpected repair no-write evidence: %+v", noWrite)
+	}
+	evidence := payload["approval_request"].(map[string]any)["evidence_ref"].(string)
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--approve", evidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("approved repair failed: code=%d stderr=%s", code, stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); err != nil {
+		t.Fatalf("approved repair did not write project skill under temp profile: %v", err)
+	}
+
+	writeCLITestSkill(t, filepath.Join(profileRoot, "skills", "doksuri-server", "kkachi-plan"), "kkachi-plan")
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected rogue unknown project skill repair exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	payload = map[string]any{}
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != false || payload["approval_request"].(map[string]any)["required"] != false || payload["diagnostics"].([]any)[0].(map[string]any)["code"] != "unknown_profile_skill_dir" {
+		t.Fatalf("rogue unknown project skill must be non-approvable ok:false: %+v", payload)
+	}
+	if err := os.RemoveAll(filepath.Join(profileRoot, "skills", "doksuri-server", "kkachi-plan")); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"migrate-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected --from-generic requirement, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "from_generic_required")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", "missing-suite", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected unknown explicit source-pack exit 2, got %d", code)
+	}
+	payload = map[string]any{}
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["diagnostics"].([]any)[0].(map[string]any)["code"] != "unknown_source_pack" {
+		t.Fatalf("unexpected unknown source-pack payload: %+v", payload)
+	}
+}

@@ -34,7 +34,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, doctor, sync-project-kas, or install-project-kas command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, doctor, sync-project-kas, install-project-kas, repair-project-kas, or migrate-project-kas command", "", false, "")
 	}
 	if isHelpArg(argv[0]) {
 		printRootHelp(stdout)
@@ -51,8 +51,12 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runSyncProjectKAS(argv[1:], stdout, stderr, env)
 	case "install-project-kas":
 		return runInstallProjectKAS(argv[1:], stdout, stderr, env)
+	case "repair-project-kas":
+		return runRepairProjectKAS(argv[1:], stdout, stderr, env)
+	case "migrate-project-kas":
+		return runMigrateProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, doctor, sync-project-kas, and install-project-kas commands are implemented", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, doctor, sync-project-kas, install-project-kas, repair-project-kas, and migrate-project-kas commands are implemented", argv[0], false, "")
 	}
 }
 
@@ -158,7 +162,8 @@ func runDoctor(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	fs.SetOutput(stderr)
 	repo := fs.String("repo", "", "source KAS repo path")
 	profile := fs.String("profile", "", "Hermes target profile name")
-	project := fs.String("project", "", "KAH project path to inspect")
+	project := fs.String("project", "", "KAH project path to inspect; project suite id when --project-suite is present")
+	projectSuite := fs.Bool("project-suite", false, "interpret --project as a project-specific KAS suite id")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
 	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
@@ -175,6 +180,27 @@ func runDoctor(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	}
 	if *profile == "" {
 		return emitError(stderr, "profile_required", "doctor requires --profile <profile>.", "doctor", *jsonOutput, "")
+	}
+	if *projectSuite {
+		if *project == "" {
+			return emitError(stderr, "project_required", "doctor --project-suite requires --project <project>.", "doctor", *jsonOutput, "")
+		}
+		result, err := projectinstall.BuildProjectSuiteDoctor(*repo, projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, ProfileRoot: *profileRoot})
+		if err != nil {
+			return emitError(stderr, "doctor_failed", err.Error(), "doctor", *jsonOutput, "")
+		}
+		out := stdout
+		code := 0
+		if !result.OK {
+			out = stderr
+			code = 2
+		}
+		if *jsonOutput {
+			_ = writeJSON(out, result)
+		} else {
+			fmt.Fprintln(out, projectinstall.RenderHumanProjectSuiteDoctor(result))
+		}
+		return code
 	}
 	result, err := doctor.Build(*repo, doctor.Options{Profile: *profile, Project: *project, ProfileRoot: *profileRoot})
 	if err != nil {
@@ -309,6 +335,136 @@ func runInstallProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env
 	return code
 }
 
+func runRepairProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("repair-project-kas", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	repo := fs.String("repo", "", "source KAS repo path")
+	profile := fs.String("profile", "", "Hermes target profile name")
+	project := fs.String("project", "", "project-specific KAS id")
+	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id; defaults to kas-default-project-suite")
+	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
+	dryRun := fs.Bool("dry-run", false, "report planned repairs without writing")
+	approve := fs.String("approve", "", "approval evidence ref dry-run:<plan_hash>")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if projectInstallApproveMissingValue(argv) {
+		return emitError(stderr, "approval_evidence_malformed", "approval evidence must be exactly dry-run:sha256:<64 lowercase hex>.", "repair-project-kas", wantsJSON(argv), "Rerun with the dry-run JSON approval_request.evidence_ref value.")
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
+		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "repair-project-kas", *jsonOutput, "")
+	}
+	if *dryRun && *approve != "" {
+		return emitError(stderr, "project_repair_mode_ambiguous", "repair-project-kas accepts either --dry-run or --approve, not both.", "repair-project-kas", *jsonOutput, "Run dry-run first, then rerun with only --approve dry-run:<hash>.")
+	}
+	if !*dryRun && *approve == "" {
+		return emitError(stderr, "project_repair_requires_dry_run_or_approve", "repair-project-kas requires --dry-run or --approve dry-run:<hash>.", "repair-project-kas", *jsonOutput, "Rerun with repair-project-kas --profile <profile> --project <project> --dry-run.")
+	}
+	if *profile == "" {
+		return emitError(stderr, "profile_required", "repair-project-kas requires --profile <profile>.", "repair-project-kas", *jsonOutput, "")
+	}
+	if *project == "" {
+		return emitError(stderr, "project_required", "repair-project-kas requires --project <project>.", "repair-project-kas", *jsonOutput, "")
+	}
+	opts := projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot}
+	var result projectinstall.ProjectActionResult
+	var err error
+	if *approve != "" {
+		result, err = projectinstall.ApplyApprovedRepair(*repo, opts, *approve)
+	} else {
+		result, err = projectinstall.BuildProjectRepairDryRun(*repo, opts)
+	}
+	if err != nil {
+		return emitError(stderr, "project_repair_failed", err.Error(), "repair-project-kas", *jsonOutput, "")
+	}
+	out := stdout
+	code := 0
+	if !result.OK {
+		out = stderr
+		code = 2
+	}
+	if *jsonOutput {
+		_ = writeJSON(out, result)
+	} else {
+		fmt.Fprintln(out, projectinstall.RenderHumanProjectAction(result))
+	}
+	return code
+}
+
+func runMigrateProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("migrate-project-kas", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	repo := fs.String("repo", "", "source KAS repo path")
+	profile := fs.String("profile", "", "Hermes target profile name")
+	project := fs.String("project", "", "project-specific KAS id")
+	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id; defaults to kas-default-project-suite")
+	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
+	fromGeneric := fs.Bool("from-generic", false, "explicitly migrate clean KAS-managed generic candidates")
+	dryRun := fs.Bool("dry-run", false, "report planned migration without writing")
+	approve := fs.String("approve", "", "approval evidence ref dry-run:<plan_hash>")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if projectInstallApproveMissingValue(argv) {
+		return emitError(stderr, "approval_evidence_malformed", "approval evidence must be exactly dry-run:sha256:<64 lowercase hex>.", "migrate-project-kas", wantsJSON(argv), "Rerun with the dry-run JSON approval_request.evidence_ref value.")
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
+		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "migrate-project-kas", *jsonOutput, "")
+	}
+	if *dryRun && *approve != "" {
+		return emitError(stderr, "project_migration_mode_ambiguous", "migrate-project-kas accepts either --dry-run or --approve, not both.", "migrate-project-kas", *jsonOutput, "Run dry-run first, then rerun with only --approve dry-run:<hash>.")
+	}
+	if !*dryRun && *approve == "" {
+		return emitError(stderr, "project_migration_requires_dry_run_or_approve", "migrate-project-kas requires --dry-run or --approve dry-run:<hash>.", "migrate-project-kas", *jsonOutput, "Rerun with migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run.")
+	}
+	if !*fromGeneric {
+		return emitError(stderr, "from_generic_required", "migrate-project-kas requires --from-generic.", "migrate-project-kas", *jsonOutput, "Rerun with migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run.")
+	}
+	if *profile == "" {
+		return emitError(stderr, "profile_required", "migrate-project-kas requires --profile <profile>.", "migrate-project-kas", *jsonOutput, "")
+	}
+	if *project == "" {
+		return emitError(stderr, "project_required", "migrate-project-kas requires --project <project>.", "migrate-project-kas", *jsonOutput, "")
+	}
+	opts := projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot, FromGeneric: *fromGeneric}
+	var result projectinstall.ProjectActionResult
+	var err error
+	if *approve != "" {
+		result, err = projectinstall.ApplyApprovedMigration(*repo, opts, *approve)
+	} else {
+		result, err = projectinstall.BuildProjectMigrationDryRun(*repo, opts)
+	}
+	if err != nil {
+		return emitError(stderr, "project_migration_failed", err.Error(), "migrate-project-kas", *jsonOutput, "")
+	}
+	out := stdout
+	code := 0
+	if !result.OK {
+		out = stderr
+		code = 2
+	}
+	if *jsonOutput {
+		_ = writeJSON(out, result)
+	} else {
+		fmt.Fprintln(out, projectinstall.RenderHumanProjectAction(result))
+	}
+	return code
+}
+
 func normalizeInstallArgs(argv []string) []string {
 	rewritten := []string{}
 	positionals := []string{}
@@ -397,6 +553,8 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS skill-pack install")
 	fmt.Fprintln(w, "  sync-project-kas  Validate project-specific KAS state without writing")
 	fmt.Fprintln(w, "  install-project-kas  Plan/apply an approved project-specific KAS suite install")
+	fmt.Fprintln(w, "  repair-project-kas  Dry-run/apply approved project-specific KAS suite repair")
+	fmt.Fprintln(w, "  migrate-project-kas  Dry-run/apply approved generic-to-project KAS migration")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Use \"kkachi-hermes-skills <command> --help\" for command options.")
 }
@@ -466,6 +624,15 @@ func projectInstallApproveMissingValue(argv []string) bool {
 func wantsJSON(argv []string) bool {
 	for _, arg := range argv {
 		if arg == "--json" || arg == "--json=true" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasFlag(argv []string, name string) bool {
+	for _, arg := range argv {
+		if arg == name || strings.HasPrefix(arg, name+"=") {
 			return true
 		}
 	}

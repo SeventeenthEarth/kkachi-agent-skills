@@ -3,9 +3,9 @@
 Date: 2026-06-09
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / PR1 docs-contract evidence
-Status: canonical SOT for `KASPROJ-001`; `KASPROJ-002` read-only dry-run planner is implemented/pre-commit-ready; `KASPROJ-003` approved install is implemented/in-review pending gates; doctor/repair and migration remain later KASPROJ tasks
+Status: canonical SOT for `KASPROJ-001`; `KASPROJ-002` read-only dry-run planner is implemented/pre-commit-ready; `KASPROJ-003` approved install is implemented/in-review pending gates; `KASPROJ-004` project-suite doctor/repair/migrate is implemented/in-review pending gates
 Authority level: source of truth for project-specific KAS install layout, naming, manifest vocabulary, and doctor severity semantics
-Scope: project-specific KAS skill suites installed under one Hermes profile; KASPROJ-003 authorizes only approval-hash-bound project suite writes into the selected Hermes profile after a matching current dry-run. No repair, migration, auth/token/gateway/provider/model config mutation, KAH state mutation, KAB runtime activation, semantic-port completion claim, or operational rollout is authorized by this document alone
+Scope: project-specific KAS skill suites installed under one Hermes profile; KASPROJ-003 authorizes approval-hash-bound project suite install writes, and KASPROJ-004 authorizes approval-hash-bound project suite repair/migration writes after matching current dry-runs. No auth/token/gateway/provider/model config mutation, KAH state mutation, KAB runtime activation, semantic-port completion claim, generic fallback, generic deletion, or operational rollout is authorized by this document alone
 Related docs: `docs/sot/kas-cli-contract.md`, `docs/sot/project-kas-sync-state.md`, `docs/sot/minimum-pilot-cli-lane.md`, `docs/README.md`, `docs/roadmap.md`, `docs/kkachi-docs-map.yaml`
 
 ## 1. Decision
@@ -232,26 +232,31 @@ kkachi-hermes-skills install-project-kas --profile <profile> --project <project>
 
 Approved install recomputes the current dry-run, compares approval evidence to the recomputed `plan_hash`, and fails closed before any write unless `--approve dry-run:<plan_hash>` exactly matches the recomputed plan hash and the plan is `ok:true`. Missing both `--dry-run`/`--approve`, using both together, malformed approval evidence, unsupported write/force/repair/migrate/from-generic flags, unguarded `--profile-root`, unknown profiles, unsafe/path-traversing targets, symlink escapes, ambiguous duplicate manifest entries, duplicate installed skills/target paths, unmanifested existing targets, local modifications, and checksum mismatches must return exit 2 with `ok:false` JSON.
 
-Safe write ordering is: preflight all source/target checksums and paths, create backups for trusted replacements, atomically write project skill files, verify post-write checksums, and write/update the compatible profile manifest last. Existing top-level `installs` and unrelated `project_suites` are preserved; only the matching `(project, source_pack.id)` suite is replaced. Human and JSON approved output must include approval evidence, `install_id`, `manifest_path`, backup/recovery evidence, changed-path counts/actions, and `next_action` stating that project doctor/repair remains KASPROJ-004.
+Safe write ordering is: preflight all source/target checksums and paths, create backups for trusted replacements, atomically write project skill files, verify post-write checksums, and write/update the compatible profile manifest last. Existing top-level `installs` and unrelated `project_suites` are preserved; only the matching `(project, source_pack.id)` suite is replaced. Human and JSON approved output must include approval evidence, `install_id`, `manifest_path`, backup/recovery evidence, changed-path counts/actions, and `next_action` stating that project-suite doctor should be rerun.
 
-Later PRs may implement the remaining behavior only after their own acceptance criteria and verification gates are approved.
-- `KASPROJ-004` doctor/repair/migrate: reports the severities above; repair and
-  migration must start with dry-run evidence, require explicit approval before profile mutation, create backups for changed files, preserve project-tailored
-  language/characteristics, and never mutate auth, tokens, secrets, gateway, provider/model config, KAH state, or KAB runtime state.
+KASPROJ-004 implemented doctor/repair/migrate forms:
 
-Migration from older generic/global installs must be explicit. A future migrate
-command may propose moves such as `kkachi-plan` to `doksuri-server-plan`, but it
-must not guess project language or authority content silently. If project-specific
-content cannot be generated safely, it must produce a manual semantic-port task
-rather than installing a generic fallback.
+```bash
+kkachi-hermes-skills doctor --profile <profile> --project <project> --project-suite [--json]
+kkachi-hermes-skills repair-project-kas --profile <profile> --project <project> --dry-run [--json]
+kkachi-hermes-skills repair-project-kas --profile <profile> --project <project> --approve dry-run:<hash> [--json]
+kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run [--json]
+kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --approve dry-run:<hash> [--json]
+```
+
+When `doctor --project-suite` is absent, `doctor --project <path>` keeps its existing KAH project-path meaning. When `--project-suite` is present, `--project` is the project suite id. Repair and migration default `source_pack` to `kas-default-project-suite`; optional explicit `--source-pack` values fail closed when unknown, and the resolved source pack is included in JSON, diagnostics, and plan-hash evidence.
+
+`KASPROJ-004` doctor/repair/migrate reports the severities above; repair and migration start with dry-run evidence, require explicit approval before profile mutation, create backups for changed files and previous manifests, preserve project-tailored language/characteristics, and never mutate auth, tokens, secrets, gateway, provider/model config, KAH state, or KAB runtime state.
+
+Migration from older generic/global installs is explicit through `--from-generic`. It may propose non-deleting creation from clean KAS-managed generic candidates such as `kkachi-plan` to `doksuri-server-plan`, but it must not guess project language or authority content silently. If project-specific content cannot be generated safely, it produces `manual_semantic_port_tasks[]` rather than installing a generic fallback. KASPROJ-004 retains generic files; deletion or de-manifest policy is deferred unless separately approved.
 
 ## 8. Relationship to existing contracts
 
 - `docs/sot/kas-cli-contract.md` owns the existing CLIMVP profile-scoped
   list/install/doctor contract. KASPROJ extends that contract for
   project-specific suite identity and target layout. The current CLI implements
-  KASPROJ-002 project-suite dry-run planning and KASPROJ-003 approval-hash-bound
-  project-suite install; it does not implement project-suite doctor/repair/migration.
+  KASPROJ-002 project-suite dry-run planning, KASPROJ-003 approval-hash-bound
+  project-suite install, and KASPROJ-004 project-suite doctor/repair/migration.
 - `docs/sot/project-kas-sync-state.md` owns upstream sync state after a
   project-specific suite exists. This document owns initial install layout,
   naming, manifest vocabulary, and doctor severity for suite presence/identity.

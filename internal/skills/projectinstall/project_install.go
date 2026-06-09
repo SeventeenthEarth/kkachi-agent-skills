@@ -51,6 +51,7 @@ type Project struct {
 
 type SourcePack struct {
 	ID             string               `json:"id"`
+	Source         string               `json:"source,omitempty"`
 	ResolvedFrom   string               `json:"resolved_from"`
 	SourceRepo     discovery.SourceRepo `json:"source_repo"`
 	PackChecksums  map[string]string    `json:"pack_checksums"`
@@ -301,7 +302,7 @@ func baseResult(sourceRepo string, profileRoot string, opts Options) Result {
 		BackupPlan:       []BackupEntry{},
 		Conflicts:        []Conflict{},
 		Diagnostics:      []discovery.Diagnostic{},
-		NextAction:       "Review changed_paths and approve with install-project-kas --approve dry-run:<plan_hash>; project doctor/repair remains KASPROJ-004.",
+		NextAction:       "Review changed_paths and approve with install-project-kas --approve dry-run:<plan_hash>; verify with doctor --project-suite after approved install.",
 	}
 }
 
