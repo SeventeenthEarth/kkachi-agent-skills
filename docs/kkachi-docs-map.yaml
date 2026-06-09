@@ -7,6 +7,7 @@ sot_docs:
   - "docs/sot/kas-cli-contract.md"
   - "docs/sot/project-specific-kas-install-contract.md"
   - "docs/sot/project-kas-sync-state.md"
+  - "docs/sot/token-economy-and-agent-instruction-contract.md"
 adr_dir: "docs/adr"
 todo_dir: "docs/todo"
 spec_dir: "docs/sot"
