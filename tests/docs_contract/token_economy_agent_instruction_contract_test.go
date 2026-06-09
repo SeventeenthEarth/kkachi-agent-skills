@@ -1,11 +1,20 @@
 package docscontract
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 const tokenEconomyAgentInstructionSOT = "docs/sot/token-economy-and-agent-instruction-contract.md"
+
+var token003AgentInstructionTemplates = []string{
+	"templates/agent-instructions/AGENTS.md.tmpl",
+	"templates/agent-instructions/CLAUDE.md.tmpl",
+}
+
+const token003DryRunExamples = "docs/examples/agent-instruction-dry-run-merge-plans.md"
 
 func TestTokenEconomyAgentInstructionSOTDefinesCoreContract(t *testing.T) {
 	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{
@@ -146,8 +155,8 @@ func TestTokenEconomyAgentInstructionSOTPreservesLayerAndMutationBoundaries(t *t
 func TestTokenEconomyAgentInstructionDocsRegistrationAndRoadmap(t *testing.T) {
 	requireContainsAll(t, "docs/README.md", []string{
 		"sot/token-economy-and-agent-instruction-contract.md",
-		"Candidate token-economy and agent-instruction SOT",
-		"selected candidate 6 KAS PR + 1 dependent KAH PR workstream pending responsible-approver confirmation",
+		"Accepted token-economy and agent-instruction SOT",
+		"selected 6 KAS PR + 1 dependent KAH PR workstream",
 		"English KAS-generated prompt/CLI/console/artifact-template output",
 		"compact console output",
 		"artifact-first details",
@@ -167,4 +176,134 @@ func TestTokenEconomyAgentInstructionDocsRegistrationAndRoadmap(t *testing.T) {
 		"English KAS-generated prompt/CLI/console/artifact-template output",
 		"does not authorize implementation, unapproved profile mutation, KAB activation, Hermes runtime changes, or auth/token/provider/gateway/model mutation by itself",
 	})
+}
+
+func TestToken003AgentInstructionTemplatesCarryManagedEnglishPolicy(t *testing.T) {
+	for _, rel := range token003AgentInstructionTemplates {
+		requireContainsAll(t, rel, []string{
+			"<!-- KAS:MANAGED:BEGIN core-behavior -->",
+			"<!-- KAS:MANAGED:END core-behavior -->",
+			"<!-- PROJECT:LOCAL:BEGIN -->",
+			"<!-- PROJECT:LOCAL:END -->",
+			"{{project_name}}",
+			"{{repository_role}}",
+			"{{project_suite_id}}",
+			"{{kab_adoption_stage}}",
+			"{{upstream_kas_baseline}}",
+			"{{local_authority_notes}}",
+			"KAS",
+			"KAH",
+			"KAB",
+			"English",
+			"artifact",
+			"auth",
+			"token",
+			"provider/model/gateway",
+		})
+	}
+
+	requireContainsAll(t, "templates/agent-instructions/AGENTS.md.tmpl", []string{
+		"Think before coding",
+		"Simplicity first",
+		"Surgical changes",
+		"Goal-driven execution",
+		"Status: pass, fail, blocked, in_progress, or not_applicable.",
+	})
+	requireContainsAll(t, "templates/agent-instructions/CLAUDE.md.tmpl", []string{
+		"Think before coding.",
+		"Keep the implementation simple.",
+		"Make surgical changes.",
+		"Work toward verified goals.",
+	})
+}
+
+func TestToken003DryRunExamplesCoverNoWriteMergeCases(t *testing.T) {
+	requireContainsAll(t, token003DryRunExamples, []string{
+		"Existing Managed File",
+		"Existing Unmarked AGENTS.md",
+		"Missing CLAUDE.md",
+		"Malformed Or Conflicting Markers",
+		"mode: dry_run_only",
+		"target_file_writes: []",
+		"planned_state: update",
+		"planned_state: blocked",
+		"planned_state: not_applicable",
+		"planned_state: conflict",
+		"preserve_project_local_block",
+		"preserve_entire_existing_file",
+		"unmarked_existing_instruction_file",
+		"missing_optional_claude_instruction",
+		"malformed_or_conflicting_markers",
+		"TOKEN-003 must not blind-overwrite or insert managed blocks into an",
+		"TOKEN-003",
+		"must not create root `CLAUDE.md`.",
+	})
+
+	content := readRepoFile(t, token003DryRunExamples)
+	if count := strings.Count(content, "target_file_writes: []"); count != 4 {
+		t.Fatalf("%s should keep every documented merge case no-write; got %d target_file_writes entries", token003DryRunExamples, count)
+	}
+}
+
+func TestToken003DryRunSurfacesRejectWriteCapableWording(t *testing.T) {
+	relPaths := append([]string{token003DryRunExamples}, token003AgentInstructionTemplates...)
+	for _, rel := range relPaths {
+		requireContainsNone(t, rel, []string{
+			"--apply",
+			"--approve",
+			"apply dry-run:sha256",
+			"approve dry-run:",
+			"may write target files",
+			"will write target files",
+			"rewrite root `AGENTS.md` now",
+			"create root `CLAUDE.md` now",
+			"blind-overwrite is allowed",
+			"profile mutation is authorized",
+			"auth/token/provider/gateway/model mutation is authorized",
+		}, "contains TOKEN-003 forbidden write-capable wording")
+	}
+}
+
+func TestToken003RoadmapSeparationFromToken004AndToken005(t *testing.T) {
+	requireRoadmapTaskStatus(t, "TOKEN-003", "Completed")
+	requireRoadmapTaskStatus(t, "TOKEN-004", "Planned")
+	requireRoadmapTaskStatus(t, "TOKEN-005", "Planned")
+	requireContainsAll(t, "docs/roadmap.md", []string{
+		"TOKEN-003 | Implement English repo-local agent instruction templates | Completed",
+		"`AGENTS.md` and `CLAUDE.md` templates use English managed blocks, preserve project-local content, and encode KAS/KAH/KAB boundaries without blind overwrite.",
+		"Verified dry-run examples, managed-marker tests, docs-contract, repo test gate, GLM Octo review, post-Octo second color review, and KAH final gate `evt-001886` in run `run-20260609T134803Z-fe1b071fd6d9`.",
+		"TOKEN-004 | Implement public project KAS lifecycle UX and read-only planner | Planned",
+		"TOKEN-005 | Implement approved lifecycle writes and uninstall vault backup | Planned",
+	})
+	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{
+		"KAS PR 3: English agent instruction templates and management workflow",
+		"CLI or documented dry-run workflow reports create/update/no-change/not_applicable posture without blind overwrite.",
+		"KAS PR 4: project KAS lifecycle UX and read-only planner surface",
+		"KAS PR 5: approved lifecycle writes, update apply, and uninstall with vault backup",
+	})
+}
+
+func TestToken003DoesNotInstallRootInstructionFiles(t *testing.T) {
+	if _, err := os.Stat(filepath.Join(repoRoot(t), "CLAUDE.md")); !os.IsNotExist(err) {
+		t.Fatalf("TOKEN-003 must not create root CLAUDE.md; stat error = %v", err)
+	}
+
+	requireContainsNone(t, "AGENTS.md", []string{
+		"<!-- KAS:MANAGED:BEGIN core-behavior -->",
+		"<!-- KAS:MANAGED:END core-behavior -->",
+		"<!-- PROJECT:LOCAL:BEGIN -->",
+		"<!-- PROJECT:LOCAL:END -->",
+		"Repository agent instructions for {{project_name}}.",
+		"Project-specific instructions belong here.",
+	}, "must not install managed template content into root AGENTS.md; found")
+}
+
+func requireContainsNone(t *testing.T, rel string, forbidden []string, message string) {
+	t.Helper()
+	content := readRepoFile(t, rel)
+	for _, phrase := range forbidden {
+		if strings.Contains(content, phrase) {
+			t.Fatalf("%s %s %q", rel, message, phrase)
+		}
+	}
 }

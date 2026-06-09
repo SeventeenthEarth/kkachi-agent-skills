@@ -375,12 +375,12 @@ For each PR in this workstream, reports must include:
 - repository test gate when the changed surface requires it;
 - color review / KAH gate evidence when required by task class.
 
-## 11. Completion criteria for this SOT
+## 11. Acceptance record
 
-This candidate SOT becomes accepted only after:
+This SOT is accepted. Acceptance evidence includes:
 
-1. 주군 or responsible approver confirms the six KAS PRs plus one dependent KAH PR structure and SOT wording;
+1. responsible review accepted the six KAS PRs plus one dependent KAH PR structure and SOT wording;
 2. docs indexes include this SOT as the active token-economy / agent-instruction authority;
-3. docs-contract or equivalent local verification protects the core terms;
-4. required color review accepts the docs/spec boundary;
-5. no implementation or rollout completion is claimed before the later PRs produce evidence.
+3. docs-contract verification protects the core terms;
+4. required color review accepted the docs/spec boundary;
+5. later TOKEN tasks remain separately gated and must not claim implementation, rollout, profile mutation, KAB activation, Hermes runtime changes, or auth/token/provider/gateway/model mutation before their own evidence exists.

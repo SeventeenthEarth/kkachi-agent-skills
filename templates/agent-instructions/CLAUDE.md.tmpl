@@ -1,0 +1,79 @@
+# CLAUDE.md
+
+Claude-compatible repository instructions for {{project_name}}.
+
+<!-- KAS:MANAGED:BEGIN core-behavior -->
+## Work Style
+
+Think before coding. Read the named source of truth, understand the current
+repo shape, and surface real uncertainty instead of guessing. Proceed with
+safe, reversible, local work when the task is clear; ask only for destructive,
+credential-gated, external-production, or materially branching decisions.
+
+Keep the implementation simple. Prefer deletion, reuse, and local patterns over
+new abstractions. Do not add speculative features, compatibility layers, or
+dependencies unless the task explicitly requires them.
+
+Make surgical changes. Touch only the files needed for the request, preserve
+project-local content, and do not reformat or rewrite unrelated guidance.
+
+Work toward verified goals. Identify what proves the change, run the focused
+checks, read the results, and report the evidence honestly.
+
+## Kkachi Boundaries
+
+- KAS owns skill/process/prompt policy, task contracts, templates, and evidence
+  expectations. It does not own deterministic project state or backend runtime
+  control.
+- KAH owns deterministic artifacts, schemas, events, locks, diagnostics, and
+  mechanical gates. It does not own policy prose or subjective language
+  judgment.
+- KAB owns backend bridge/session/control and retained execution evidence. It
+  does not own KAS task policy and must not provide hidden fallback execution.
+
+Do not mutate profiles, auth, tokens, secrets, provider/model/gateway settings,
+KAH source/state, KAB runtime/policy, commits, pushes, or deployment unless the
+current task explicitly authorizes that exact operation.
+
+## English Compact Output
+
+KAS-generated product output must be English by default. Keep console/chat
+reports compact and artifact-first:
+
+- Status
+- Summary
+- Files
+- Verification
+- Risks/blockers
+- Detailed artifact
+- Next action requested
+
+Write long reasoning, plans, diffs, logs, and reviews to the requested artifact
+path when the task requires detail. If the artifact cannot be written, report a
+blocked status instead of pasting raw detail into chat.
+
+## Project-Suite Adaptation
+
+Rendered fields:
+
+- Project name: {{project_name}}
+- Repository role: {{repository_role}}
+- Project suite id: {{project_suite_id}}
+- Selected KAB adoption stage: {{kab_adoption_stage}}
+- Upstream KAS baseline: {{upstream_kas_baseline}}
+- Local authority notes: {{local_authority_notes}}
+
+Repository-role substitutions:
+
+- KAS repository: keep KAS focused on skill/process/prompt policy.
+- KAH repository: keep KAH focused on deterministic evidence and gates.
+- KAB repository: keep KAB focused on bridge/session/control evidence.
+- Project-specific suite: preserve the concrete project name, selected KAB
+  adoption stage, upstream KAS baseline, and local authority notes.
+<!-- KAS:MANAGED:END core-behavior -->
+
+<!-- PROJECT:LOCAL:BEGIN -->
+Project-specific Claude guidance belongs here. KAS dry-run merge planning must
+preserve this block and any unmarked local text unless a separate approved
+task authorizes a concrete edit.
+<!-- PROJECT:LOCAL:END -->
