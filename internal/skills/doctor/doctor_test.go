@@ -295,7 +295,7 @@ func TestBuildKAHMissingDegradedAndProjectProbes(t *testing.T) {
 	}
 }
 
-func TestRenderHumanKoreanFriendlySummary(t *testing.T) {
+func TestRenderHumanEnglishSummary(t *testing.T) {
 	repo := t.TempDir()
 	profileRoot := filepath.Join(t.TempDir(), "profile")
 	writeSkill(t, filepath.Join(repo, "skills", "alpha"), "Alpha", "healthy")
@@ -306,7 +306,12 @@ func TestRenderHumanKoreanFriendlySummary(t *testing.T) {
 		t.Fatal(err)
 	}
 	human := RenderHuman(result)
-	for _, want := range []string{"상태:", "건강", "경고", "오류", "KAB"} {
+	for _, r := range human {
+		if r >= 0xAC00 && r <= 0xD7AF {
+			t.Fatalf("expected no Korean prose in human output, got %q", human)
+		}
+	}
+	for _, want := range []string{"Status:", "healthy", "warnings", "errors", "KAB"} {
 		if !strings.Contains(human, want) {
 			t.Fatalf("human output missing %q: %s", want, human)
 		}

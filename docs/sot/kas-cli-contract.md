@@ -305,6 +305,28 @@ Rules:
 - The required classification vocabulary is exactly `auto_copy_candidate`, `local_only`, `semantic_merge_required`, `new_upstream_candidate`, `removed_or_renamed_upstream`, and `fail_closed_conflict`. Do not add no-op/unchanged as a seventh classification without a new SOT update.
 - Semantic-port packet content is evidence only. Human output summarizes packet counts; the command must not write packet files.
 
+TOKEN-004 public lifecycle wrapper:
+
+```bash
+kkachi-hermes-skills update \
+  --profile <profile> \
+  --project <project-id> \
+  --state skills/<project>/<project>-kas/references/kas-project-state.yaml \
+  [--repo <current-upstream-kas-repo>] \
+  [--project-root <project-specific-kas-root>] \
+  --dry-run \
+  --json
+```
+
+`update --dry-run` is the public project KAS sync command. It exposes the same
+read-only classifier as `sync-project-kas`. JSON output reports target
+roles/profiles, source packs, skill ids, target paths, checksums, planned
+states, changed paths, backup/recovery posture, doctor commands, and explicit
+zero-write evidence for profile writes, auth/token/gateway/provider or model
+mutation, KAB runtime/policy mutation, KAH subjective-judgment mutation, Hermes
+runtime mutation, and profile activation. `sync-project-kas` remains available
+as a compatibility command.
+
 Minimum JSON shape:
 
 ```json
@@ -756,6 +778,30 @@ kkachi-hermes-skills repair-project-kas --profile <profile> --project <project> 
 kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run [--json]
 kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --approve dry-run:<hash> [--json]
 ```
+
+TOKEN-004 public lifecycle forms wrap the same dry-run planners:
+
+```bash
+kkachi-hermes-skills install --profile <profile> --project <project> --dry-run [--json]
+kkachi-hermes-skills install --profile <profile> --project <project> --from-generic --dry-run [--json]
+kkachi-hermes-skills repair --profile <profile> --project <project> --dry-run [--json]
+kkachi-hermes-skills uninstall --profile <profile> --project <project> --dry-run [--json]
+```
+
+In TOKEN-004, these public project forms are read-only. `install --project`
+uses the project-suite dry-run planner, `install --from-generic` uses the
+generic-to-project migration dry-run planner, and `repair` uses the project
+repair dry-run planner. Public write/apply forms fail closed until TOKEN-005.
+The old `install-project-kas`, `repair-project-kas`, and `migrate-project-kas`
+commands remain compatibility surfaces for existing tests and scripts.
+
+`uninstall --dry-run` is planner-only in TOKEN-004. It reads the profile
+manifest and filesystem, then reports manifest-tracked planned removals,
+skipped local-only or unmanifested files, checksums, changed paths,
+backup/recovery posture, and the future apply command. It must not remove
+files, write profile manifests, create backup files, mutate KAH/KAB/Hermes
+runtime state, change auth/token/gateway/provider/model configuration, or
+activate profiles. Removal and backup/evidence writing are TOKEN-005 behavior.
 
 When `doctor --project-suite` is absent, `doctor --project <path>` keeps its existing KAH project-path meaning. When `--project-suite` is present, `--project` is interpreted as the project suite id. Repair and migration default `source_pack` to `kas-default-project-suite`; optional explicit `--source-pack` values fail closed when unknown, and the resolved source pack is included in JSON, diagnostics, and plan-hash evidence.
 

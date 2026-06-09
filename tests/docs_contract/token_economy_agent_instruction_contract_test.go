@@ -264,15 +264,20 @@ func TestToken003DryRunSurfacesRejectWriteCapableWording(t *testing.T) {
 	}
 }
 
-func TestToken003RoadmapSeparationFromToken004AndToken005(t *testing.T) {
+func TestTokenRoadmapSeparatesCompletedToken004FromToken005Writes(t *testing.T) {
 	requireRoadmapTaskStatus(t, "TOKEN-003", "Completed")
-	requireRoadmapTaskStatus(t, "TOKEN-004", "Planned")
+	requireRoadmapTaskStatus(t, "TOKEN-004", "Completed")
 	requireRoadmapTaskStatus(t, "TOKEN-005", "Planned")
 	requireContainsAll(t, "docs/roadmap.md", []string{
 		"TOKEN-003 | Implement English repo-local agent instruction templates | Completed",
 		"`AGENTS.md` and `CLAUDE.md` templates use English managed blocks, preserve project-local content, and encode KAS/KAH/KAB boundaries without blind overwrite.",
 		"Verified dry-run examples, managed-marker tests, docs-contract, repo test gate, GLM Octo review, post-Octo second color review, and KAH final gate `evt-001886` in run `run-20260609T134803Z-fe1b071fd6d9`.",
-		"TOKEN-004 | Implement public project KAS lifecycle UX and read-only planner | Planned",
+		"TOKEN-004 | Implement public project KAS lifecycle UX and read-only planner | Completed",
+		"Completed in KAH run `run-20260609T150446Z-ffd5705a418e`",
+		"Codex implementation/fixes, enhance-test, AI slop cleanup, optimize, and docs-update evidence passed",
+		"Official KAB GLM Octo session `872cd977-7b23-4b48-bbcc-886f2cf833b3` accepted with 0 blockers",
+		"Post-fix second color re-review accepted: Red `t_61d7a108`, Orange `t_3c95fbed`, Gray `t_817322f8`",
+		"KAH final verification gate passed as `evt-002022`",
 		"TOKEN-005 | Implement approved lifecycle writes and uninstall vault backup | Planned",
 	})
 	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{

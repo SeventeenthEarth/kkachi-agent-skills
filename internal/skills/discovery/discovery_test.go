@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -37,6 +38,15 @@ func joinLines(lines []string) string {
 		out += line
 	}
 	return out
+}
+
+func assertNoHangul(t *testing.T, out string) {
+	t.Helper()
+	for _, r := range out {
+		if r >= 0xAC00 && r <= 0xD7AF {
+			t.Fatalf("expected no Korean prose in human output, got %q", out)
+		}
+	}
 }
 
 func expectedPackChecksum(t *testing.T, packDir string) string {
@@ -157,6 +167,13 @@ func TestListCategoryAndProfileStates(t *testing.T) {
 	}
 	if len(missing.Packs) != 0 || len(missing.Diagnostics) != 1 || missing.Diagnostics[0].Code != "unknown_category" {
 		t.Fatalf("unexpected missing category result: %+v", missing)
+	}
+	missingHuman := RenderHumanList(missing)
+	assertNoHangul(t, missingHuman)
+	for _, want := range []string{"Status:", "Source:", "Diagnostic:", "Next:"} {
+		if !strings.Contains(missingHuman, want) {
+			t.Fatalf("missing human label %q: %s", want, missingHuman)
+		}
 	}
 
 	profileRoot := filepath.Join(t.TempDir(), "profile")

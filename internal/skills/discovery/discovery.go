@@ -186,7 +186,7 @@ func BuildListResult(repo string, opts ListOptions) (ListResult, error) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Level:   "info",
 				Code:    "unknown_category",
-				Message: fmt.Sprintf("카테고리 '%s'에 해당하는 KAS pack이 없습니다.", opts.Category),
+				Message: fmt.Sprintf("No KAS packs match category %q.", opts.Category),
 			})
 		}
 		packs = filtered
@@ -213,7 +213,7 @@ func BuildListResult(repo string, opts ListOptions) (ListResult, error) {
 }
 
 func RenderHumanList(result ListResult) string {
-	lines := []string{fmt.Sprintf("상태: 조회 완료 — KAS pack %d개 발견.", len(result.Packs))}
+	lines := []string{fmt.Sprintf("Status: list complete; found %d KAS packs.", len(result.Packs))}
 	if result.TargetProfile != nil {
 		counts := map[string]int{}
 		for _, pack := range result.Packs {
@@ -222,7 +222,7 @@ func RenderHumanList(result ListResult) string {
 			}
 		}
 		lines = append(lines, fmt.Sprintf(
-			"설치 상태: current %d, missing %d, drifted %d, unknown %d, conflict %d, error %d.",
+			"Install state: current %d, missing %d, drifted %d, unknown %d, conflict %d, error %d.",
 			counts["installed_current"],
 			counts["not_installed"]+counts["manifest_missing"],
 			counts["installed_drifted"],
@@ -235,11 +235,11 @@ func RenderHumanList(result ListResult) string {
 	if result.SourceRepo.GitCommit != nil && *result.SourceRepo.GitCommit != "" {
 		commit = *result.SourceRepo.GitCommit
 	}
-	lines = append(lines, fmt.Sprintf("소스: %s @ %s", result.SourceRepo.Path, commit))
+	lines = append(lines, fmt.Sprintf("Source: %s @ %s", result.SourceRepo.Path, commit))
 	for _, diagnostic := range result.Diagnostics {
-		lines = append(lines, "진단: "+diagnostic.Message)
+		lines = append(lines, "Diagnostic: "+diagnostic.Message)
 	}
-	lines = append(lines, "다음: 설치 전 `install --dry-run`으로 변경 경로를 확인하세요.")
+	lines = append(lines, "Next: before installing, run `install --dry-run` to review changed paths.")
 	return strings.Join(lines, "\n")
 }
 

@@ -173,22 +173,22 @@ func BuildProjectSuiteDoctor(repo string, opts ProjectSuiteOptions) (ProjectSuit
 }
 
 func RenderHumanProjectSuiteDoctor(result ProjectSuiteDoctorResult) string {
-	state := "건강"
+	state := "healthy"
 	if !result.OK {
-		state = "오류"
+		state = "error"
 	} else if hasSuiteSeverity(result.ProjectSuiteDiagnostics, "warning") {
-		state = "경고"
+		state = "warning"
 	}
 	lines := []string{
-		fmt.Sprintf("상태: %s — profile %s project-suite doctor %s.", state, result.TargetProfile.Name, result.Project.ID),
+		fmt.Sprintf("Status: %s - profile %s project-suite doctor %s.", state, result.TargetProfile.Name, result.Project.ID),
 		fmt.Sprintf("manifest: %s (%s)", result.ProjectSuite.ManifestState, result.ManifestPath),
 		fmt.Sprintf("suite: %s (%s), files checked %d.", result.ProjectSuite.PhysicalState, result.Project.TargetSuitePath, result.ProjectSuite.FilesChecked),
 		"source_pack: " + result.SourcePack.ID,
 	}
 	for _, diagnostic := range result.ProjectSuiteDiagnostics {
-		lines = append(lines, fmt.Sprintf("%s: %s — %s", diagnostic.Severity, diagnostic.Condition, diagnostic.Message))
+		lines = append(lines, fmt.Sprintf("%s: %s - %s", diagnostic.Severity, diagnostic.Condition, diagnostic.Message))
 	}
-	lines = append(lines, "다음: "+result.NextAction)
+	lines = append(lines, "Next: "+result.NextAction)
 	return strings.Join(lines, "\n")
 }
 
@@ -217,16 +217,16 @@ func RenderHumanProjectAction(result ProjectActionResult) string {
 		status = "complete"
 	}
 	lines := []string{
-		fmt.Sprintf("상태: %s %s — profile %s / project %s.", result.Command, status, result.TargetProfile.Name, result.Project.ID),
-		fmt.Sprintf("소스 팩: %s", result.SourcePack.ID),
-		fmt.Sprintf("계획: actions %d, manual tasks %d, plan_hash %s", len(result.PlannedActions), len(result.ManualSemanticPortTasks), result.PlanHash),
+		fmt.Sprintf("Status: %s %s - profile %s / project %s.", result.Command, status, result.TargetProfile.Name, result.Project.ID),
+		fmt.Sprintf("Source pack: %s", result.SourcePack.ID),
+		fmt.Sprintf("Plan: actions %d, manual tasks %d, plan_hash %s", len(result.PlannedActions), len(result.ManualSemanticPortTasks), result.PlanHash),
 	}
 	if result.DryRun {
-		lines = append(lines, "쓰기: dry-run only; profile/manifest/KAH/KAB/auth/provider writes 0.")
-		lines = append(lines, fmt.Sprintf("승인 필요: %t", result.ApprovalRequest.Required))
-		lines = append(lines, "승인 증거: "+result.ApprovalRequest.EvidenceRef)
+		lines = append(lines, "Writes: dry-run only; profile/manifest/KAH/KAB/auth/provider writes 0.")
+		lines = append(lines, fmt.Sprintf("Approval required: %t", result.ApprovalRequest.Required))
+		lines = append(lines, "Approval evidence: "+result.ApprovalRequest.EvidenceRef)
 	} else {
-		lines = append(lines, "승인 증거: "+result.Approval.EvidenceRef, "복구: "+result.BackupPath)
+		lines = append(lines, "Approval evidence: "+result.Approval.EvidenceRef, "Recovery: "+result.BackupPath)
 	}
 	for _, diagnostic := range result.ProjectSuiteDiagnostics {
 		lines = append(lines, humanProjectSuiteDiagnosticLine(diagnostic))
@@ -235,20 +235,20 @@ func RenderHumanProjectAction(result ProjectActionResult) string {
 		lines = append(lines, humanPlannedActionLine(action))
 	}
 	if len(result.PlannedActions) > 5 {
-		lines = append(lines, fmt.Sprintf("액션: ... %d more planned actions", len(result.PlannedActions)-5))
+		lines = append(lines, fmt.Sprintf("Action: ... %d more planned actions", len(result.PlannedActions)-5))
 	}
 	for _, diagnostic := range result.Diagnostics {
-		lines = append(lines, "진단: "+diagnostic.Message)
+		lines = append(lines, "Diagnostic: "+diagnostic.Message)
 	}
 	for _, task := range result.ManualSemanticPortTasks {
-		lines = append(lines, "수동 semantic-port: "+task.Reason+" — "+task.SourcePath)
+		lines = append(lines, "Manual semantic-port: "+task.Reason+" - "+task.SourcePath)
 	}
-	lines = append(lines, "다음: "+result.NextAction)
+	lines = append(lines, "Next: "+result.NextAction)
 	return strings.Join(lines, "\n")
 }
 
 func humanProjectSuiteDiagnosticLine(diagnostic ProjectSuiteDiagnostic) string {
-	parts := []string{fmt.Sprintf("project-suite 진단: %s/%s — %s", diagnostic.Severity, diagnostic.Condition, diagnostic.Message)}
+	parts := []string{fmt.Sprintf("project-suite diagnostic: %s/%s - %s", diagnostic.Severity, diagnostic.Condition, diagnostic.Message)}
 	if diagnostic.InstalledSkill != "" {
 		parts = append(parts, "skill "+diagnostic.InstalledSkill)
 	}
@@ -269,12 +269,12 @@ func firstPlannedActions(actions []PlannedAction, limit int) []PlannedAction {
 }
 
 func humanPlannedActionLine(action PlannedAction) string {
-	line := fmt.Sprintf("액션: %s %s", action.Action, action.TargetPath)
+	line := fmt.Sprintf("Action: %s %s", action.Action, action.TargetPath)
 	if action.InstalledSkill != "" {
 		line += " (" + action.InstalledSkill + ")"
 	}
 	if action.Reason != "" {
-		line += " — " + action.Reason
+		line += " - " + action.Reason
 	}
 	if action.SourcePath != "" {
 		line += " from " + action.SourcePath

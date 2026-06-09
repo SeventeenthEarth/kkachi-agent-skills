@@ -75,12 +75,11 @@ kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --
 kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --approve dry-run:<hash> [--json]
 kkachi-hermes-skills doctor [--repo <path>] --profile <profile> [--project <path>] [--json]
 kkachi-hermes-skills doctor [--repo <path>] --profile <profile> --project <project> --project-suite [--json]
-kkachi-hermes-skills install-project-kas [--repo <path>] --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run [--json]
-kkachi-hermes-skills install-project-kas [--repo <path>] --profile <profile> --project <project> --source-pack kas-default-project-suite --approve dry-run:<hash> [--json]
-kkachi-hermes-skills repair-project-kas [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
-kkachi-hermes-skills repair-project-kas [--repo <path>] --profile <profile> --project <project> --approve dry-run:<hash> [--json]
-kkachi-hermes-skills migrate-project-kas [--repo <path>] --profile <profile> --project <project> --from-generic --dry-run [--json]
-kkachi-hermes-skills migrate-project-kas [--repo <path>] --profile <profile> --project <project> --from-generic --approve dry-run:<hash> [--json]
+kkachi-hermes-skills install [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
+kkachi-hermes-skills install [--repo <path>] --profile <profile> --project <project> --from-generic --dry-run [--json]
+kkachi-hermes-skills update [--repo <path>] --profile <profile> --project <project> --state <path> --dry-run [--json]
+kkachi-hermes-skills repair [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
+kkachi-hermes-skills uninstall --profile <profile> --project <project> --dry-run [--json]
 ```
 
 `list` discovers source KAS packs from `skills/`, reports direct-layout packs
@@ -96,7 +95,21 @@ copy install requires `--approve dry-run:<hash>`, recomputes the plan, fails
 closed on hash mismatch, copies selected packs into the target profile, records
 manifest/checksum evidence, and prints recovery guidance.
 
-`install-project-kas --dry-run` is the KASPROJ-002 read-only planner for project-specific KAS suites. It renders project-prefixed planned skill names and `skills/<project>/<project>-.../SKILL.md` target paths, emits no-write/checksum/plan-hash evidence, and does not create profile roots, manifests, KAH state, KAB runtime state, or approved installs. `install-project-kas --approve dry-run:<hash>` is the KASPROJ-003 approved install path: it recomputes the current dry-run, fails closed unless the approval hash matches, writes only the selected profile project suite, backs up trusted replacements, updates the compatible KAS profile manifest `project_suites[]` last, records `semantic_adaptation_claimed:false`, and does not claim semantic-port completion, KAB activation, or operational rollout. KASPROJ-004 adds project-suite doctor/repair/migrate: `doctor --project-suite` interprets `--project` as the suite id while preserving the existing KAH project-path meaning when `--project-suite` is absent; repair and migration default `source_pack` to `kas-default-project-suite`, are dry-run-first and approval-hash-bound, back up changed files/manifests, retain generic skills during migration, and never claim semantic-port completion or generic fallback.
+For project-specific KAS suites, the TOKEN-004 lifecycle commands are
+`install`, `update`, `doctor`, `repair`, and `uninstall`. Project forms are
+read-only in TOKEN-004: `install --project --dry-run` uses the project-suite
+install planner, `install --from-generic --dry-run` uses the
+generic-to-project migration planner, `update --dry-run` uses the sync
+classifier, `repair --dry-run` uses the project repair planner, and
+`uninstall --dry-run` reads the manifest and filesystem to plan
+manifest-tracked removals while skipping local-only or unmanifested files.
+Public `--apply` forms are deferred to TOKEN-005.
+
+Compatibility commands remain available for existing automation:
+`sync-project-kas`, `install-project-kas`, `repair-project-kas`, and
+`migrate-project-kas`. Their approved install/repair/migration paths preserve
+the existing approval-hash behavior; the public TOKEN-004 wrappers are
+dry-run-only.
 
 `doctor` verifies source pack integrity, installed profile state,
 manifest/checksum consistency, KAH availability/version/capabilities, optional

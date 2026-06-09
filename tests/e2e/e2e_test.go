@@ -34,6 +34,15 @@ func buildBinary(t *testing.T) string {
 	return binary
 }
 
+func assertNoHangul(t *testing.T, out string) {
+	t.Helper()
+	for _, r := range out {
+		if r >= 0xAC00 && r <= 0xD7AF {
+			t.Fatalf("expected no Korean prose in human output, got %q", out)
+		}
+	}
+}
+
 func TestRealRepoListAndInstallDryRunDoNotWriteProfile(t *testing.T) {
 	root := repoRoot(t)
 	binary := buildBinary(t)
@@ -346,8 +355,10 @@ func TestRealRepoDoctorReportsApprovedTempProfileReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("doctor human failed: %v\n%s", err, doctorHumanOut)
 	}
-	if !strings.Contains(string(doctorHumanOut), "상태:") || !strings.Contains(string(doctorHumanOut), "건강") {
-		t.Fatalf("unexpected doctor human output: %s", doctorHumanOut)
+	doctorHumanText := string(doctorHumanOut)
+	assertNoHangul(t, doctorHumanText)
+	if !strings.Contains(doctorHumanText, "Status:") || !strings.Contains(doctorHumanText, "healthy") {
+		t.Fatalf("unexpected doctor human output: %s", doctorHumanText)
 	}
 	after, err := os.ReadFile(filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json"))
 	if err != nil {

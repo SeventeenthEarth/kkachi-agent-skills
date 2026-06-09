@@ -8,6 +8,15 @@ import (
 	"testing"
 )
 
+func assertNoHangul(t *testing.T, out string) {
+	t.Helper()
+	for _, r := range out {
+		if r >= 0xAC00 && r <= 0xD7AF {
+			t.Fatalf("expected no Korean prose in human output, got %q", out)
+		}
+	}
+}
+
 func TestBuildDryRunRendersProjectPrefixedSuiteAndWritesNothing(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{
 		"kkachi-plan":         "---\nname: kkachi-plan\n---\n# kkachi-plan\n",
@@ -38,6 +47,13 @@ func TestBuildDryRunRendersProjectPrefixedSuiteAndWritesNothing(t *testing.T) {
 	}
 	if result.SourcePack.FormalRegistry != "skill-pack.yaml" {
 		t.Fatalf("source suite was not formalized through skill-pack.yaml: %+v", result.SourcePack)
+	}
+	human := RenderHumanDryRun(result)
+	assertNoHangul(t, human)
+	for _, want := range []string{"Status:", "Source pack:", "Plan:", "Writes:", "Approval evidence:", "Next:"} {
+		if !strings.Contains(human, want) {
+			t.Fatalf("human dry-run output missing %q:\n%s", want, human)
+		}
 	}
 	if result.ProjectTailoring.Mode != "prefix_render_only" || result.ProjectTailoring.SemanticPortRequiredBeforeApprovedInstall || result.ProjectTailoring.SemanticAdaptationClaimed {
 		t.Fatalf("unexpected tailoring posture: %+v", result.ProjectTailoring)
@@ -338,6 +354,7 @@ func TestBuildDryRunRejectsUmbrellaOnlySourceSuite(t *testing.T) {
 func TestPlannerSourceContainsNoWriteAPIs(t *testing.T) {
 	assertSourceContainsNoWriteAPIs(t, "project_install.go", "")
 	assertSourceContainsNoWriteAPIs(t, "kasproj004.go", sourceSection(t, "kasproj004.go", "func buildProjectActionDryRun", "func applyApprovedProjectAction"))
+	assertSourceContainsNoWriteAPIs(t, "uninstall.go", "")
 }
 
 func assertSourceContainsNoWriteAPIs(t *testing.T, path string, source string) {
@@ -557,14 +574,15 @@ func TestProjectRepairHumanOutputShowsSuiteDiagnosticsAndActions(t *testing.T) {
 		t.Fatalf("missing suite repair should remain approvable, got %+v", repairDryRun)
 	}
 	human := RenderHumanProjectAction(repairDryRun)
+	assertNoHangul(t, human)
 	for _, want := range []string{
-		"project-suite 진단: error/missing_project_suite",
+		"project-suite diagnostic: error/missing_project_suite",
 		"no trusted project_suites[] entry exists",
 		"next_action: Install or repair the project-specific suite",
 		"path skills/doksuri-server",
-		"액션: create skills/doksuri-server/doksuri-server-plan/SKILL.md",
+		"Action: create skills/doksuri-server/doksuri-server-plan/SKILL.md",
 		"restore_missing_project_suite_file",
-		"승인 필요: true",
+		"Approval required: true",
 	} {
 		if !strings.Contains(human, want) {
 			t.Fatalf("human repair output missing %q:\n%s", want, human)

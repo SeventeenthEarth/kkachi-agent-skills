@@ -270,16 +270,16 @@ func RenderHumanDryRun(result Result) string {
 		status = "blocked"
 	}
 	lines := []string{
-		fmt.Sprintf("상태: project KAS dry-run %s — %s", status, result.Project.ID),
-		fmt.Sprintf("소스 팩: %s", result.SourcePack.ID),
-		fmt.Sprintf("계획: skills %d, conflicts %d, plan_hash %s", result.Summary.TotalSkills, result.Summary.ConflictCount, result.PlanHash),
-		"쓰기: dry-run only; profile/manifest/KAH/KAB writes 0.",
-		"승인 증거: " + result.ApprovalRequest.EvidenceRef,
+		fmt.Sprintf("Status: project KAS dry-run %s - %s", status, result.Project.ID),
+		fmt.Sprintf("Source pack: %s", result.SourcePack.ID),
+		fmt.Sprintf("Plan: skills %d, conflicts %d, plan_hash %s", result.Summary.TotalSkills, result.Summary.ConflictCount, result.PlanHash),
+		"Writes: dry-run only; profile/manifest/KAH/KAB writes 0.",
+		"Approval evidence: " + result.ApprovalRequest.EvidenceRef,
 	}
 	for _, conflict := range result.Conflicts {
-		lines = append(lines, "충돌: "+conflict.Condition+" — "+conflict.Message)
+		lines = append(lines, "Conflict: "+conflict.Condition+" - "+conflict.Message)
 	}
-	lines = append(lines, "다음: "+result.NextAction)
+	lines = append(lines, "Next: "+result.NextAction)
 	return strings.Join(lines, "\n")
 }
 

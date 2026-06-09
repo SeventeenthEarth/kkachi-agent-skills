@@ -10,6 +10,15 @@ import (
 	"testing"
 )
 
+func assertNoHangul(t *testing.T, out string) {
+	t.Helper()
+	for _, r := range out {
+		if r >= 0xAC00 && r <= 0xD7AF {
+			t.Fatalf("expected no Korean prose in human output, got %q", out)
+		}
+	}
+}
+
 func writeSkill(t *testing.T, dir string, body string) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -129,6 +138,13 @@ func TestCreatePlanIsNoWriteAndHashIncludesSOTFields(t *testing.T) {
 	}
 	if !contains(result.NextAction, "approve the current dry_run_plan_hash") || contains(result.NextAction, "CLIMVP-004") {
 		t.Fatalf("unexpected approval guidance: %s", result.NextAction)
+	}
+	human := RenderHumanDryRun(result)
+	assertNoHangul(t, human)
+	for _, want := range []string{"Status:", "Target:", "Plan:", "Diagnostic:", "plan hash:"} {
+		if !contains(human, want) {
+			t.Fatalf("missing human label %q: %s", want, human)
+		}
 	}
 }
 

@@ -200,22 +200,22 @@ func Build(repo string, opts Options) (Result, error) {
 }
 
 func RenderHuman(result Result) string {
-	state := "건강"
+	state := "healthy"
 	if !result.OK {
-		state = "오류"
+		state = "error"
 	} else if countLevel(result.Diagnostics, "warning") > 0 {
-		state = "경고"
+		state = "warning"
 	}
 	lines := []string{
-		fmt.Sprintf("상태: %s — profile %s doctor.", state, result.TargetProfile.Name),
-		fmt.Sprintf("요약: 건강 %d, 경고 %d, 오류 %d.", healthyCount(result), countLevel(result.Diagnostics, "warning"), countLevel(result.Diagnostics, "error")),
+		fmt.Sprintf("Status: %s; profile %s doctor.", state, result.TargetProfile.Name),
+		fmt.Sprintf("Summary: healthy %d, warnings %d, errors %d.", healthyCount(result), countLevel(result.Diagnostics, "warning"), countLevel(result.Diagnostics, "error")),
 		"manifest: " + result.Manifest.State + " (" + result.Manifest.Path + ")",
 		"KAB adoption marker: " + result.KABAdoptionStage.State,
 		fmt.Sprintf("KAH: %s", kahHuman(result.KAH)),
 		"KAB: " + result.KAB.Message,
 	}
 	for _, diagnostic := range result.Diagnostics {
-		lines = append(lines, fmt.Sprintf("진단[%s]: %s", diagnostic.Level, diagnostic.Message))
+		lines = append(lines, fmt.Sprintf("Diagnostic[%s]: %s", diagnostic.Level, diagnostic.Message))
 	}
 	lines = append(lines, result.NextAction)
 	return strings.Join(lines, "\n")
@@ -593,7 +593,7 @@ func finalize(result *Result) {
 	if result.OK {
 		result.NextAction = "Profile install state is healthy. Use full KAS+KAH+KAB path for execution-runtime/code-change work."
 	} else {
-		result.NextAction = "프로필 설치 상태를 수정한 뒤 doctor를 다시 실행하세요. KAH project doctor는 profile install health의 증거가 아닙니다."
+		result.NextAction = "Fix the profile install state, then rerun doctor. KAH project doctor is not evidence of profile install health."
 	}
 }
 

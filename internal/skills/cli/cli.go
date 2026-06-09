@@ -34,7 +34,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, doctor, sync-project-kas, install-project-kas, repair-project-kas, or migrate-project-kas command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, or uninstall command", "", false, "")
 	}
 	if isHelpArg(argv[0]) {
 		printRootHelp(stdout)
@@ -45,8 +45,14 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runList(argv[1:], stdout, stderr, env)
 	case "install":
 		return runInstall(argv[1:], stdout, stderr, env)
+	case "update":
+		return runUpdate(argv[1:], stdout, stderr, env)
 	case "doctor":
 		return runDoctor(argv[1:], stdout, stderr, env)
+	case "repair":
+		return runRepair(argv[1:], stdout, stderr, env)
+	case "uninstall":
+		return runUninstall(argv[1:], stdout, stderr, env)
 	case "sync-project-kas":
 		return runSyncProjectKAS(argv[1:], stdout, stderr, env)
 	case "install-project-kas":
@@ -56,7 +62,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 	case "migrate-project-kas":
 		return runMigrateProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, doctor, sync-project-kas, install-project-kas, repair-project-kas, and migrate-project-kas commands are implemented", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, and uninstall commands are routine public lifecycle commands", argv[0], false, "")
 	}
 }
 
@@ -97,9 +103,13 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 	fs.SetOutput(stderr)
 	repo := fs.String("repo", "", "source KAS repo path")
 	profile := fs.String("profile", "", "Hermes target profile name")
+	project := fs.String("project", "", "project-specific KAS id")
+	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
+	fromGeneric := fs.Bool("from-generic", false, "plan explicit generic-to-project migration")
 	dryRun := fs.Bool("dry-run", false, "report planned changes without writing")
 	approve := fs.String("approve", "", "approval evidence ref for future approved copy install")
+	apply := fs.String("apply", "", "reserved for TOKEN-005 approved lifecycle writes")
 	kabStage := fs.String("kab-stage", "", "KAB adoption stage numeric selector (1 or 2)")
 	kabAdoptionStage := fs.String("kab-adoption-stage", "", "KAB adoption stage canonical selector")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
@@ -111,6 +121,12 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 	}
 	if err := fs.Parse(normalizeInstallArgs(argv)); err != nil {
 		return 2
+	}
+	if *project != "" || *fromGeneric {
+		return runPublicProjectInstall(*repo, *profile, *project, *sourcePack, *profileRoot, *dryRun, *fromGeneric, *approve, *apply, *jsonOutput, stdout, stderr, env, argv)
+	}
+	if *apply != "" {
+		return emitError(stderr, "apply_deferred_to_token_005", "install --apply is TOKEN-005 behavior.", "install", *jsonOutput, "Use install --dry-run for TOKEN-004 planning.")
 	}
 	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "install", *jsonOutput, "")
@@ -155,6 +171,83 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 		fmt.Fprintln(out, install.RenderHumanDryRun(result))
 	}
 	return code
+}
+
+func runPublicProjectInstall(repo string, profile string, project string, sourcePack string, profileRoot string, dryRun bool, fromGeneric bool, approve string, apply string, jsonOutput bool, stdout io.Writer, stderr io.Writer, env map[string]string, argv []string) int {
+	if profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
+		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "install", jsonOutput, "")
+	}
+	if apply != "" || approve != "" || !dryRun {
+		return emitError(stderr, "public_project_install_dry_run_only", "install --project is read-only in TOKEN-004 and requires --dry-run; writes are TOKEN-005 behavior.", "install", jsonOutput, "Rerun with install --profile <profile> --project <project> --dry-run.")
+	}
+	if profile == "" {
+		return emitError(stderr, "profile_required", "install --project requires --profile <profile>.", "install", jsonOutput, "")
+	}
+	if project == "" {
+		return emitError(stderr, "project_required", "install --project or install --from-generic requires --project <project>.", "install", jsonOutput, "")
+	}
+	if sourcePack == "" {
+		sourcePack = projectinstall.VirtualSourcePackID
+	}
+	opts := projectinstall.ProjectSuiteOptions{Profile: profile, Project: project, SourcePack: sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: profileRoot, FromGeneric: fromGeneric}
+	if fromGeneric {
+		result, err := projectinstall.BuildProjectMigrationDryRun(repo, opts)
+		if err != nil {
+			return emitError(stderr, "project_install_planner_failed", err.Error(), "install", jsonOutput, "")
+		}
+		result.Command = "install"
+		return emitResult(stdout, stderr, result.OK, jsonOutput, result, func() string {
+			return projectinstall.RenderHumanProjectAction(result)
+		})
+	}
+	result, err := projectinstall.BuildDryRun(repo, projectinstall.Options{Profile: profile, Project: project, SourcePack: sourcePack, ProfileRoot: profileRoot, DryRun: true})
+	if err != nil {
+		return emitError(stderr, "project_install_planner_failed", err.Error(), "install", jsonOutput, "")
+	}
+	result.Command = "install"
+	result.NextAction = "Review install --project dry-run evidence; no files were written. Use doctor --project-suite after future approved writes."
+	return emitResult(stdout, stderr, result.OK, jsonOutput, result, func() string {
+		return projectinstall.RenderHumanDryRun(result)
+	})
+}
+
+func runUpdate(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("update", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	profile := fs.String("profile", "", "Hermes target profile name")
+	project := fs.String("project", "", "project-specific KAS id")
+	statePath := fs.String("state", "", "project kas-project-state.yaml path")
+	legacyMarkerPath := fs.String("legacy-marker", "", "optional legacy kab-adoption-stage.md path")
+	repoPath := fs.String("repo", "", "current upstream KAS source repo path")
+	projectRoot := fs.String("project-root", "", "project-specific KAS root path")
+	dryRun := fs.Bool("dry-run", false, "classify project KAS update without writing")
+	apply := fs.String("apply", "", "reserved for TOKEN-005 approved lifecycle writes")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if *apply != "" {
+		return emitError(stderr, "apply_deferred_to_token_005", "update --apply is TOKEN-005 behavior.", "update", *jsonOutput, "Use update --dry-run for TOKEN-004 planning.")
+	}
+	if !*dryRun {
+		return emitError(stderr, "update_requires_dry_run", "update is read-only in TOKEN-004 and requires --dry-run.", "update", *jsonOutput, "Rerun with update --profile <profile> --project <project-id> --state <path> --dry-run.")
+	}
+	if *profile == "" {
+		return emitError(stderr, "profile_required", "update requires --profile <profile>.", "update", *jsonOutput, "")
+	}
+	if *project == "" {
+		return emitError(stderr, "project_required", "update requires --project <project-id>.", "update", *jsonOutput, "")
+	}
+	result := kasstate.BuildLifecycleUpdate(kasstate.Options{Profile: *profile, Project: *project, StatePath: *statePath, LegacyMarkerPath: *legacyMarkerPath, DryRun: *dryRun, RepoPath: *repoPath, ProjectRoot: *projectRoot})
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return kasstate.RenderHumanLifecycleUpdate(result)
+	})
 }
 
 func runDoctor(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
@@ -218,6 +311,86 @@ func runDoctor(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 		fmt.Fprintln(out, doctor.RenderHuman(result))
 	}
 	return code
+}
+
+func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("repair", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	repo := fs.String("repo", "", "source KAS repo path")
+	profile := fs.String("profile", "", "Hermes target profile name")
+	project := fs.String("project", "", "project-specific KAS id")
+	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id")
+	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
+	dryRun := fs.Bool("dry-run", false, "report planned repairs without writing")
+	approve := fs.String("approve", "", "compatibility alias; public repair writes are deferred to TOKEN-005")
+	apply := fs.String("apply", "", "reserved for TOKEN-005 approved lifecycle writes")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
+		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "repair", *jsonOutput, "")
+	}
+	if *apply != "" || *approve != "" || !*dryRun {
+		return emitError(stderr, "public_project_repair_dry_run_only", "repair is read-only in TOKEN-004 and requires --dry-run; writes are TOKEN-005 behavior.", "repair", *jsonOutput, "Rerun with repair --profile <profile> --project <project> --dry-run.")
+	}
+	if *profile == "" {
+		return emitError(stderr, "profile_required", "repair requires --profile <profile>.", "repair", *jsonOutput, "")
+	}
+	if *project == "" {
+		return emitError(stderr, "project_required", "repair requires --project <project>.", "repair", *jsonOutput, "")
+	}
+	result, err := projectinstall.BuildProjectRepairDryRun(*repo, projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot})
+	if err != nil {
+		return emitError(stderr, "project_repair_failed", err.Error(), "repair", *jsonOutput, "")
+	}
+	result.Command = "repair"
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return projectinstall.RenderHumanProjectAction(result)
+	})
+}
+
+func runUninstall(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("uninstall", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	profile := fs.String("profile", "", "Hermes target profile name")
+	project := fs.String("project", "", "project-specific KAS id")
+	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id")
+	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
+	dryRun := fs.Bool("dry-run", false, "report planned removals without writing")
+	apply := fs.String("apply", "", "reserved for TOKEN-005 approved lifecycle writes")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
+		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "uninstall", *jsonOutput, "")
+	}
+	if *apply != "" || !*dryRun {
+		return emitError(stderr, "public_project_uninstall_dry_run_only", "uninstall is read-only in TOKEN-004 and requires --dry-run; removal is TOKEN-005 behavior.", "uninstall", *jsonOutput, "Rerun with uninstall --profile <profile> --project <project> --dry-run.")
+	}
+	if *profile == "" {
+		return emitError(stderr, "profile_required", "uninstall requires --profile <profile>.", "uninstall", *jsonOutput, "")
+	}
+	if *project == "" {
+		return emitError(stderr, "project_required", "uninstall requires --project <project>.", "uninstall", *jsonOutput, "")
+	}
+	result := projectinstall.BuildProjectUninstallDryRun(projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot})
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return projectinstall.RenderHumanProjectUninstall(result)
+	})
 }
 
 func runSyncProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
@@ -471,13 +644,13 @@ func normalizeInstallArgs(argv []string) []string {
 	for i := 0; i < len(argv); i++ {
 		arg := argv[i]
 		switch arg {
-		case "--repo", "--profile", "--profile-root", "--approve", "--kab-stage", "--kab-adoption-stage":
+		case "--repo", "--profile", "--project", "--source-pack", "--profile-root", "--approve", "--apply", "--kab-stage", "--kab-adoption-stage":
 			rewritten = append(rewritten, arg)
 			if i+1 < len(argv) {
 				i++
 				rewritten = append(rewritten, argv[i])
 			}
-		case "--dry-run", "--json", "--no-color":
+		case "--from-generic", "--dry-run", "--json", "--no-color":
 			rewritten = append(rewritten, arg)
 		default:
 			if hasInstallFlagValue(arg) || arg == "--dry-run=true" || arg == "--json=true" || arg == "--no-color=true" {
@@ -491,7 +664,7 @@ func normalizeInstallArgs(argv []string) []string {
 }
 
 func hasInstallFlagValue(arg string) bool {
-	for _, name := range []string{"--repo=", "--profile=", "--profile-root=", "--approve=", "--kab-stage=", "--kab-adoption-stage=", "--dry-run=", "--json=", "--no-color="} {
+	for _, name := range []string{"--repo=", "--profile=", "--project=", "--source-pack=", "--profile-root=", "--approve=", "--apply=", "--kab-stage=", "--kab-adoption-stage=", "--from-generic=", "--dry-run=", "--json=", "--no-color="} {
 		if strings.HasPrefix(arg, name) {
 			return true
 		}
@@ -549,12 +722,14 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Available commands:")
 	fmt.Fprintln(w, "  list     List available KAS skill packs")
-	fmt.Fprintln(w, "  install  Plan a profile-scoped KAS skill-pack install")
-	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS skill-pack install")
-	fmt.Fprintln(w, "  sync-project-kas  Validate project-specific KAS state without writing")
-	fmt.Fprintln(w, "  install-project-kas  Plan/apply an approved project-specific KAS suite install")
-	fmt.Fprintln(w, "  repair-project-kas  Dry-run/apply approved project-specific KAS suite repair")
-	fmt.Fprintln(w, "  migrate-project-kas  Dry-run/apply approved generic-to-project KAS migration")
+	fmt.Fprintln(w, "  install  Plan KAS install or project-suite migration")
+	fmt.Fprintln(w, "  update   Classify project KAS updates without writing")
+	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
+	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
+	fmt.Fprintln(w, "  uninstall  Plan project-suite removal without writing")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Compatibility commands:")
+	fmt.Fprintln(w, "  sync-project-kas, install-project-kas, repair-project-kas, migrate-project-kas")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Use \"kkachi-hermes-skills <command> --help\" for command options.")
 }
@@ -574,7 +749,7 @@ func emitError(w io.Writer, code string, message string, command string, jsonOut
 	if jsonOutput {
 		_ = writeJSON(w, payload)
 	} else {
-		fmt.Fprintln(w, "오류: "+message)
+		fmt.Fprintln(w, "Error: "+message)
 	}
 	return 2
 }
@@ -586,6 +761,21 @@ func writeJSON(w io.Writer, value any) error {
 	}
 	_, err = fmt.Fprintln(w, string(data))
 	return err
+}
+
+func emitResult(stdout io.Writer, stderr io.Writer, ok bool, jsonOutput bool, value any, renderHuman func() string) int {
+	out := stdout
+	code := 0
+	if !ok {
+		out = stderr
+		code = 2
+	}
+	if jsonOutput {
+		_ = writeJSON(out, value)
+	} else {
+		fmt.Fprintln(out, renderHuman())
+	}
+	return code
 }
 
 func envValue(env map[string]string, key string) string {

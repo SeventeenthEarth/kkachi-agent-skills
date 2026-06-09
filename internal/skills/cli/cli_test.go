@@ -49,6 +49,105 @@ func assertCLIErrorCode(t *testing.T, data []byte, code string) {
 	}
 }
 
+func assertEnglishCLIError(t *testing.T, data []byte) {
+	t.Helper()
+	out := string(data)
+	if !strings.HasPrefix(out, "Error: ") {
+		t.Fatalf("expected English error prefix, got %q", out)
+	}
+	for _, r := range out {
+		if r >= 0xAC00 && r <= 0xD7AF {
+			t.Fatalf("expected no Korean prose in CLI error output, got %q", out)
+		}
+	}
+}
+
+func assertEnglishHumanOutput(t *testing.T, out string, labels ...string) {
+	t.Helper()
+	for _, r := range out {
+		if r >= 0xAC00 && r <= 0xD7AF {
+			t.Fatalf("expected no Korean prose in human output, got %q", out)
+		}
+	}
+	for _, label := range labels {
+		if !strings.Contains(out, label) {
+			t.Fatalf("expected human output to contain %q, got %q", label, out)
+		}
+	}
+}
+
+func assertNoWriteEvidence(t *testing.T, payload map[string]any) {
+	t.Helper()
+	noWrite, ok := payload["no_write"].(map[string]any)
+	if !ok {
+		t.Fatalf("payload missing no_write evidence: %+v", payload)
+	}
+	if noWrite["guaranteed"] != true {
+		t.Fatalf("expected guaranteed no-write evidence: %+v", noWrite)
+	}
+	for _, key := range []string{
+		"profile_write_count",
+		"skill_write_count",
+		"manifest_write_count",
+		"kas_directory_write_count",
+		"kah_state_write_count",
+		"kab_runtime_mutation_count",
+		"hermes_runtime_mutation_count",
+		"auth_provider_config_write_count",
+		"profile_activation_count",
+	} {
+		if value, ok := noWrite[key]; ok && value != float64(0) {
+			t.Fatalf("expected %s=0 in no-write evidence: %+v", key, noWrite)
+		}
+	}
+}
+
+func TestPublicLifecycleFailClosedHumanErrorsAreEnglish(t *testing.T) {
+	dir := t.TempDir()
+	profileRoot := filepath.Join(dir, "profile")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	for name, args := range map[string][]string{
+		"install-apply": {
+			"install",
+			"--profile", "kwanwoo",
+			"--project", "doksuri-server",
+			"--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000",
+			"--profile-root", profileRoot,
+		},
+		"update-missing-dry-run": {
+			"update",
+			"--profile", "kwanwoo",
+			"--project", "doksuri-server",
+		},
+		"update-apply": {
+			"update",
+			"--profile", "kwanwoo",
+			"--project", "doksuri-server",
+			"--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000",
+		},
+		"uninstall-apply": {
+			"uninstall",
+			"--profile", "kwanwoo",
+			"--project", "doksuri-server",
+			"--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000",
+			"--profile-root", profileRoot,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := Main(args, &stdout, &stderr, env)
+			if code != 2 {
+				t.Fatalf("expected fail-closed exit 2, got %d", code)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("expected human error on stderr only, got stdout=%q", stdout.String())
+			}
+			assertEnglishCLIError(t, stderr.Bytes())
+		})
+	}
+}
+
 func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 	for _, arg := range []string{"--help", "-h"} {
 		t.Run(arg, func(t *testing.T) {
@@ -58,8 +157,16 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := stdout.String()
-			if !strings.Contains(out, "list") || !strings.Contains(out, "install") || !strings.Contains(out, "doctor") || !strings.Contains(out, "sync-project-kas") || !strings.Contains(out, "install-project-kas") {
+			for _, want := range []string{"list", "install", "update", "doctor", "repair", "uninstall"} {
+				if !strings.Contains(out, want) {
+					t.Fatalf("root help did not list public command %s: %q", want, out)
+				}
+			}
+			if !strings.Contains(out, "Compatibility commands:") || !strings.Contains(out, "sync-project-kas") || !strings.Contains(out, "migrate-project-kas") {
 				t.Fatalf("root help did not list available commands: %q", out)
+			}
+			if !strings.Contains(out, "update   Classify project KAS updates without writing") || !strings.Contains(out, "Compatibility commands:") {
+				t.Fatalf("root help did not prioritize public dry-run lifecycle UX over legacy sync/migrate verbs: %q", out)
 			}
 			if stderr.Len() != 0 {
 				t.Fatalf("expected root help on stdout only, got stderr=%q", stderr.String())
@@ -69,7 +176,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 }
 
 func TestSubcommandHelpExitsZero(t *testing.T) {
-	for _, command := range []string{"list", "install", "doctor", "sync-project-kas", "install-project-kas"} {
+	for _, command := range []string{"list", "install", "update", "doctor", "repair", "uninstall", "sync-project-kas", "install-project-kas"} {
 		t.Run(command, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			code := Main([]string{command, "--help"}, &stdout, &stderr, nil)
@@ -82,6 +189,136 @@ func TestSubcommandHelpExitsZero(t *testing.T) {
 			if stderr.Len() != 0 {
 				t.Fatalf("expected help on stdout only, got stderr=%q", stderr.String())
 			}
+		})
+	}
+}
+
+func TestPublicLifecycleWrappersJSONDryRunOnly(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan")
+	writeCLITestSkillPackYAML(t, repo, "kkachi-plan")
+	profileRoot := filepath.Join(dir, "profile")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("public install dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	if _, err := os.Stat(profileRoot); !os.IsNotExist(err) {
+		t.Fatalf("public install dry-run created profile root: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["command"] != "install" || payload["mode"] != "project_dry_run" || payload["dry_run"] != true {
+		t.Fatalf("unexpected public install payload: %+v", payload)
+	}
+	assertNoWriteEvidence(t, payload)
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected public install apply rejection, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "public_project_install_dry_run_only")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("public repair dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	payload = map[string]any{}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["command"] != "repair" || payload["mode"] != "project_repair_dry_run" || payload["no_write"].(map[string]any)["guaranteed"] != true {
+		t.Fatalf("unexpected public repair payload: %+v", payload)
+	}
+	assertNoWriteEvidence(t, payload)
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--approve", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected public repair approve rejection, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "public_project_repair_dry_run_only")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install", "--from-generic", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("install --from-generic dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	payload = map[string]any{}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["command"] != "install" || payload["mode"] != "project_migration_dry_run" || payload["dry_run"] != true {
+		t.Fatalf("unexpected public migration payload: %+v", payload)
+	}
+	assertNoWriteEvidence(t, payload)
+}
+
+func TestPublicLifecycleProjectHumanOutputIsEnglish(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan")
+	writeCLITestSkillPackYAML(t, repo, "kkachi-plan")
+	profileRoot := filepath.Join(dir, "profile")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	for name, tc := range map[string]struct {
+		args       []string
+		wantCode   int
+		wantStdout bool
+		labels     []string
+	}{
+		"install-project-dry-run": {
+			args:       []string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot},
+			wantCode:   0,
+			wantStdout: true,
+			labels:     []string{"Status:", "Source pack:", "Plan:", "Writes:", "Approval evidence:", "Next:"},
+		},
+		"install-from-generic-dry-run": {
+			args:       []string{"install", "--from-generic", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot},
+			wantCode:   0,
+			wantStdout: true,
+			labels:     []string{"Status:", "Source pack:", "Plan:", "Writes:", "Approval required:", "Approval evidence:", "Manual semantic-port:", "Next:"},
+		},
+		"repair-dry-run": {
+			args:       []string{"repair", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot},
+			wantCode:   0,
+			wantStdout: true,
+			labels:     []string{"Status:", "Source pack:", "Plan:", "Writes:", "Approval required:", "Approval evidence:", "project-suite diagnostic:", "Action:", "Next:"},
+		},
+		"doctor-project-suite": {
+			args:     []string{"doctor", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--project-suite", "--profile-root", profileRoot},
+			wantCode: 2,
+			labels:   []string{"Status:", "manifest:", "suite:", "source_pack:", "error:", "Next:"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := Main(tc.args, &stdout, &stderr, env)
+			if code != tc.wantCode {
+				t.Fatalf("expected code %d, got %d stdout=%s stderr=%s", tc.wantCode, code, stdout.String(), stderr.String())
+			}
+			out := stderr.String()
+			if tc.wantStdout {
+				out = stdout.String()
+				if stderr.Len() != 0 {
+					t.Fatalf("expected human output on stdout only, got stderr=%q", stderr.String())
+				}
+			} else if stdout.Len() != 0 {
+				t.Fatalf("expected failed doctor human output on stderr only, got stdout=%q", stdout.String())
+			}
+			assertEnglishHumanOutput(t, out, tc.labels...)
 		})
 	}
 }
@@ -339,6 +576,124 @@ func TestSyncProjectKASJSONAndFailClosedGuards(t *testing.T) {
 	}
 }
 
+func TestUpdateDryRunLifecycleJSONAndNoWrite(t *testing.T) {
+	repo, projectRoot, statePath := setupCLISyncFixture(t)
+	before, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"update", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--dry-run", "--json", "--repo", repo, "--project-root", projectRoot}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("update dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["command"] != "update" || payload["mode"] != "project_update_dry_run" || payload["dry_run"] != true {
+		t.Fatalf("unexpected update payload: %+v", payload)
+	}
+	assertNoWriteEvidence(t, payload)
+	if len(payload["target_profiles"].([]any)) != 1 || len(payload["planned_states"].([]any)) == 0 || len(payload["doctor_commands"].([]any)) != 1 {
+		t.Fatalf("missing lifecycle planner fields: %+v", payload)
+	}
+	syncPayload := payload["sync_classification"].(map[string]any)
+	if syncPayload["command"] != "sync-project-kas" || syncPayload["summary"].(map[string]any)["no_action_count"] != float64(1) {
+		t.Fatalf("missing compatibility classification payload: %+v", syncPayload)
+	}
+	after, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("update dry-run rewrote state")
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"update", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected missing dry-run failure, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "update_requires_dry_run")
+}
+
+func TestUninstallDryRunPlansManifestTrackedOnly(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan")
+	writeCLITestSkillPackYAML(t, repo, "kkachi-plan")
+	profileRoot := filepath.Join(dir, "profile")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("install dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var dryRun map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &dryRun); err != nil {
+		t.Fatal(err)
+	}
+	evidence := dryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--approve", evidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("approved install failed: code=%d stderr=%s", code, stderr.String())
+	}
+	localOnly := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-local", "SKILL.md")
+	writeCLITestSkill(t, filepath.Dir(localOnly), "doksuri-server-local")
+	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")
+	before, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"uninstall", "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("uninstall dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["command"] != "uninstall" || payload["mode"] != "project_uninstall_dry_run" || payload["dry_run"] != true {
+		t.Fatalf("unexpected uninstall payload: %+v", payload)
+	}
+	removals := payload["planned_removals"].([]any)
+	if len(removals) != 1 || removals[0].(map[string]any)["action"] != "remove" {
+		t.Fatalf("unexpected planned removals: %+v", removals)
+	}
+	skipped := payload["skipped_local_files"].([]any)
+	if len(skipped) != 1 || skipped[0].(map[string]any)["path"] != "skills/doksuri-server/doksuri-server-local/SKILL.md" {
+		t.Fatalf("unexpected skipped files: %+v", skipped)
+	}
+	assertNoWriteEvidence(t, payload)
+	after, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("uninstall dry-run rewrote manifest-tracked file")
+	}
+	if _, err := os.Stat(localOnly); err != nil {
+		t.Fatalf("uninstall dry-run touched skipped local-only file: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"uninstall", "--profile", "kwanwoo", "--project", "doksuri-server", "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected uninstall apply rejection, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "public_project_uninstall_dry_run_only")
+}
+
 func setupCLISyncFixture(t *testing.T) (string, string, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -516,9 +871,7 @@ func TestDoctorJSONHumanAndProfileRootGuard(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("doctor human code=%d stderr=%s", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "상태:") || !strings.Contains(stdout.String(), "건강") || !strings.Contains(stdout.String(), "KAB") {
-		t.Fatalf("unexpected human output: %q", stdout.String())
-	}
+	assertEnglishHumanOutput(t, stdout.String(), "Status:", "healthy", "warnings", "errors", "KAB")
 
 	stdout.Reset()
 	stderr.Reset()
@@ -576,6 +929,14 @@ func TestListJSONShapeAndProfileRootGuard(t *testing.T) {
 	if diagnostics[0].(map[string]any)["code"] != "profile_root_override_rejected" {
 		t.Fatalf("unexpected guard payload: %+v", payload)
 	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"list", "--repo", repo, "--no-color"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("list human code=%d stderr=%s", code, stderr.String())
+	}
+	assertEnglishHumanOutput(t, stdout.String(), "Status:", "Source:", "Next:")
 }
 
 func TestInstallDryRunJSONAndFailClosedGuards(t *testing.T) {
@@ -747,6 +1108,7 @@ func TestInstallKABAdoptionStageFlagsDefaultsAndInteractive(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("interactive dry-run code=%d stderr=%s", code, stderr.String())
 	}
+	assertEnglishHumanOutput(t, stdout.String(), "Status:", "Target:", "Plan:", "Diagnostic:", "plan hash:")
 	if !strings.Contains(stdout.String(), "Choice [1]:") || !strings.Contains(stdout.String(), "source interactive") {
 		t.Fatalf("interactive output did not prompt/default: %q", stdout.String())
 	}

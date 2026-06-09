@@ -414,15 +414,15 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 }
 
 func RenderHumanDryRun(result Result) string {
-	state := "완료"
+	state := "complete"
 	if !result.OK {
-		state = "실패"
+		state = "failed"
 	}
 	lines := []string{
-		fmt.Sprintf("상태: install dry-run %s — 프로필 %s에는 아무것도 쓰지 않았습니다.", state, result.TargetProfile.Name),
-		"대상: " + result.TargetProfile.Root,
+		fmt.Sprintf("Status: install dry-run %s; no files were written to profile %s.", state, result.TargetProfile.Name),
+		"Target: " + result.TargetProfile.Root,
 		fmt.Sprintf(
-			"변경 계획: create %d, update %d, skip %d, conflict %d, error %d.",
+			"Plan: create %d, update %d, skip %d, conflict %d, error %d.",
 			result.Summary.CountsByAction["create"],
 			result.Summary.CountsByAction["update"],
 			result.Summary.CountsByAction["skip"],
@@ -433,7 +433,7 @@ func RenderHumanDryRun(result Result) string {
 		"plan hash: " + result.DryRunPlanHash,
 	}
 	for _, diagnostic := range result.Diagnostics {
-		lines = append(lines, "진단: "+diagnostic.Message)
+		lines = append(lines, "Diagnostic: "+diagnostic.Message)
 	}
 	lines = append(lines, result.NextAction)
 	return strings.Join(lines, "\n")
@@ -456,7 +456,7 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 			MatchedCurrentPlan: false,
 		}
 		result.Diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: "approval_plan_hash_mismatch", Message: "approval evidence does not match the current dry-run plan hash; rerun dry-run and approve the current plan."}}, dryRun.Diagnostics...)
-		result.NextAction = "설치하지 않았습니다. 현재 dry-run plan hash를 다시 확인한 뒤 --approve dry-run:<hash>로 재실행하세요."
+		result.NextAction = "Install was not performed. Recheck the current dry-run plan hash, then rerun with --approve dry-run:<hash>."
 		return result, nil
 	}
 	if !dryRun.OK {
@@ -469,7 +469,7 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 			MatchedCurrentPlan: true,
 		}
 		result.Diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: "install_plan_not_approvable", Message: "current dry-run plan contains conflict or error entries; approved install is closed."}}, dryRun.Diagnostics...)
-		result.NextAction = "설치하지 않았습니다. conflict/error를 해결하고 새 dry-run을 승인하세요."
+		result.NextAction = "Install was not performed. Resolve conflict/error entries, then approve a new dry-run."
 		return result, nil
 	}
 
@@ -564,20 +564,20 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 	actualChanged = append(actualChanged, manifestChanged)
 
 	result := buildApprovedResult(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, true, nil)
-	result.NextAction = "설치 완료. 다음: kkachi-hermes-skills doctor --profile " + dryRun.TargetProfile.Name + " (CLIMVP-005에서 구현 예정)."
+	result.NextAction = "Install complete. Next: kkachi-hermes-skills doctor --profile " + dryRun.TargetProfile.Name + " (implemented in CLIMVP-005)."
 	return result, nil
 }
 
 func RenderHumanApproved(result Result) string {
-	state := "완료"
+	state := "complete"
 	if !result.OK {
-		state = "실패"
+		state = "failed"
 	}
 	lines := []string{
-		fmt.Sprintf("상태: approved copy install %s — 프로필 %s.", state, result.TargetProfile.Name),
-		"대상: " + result.TargetProfile.Root,
+		fmt.Sprintf("Status: approved copy install %s; profile %s.", state, result.TargetProfile.Name),
+		"Target: " + result.TargetProfile.Root,
 		fmt.Sprintf(
-			"변경: create %d, update %d, backup %d, manifest_update %d, conflict %d, error %d.",
+			"Changes: create %d, update %d, backup %d, manifest_update %d, conflict %d, error %d.",
 			result.Summary.CountsByAction["create"],
 			result.Summary.CountsByAction["update"],
 			result.Summary.CountsByAction["backup"],
@@ -587,10 +587,10 @@ func RenderHumanApproved(result Result) string {
 		),
 		fmt.Sprintf("KAB adoption stage: %d (%s); marker %s.", result.KABAdoptionStage.Numeric, result.KABAdoptionStage.Canonical, result.KABAdoptionStage.MarkerPath),
 		"manifest: " + result.ManifestPath,
-		"복구: " + result.BackupPath,
+		"Recovery: " + result.BackupPath,
 	}
 	for _, diagnostic := range result.Diagnostics {
-		lines = append(lines, "진단: "+diagnostic.Message)
+		lines = append(lines, "Diagnostic: "+diagnostic.Message)
 	}
 	lines = append(lines, result.NextAction)
 	return strings.Join(lines, "\n")
@@ -1136,7 +1136,7 @@ func approvedFailure(dryRun Result, evidenceRef string, approvedHash string, ins
 	diagnostics := []discovery.Diagnostic{{Level: "error", Code: code, Message: message}}
 	diagnostics = append(diagnostics, dryRun.Diagnostics...)
 	result := buildApprovedResult(dryRun, evidenceRef, approvedHash, installID, backupRoot, changed, false, diagnostics)
-	result.NextAction = "설치가 중단되었습니다. 파일과 manifest 상태를 확인하고 새 dry-run부터 다시 실행하세요."
+	result.NextAction = "Install was interrupted. Check file and manifest state, then restart from a new dry-run."
 	return result
 }
 

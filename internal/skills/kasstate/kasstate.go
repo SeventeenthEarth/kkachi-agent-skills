@@ -80,6 +80,74 @@ type Summary struct {
 	WriteCount              int            `json:"write_count"`
 }
 
+type LifecycleNoWriteEvidence struct {
+	Guaranteed                   bool `json:"guaranteed"`
+	ProfileWriteCount            int  `json:"profile_write_count"`
+	SkillWriteCount              int  `json:"skill_write_count"`
+	ManifestWriteCount           int  `json:"manifest_write_count"`
+	KAHStateWriteCount           int  `json:"kah_state_write_count"`
+	KABRuntimeMutationCount      int  `json:"kab_runtime_mutation_count"`
+	HermesRuntimeMutationCount   int  `json:"hermes_runtime_mutation_count"`
+	AuthProviderConfigWriteCount int  `json:"auth_provider_config_write_count"`
+	ProfileActivationCount       int  `json:"profile_activation_count"`
+}
+
+type LifecycleTargetProfile struct {
+	Name          string `json:"name"`
+	Role          string `json:"role"`
+	StatePath     string `json:"state_path"`
+	ProjectRoot   string `json:"project_root,omitempty"`
+	LegacyMarker  string `json:"legacy_marker_path,omitempty"`
+	PlannedState  string `json:"planned_state"`
+	DoctorCommand string `json:"doctor_command"`
+}
+
+type LifecycleSourcePack struct {
+	ID        string            `json:"id"`
+	Paths     map[string]string `json:"paths"`
+	Checksums map[string]string `json:"checksums"`
+	State     string            `json:"planned_state"`
+}
+
+type LifecyclePlannedState struct {
+	ID             string            `json:"id"`
+	SkillID        string            `json:"skill_id"`
+	SourcePackID   string            `json:"source_pack_id,omitempty"`
+	TargetPath     string            `json:"target_path,omitempty"`
+	PlannedState   string            `json:"planned_state"`
+	Classification string            `json:"classification"`
+	Checksums      map[string]string `json:"checksums"`
+	ChangedPaths   []string          `json:"changed_paths"`
+	DoctorCommand  string            `json:"doctor_command"`
+}
+
+type LifecycleBackupRecovery struct {
+	BackupRequired        bool     `json:"backup_required"`
+	BackupWriteDeferred   bool     `json:"backup_write_deferred"`
+	RecoveryWriteDeferred bool     `json:"recovery_write_deferred"`
+	Instructions          []string `json:"instructions"`
+}
+
+type LifecycleUpdateResult struct {
+	OK                 bool                     `json:"ok"`
+	Command            string                   `json:"command"`
+	Mode               string                   `json:"mode"`
+	CLIVersion         string                   `json:"cli_version"`
+	DryRun             bool                     `json:"dry_run"`
+	TargetRoles        []string                 `json:"target_roles"`
+	TargetProfiles     []LifecycleTargetProfile `json:"target_profiles"`
+	SourcePacks        []LifecycleSourcePack    `json:"source_packs"`
+	SkillIDs           []string                 `json:"skill_ids"`
+	PlannedStates      []LifecyclePlannedState  `json:"planned_states"`
+	ChangedPaths       []string                 `json:"changed_paths"`
+	BackupRecovery     LifecycleBackupRecovery  `json:"backup_recovery"`
+	DoctorCommands     []string                 `json:"doctor_commands"`
+	NoWrite            LifecycleNoWriteEvidence `json:"no_write"`
+	SyncClassification Result                   `json:"sync_classification"`
+	Diagnostics        []discovery.Diagnostic   `json:"diagnostics"`
+	NextAction         string                   `json:"next_action"`
+}
+
 type Classification struct {
 	ID                   string                 `json:"id"`
 	UpstreamPack         string                 `json:"upstream_pack,omitempty"`
@@ -90,6 +158,202 @@ type Classification struct {
 	Checksums            map[string]string      `json:"checksums"`
 	RequiresSemanticPort bool                   `json:"requires_semantic_port"`
 	Diagnostics          []discovery.Diagnostic `json:"diagnostics"`
+}
+
+func BuildLifecycleUpdate(opts Options) LifecycleUpdateResult {
+	sync := Build(opts)
+	doctorCommand := fmt.Sprintf("kkachi-hermes-skills doctor --profile %s --project %s --project-suite", opts.Profile, opts.Project)
+	result := LifecycleUpdateResult{
+		OK:             sync.OK,
+		Command:        "update",
+		Mode:           "project_update_dry_run",
+		CLIVersion:     CLIVersion,
+		DryRun:         true,
+		TargetRoles:    []string{"project_suite"},
+		TargetProfiles: []LifecycleTargetProfile{{Name: opts.Profile, Role: "project_suite", StatePath: opts.StatePath, LegacyMarker: sync.LegacyMarkerPath, PlannedState: lifecycleOverallState(sync), DoctorCommand: doctorCommand}},
+		SourcePacks:    []LifecycleSourcePack{},
+		SkillIDs:       []string{},
+		PlannedStates:  []LifecyclePlannedState{},
+		ChangedPaths:   []string{},
+		BackupRecovery: LifecycleBackupRecovery{
+			BackupRequired:        lifecycleBackupRequired(sync),
+			BackupWriteDeferred:   true,
+			RecoveryWriteDeferred: true,
+			Instructions:          []string{"TOKEN-004 is read-only; review update classifications before TOKEN-005 apply.", "Run the listed doctor command after future approved writes."},
+		},
+		DoctorCommands:     []string{doctorCommand},
+		NoWrite:            LifecycleNoWriteEvidence{Guaranteed: true},
+		SyncClassification: sync,
+		Diagnostics:        append([]discovery.Diagnostic(nil), sync.Validation.Diagnostics...),
+		NextAction:         sync.NextAction,
+	}
+	if sync.ProjectRoot != nil {
+		result.TargetProfiles[0].ProjectRoot = sync.ProjectRoot.Path
+	}
+	for _, classification := range sync.Classifications {
+		result.Diagnostics = append(result.Diagnostics, classification.Diagnostics...)
+		state := lifecycleStateForClassification(classification.Classification)
+		changed := lifecycleChangedPaths(classification.Paths)
+		result.PlannedStates = append(result.PlannedStates, LifecyclePlannedState{
+			ID:             classification.ID,
+			SkillID:        classification.ProjectSkill,
+			SourcePackID:   classification.UpstreamPack,
+			TargetPath:     classification.Paths["project_skill_path"],
+			PlannedState:   state,
+			Classification: classification.Classification,
+			Checksums:      classification.Checksums,
+			ChangedPaths:   changed,
+			DoctorCommand:  doctorCommand,
+		})
+		result.SourcePacks = append(result.SourcePacks, LifecycleSourcePack{ID: classification.UpstreamPack, Paths: classification.Paths, Checksums: classification.Checksums, State: state})
+		if classification.ProjectSkill != "" {
+			result.SkillIDs = append(result.SkillIDs, classification.ProjectSkill)
+		}
+		result.ChangedPaths = append(result.ChangedPaths, changed...)
+	}
+	for _, unchanged := range sync.UnchangedMappings {
+		result.PlannedStates = append(result.PlannedStates, LifecyclePlannedState{
+			ID:             unchanged.ID,
+			SkillID:        unchanged.ProjectSkill,
+			SourcePackID:   unchanged.UpstreamPack,
+			TargetPath:     unchanged.Paths["project_skill_path"],
+			PlannedState:   "no_change",
+			Classification: "unchanged",
+			Checksums:      unchanged.Checksums,
+			DoctorCommand:  doctorCommand,
+		})
+		result.SourcePacks = append(result.SourcePacks, LifecycleSourcePack{ID: unchanged.UpstreamPack, Paths: unchanged.Paths, Checksums: unchanged.Checksums, State: "no_change"})
+		result.SkillIDs = append(result.SkillIDs, unchanged.ProjectSkill)
+	}
+	result.SkillIDs = uniqueStrings(result.SkillIDs)
+	result.ChangedPaths = uniqueStrings(result.ChangedPaths)
+	sort.Slice(result.SourcePacks, func(i, j int) bool {
+		if result.SourcePacks[i].ID == result.SourcePacks[j].ID {
+			return result.SourcePacks[i].State < result.SourcePacks[j].State
+		}
+		return result.SourcePacks[i].ID < result.SourcePacks[j].ID
+	})
+	if !sync.OK {
+		result.NextAction = "Resolve update dry-run diagnostics before TOKEN-005 apply; no files were written."
+	} else {
+		result.NextAction = "Review update --dry-run planned_states and run doctor after future approved writes; no files were written."
+	}
+	return result
+}
+
+func RenderHumanLifecycleUpdate(result LifecycleUpdateResult) string {
+	status := "ready"
+	if !result.OK {
+		status = "blocked"
+	}
+	lines := []string{
+		fmt.Sprintf("Status: update dry-run %s for profile %s.", status, firstTargetProfileName(result.TargetProfiles)),
+		fmt.Sprintf("Targets: roles=%s profiles=%d source_packs=%d skills=%d.", strings.Join(result.TargetRoles, ","), len(result.TargetProfiles), len(result.SourcePacks), len(result.SkillIDs)),
+		fmt.Sprintf("Planned states: %s", lifecycleStateCounts(result.PlannedStates)),
+		"Writes: dry-run only; profile/auth/token/gateway/provider/model/KAB/KAH/Hermes runtime/profile activation writes 0.",
+	}
+	for _, state := range result.PlannedStates {
+		lines = append(lines, fmt.Sprintf("Plan: %s %s -> %s (%s)", state.SkillID, state.TargetPath, state.PlannedState, state.Classification))
+	}
+	for _, diagnostic := range result.Diagnostics {
+		lines = append(lines, fmt.Sprintf("%s: %s - %s", diagnostic.Level, diagnostic.Code, diagnostic.Message))
+	}
+	for _, command := range result.DoctorCommands {
+		lines = append(lines, "Doctor: "+command)
+	}
+	lines = append(lines, "Next: "+result.NextAction)
+	return strings.Join(lines, "\n")
+}
+
+func lifecycleStateForClassification(classification string) string {
+	switch classification {
+	case "auto_copy_candidate":
+		return "update"
+	case "new_upstream_candidate":
+		return "create"
+	case "local_only":
+		return "no_change"
+	case "semantic_merge_required", "removed_or_renamed_upstream":
+		return "blocked"
+	case "fail_closed_conflict":
+		return "error"
+	default:
+		return "no_change"
+	}
+}
+
+func lifecycleOverallState(result Result) string {
+	if !result.OK {
+		return "error"
+	}
+	if result.Summary == nil {
+		return "blocked"
+	}
+	if result.Summary.CountsByClassification["semantic_merge_required"] > 0 || result.Summary.CountsByClassification["removed_or_renamed_upstream"] > 0 {
+		return "blocked"
+	}
+	if result.Summary.CountsByClassification["auto_copy_candidate"] > 0 {
+		return "update"
+	}
+	if result.Summary.CountsByClassification["new_upstream_candidate"] > 0 {
+		return "create"
+	}
+	return "no_change"
+}
+
+func lifecycleBackupRequired(result Result) bool {
+	if result.Summary == nil {
+		return false
+	}
+	return result.Summary.CountsByClassification["auto_copy_candidate"] > 0 || result.Summary.CountsByClassification["semantic_merge_required"] > 0
+}
+
+func lifecycleChangedPaths(paths map[string]string) []string {
+	out := []string{}
+	for _, key := range []string{"project_skill_path", "current_upstream_path"} {
+		if paths[key] != "" {
+			out = append(out, paths[key])
+		}
+	}
+	return out
+}
+
+func lifecycleStateCounts(states []LifecyclePlannedState) string {
+	counts := map[string]int{}
+	for _, state := range states {
+		counts[state.PlannedState]++
+	}
+	parts := []string{}
+	for _, key := range []string{"create", "update", "remove", "no_change", "blocked", "conflict", "error"} {
+		if counts[key] > 0 {
+			parts = append(parts, fmt.Sprintf("%s=%d", key, counts[key]))
+		}
+	}
+	if len(parts) == 0 {
+		return "none"
+	}
+	return strings.Join(parts, ", ")
+}
+
+func firstTargetProfileName(profiles []LifecycleTargetProfile) string {
+	if len(profiles) == 0 {
+		return ""
+	}
+	return profiles[0].Name
+}
+
+func uniqueStrings(values []string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 type UnchangedMapping struct {
