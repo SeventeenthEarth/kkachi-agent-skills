@@ -3,7 +3,7 @@
 Date: 2026-06-09
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / PR1 docs-contract evidence
-Status: canonical SOT for `KASPROJ-001`; `KASPROJ-002` read-only dry-run planner is implemented/pre-commit-ready; `KASPROJ-003` approved install is implemented/in-review pending gates; `KASPROJ-004` project-suite doctor/repair/migrate is implemented/in-review pending gates
+Status: canonical SOT for `KASPROJ-001`; `KASPROJ-002` read-only dry-run planner is implemented/pre-commit-ready; `KASPROJ-003` approved install is implemented/in-review pending gates; `KASPROJ-004` project-suite doctor/repair/migrate is implemented/in-review pending gates; `KASPROJ-005` project-tailored doctor checksum policy is in review
 Authority level: source of truth for project-specific KAS install layout, naming, manifest vocabulary, and doctor severity semantics
 Scope: project-specific KAS skill suites installed under one Hermes profile; KASPROJ-003 authorizes approval-hash-bound project suite install writes, and KASPROJ-004 authorizes approval-hash-bound project suite repair/migration writes after matching current dry-runs. No auth/token/gateway/provider/model config mutation, KAH state mutation, KAB runtime activation, semantic-port completion claim, generic fallback, generic deletion, or operational rollout is authorized by this document alone
 Related docs: `docs/sot/kas-cli-contract.md`, `docs/sot/project-kas-sync-state.md`, `docs/sot/minimum-pilot-cli-lane.md`, `docs/README.md`, `docs/roadmap.md`, `docs/kkachi-docs-map.yaml`
@@ -183,7 +183,8 @@ repair, or migration behavior.
 | missing project suite | `error` | No `skills/<project>/` suite exists for a manifest/requested project. KAS must fail closed and must not use a global generic suite as a substitute. |
 | umbrella-only | `error` | The project umbrella skill exists without the full required project-prefixed suite. The install is incomplete/invalid. |
 | missing file | `error` | A manifest-required `target_path` such as `skills/<project>/<project>-plan/SKILL.md` is absent. |
-| checksum mismatch | `error` | Installed content exists but does not match the manifest/source checksum. Manual review or approved repair is required. |
+| checksum mismatch | `error` | Prefix-render-only or otherwise untrusted installed content exists but does not match the manifest/source checksum. Manual review or approved repair is required. |
+| project tailoring checksum drift | `warning` | Installed content differs from the initial/template checksum, but the manifest marks the skill as project-local semantic tailoring with `tailoring_mode: profile_local_repo_semantic_tailoring` and `drift_policy: manual_review_required`. This is expected for real project use and must not make doctor fail. |
 | unknown profile skill dir | `warning` | A profile skill directory not tracked by the KAS manifest is present. It must not be silently adopted, overwritten, or deleted. Escalate to `error` only if it shadows a required project-prefixed skill or makes identity ambiguous. |
 | profile/source language drift | `warning` | Installed project guidance language/runtime/test-command assumptions differ from `source_pack` or project metadata. Escalate to `error` when the drift invalidates required phase behavior or verification commands. |
 
@@ -248,6 +249,8 @@ When `doctor --project-suite` is absent, `doctor --project <path>` keeps its exi
 
 `KASPROJ-004` doctor/repair/migrate reports the severities above; repair and migration start with dry-run evidence, require explicit approval before profile mutation, create backups for changed files and previous manifests, preserve project-tailored language/characteristics, and never mutate auth, tokens, secrets, gateway, provider/model config, KAH state, or KAB runtime state.
 
+`KASPROJ-005` fixes the project-tailored doctor policy: source/template checksum equality is not required after a project suite has been adapted for a concrete repository. `doctor --project-suite` must report `project_tailoring_checksum_drift` as a warning, not an error, when the manifest skill record uses `tailoring_mode: profile_local_repo_semantic_tailoring` with `drift_policy: manual_review_required`. Prefix-render-only records, missing files, missing checksums, unsafe targets, and unmanifested edits remain fail-closed errors. KASPROJ-005 does not approve repair writes, manifest resealing, broad rollout, or any auth/token/gateway/provider/model/KAH/KAB mutation.
+
 Migration from older generic/global installs is explicit through `--from-generic`. It may propose non-deleting creation from clean KAS-managed generic candidates such as `kkachi-plan` to `doksuri-server-plan`, but it must not guess project language or authority content silently. If project-specific content cannot be generated safely, it produces `manual_semantic_port_tasks[]` rather than installing a generic fallback. KASPROJ-004 retains generic files; deletion or de-manifest policy is deferred unless separately approved.
 
 ## 8. Relationship to existing contracts
@@ -256,7 +259,8 @@ Migration from older generic/global installs is explicit through `--from-generic
   list/install/doctor contract. KASPROJ extends that contract for
   project-specific suite identity and target layout. The current CLI implements
   KASPROJ-002 project-suite dry-run planning, KASPROJ-003 approval-hash-bound
-  project-suite install, and KASPROJ-004 project-suite doctor/repair/migration.
+  project-suite install, KASPROJ-004 project-suite doctor/repair/migration,
+  and KASPROJ-005 project-tailored doctor checksum policy.
 - `docs/sot/project-kas-sync-state.md` owns upstream sync state after a
   project-specific suite exists. This document owns initial install layout,
   naming, manifest vocabulary, and doctor severity for suite presence/identity.

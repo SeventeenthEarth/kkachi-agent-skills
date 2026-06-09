@@ -18,6 +18,8 @@ type manifestSkillRecord struct {
 	InstalledSkill string
 	TargetPath     string
 	Checksum       string
+	DriftPolicy    string
+	TailoringMode  string
 }
 
 func discoverDefaultProjectSuite(sourceRepo string) ([]discovery.SourcePack, string, error) {
@@ -149,10 +151,12 @@ func trustedProjectSuite(profileRoot string, project string, sourcePack string) 
 		}
 		checksum, _ := skill["checksum"].(string)
 		installed, _ := skill["installed_skill"].(string)
+		driftPolicy, _ := skill["drift_policy"].(string)
+		tailoringMode, _ := skill["tailoring_mode"].(string)
 		if records[target].TargetPath != "" {
 			return records, []Conflict{conflict("duplicate_manifest_target_path", project, installed, target, "project suite manifest contains duplicate target_path", "Repair the project suite manifest before approved install.")}, &previous
 		}
-		records[target] = manifestSkillRecord{InstalledSkill: installed, TargetPath: target, Checksum: checksum}
+		records[target] = manifestSkillRecord{InstalledSkill: installed, TargetPath: target, Checksum: checksum, DriftPolicy: driftPolicy, TailoringMode: tailoringMode}
 	}
 	return records, nil, &previous
 }

@@ -68,6 +68,9 @@ func TestProjectSpecificKASInstallSOTDefinesDoctorSeveritiesAndApprovalBoundary(
 		"umbrella-only | `error`",
 		"missing file | `error`",
 		"checksum mismatch | `error`",
+		"project tailoring checksum drift | `warning`",
+		"project_tailoring_checksum_drift",
+		"tailoring_mode: profile_local_repo_semantic_tailoring",
 		"unknown profile skill dir | `warning`",
 		"profile/source language drift | `warning`",
 		"KASPROJ-002 implements the read-only dry-run planner surface",
@@ -99,7 +102,7 @@ func TestProjectSpecificKASInstallDocsRegistrationAndRoadmap(t *testing.T) {
 		"requires `skills/<project>/<project>-<phase-or-skill>/SKILL.md`",
 		"generic duplicate skill names such as `kkachi-plan` are invalid",
 		"umbrella-only installs are incomplete",
-		"KASPROJ-002 read-only dry-run planning, KASPROJ-003 approval-hash-bound install, and KASPROJ-004 doctor/repair/migrate are implemented/in-review",
+		"KASPROJ-002 read-only dry-run planning, KASPROJ-003 approval-hash-bound install, KASPROJ-004 doctor/repair/migrate, and KASPROJ-005 project-tailored doctor policy are implemented/in-review",
 	})
 	requireContainsAll(t, "docs/kkachi-docs-map.yaml", []string{
 		"docs/sot/project-specific-kas-install-contract.md",
@@ -110,14 +113,16 @@ func TestProjectSpecificKASInstallDocsRegistrationAndRoadmap(t *testing.T) {
 		"KASPROJ-002 | Implement project-specific dry-run planner | In Review",
 		"KASPROJ-003 | Implement approved project-specific install | In Review",
 		"KASPROJ-004 | Implement doctor/repair/migrate for project suites | In Review",
-		"KASPROJ-005 | Apply project-specific KAS install to one approved operational profile/project set | Planned",
+		"KASPROJ-005 | Fix project-tailored doctor checksum policy | In Review",
+		"KASPROJ-006 | Apply project-specific KAS install to one approved operational profile/project set | Planned",
 		"In review pending post-implementation gates",
 	})
 	requireRoadmapTaskStatus(t, "KASPROJ-001", "In Review")
 	requireRoadmapTaskStatus(t, "KASPROJ-002", "In Review")
 	requireRoadmapTaskStatus(t, "KASPROJ-003", "In Review")
 	requireRoadmapTaskStatus(t, "KASPROJ-004", "In Review")
-	requireRoadmapTaskStatus(t, "KASPROJ-005", "Planned")
+	requireRoadmapTaskStatus(t, "KASPROJ-005", "In Review")
+	requireRoadmapTaskStatus(t, "KASPROJ-006", "Planned")
 }
 
 func TestProjectSpecificKASCLIContractDefinesApprovedInstallWithoutRolloutClaim(t *testing.T) {
@@ -144,6 +149,8 @@ func TestProjectSpecificKASCLIContractDefinesApprovedInstallWithoutRolloutClaim(
 		"migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run",
 		"migrate-project-kas --profile <profile> --project <project> --from-generic --approve dry-run:<hash>",
 		"Repair and migration default `source_pack` to `kas-default-project-suite`",
+		"KASPROJ-005 refines doctor semantics so project-local semantic tailoring is a warning condition",
+		"project_tailoring_checksum_drift",
 		"umbrella-only installs are incomplete/invalid",
 		"duplicate generic installed skill names such as `kkachi-plan` are invalid",
 	})

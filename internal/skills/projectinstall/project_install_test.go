@@ -505,6 +505,27 @@ func TestProjectSuiteDoctorDetectsHealthyMissingUmbrellaChecksumAndUnknownDirs(t
 		t.Fatalf("expected checksum mismatch error, got %+v", mismatch.ProjectSuiteDiagnostics)
 	}
 
+	manifestPath := filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")
+	manifest := readProjectInstallManifest(t, manifestPath)
+	for _, rawSuite := range manifest["project_suites"].([]any) {
+		suite := rawSuite.(map[string]any)
+		for _, rawSkill := range suite["installed_skills"].([]any) {
+			skill := rawSkill.(map[string]any)
+			if skill["installed_skill"] == "doksuri-server-plan" {
+				skill["tailoring_mode"] = "profile_local_repo_semantic_tailoring"
+				skill["drift_policy"] = "manual_review_required"
+			}
+		}
+	}
+	writeJSON(t, manifestPath, manifest)
+	tailored, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !tailored.OK || !hasProjectSuiteDiag(tailored.ProjectSuiteDiagnostics, "project_tailoring_checksum_drift", "warning") || hasProjectSuiteDiag(tailored.ProjectSuiteDiagnostics, "checksum_mismatch", "error") {
+		t.Fatalf("expected project-local tailoring drift warning, got %+v", tailored.ProjectSuiteDiagnostics)
+	}
+
 	missingRoot := filepath.Join(t.TempDir(), "profile")
 	missing, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: missingRoot})
 	if err != nil {

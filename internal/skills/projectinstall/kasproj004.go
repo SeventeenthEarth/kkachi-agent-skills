@@ -452,6 +452,8 @@ func inspectProjectSuite(profileRoot string, project string, sourcePackID string
 		installed, _ := skill["installed_skill"].(string)
 		target, _ := skill["target_path"].(string)
 		checksum, _ := skill["checksum"].(string)
+		driftPolicy, _ := skill["drift_policy"].(string)
+		tailoringMode, _ := skill["tailoring_mode"].(string)
 		if installed != project+"-kas" {
 			manifestOnlyUmbrella = false
 		}
@@ -463,7 +465,7 @@ func inspectProjectSuite(profileRoot string, project string, sourcePackID string
 			info.Diagnostics = append(info.Diagnostics, suiteDiag(project, installed, target, "error", "duplicate_manifest_target_path", "project suite manifest contains duplicate target_path", "Manually repair duplicate target paths."))
 			continue
 		}
-		info.Records[target] = manifestSkillRecord{InstalledSkill: installed, TargetPath: target, Checksum: checksum}
+		info.Records[target] = manifestSkillRecord{InstalledSkill: installed, TargetPath: target, Checksum: checksum, DriftPolicy: driftPolicy, TailoringMode: tailoringMode}
 		if lp := sourceLanguageProfile(info.Suite); lp != "" && lp != "project-specific-prefix-render-only" {
 			info.Diagnostics = append(info.Diagnostics, suiteDiag(project, installed, target, "warning", "profile_source_language_drift", "source_pack language_profile differs from prefix-render-only KASPROJ posture", "Review project language/runtime/test-command assumptions before relying on this suite."))
 		}
@@ -486,7 +488,15 @@ func inspectProjectSuite(profileRoot string, project string, sourcePackID string
 			}
 			continue
 		}
-		if record.Checksum == "" || sha256Bytes(data) != record.Checksum {
+		if record.Checksum == "" {
+			info.Diagnostics = append(info.Diagnostics, suiteDiag(project, record.InstalledSkill, target, "error", "checksum_mismatch", "installed file checksum differs from manifest/source evidence", "Run repair-project-kas --dry-run and approve a matching repair plan, or review local edits manually."))
+			continue
+		}
+		if sha256Bytes(data) != record.Checksum {
+			if projectTailoringChecksumDriftAllowed(record) {
+				info.Diagnostics = append(info.Diagnostics, suiteDiag(project, record.InstalledSkill, target, "warning", "project_tailoring_checksum_drift", "installed file differs from the template/install checksum, but manifest marks this skill as project-local semantic tailoring", "Review the project-local skill content and preserve it; do not run source repair unless the tailoring is intentionally being reset."))
+				continue
+			}
 			info.Diagnostics = append(info.Diagnostics, suiteDiag(project, record.InstalledSkill, target, "error", "checksum_mismatch", "installed file checksum differs from manifest/source evidence", "Run repair-project-kas --dry-run and approve a matching repair plan, or review local edits manually."))
 		}
 	}
@@ -497,6 +507,10 @@ func sourceLanguageProfile(suite map[string]any) string {
 	sourcePack, _ := suite["source_pack"].(map[string]any)
 	value, _ := sourcePack["language_profile"].(string)
 	return value
+}
+
+func projectTailoringChecksumDriftAllowed(record manifestSkillRecord) bool {
+	return record.TailoringMode == "profile_local_repo_semantic_tailoring" && record.DriftPolicy == "manual_review_required"
 }
 
 func addPhysicalSuiteDiagnostics(info *projectSuiteManifestInfo, profileRoot string, project string) {

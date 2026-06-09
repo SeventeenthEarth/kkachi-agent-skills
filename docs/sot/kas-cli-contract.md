@@ -764,6 +764,7 @@ Contractual rules for project commands:
 - dry-run planner behavior belongs to KASPROJ-002 and performs no profile writes;
 - approved project-specific install belongs to KASPROJ-003 and requires approval evidence matching the recomputed dry-run plan hash;
 - doctor/repair/migrate behavior belongs to KASPROJ-004 and uses the severity semantics from the project-specific install SOT;
+- KASPROJ-005 refines doctor semantics so project-local semantic tailoring is a warning condition, not a failed source/template checksum comparison;
 - repair and migration are dry-run-first, approval-gated, backup-aware, and must not silently convert generic skills into project-tailored skills;
 - all project-suite writes must use `target_path` values under `skills/<project>/<project>-<phase-or-skill>/SKILL.md`;
 - umbrella-only installs are incomplete/invalid and must not be treated as healthy;
@@ -773,10 +774,13 @@ Contractual rules for project commands:
 
 Doctor severity names for KASPROJ are `error` and `warning` with these
 required conditions: missing project suite, umbrella-only, missing file, and
-checksum mismatch are `error`; unknown profile skill dir is `warning` unless it
-shadows or ambiguates a required project skill; profile/source language drift is
-`warning` unless it invalidates required behavior or verification, in which case
-it escalates to `error`.
+prefix-render-only or otherwise untrusted checksum mismatch are `error`;
+`project_tailoring_checksum_drift` is `warning` when a manifest skill record is
+marked `tailoring_mode: profile_local_repo_semantic_tailoring` with
+`drift_policy: manual_review_required`; unknown profile skill dir is `warning`
+unless it shadows or ambiguates a required project skill; profile/source language
+drift is `warning` unless it invalidates required behavior or verification, in
+which case it escalates to `error`.
 
 
 ## 7. Manifest/checksum contract
