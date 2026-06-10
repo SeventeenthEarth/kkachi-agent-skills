@@ -354,7 +354,7 @@ func TestBuildDryRunRejectsUmbrellaOnlySourceSuite(t *testing.T) {
 func TestPlannerSourceContainsNoWriteAPIs(t *testing.T) {
 	assertSourceContainsNoWriteAPIs(t, "project_install.go", "")
 	assertSourceContainsNoWriteAPIs(t, "kasproj004.go", sourceSection(t, "kasproj004.go", "func buildProjectActionDryRun", "func applyApprovedProjectAction"))
-	assertSourceContainsNoWriteAPIs(t, "uninstall.go", "")
+	assertSourceContainsNoWriteAPIs(t, "uninstall.go", sourceSection(t, "uninstall.go", "func BuildProjectUninstallDryRun", "func RenderHumanProjectUninstall"))
 }
 
 func assertSourceContainsNoWriteAPIs(t *testing.T, path string, source string) {
@@ -561,6 +561,127 @@ func TestProjectSuiteDoctorDetectsHealthyMissingUmbrellaChecksumAndUnknownDirs(t
 	if umbrella.OK || !hasProjectSuiteDiag(umbrella.ProjectSuiteDiagnostics, "umbrella_only", "error") {
 		t.Fatalf("expected umbrella-only error, got %+v", umbrella.ProjectSuiteDiagnostics)
 	}
+}
+
+func TestApplyProjectUninstallFailsClosedOnDriftSymlinkAndBacksUp(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	dryRun, err := BuildDryRun(repo, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	installed, err := ApplyApprovedInstall(repo, opts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil || !installed.OK {
+		t.Fatalf("approved install failed: result=%+v err=%v", installed, err)
+	}
+	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")
+	originalTarget, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	localOnly := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-local", "SKILL.md")
+	writeProjectInstallFile(t, localOnly, "local only\n")
+	manifestPath := filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")
+	manifest := readProjectInstallManifest(t, manifestPath)
+	manifest["installs"] = append(manifest["installs"].([]any), map[string]any{
+		"pack_id":     "generic-kas",
+		"target_path": "skills/generic-kas",
+		"files":       []any{},
+	})
+	manifest["project_suites"] = append(manifest["project_suites"].([]any), map[string]any{
+		"kind":        ManifestKind,
+		"project":     "other-project",
+		"source_pack": map[string]any{"id": VirtualSourcePackID},
+		"target_path": "skills/other-project",
+		"files":       []any{},
+	})
+	if err := writeJSONFile(manifestPath, manifest); err != nil {
+		t.Fatal(err)
+	}
+	uninstallOpts := ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot}
+	uninstallDryRun := BuildProjectUninstallDryRun(uninstallOpts)
+	if !uninstallDryRun.OK || uninstallDryRun.ApprovalRequest.EvidenceRef != "dry-run:"+uninstallDryRun.PlanHash {
+		t.Fatalf("unexpected uninstall dry-run: %+v", uninstallDryRun)
+	}
+	if !strings.Contains(uninstallDryRun.FutureApplyCommand, "--apply dry-run:sha256:") ||
+		!strings.Contains(uninstallDryRun.FutureApplyCommand, "--backup-vault-root <abs-path>") {
+		t.Fatalf("future apply command must include approval evidence and backup vault placeholder, got %q", uninstallDryRun.FutureApplyCommand)
+	}
+	assertNoHangul(t, uninstallDryRun.FutureApplyCommand)
+
+	if err := os.WriteFile(target, []byte("local drift\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	drift := BuildProjectUninstallDryRun(uninstallOpts)
+	if drift.OK || firstUninstallDiagnosticCode(drift) != "checksum_mismatch" {
+		t.Fatalf("checksum drift must block uninstall dry-run: %+v", drift)
+	}
+	wrong, err := ApplyProjectUninstall(uninstallOpts, uninstallDryRun.ApprovalRequest.EvidenceRef, filepath.Join(t.TempDir(), "vault"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wrong.OK || firstUninstallDiagnosticCode(wrong) != "approval_plan_hash_mismatch" {
+		t.Fatalf("stale uninstall hash should fail closed after drift: %+v", wrong)
+	}
+
+	if err := os.Remove(target); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(t.TempDir(), "escape"), target); err != nil {
+		t.Fatal(err)
+	}
+	symlink := BuildProjectUninstallDryRun(uninstallOpts)
+	if symlink.OK || firstUninstallDiagnosticCode(symlink) != "target_symlink_rejected" {
+		t.Fatalf("symlink target must block uninstall dry-run: %+v", symlink)
+	}
+	if err := os.Remove(target); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectInstallFile(t, target, string(originalTarget))
+	fresh := BuildProjectUninstallDryRun(uninstallOpts)
+	unsafeVault, err := ApplyProjectUninstall(uninstallOpts, fresh.ApprovalRequest.EvidenceRef, profileRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unsafeVault.OK || firstUninstallDiagnosticCode(unsafeVault) != "backup_vault_root_rejected" {
+		t.Fatalf("profile-local backup vault root should fail closed: %+v", unsafeVault)
+	}
+	if _, err := os.Stat(target); err != nil {
+		t.Fatalf("unsafe backup vault root removed target: %v", err)
+	}
+	vault := filepath.Join(t.TempDir(), "vault")
+	if err := os.MkdirAll(vault, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	applied, err := ApplyProjectUninstall(uninstallOpts, fresh.ApprovalRequest.EvidenceRef, vault)
+	if err != nil || !applied.OK || !applied.BackupRecovery.BackupVerified {
+		t.Fatalf("approved uninstall failed: result=%+v err=%v", applied, err)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("approved uninstall did not remove manifest target: %v", err)
+	}
+	if _, err := os.Stat(localOnly); err != nil {
+		t.Fatalf("approved uninstall touched local-only file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(applied.BackupPath, "files", "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); err != nil {
+		t.Fatalf("approved uninstall did not write backup file: %v", err)
+	}
+	updatedManifest := readProjectInstallManifest(t, manifestPath)
+	if len(updatedManifest["installs"].([]any)) != 1 {
+		t.Fatalf("approved uninstall did not preserve unrelated generic manifest entries: %+v", updatedManifest)
+	}
+	projectSuites := updatedManifest["project_suites"].([]any)
+	if len(projectSuites) != 1 || projectSuites[0].(map[string]any)["project"] != "other-project" {
+		t.Fatalf("approved uninstall did not preserve unrelated project suite entries: %+v", updatedManifest)
+	}
+}
+
+func firstUninstallDiagnosticCode(result ProjectUninstallResult) string {
+	if len(result.Diagnostics) == 0 {
+		return ""
+	}
+	return result.Diagnostics[0].Code
 }
 
 func TestProjectRepairHumanOutputShowsSuiteDiagnosticsAndActions(t *testing.T) {

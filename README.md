@@ -76,10 +76,15 @@ kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --
 kkachi-hermes-skills doctor [--repo <path>] --profile <profile> [--project <path>] [--json]
 kkachi-hermes-skills doctor [--repo <path>] --profile <profile> --project <project> --project-suite [--json]
 kkachi-hermes-skills install [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
+kkachi-hermes-skills install [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
 kkachi-hermes-skills install [--repo <path>] --profile <profile> --project <project> --from-generic --dry-run [--json]
+kkachi-hermes-skills install [--repo <path>] --profile <profile> --project <project> --from-generic --apply dry-run:sha256:<hash> [--json]
 kkachi-hermes-skills update [--repo <path>] --profile <profile> --project <project> --state <path> --dry-run [--json]
+kkachi-hermes-skills update [--repo <path>] --profile <profile> --project <project> --state <path> --apply dry-run:sha256:<hash> [--json]
 kkachi-hermes-skills repair [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
+kkachi-hermes-skills repair [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
 kkachi-hermes-skills uninstall --profile <profile> --project <project> --dry-run [--json]
+kkachi-hermes-skills uninstall --profile <profile> --project <project> --apply dry-run:sha256:<hash> --backup-vault-root <abs-path> [--json]
 ```
 
 `list` discovers source KAS packs from `skills/`, reports direct-layout packs
@@ -95,21 +100,25 @@ copy install requires `--approve dry-run:<hash>`, recomputes the plan, fails
 closed on hash mismatch, copies selected packs into the target profile, records
 manifest/checksum evidence, and prints recovery guidance.
 
-For project-specific KAS suites, the TOKEN-004 lifecycle commands are
-`install`, `update`, `doctor`, `repair`, and `uninstall`. Project forms are
-read-only in TOKEN-004: `install --project --dry-run` uses the project-suite
-install planner, `install --from-generic --dry-run` uses the
+For project-specific KAS suites, the public lifecycle commands are `install`,
+`update`, `doctor`, `repair`, and `uninstall`. Dry-run forms preserve the
+TOKEN-004 no-write behavior: `install --project --dry-run` uses the
+project-suite install planner, `install --from-generic --dry-run` uses the
 generic-to-project migration planner, `update --dry-run` uses the sync
 classifier, `repair --dry-run` uses the project repair planner, and
 `uninstall --dry-run` reads the manifest and filesystem to plan
 manifest-tracked removals while skipping local-only or unmanifested files.
-Public `--apply` forms are deferred to TOKEN-005.
+TOKEN-005 write forms require `--apply dry-run:sha256:<hash>` from the matching
+current dry-run plan and fail closed before mutation on malformed, mismatched,
+or stale evidence. `uninstall --apply` additionally requires
+`--backup-vault-root <abs-path>` and rejects missing, relative, profile-contained,
+symlink-unsafe, or unwritable backup roots.
 
 Compatibility commands remain available for existing automation:
 `sync-project-kas`, `install-project-kas`, `repair-project-kas`, and
 `migrate-project-kas`. Their approved install/repair/migration paths preserve
-the existing approval-hash behavior; the public TOKEN-004 wrappers are
-dry-run-only.
+the existing approval-hash behavior; public docs prefer `--apply` for lifecycle
+writes.
 
 `doctor` verifies source pack integrity, installed profile state,
 manifest/checksum consistency, KAH availability/version/capabilities, optional

@@ -788,10 +788,10 @@ kkachi-hermes-skills repair --profile <profile> --project <project> --dry-run [-
 kkachi-hermes-skills uninstall --profile <profile> --project <project> --dry-run [--json]
 ```
 
-In TOKEN-004, these public project forms are read-only. `install --project`
-uses the project-suite dry-run planner, `install --from-generic` uses the
-generic-to-project migration dry-run planner, and `repair` uses the project
-repair dry-run planner. Public write/apply forms fail closed until TOKEN-005.
+In TOKEN-004, these public project forms were read-only. `install --project`
+used the project-suite dry-run planner, `install --from-generic` used the
+generic-to-project migration dry-run planner, and `repair` used the project
+repair dry-run planner. Public write/apply forms failed closed before TOKEN-005.
 The old `install-project-kas`, `repair-project-kas`, and `migrate-project-kas`
 commands remain compatibility surfaces for existing tests and scripts.
 
@@ -802,6 +802,21 @@ backup/recovery posture, and the future apply command. It must not remove
 files, write profile manifests, create backup files, mutate KAH/KAB/Hermes
 runtime state, change auth/token/gateway/provider/model configuration, or
 activate profiles. Removal and backup/evidence writing are TOKEN-005 behavior.
+
+TOKEN-005 public lifecycle write forms use `--apply dry-run:sha256:<hash>`.
+`install --project --apply`, `install --from-generic --apply`,
+`repair --apply`, `update --apply`, and `uninstall --apply` recompute the
+current dry-run evidence and fail closed before mutation when the token is
+malformed, mismatched, stale, or paired with `--dry-run`. `update --apply`
+writes only hash-bound auto-copy candidates and keeps semantic merge, removed
+upstream, new upstream, and conflict classifications blocked. `uninstall
+--apply` removes only manifest-tracked project-suite files and requires
+`--backup-vault-root <abs-path>`; the backup root must be absolute, outside the
+target profile, symlink-safe, and writable/verifiable. Backup files, manifest
+snapshot, skipped local-only files, checksums, approval evidence, and uninstall
+evidence are written under the explicit vault root before any removal, and the
+profile manifest is updated last while preserving unrelated `installs` and
+`project_suites`.
 
 When `doctor --project-suite` is absent, `doctor --project <path>` keeps its existing KAH project-path meaning. When `--project-suite` is present, `--project` is interpreted as the project suite id. Repair and migration default `source_pack` to `kas-default-project-suite`; optional explicit `--source-pack` values fail closed when unknown, and the resolved source pack is included in JSON, diagnostics, and plan-hash evidence.
 

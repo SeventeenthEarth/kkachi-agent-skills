@@ -239,6 +239,74 @@ func TestProjectRootInferenceRequiresCanonicalStatePath(t *testing.T) {
 	}
 }
 
+func TestApplyLifecycleUpdateHashBoundAutoCopyAndStaleNoWrite(t *testing.T) {
+	repo, projectRoot, statePath := setupUnchangedClassificationFixture(t, validStateYAML)
+	target := filepath.Join(projectRoot, "skills", "kan-plugin", "kan-plugin-plan", "SKILL.md")
+	before, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeSkillPack(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan", "upstream changed")
+	gitCommitAll(t, repo, "upstream changed")
+
+	opts := Options{Profile: "hwangchung", Project: "kan-plugin", StatePath: statePath, DryRun: true, RepoPath: repo, ProjectRoot: projectRoot}
+	dryRun := BuildLifecycleUpdate(opts)
+	if !dryRun.OK || dryRun.PlanHash == "" || dryRun.ApprovalRequest.EvidenceRef != "dry-run:"+dryRun.PlanHash {
+		t.Fatalf("expected hash-bound update dry-run: %+v", dryRun)
+	}
+	if dryRun.SyncClassification.Summary.CountsByClassification["auto_copy_candidate"] != 1 {
+		t.Fatalf("expected auto-copy candidate: %+v", dryRun.SyncClassification.Summary)
+	}
+
+	wrong := ApplyLifecycleUpdate(opts, "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000")
+	if wrong.OK || wrong.Approval.MatchedCurrentPlan || firstLifecycleDiagnosticCode(wrong) != "approval_plan_hash_mismatch" {
+		t.Fatalf("wrong hash should fail closed: %+v", wrong)
+	}
+	unchanged, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(unchanged) != string(before) {
+		t.Fatal("wrong update approval wrote project skill")
+	}
+
+	staleEvidence := dryRun.ApprovalRequest.EvidenceRef
+	writeSkillPack(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan", "changed again")
+	gitCommitAll(t, repo, "changed again")
+	stale := ApplyLifecycleUpdate(opts, staleEvidence)
+	if stale.OK || firstLifecycleDiagnosticCode(stale) != "approval_plan_hash_mismatch" {
+		t.Fatalf("stale update evidence should fail closed: %+v", stale)
+	}
+
+	fresh := BuildLifecycleUpdate(opts)
+	applied := ApplyLifecycleUpdate(opts, fresh.ApprovalRequest.EvidenceRef)
+	if !applied.OK || applied.Mode != "project_update_approved" || !applied.Approval.MatchedCurrentPlan {
+		t.Fatalf("approved update failed: %+v", applied)
+	}
+	after, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) == string(before) || !strings.Contains(string(after), "changed again") {
+		t.Fatalf("approved update did not copy current upstream content:\n%s", after)
+	}
+	stateBytes, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentChecksum := checksumFor(t, filepath.Join(repo, "skills", "kkachi-plan"))
+	if strings.Count(string(stateBytes), currentChecksum) < 2 {
+		t.Fatalf("state baselines were not updated last with current checksums:\n%s", stateBytes)
+	}
+}
+
+func firstLifecycleDiagnosticCode(result LifecycleUpdateResult) string {
+	if len(result.Diagnostics) == 0 {
+		return ""
+	}
+	return result.Diagnostics[0].Code
+}
+
 func TestBuildInvalidYAMLAndPolicyFailuresFailClosed(t *testing.T) {
 	tests := []struct {
 		name string

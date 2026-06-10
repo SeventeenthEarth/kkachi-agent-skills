@@ -128,24 +128,43 @@ type LifecycleBackupRecovery struct {
 	Instructions          []string `json:"instructions"`
 }
 
+type LifecycleApprovalRequest struct {
+	Required                    bool   `json:"required"`
+	EvidenceRef                 string `json:"evidence_ref"`
+	HashIncludesProfile         bool   `json:"hash_includes_profile"`
+	HashIncludesChangedPaths    bool   `json:"hash_includes_changed_paths"`
+	HashIncludesNoWriteEvidence bool   `json:"hash_includes_no_write_evidence"`
+	HashIncludesBackupPlan      bool   `json:"hash_includes_backup_plan"`
+}
+
+type LifecycleApprovalEvidence struct {
+	EvidenceRef        string `json:"evidence_ref"`
+	DryRunPlanHash     string `json:"dry_run_plan_hash"`
+	ApprovedPlanHash   string `json:"approved_plan_hash"`
+	MatchedCurrentPlan bool   `json:"matched_current_plan"`
+}
+
 type LifecycleUpdateResult struct {
-	OK                 bool                     `json:"ok"`
-	Command            string                   `json:"command"`
-	Mode               string                   `json:"mode"`
-	CLIVersion         string                   `json:"cli_version"`
-	DryRun             bool                     `json:"dry_run"`
-	TargetRoles        []string                 `json:"target_roles"`
-	TargetProfiles     []LifecycleTargetProfile `json:"target_profiles"`
-	SourcePacks        []LifecycleSourcePack    `json:"source_packs"`
-	SkillIDs           []string                 `json:"skill_ids"`
-	PlannedStates      []LifecyclePlannedState  `json:"planned_states"`
-	ChangedPaths       []string                 `json:"changed_paths"`
-	BackupRecovery     LifecycleBackupRecovery  `json:"backup_recovery"`
-	DoctorCommands     []string                 `json:"doctor_commands"`
-	NoWrite            LifecycleNoWriteEvidence `json:"no_write"`
-	SyncClassification Result                   `json:"sync_classification"`
-	Diagnostics        []discovery.Diagnostic   `json:"diagnostics"`
-	NextAction         string                   `json:"next_action"`
+	OK                 bool                      `json:"ok"`
+	Command            string                    `json:"command"`
+	Mode               string                    `json:"mode"`
+	CLIVersion         string                    `json:"cli_version"`
+	DryRun             bool                      `json:"dry_run"`
+	TargetRoles        []string                  `json:"target_roles"`
+	TargetProfiles     []LifecycleTargetProfile  `json:"target_profiles"`
+	SourcePacks        []LifecycleSourcePack     `json:"source_packs"`
+	SkillIDs           []string                  `json:"skill_ids"`
+	PlannedStates      []LifecyclePlannedState   `json:"planned_states"`
+	ChangedPaths       []string                  `json:"changed_paths"`
+	BackupRecovery     LifecycleBackupRecovery   `json:"backup_recovery"`
+	DoctorCommands     []string                  `json:"doctor_commands"`
+	NoWrite            LifecycleNoWriteEvidence  `json:"no_write"`
+	SyncClassification Result                    `json:"sync_classification"`
+	PlanHash           string                    `json:"plan_hash"`
+	ApprovalRequest    LifecycleApprovalRequest  `json:"approval_request,omitempty"`
+	Approval           LifecycleApprovalEvidence `json:"approval,omitempty"`
+	Diagnostics        []discovery.Diagnostic    `json:"diagnostics"`
+	NextAction         string                    `json:"next_action"`
 }
 
 type Classification struct {
@@ -238,6 +257,67 @@ func BuildLifecycleUpdate(opts Options) LifecycleUpdateResult {
 	} else {
 		result.NextAction = "Review update --dry-run planned_states and run doctor after future approved writes; no files were written."
 	}
+	finalizeLifecycleUpdateHash(&result)
+	return result
+}
+
+func ApplyLifecycleUpdate(opts Options, evidenceRef string) LifecycleUpdateResult {
+	opts.DryRun = true
+	dryRun := BuildLifecycleUpdate(opts)
+	approvedHash, evidenceOK := lifecycleApprovedHashFromEvidence(evidenceRef)
+	if !evidenceOK {
+		return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "approval_evidence_malformed", "approval evidence must be exactly dry-run:sha256:<64 lowercase hex>.")
+	}
+	if approvedHash != dryRun.PlanHash {
+		return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "approval_plan_hash_mismatch", "approval evidence does not match the current dry-run plan hash; no files were written.")
+	}
+	if !dryRun.OK {
+		return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "project_update_plan_not_approvable", "current dry-run plan contains conflict or error entries; no files were written.")
+	}
+	writable := []Classification{}
+	for _, classification := range dryRun.SyncClassification.Classifications {
+		switch classification.Classification {
+		case "auto_copy_candidate":
+			writable = append(writable, classification)
+		case "new_upstream_candidate", "semantic_merge_required", "removed_or_renamed_upstream", "fail_closed_conflict":
+			return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "project_update_manual_review_required", "update --apply writes only hash-bound auto-copy candidates; semantic, new, removed, or conflict classifications require manual review.")
+		case "local_only":
+			// no write
+		default:
+			return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "project_update_unknown_classification", "update --apply cannot write unknown classification "+classification.Classification+".")
+		}
+	}
+	if len(writable) == 0 {
+		return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "project_update_no_auto_copy_candidates", "current dry-run plan has no auto-copy update candidates; no files were written.")
+	}
+	for _, classification := range writable {
+		if err := preflightLifecycleAutoCopy(dryRun, classification); err != nil {
+			return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "project_update_preflight_failed", err.Error())
+		}
+	}
+	for _, classification := range writable {
+		if err := copyLifecyclePack(classification.Paths["current_upstream_path"], classification.Paths["project_skill_path"], dryRun.SyncClassification.SourceRepo.Path, dryRun.SyncClassification.ProjectRoot.Path); err != nil {
+			return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "project_update_write_failed", err.Error())
+		}
+	}
+	stateBytes, err := os.ReadFile(opts.StatePath)
+	if err != nil {
+		return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "state_read_failed", err.Error())
+	}
+	updatedState, err := rewriteLifecycleStateBaselines(string(stateBytes), writable)
+	if err != nil {
+		return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "state_update_failed", err.Error())
+	}
+	if err := writeLifecycleFileAtomic(opts.StatePath, []byte(updatedState), 0o644); err != nil {
+		return lifecycleApprovalFailure(dryRun, evidenceRef, approvedHash, "state_write_failed", err.Error())
+	}
+	result := dryRun
+	result.OK = true
+	result.Mode = "project_update_approved"
+	result.DryRun = false
+	result.NoWrite = LifecycleNoWriteEvidence{Guaranteed: false, ProfileWriteCount: len(writable), SkillWriteCount: len(writable)}
+	result.Approval = LifecycleApprovalEvidence{EvidenceRef: evidenceRef, DryRunPlanHash: dryRun.PlanHash, ApprovedPlanHash: approvedHash, MatchedCurrentPlan: true}
+	result.NextAction = "Update apply complete. Run the listed doctor command before claiming profile readiness."
 	return result
 }
 
@@ -245,12 +325,19 @@ func RenderHumanLifecycleUpdate(result LifecycleUpdateResult) string {
 	status := "ready"
 	if !result.OK {
 		status = "blocked"
+	} else if !result.DryRun {
+		status = "complete"
 	}
 	lines := []string{
-		fmt.Sprintf("Status: update dry-run %s for profile %s.", status, firstTargetProfileName(result.TargetProfiles)),
+		fmt.Sprintf("Status: update %s for profile %s.", status, firstTargetProfileName(result.TargetProfiles)),
 		fmt.Sprintf("Targets: roles=%s profiles=%d source_packs=%d skills=%d.", strings.Join(result.TargetRoles, ","), len(result.TargetProfiles), len(result.SourcePacks), len(result.SkillIDs)),
 		fmt.Sprintf("Planned states: %s", lifecycleStateCounts(result.PlannedStates)),
-		"Writes: dry-run only; profile/auth/token/gateway/provider/model/KAB/KAH/Hermes runtime/profile activation writes 0.",
+	}
+	if result.DryRun {
+		lines = append(lines, "Writes: dry-run only; profile/auth/token/gateway/provider/model/KAB/KAH/Hermes runtime/profile activation writes 0.")
+		lines = append(lines, "Approval evidence: "+result.ApprovalRequest.EvidenceRef)
+	} else {
+		lines = append(lines, "Approval evidence: "+result.Approval.EvidenceRef)
 	}
 	for _, state := range result.PlannedStates {
 		lines = append(lines, fmt.Sprintf("Plan: %s %s -> %s (%s)", state.SkillID, state.TargetPath, state.PlannedState, state.Classification))
@@ -280,6 +367,204 @@ func lifecycleStateForClassification(classification string) string {
 	default:
 		return "no_change"
 	}
+}
+
+func finalizeLifecycleUpdateHash(result *LifecycleUpdateResult) {
+	canonical := map[string]any{
+		"command":             result.Command,
+		"mode":                result.Mode,
+		"dry_run":             result.DryRun,
+		"target_roles":        result.TargetRoles,
+		"target_profiles":     result.TargetProfiles,
+		"source_packs":        result.SourcePacks,
+		"skill_ids":           result.SkillIDs,
+		"planned_states":      result.PlannedStates,
+		"changed_paths":       result.ChangedPaths,
+		"backup_recovery":     result.BackupRecovery,
+		"doctor_commands":     result.DoctorCommands,
+		"no_write":            result.NoWrite,
+		"sync_classification": result.SyncClassification,
+		"diagnostics":         result.Diagnostics,
+	}
+	result.PlanHash = checksumAny(canonical)
+	result.ApprovalRequest = LifecycleApprovalRequest{Required: result.OK && len(result.ChangedPaths) > 0, EvidenceRef: "dry-run:" + result.PlanHash, HashIncludesProfile: true, HashIncludesChangedPaths: true, HashIncludesNoWriteEvidence: true, HashIncludesBackupPlan: true}
+}
+
+func lifecycleApprovedHashFromEvidence(evidenceRef string) (string, bool) {
+	if !lifecycleApprovedEvidencePattern.MatchString(evidenceRef) {
+		hash, _ := strings.CutPrefix(evidenceRef, "dry-run:")
+		return hash, false
+	}
+	return strings.TrimPrefix(evidenceRef, "dry-run:"), true
+}
+
+func lifecycleApprovalFailure(dryRun LifecycleUpdateResult, evidenceRef string, approvedHash string, code string, message string) LifecycleUpdateResult {
+	result := dryRun
+	result.OK = false
+	result.Mode = "project_update_approved"
+	result.DryRun = false
+	result.NoWrite = LifecycleNoWriteEvidence{Guaranteed: true}
+	result.Approval = LifecycleApprovalEvidence{EvidenceRef: evidenceRef, DryRunPlanHash: dryRun.PlanHash, ApprovedPlanHash: approvedHash, MatchedCurrentPlan: approvedHash == dryRun.PlanHash}
+	result.Diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: code, Message: message}}, dryRun.Diagnostics...)
+	result.NextAction = "No files were written. Fix the reported issue, rerun dry-run, and apply only the matching plan hash."
+	return result
+}
+
+func preflightLifecycleAutoCopy(result LifecycleUpdateResult, classification Classification) error {
+	if result.SyncClassification.SourceRepo == nil || result.SyncClassification.ProjectRoot == nil {
+		return fmt.Errorf("source repo and project root evidence are required")
+	}
+	sourceRel := classification.Paths["current_upstream_path"]
+	targetRel := classification.Paths["project_skill_path"]
+	if sourceRel == "" || targetRel == "" {
+		return fmt.Errorf("auto-copy candidate lacks source or target path")
+	}
+	source, err := cleanExistingDirInside(result.SyncClassification.SourceRepo.Path, filepath.Join(result.SyncClassification.SourceRepo.Path, filepath.FromSlash(sourceRel)))
+	if err != nil {
+		return err
+	}
+	target, err := cleanExistingDirInside(result.SyncClassification.ProjectRoot.Path, filepath.Join(result.SyncClassification.ProjectRoot.Path, filepath.FromSlash(targetRel)))
+	if err != nil {
+		return err
+	}
+	sourceChecksum, err := discovery.ComputePackChecksum(source)
+	if err != nil {
+		return err
+	}
+	targetChecksum, err := discovery.ComputePackChecksum(target)
+	if err != nil {
+		return err
+	}
+	if ensureChecksumPrefix(sourceChecksum) != classification.Checksums["current_source_checksum"] {
+		return fmt.Errorf("source checksum changed after dry-run: %s", sourceRel)
+	}
+	if ensureChecksumPrefix(targetChecksum) != classification.Checksums["current_project_checksum"] {
+		return fmt.Errorf("target checksum changed after dry-run: %s", targetRel)
+	}
+	if classification.Checksums["current_project_checksum"] != classification.Checksums["recorded_project_checksum"] {
+		return fmt.Errorf("target no longer matches recorded project baseline: %s", targetRel)
+	}
+	return nil
+}
+
+func copyLifecyclePack(sourceRel string, targetRel string, repoRoot string, projectRoot string) error {
+	sourceRoot := filepath.Join(repoRoot, filepath.FromSlash(sourceRel))
+	targetRoot := filepath.Join(projectRoot, filepath.FromSlash(targetRel))
+	return filepath.WalkDir(sourceRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return fmt.Errorf("source path is not a regular file: %s", path)
+		}
+		rel, err := filepath.Rel(sourceRoot, path)
+		if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+			return fmt.Errorf("source path escapes pack root: %s", path)
+		}
+		if excludedPackPath(filepath.ToSlash(rel)) {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return writeLifecycleFileAtomic(filepath.Join(targetRoot, rel), data, info.Mode().Perm())
+	})
+}
+
+func rewriteLifecycleStateBaselines(data string, classifications []Classification) (string, error) {
+	updates := map[string]Classification{}
+	for _, classification := range classifications {
+		updates[classification.UpstreamPack+"|"+classification.ProjectSkill] = classification
+	}
+	lines := strings.Split(data, "\n")
+	currentKey := ""
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "- upstream_pack:") {
+			upstream := unquote(strings.TrimSpace(strings.TrimPrefix(trimmed, "- upstream_pack:")))
+			currentKey = upstream + "|"
+			continue
+		}
+		if currentKey != "" && strings.HasPrefix(trimmed, "project_skill:") {
+			projectSkill := unquote(strings.TrimSpace(strings.TrimPrefix(trimmed, "project_skill:")))
+			parts := strings.SplitN(currentKey, "|", 2)
+			currentKey = parts[0] + "|" + projectSkill
+			continue
+		}
+		classification, ok := updates[currentKey]
+		if !ok {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(trimmed, "source_checksum:"):
+			lines[i] = linePrefixBeforeValue(line) + quoteYAML(classification.Checksums["current_source_checksum"])
+		case strings.HasPrefix(trimmed, "project_checksum:"):
+			lines[i] = linePrefixBeforeValue(line) + quoteYAML(classification.Checksums["current_source_checksum"])
+		}
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
+func linePrefixBeforeValue(line string) string {
+	idx := strings.Index(line, ":")
+	if idx < 0 {
+		return line
+	}
+	return line[:idx+1] + " "
+}
+
+func quoteYAML(value string) string {
+	return `"` + strings.ReplaceAll(value, `"`, `\"`) + `"`
+}
+
+func writeLifecycleFileAtomic(path string, data []byte, mode os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".kas-update-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	removeTmp := true
+	defer func() {
+		if removeTmp {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(mode); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	removeTmp = false
+	return nil
+}
+
+func checksumAny(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		data = []byte(fmt.Sprint(value))
+	}
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func lifecycleOverallState(result Result) string {
@@ -410,8 +695,9 @@ type stateFile struct {
 }
 
 var (
-	shaPattern      = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
-	checksumPattern = regexp.MustCompile(`^sha256:[0-9a-fA-F]{64}$`)
+	shaPattern                       = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
+	checksumPattern                  = regexp.MustCompile(`^sha256:[0-9a-fA-F]{64}$`)
+	lifecycleApprovedEvidencePattern = regexp.MustCompile(`^dry-run:sha256:[0-9a-f]{64}$`)
 )
 
 func Build(opts Options) Result {

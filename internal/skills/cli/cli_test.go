@@ -23,6 +23,15 @@ func writeCLITestSkill(t *testing.T, dir string, name string) {
 	}
 }
 
+func assertNoHangul(t *testing.T, out string) {
+	t.Helper()
+	for _, r := range out {
+		if r >= 0xAC00 && r <= 0xD7AF {
+			t.Fatalf("expected no Korean prose in human output, got %q", out)
+		}
+	}
+}
+
 func writeCLITestSkillPackYAML(t *testing.T, repo string, skills ...string) {
 	t.Helper()
 	content := "name: fixture\nversion: 0.1.0\nskills:\n"
@@ -103,40 +112,16 @@ func assertNoWriteEvidence(t *testing.T, payload map[string]any) {
 }
 
 func TestPublicLifecycleFailClosedHumanErrorsAreEnglish(t *testing.T) {
-	dir := t.TempDir()
-	profileRoot := filepath.Join(dir, "profile")
-	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
-
 	for name, args := range map[string][]string{
-		"install-apply": {
-			"install",
-			"--profile", "kwanwoo",
-			"--project", "doksuri-server",
-			"--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000",
-			"--profile-root", profileRoot,
-		},
 		"update-missing-dry-run": {
 			"update",
 			"--profile", "kwanwoo",
 			"--project", "doksuri-server",
 		},
-		"update-apply": {
-			"update",
-			"--profile", "kwanwoo",
-			"--project", "doksuri-server",
-			"--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000",
-		},
-		"uninstall-apply": {
-			"uninstall",
-			"--profile", "kwanwoo",
-			"--project", "doksuri-server",
-			"--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000",
-			"--profile-root", profileRoot,
-		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			code := Main(args, &stdout, &stderr, env)
+			code := Main(args, &stdout, &stderr, nil)
 			if code != 2 {
 				t.Fatalf("expected fail-closed exit 2, got %d", code)
 			}
@@ -220,11 +205,11 @@ func TestPublicLifecycleWrappersJSONDryRunOnly(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	code = Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	code = Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
 	if code != 2 {
-		t.Fatalf("expected public install apply rejection, got %d", code)
+		t.Fatalf("expected public install ambiguous-mode rejection, got %d", code)
 	}
-	assertCLIErrorCode(t, stderr.Bytes(), "public_project_install_dry_run_only")
+	assertCLIErrorCode(t, stderr.Bytes(), "project_install_mode_ambiguous")
 
 	stdout.Reset()
 	stderr.Reset()
@@ -243,11 +228,11 @@ func TestPublicLifecycleWrappersJSONDryRunOnly(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	code = Main([]string{"repair", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--approve", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	code = Main([]string{"repair", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--approve", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
 	if code != 2 {
-		t.Fatalf("expected public repair approve rejection, got %d", code)
+		t.Fatalf("expected public repair ambiguous-mode rejection, got %d", code)
 	}
-	assertCLIErrorCode(t, stderr.Bytes(), "public_project_repair_dry_run_only")
+	assertCLIErrorCode(t, stderr.Bytes(), "project_repair_mode_ambiguous")
 
 	stdout.Reset()
 	stderr.Reset()
@@ -617,7 +602,7 @@ func TestUpdateDryRunLifecycleJSONAndNoWrite(t *testing.T) {
 	if code != 2 {
 		t.Fatalf("expected missing dry-run failure, got %d", code)
 	}
-	assertCLIErrorCode(t, stderr.Bytes(), "update_requires_dry_run")
+	assertCLIErrorCode(t, stderr.Bytes(), "update_requires_dry_run_or_apply")
 }
 
 func TestUninstallDryRunPlansManifestTrackedOnly(t *testing.T) {
@@ -665,6 +650,12 @@ func TestUninstallDryRunPlansManifestTrackedOnly(t *testing.T) {
 	if payload["command"] != "uninstall" || payload["mode"] != "project_uninstall_dry_run" || payload["dry_run"] != true {
 		t.Fatalf("unexpected uninstall payload: %+v", payload)
 	}
+	futureApplyCommand, ok := payload["future_apply_command"].(string)
+	if !ok || !strings.Contains(futureApplyCommand, "--apply dry-run:sha256:") ||
+		!strings.Contains(futureApplyCommand, "--backup-vault-root <abs-path>") {
+		t.Fatalf("future apply command must include approval evidence and backup vault placeholder, got %q", futureApplyCommand)
+	}
+	assertNoHangul(t, futureApplyCommand)
 	removals := payload["planned_removals"].([]any)
 	if len(removals) != 1 || removals[0].(map[string]any)["action"] != "remove" {
 		t.Fatalf("unexpected planned removals: %+v", removals)
@@ -691,7 +682,64 @@ func TestUninstallDryRunPlansManifestTrackedOnly(t *testing.T) {
 	if code != 2 {
 		t.Fatalf("expected uninstall apply rejection, got %d", code)
 	}
-	assertCLIErrorCode(t, stderr.Bytes(), "public_project_uninstall_dry_run_only")
+	assertCLIErrorCode(t, stderr.Bytes(), "approval_plan_hash_mismatch")
+
+	evidence = payload["approval_request"].(map[string]any)["evidence_ref"].(string)
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"uninstall", "--profile", "kwanwoo", "--project", "doksuri-server", "--apply", evidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected uninstall missing backup-vault-root rejection, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "backup_vault_root_rejected")
+	if _, err := os.Stat(target); err != nil {
+		t.Fatalf("missing vault root removed target: %v", err)
+	}
+
+	vaultRoot := filepath.Join(dir, "vault")
+	if err := os.MkdirAll(vaultRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"uninstall", "--profile", "kwanwoo", "--project", "doksuri-server", "--apply", evidence, "--backup-vault-root", vaultRoot, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("approved uninstall failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var applied map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &applied); err != nil {
+		t.Fatal(err)
+	}
+	if applied["ok"] != true || applied["mode"] != "project_uninstall_approved" || applied["dry_run"] != false {
+		t.Fatalf("unexpected approved uninstall payload: %+v", applied)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("approved uninstall did not remove manifest target or unexpected stat error: %v", err)
+	}
+	if _, err := os.Stat(localOnly); err != nil {
+		t.Fatalf("approved uninstall touched local-only file: %v", err)
+	}
+	backup := applied["backup_recovery"].(map[string]any)
+	if backup["backup_verified"] != true || backup["backup_evidence_path"] == "" || backup["backup_sha256"] == "" {
+		t.Fatalf("missing backup evidence: %+v", backup)
+	}
+	if _, err := os.Stat(backup["backup_evidence_path"].(string)); err != nil {
+		t.Fatalf("backup evidence path missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(applied["backup_path"].(string), "files", "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); err != nil {
+		t.Fatalf("backup file missing: %v", err)
+	}
+	manifestBytes, err := os.ReadFile(filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest map[string]any
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if len(manifest["project_suites"].([]any)) != 0 || manifest["last_uninstall"] == nil {
+		t.Fatalf("manifest did not remove only project suite and preserve uninstall evidence: %+v", manifest)
+	}
 }
 
 func setupCLISyncFixture(t *testing.T) (string, string, string) {

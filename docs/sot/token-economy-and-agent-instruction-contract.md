@@ -318,7 +318,7 @@ Acceptance criteria:
 - Write-capable lifecycle commands use `--apply dry-run:sha256:<hash>` as the preferred operator-facing spelling and may retain `--approve dry-run:sha256:<hash>` only as a compatibility alias/internal detail.
 - Approved writes are bound to an exact dry-run evidence reference or plan hash and fail closed on mismatched manifests, partial approval, sibling-profile write failure, or unapproved content drift.
 - Each affected profile receives a per-profile manifest and independent project-suite doctor verification.
-- Uninstall removes only manifest-tracked KAS-managed project-suite artifacts by default and writes backup/evidence to the approved long-lived Obsidian vault backup area.
+- Uninstall removes only manifest-tracked KAS-managed project-suite artifacts by default and writes backup/evidence to the approved long-lived Obsidian vault backup area. Apply requires explicit `--backup-vault-root <abs-path>` and fails closed when that root is missing, relative, inside the target profile, symlink-unsafe, unwritable, or unverifiable.
 - English human output distinguishes `create`, `update`, `remove`, `no_change`, `conflict`, `error`, `blocked`, and `degraded` per role/profile.
 - Tests prove no auth, token, gateway, provider, model, KAB policy, KAH subjective-judgment, Hermes runtime, profile-activation, local-only file removal, or unmanifested instruction removal is introduced.
 

@@ -109,7 +109,7 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 	fromGeneric := fs.Bool("from-generic", false, "plan explicit generic-to-project migration")
 	dryRun := fs.Bool("dry-run", false, "report planned changes without writing")
 	approve := fs.String("approve", "", "approval evidence ref for future approved copy install")
-	apply := fs.String("apply", "", "reserved for TOKEN-005 approved lifecycle writes")
+	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash> for TOKEN-005 approved lifecycle writes")
 	kabStage := fs.String("kab-stage", "", "KAB adoption stage numeric selector (1 or 2)")
 	kabAdoptionStage := fs.String("kab-adoption-stage", "", "KAB adoption stage canonical selector")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
@@ -126,7 +126,10 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 		return runPublicProjectInstall(*repo, *profile, *project, *sourcePack, *profileRoot, *dryRun, *fromGeneric, *approve, *apply, *jsonOutput, stdout, stderr, env, argv)
 	}
 	if *apply != "" {
-		return emitError(stderr, "apply_deferred_to_token_005", "install --apply is TOKEN-005 behavior.", "install", *jsonOutput, "Use install --dry-run for TOKEN-004 planning.")
+		if *approve != "" || *dryRun {
+			return emitError(stderr, "install_mode_ambiguous", "install accepts only one of --dry-run, --approve, or --apply.", "install", *jsonOutput, "Run dry-run first, then rerun with one approval token.")
+		}
+		*approve = *apply
 	}
 	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "install", *jsonOutput, "")
@@ -177,8 +180,18 @@ func runPublicProjectInstall(repo string, profile string, project string, source
 	if profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "install", jsonOutput, "")
 	}
-	if apply != "" || approve != "" || !dryRun {
-		return emitError(stderr, "public_project_install_dry_run_only", "install --project is read-only in TOKEN-004 and requires --dry-run; writes are TOKEN-005 behavior.", "install", jsonOutput, "Rerun with install --profile <profile> --project <project> --dry-run.")
+	if apply != "" && approve != "" {
+		return emitError(stderr, "project_install_mode_ambiguous", "install --project accepts only one approval flag.", "install", jsonOutput, "Run dry-run first, then rerun with --apply dry-run:sha256:<hash>.")
+	}
+	approval := apply
+	if approval == "" {
+		approval = approve
+	}
+	if dryRun && approval != "" {
+		return emitError(stderr, "project_install_mode_ambiguous", "install --project accepts either --dry-run or --apply, not both.", "install", jsonOutput, "Run dry-run first, then rerun with only --apply dry-run:sha256:<hash>.")
+	}
+	if !dryRun && approval == "" {
+		return emitError(stderr, "project_install_requires_dry_run_or_apply", "install --project requires --dry-run or --apply dry-run:sha256:<hash>.", "install", jsonOutput, "Rerun with install --profile <profile> --project <project> --dry-run.")
 	}
 	if profile == "" {
 		return emitError(stderr, "profile_required", "install --project requires --profile <profile>.", "install", jsonOutput, "")
@@ -191,7 +204,13 @@ func runPublicProjectInstall(repo string, profile string, project string, source
 	}
 	opts := projectinstall.ProjectSuiteOptions{Profile: profile, Project: project, SourcePack: sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: profileRoot, FromGeneric: fromGeneric}
 	if fromGeneric {
-		result, err := projectinstall.BuildProjectMigrationDryRun(repo, opts)
+		var result projectinstall.ProjectActionResult
+		var err error
+		if approval != "" {
+			result, err = projectinstall.ApplyApprovedMigration(repo, opts, approval)
+		} else {
+			result, err = projectinstall.BuildProjectMigrationDryRun(repo, opts)
+		}
 		if err != nil {
 			return emitError(stderr, "project_install_planner_failed", err.Error(), "install", jsonOutput, "")
 		}
@@ -200,14 +219,25 @@ func runPublicProjectInstall(repo string, profile string, project string, source
 			return projectinstall.RenderHumanProjectAction(result)
 		})
 	}
-	result, err := projectinstall.BuildDryRun(repo, projectinstall.Options{Profile: profile, Project: project, SourcePack: sourcePack, ProfileRoot: profileRoot, DryRun: true})
+	var result projectinstall.Result
+	var err error
+	if approval != "" {
+		result, err = projectinstall.ApplyApprovedInstall(repo, projectinstall.Options{Profile: profile, Project: project, SourcePack: sourcePack, ProfileRoot: profileRoot, DryRun: true}, approval)
+	} else {
+		result, err = projectinstall.BuildDryRun(repo, projectinstall.Options{Profile: profile, Project: project, SourcePack: sourcePack, ProfileRoot: profileRoot, DryRun: true})
+	}
 	if err != nil {
 		return emitError(stderr, "project_install_planner_failed", err.Error(), "install", jsonOutput, "")
 	}
 	result.Command = "install"
-	result.NextAction = "Review install --project dry-run evidence; no files were written. Use doctor --project-suite after future approved writes."
+	if result.DryRun {
+		result.NextAction = "Review install --project dry-run evidence; no files were written. Use doctor --project-suite after approved writes."
+	}
 	return emitResult(stdout, stderr, result.OK, jsonOutput, result, func() string {
-		return projectinstall.RenderHumanDryRun(result)
+		if result.DryRun {
+			return projectinstall.RenderHumanDryRun(result)
+		}
+		return projectinstall.RenderHumanApproved(result)
 	})
 }
 
@@ -221,7 +251,7 @@ func runUpdate(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	repoPath := fs.String("repo", "", "current upstream KAS source repo path")
 	projectRoot := fs.String("project-root", "", "project-specific KAS root path")
 	dryRun := fs.Bool("dry-run", false, "classify project KAS update without writing")
-	apply := fs.String("apply", "", "reserved for TOKEN-005 approved lifecycle writes")
+	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash> for approved lifecycle writes")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
 	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
 	if hasHelpArg(argv) {
@@ -232,11 +262,11 @@ func runUpdate(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	if err := fs.Parse(argv); err != nil {
 		return 2
 	}
-	if *apply != "" {
-		return emitError(stderr, "apply_deferred_to_token_005", "update --apply is TOKEN-005 behavior.", "update", *jsonOutput, "Use update --dry-run for TOKEN-004 planning.")
+	if *dryRun && *apply != "" {
+		return emitError(stderr, "update_mode_ambiguous", "update accepts either --dry-run or --apply, not both.", "update", *jsonOutput, "Run dry-run first, then rerun with only --apply dry-run:sha256:<hash>.")
 	}
-	if !*dryRun {
-		return emitError(stderr, "update_requires_dry_run", "update is read-only in TOKEN-004 and requires --dry-run.", "update", *jsonOutput, "Rerun with update --profile <profile> --project <project-id> --state <path> --dry-run.")
+	if !*dryRun && *apply == "" {
+		return emitError(stderr, "update_requires_dry_run_or_apply", "update requires --dry-run or --apply dry-run:sha256:<hash>.", "update", *jsonOutput, "Rerun with update --profile <profile> --project <project-id> --state <path> --dry-run.")
 	}
 	if *profile == "" {
 		return emitError(stderr, "profile_required", "update requires --profile <profile>.", "update", *jsonOutput, "")
@@ -244,7 +274,13 @@ func runUpdate(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	if *project == "" {
 		return emitError(stderr, "project_required", "update requires --project <project-id>.", "update", *jsonOutput, "")
 	}
-	result := kasstate.BuildLifecycleUpdate(kasstate.Options{Profile: *profile, Project: *project, StatePath: *statePath, LegacyMarkerPath: *legacyMarkerPath, DryRun: *dryRun, RepoPath: *repoPath, ProjectRoot: *projectRoot})
+	opts := kasstate.Options{Profile: *profile, Project: *project, StatePath: *statePath, LegacyMarkerPath: *legacyMarkerPath, DryRun: true, RepoPath: *repoPath, ProjectRoot: *projectRoot}
+	var result kasstate.LifecycleUpdateResult
+	if *apply != "" {
+		result = kasstate.ApplyLifecycleUpdate(opts, *apply)
+	} else {
+		result = kasstate.BuildLifecycleUpdate(opts)
+	}
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return kasstate.RenderHumanLifecycleUpdate(result)
 	})
@@ -322,8 +358,8 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
 	dryRun := fs.Bool("dry-run", false, "report planned repairs without writing")
-	approve := fs.String("approve", "", "compatibility alias; public repair writes are deferred to TOKEN-005")
-	apply := fs.String("apply", "", "reserved for TOKEN-005 approved lifecycle writes")
+	approve := fs.String("approve", "", "compatibility alias for --apply dry-run:sha256:<hash>")
+	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash> for approved lifecycle writes")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
 	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
 	if hasHelpArg(argv) {
@@ -337,8 +373,18 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "repair", *jsonOutput, "")
 	}
-	if *apply != "" || *approve != "" || !*dryRun {
-		return emitError(stderr, "public_project_repair_dry_run_only", "repair is read-only in TOKEN-004 and requires --dry-run; writes are TOKEN-005 behavior.", "repair", *jsonOutput, "Rerun with repair --profile <profile> --project <project> --dry-run.")
+	if *apply != "" && *approve != "" {
+		return emitError(stderr, "project_repair_mode_ambiguous", "repair accepts only one approval flag.", "repair", *jsonOutput, "Run dry-run first, then rerun with --apply dry-run:sha256:<hash>.")
+	}
+	approval := *apply
+	if approval == "" {
+		approval = *approve
+	}
+	if *dryRun && approval != "" {
+		return emitError(stderr, "project_repair_mode_ambiguous", "repair accepts either --dry-run or --apply, not both.", "repair", *jsonOutput, "Run dry-run first, then rerun with only --apply dry-run:sha256:<hash>.")
+	}
+	if !*dryRun && approval == "" {
+		return emitError(stderr, "project_repair_requires_dry_run_or_apply", "repair requires --dry-run or --apply dry-run:sha256:<hash>.", "repair", *jsonOutput, "Rerun with repair --profile <profile> --project <project> --dry-run.")
 	}
 	if *profile == "" {
 		return emitError(stderr, "profile_required", "repair requires --profile <profile>.", "repair", *jsonOutput, "")
@@ -346,7 +392,14 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	if *project == "" {
 		return emitError(stderr, "project_required", "repair requires --project <project>.", "repair", *jsonOutput, "")
 	}
-	result, err := projectinstall.BuildProjectRepairDryRun(*repo, projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot})
+	opts := projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot}
+	var result projectinstall.ProjectActionResult
+	var err error
+	if approval != "" {
+		result, err = projectinstall.ApplyApprovedRepair(*repo, opts, approval)
+	} else {
+		result, err = projectinstall.BuildProjectRepairDryRun(*repo, opts)
+	}
 	if err != nil {
 		return emitError(stderr, "project_repair_failed", err.Error(), "repair", *jsonOutput, "")
 	}
@@ -364,7 +417,8 @@ func runUninstall(argv []string, stdout io.Writer, stderr io.Writer, env map[str
 	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
 	dryRun := fs.Bool("dry-run", false, "report planned removals without writing")
-	apply := fs.String("apply", "", "reserved for TOKEN-005 approved lifecycle writes")
+	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash> for approved lifecycle writes")
+	backupVaultRoot := fs.String("backup-vault-root", "", "required absolute Obsidian vault backup root for uninstall --apply")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
 	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
 	if hasHelpArg(argv) {
@@ -378,8 +432,11 @@ func runUninstall(argv []string, stdout io.Writer, stderr io.Writer, env map[str
 	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "uninstall", *jsonOutput, "")
 	}
-	if *apply != "" || !*dryRun {
-		return emitError(stderr, "public_project_uninstall_dry_run_only", "uninstall is read-only in TOKEN-004 and requires --dry-run; removal is TOKEN-005 behavior.", "uninstall", *jsonOutput, "Rerun with uninstall --profile <profile> --project <project> --dry-run.")
+	if *dryRun && *apply != "" {
+		return emitError(stderr, "project_uninstall_mode_ambiguous", "uninstall accepts either --dry-run or --apply, not both.", "uninstall", *jsonOutput, "Run dry-run first, then rerun with only --apply dry-run:sha256:<hash> --backup-vault-root <abs-path>.")
+	}
+	if !*dryRun && *apply == "" {
+		return emitError(stderr, "project_uninstall_requires_dry_run_or_apply", "uninstall requires --dry-run or --apply dry-run:sha256:<hash>.", "uninstall", *jsonOutput, "Rerun with uninstall --profile <profile> --project <project> --dry-run.")
 	}
 	if *profile == "" {
 		return emitError(stderr, "profile_required", "uninstall requires --profile <profile>.", "uninstall", *jsonOutput, "")
@@ -387,7 +444,13 @@ func runUninstall(argv []string, stdout io.Writer, stderr io.Writer, env map[str
 	if *project == "" {
 		return emitError(stderr, "project_required", "uninstall requires --project <project>.", "uninstall", *jsonOutput, "")
 	}
-	result := projectinstall.BuildProjectUninstallDryRun(projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot})
+	opts := projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot}
+	var result projectinstall.ProjectUninstallResult
+	if *apply != "" {
+		result, _ = projectinstall.ApplyProjectUninstall(opts, *apply, *backupVaultRoot)
+	} else {
+		result = projectinstall.BuildProjectUninstallDryRun(opts)
+	}
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return projectinstall.RenderHumanProjectUninstall(result)
 	})

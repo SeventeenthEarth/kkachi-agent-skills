@@ -6,15 +6,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
 )
-
-var approvedEvidencePattern = regexp.MustCompile(`^dry-run:sha256:[0-9a-f]{64}$`)
 
 func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result, error) {
 	opts.DryRun = true
@@ -30,7 +27,7 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 		result.DryRun = false
 		result.Approval = ApprovalEvidence{EvidenceRef: evidenceRef, DryRunPlanHash: dryRun.PlanHash, ApprovedPlanHash: approvedHash, MatchedCurrentPlan: false}
 		result.Diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: "approval_evidence_malformed", Message: "approval evidence must be exactly dry-run:sha256:<64 lowercase hex>."}}, dryRun.Diagnostics...)
-		result.NextAction = "설치하지 않았습니다. dry-run JSON의 approval_request.evidence_ref 값을 그대로 사용하세요."
+		result.NextAction = "No files were written. Use the exact approval_request.evidence_ref value from the matching dry-run JSON."
 		return result, nil
 	}
 	if approvedHash != dryRun.PlanHash {
@@ -40,7 +37,7 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 		result.DryRun = false
 		result.Approval = ApprovalEvidence{EvidenceRef: evidenceRef, DryRunPlanHash: dryRun.PlanHash, ApprovedPlanHash: approvedHash, MatchedCurrentPlan: false}
 		result.Diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: "approval_plan_hash_mismatch", Message: "approval evidence does not match the current dry-run plan hash; no files were written."}}, dryRun.Diagnostics...)
-		result.NextAction = "설치하지 않았습니다. 현재 dry-run plan_hash를 다시 확인한 뒤 --approve dry-run:<hash>로 재실행하세요."
+		result.NextAction = "No files were written. Re-run dry-run and approve only the current plan hash."
 		return result, nil
 	}
 	if !dryRun.OK {
@@ -50,7 +47,7 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 		result.DryRun = false
 		result.Approval = ApprovalEvidence{EvidenceRef: evidenceRef, DryRunPlanHash: dryRun.PlanHash, ApprovedPlanHash: approvedHash, MatchedCurrentPlan: true}
 		result.Diagnostics = append([]discovery.Diagnostic{{Level: "error", Code: "project_install_plan_not_approvable", Message: "current dry-run plan contains conflict or error entries; no files were written."}}, dryRun.Diagnostics...)
-		result.NextAction = "설치하지 않았습니다. conflict/error를 해결하고 새 dry-run을 승인하세요."
+		result.NextAction = "No files were written. Resolve conflicts/errors and approve a fresh dry-run."
 		return result, nil
 	}
 	installID := makeInstallID(dryRun.PlanHash, time.Now().UTC())
@@ -135,21 +132,21 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 	actualChanged = append(actualChanged, ChangedPath{Path: ".kas/skill-pack-manifest.json", Action: "manifest_update", PreviousSHA256: dryRun.TargetProfile.PreviousManifestSHA256})
 
 	result := buildApprovedResult(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, true, nil)
-	result.NextAction = "설치 완료. 다음: doctor --project-suite로 검증하세요; do not claim operational rollout from KASPROJ-003."
+	result.NextAction = "Install complete. Verify with doctor --project-suite; do not claim operational rollout from KASPROJ-003."
 	return result, nil
 }
 
 func RenderHumanApproved(result Result) string {
-	state := "완료"
+	state := "complete"
 	if !result.OK {
-		state = "실패"
+		state = "blocked"
 	}
 	lines := []string{
-		fmt.Sprintf("상태: project KAS approved install %s — profile %s / project %s.", state, result.TargetProfile.Name, result.Project.ID),
-		"승인 증거: " + result.Approval.EvidenceRef,
+		fmt.Sprintf("Status: project KAS approved install %s - profile %s / project %s.", state, result.TargetProfile.Name, result.Project.ID),
+		"Approval evidence: " + result.Approval.EvidenceRef,
 		"install_id: " + result.InstallID,
 		"manifest: " + result.ManifestPath,
-		fmt.Sprintf("변경: create %d, update %d, backup %d, manifest_update %d, conflict %d, error %d.",
+		fmt.Sprintf("Changes: create %d, update %d, backup %d, manifest_update %d, conflict %d, error %d.",
 			result.Summary.CountsByAction["create"],
 			result.Summary.CountsByAction["update"],
 			result.Summary.CountsByAction["backup"],
@@ -157,22 +154,14 @@ func RenderHumanApproved(result Result) string {
 			result.Summary.CountsByAction["conflict"],
 			result.Summary.CountsByAction["error"],
 		),
-		"복구: " + result.BackupPath,
+		"Recovery: " + result.BackupPath,
 		"semantic_adaptation_claimed:false; drift_policy: manual_review_required.",
 	}
 	for _, diagnostic := range result.Diagnostics {
-		lines = append(lines, "진단: "+diagnostic.Message)
+		lines = append(lines, "Diagnostic: "+diagnostic.Message)
 	}
-	lines = append(lines, "다음: "+result.NextAction)
+	lines = append(lines, "Next: "+result.NextAction)
 	return strings.Join(lines, "\n")
-}
-
-func approvedHashFromEvidence(evidenceRef string) (string, bool) {
-	if !approvedEvidencePattern.MatchString(evidenceRef) {
-		hash, _ := strings.CutPrefix(evidenceRef, "dry-run:")
-		return hash, false
-	}
-	return strings.TrimPrefix(evidenceRef, "dry-run:"), true
 }
 
 func preflightApprovedInstall(dryRun Result, relativeBackupRoot string) error {
@@ -296,7 +285,7 @@ func approvedFailure(dryRun Result, evidenceRef string, approvedHash string, ins
 	diagnostics := []discovery.Diagnostic{{Level: "error", Code: code, Message: message}}
 	diagnostics = append(diagnostics, dryRun.Diagnostics...)
 	result := buildApprovedResult(dryRun, evidenceRef, approvedHash, installID, backupRoot, changed, false, diagnostics)
-	result.NextAction = "설치가 중단되었습니다. 파일과 manifest 상태를 확인하고 새 dry-run부터 다시 실행하세요."
+	result.NextAction = "No files were written after the failed preflight/write step. Review file and manifest state, then start from a fresh dry-run."
 	return result
 }
 
