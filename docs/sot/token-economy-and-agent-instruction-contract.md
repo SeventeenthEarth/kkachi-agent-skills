@@ -358,10 +358,152 @@ Acceptance criteria:
 
 - KAS defines compact phase packets or equivalent run summaries for each phase, including run id, task id, phase, status, changed paths, verification summaries, blocker list, artifact paths, checksums where applicable, and next phase/action.
 - Full detail remains recoverable by artifact path and checksum; KAS must not discard evidence to save tokens.
-- The contract names compression-forbidden fields, including acceptance criteria, explicit operator approvals/denials, forbidden scope, auth/token/provider/gateway boundaries, exact failing assertions, blocking review findings, and KAH final-gate failures.
-- The contract names compression-safe fields, including successful repetitive logs, dependency install/build noise, broad unchanged inventories, repeated status readbacks, and already-preserved artifact bodies.
+- The contract names compression-forbidden fields, including acceptance criteria, explicit operator approvals/denials, forbidden scope, auth/token/provider/gateway/model boundaries, exact failing assertions and command failures, blocking review findings, and KAH final-gate failures.
+- The contract names compression-safe fields, including successful repetitive logs, dependency install/build noise, broad unchanged inventories, repeated status readbacks, non-critical progress chatter, large passing command output with log path/checksum preserved, and already-preserved artifact bodies.
 - KAS guidance uses artifact-first retrieval: read compact packets first, then targeted artifact ranges only when the decision requires them.
-- Verification proves the summary/packet contract remains reversible and does not introduce a `headroom` dependency, Hermes proxy, or runtime context-pruning requirement.
+- Verification proves the summary/packet contract remains reversible and does not introduce a `headroom` dependency, Hermes proxy, runtime context-pruning requirement, KAB compression-policy decision, KAH subjective summarization, or auth/token/provider/gateway/model mutation.
+
+#### 7.8.1 Compact phase packet schema
+
+A compact phase packet is a per-phase reversible index, not a replacement for the source artifact. The canonical template is `templates/run-artifacts/phase-packet.yaml.tmpl`. Each packet must preserve these fields:
+
+```yaml
+packet_version: "token008.v1"
+summary_id: "phase-summary:<run_id>:<phase_id>:<source_checksum_prefix>"
+run_id: "<run_id>"
+task_id: "<task_id>"
+phase_id: "<plan|ask|implement|docs_validation|final_verify|...>"
+status: "<pass|fail|blocked|in_progress|not_applicable>"
+packet_validity: "<current|stale|invalid|superseded>"
+source_artifact:
+  path: ".kkachi/runs/<run_id>/<artifact>"
+  checksum: "sha256:<hash>"
+  ranges:
+    - "<line or section range when applicable>"
+evidence_class: "<acceptance_criteria|approval|forbidden_scope|failure|review_finding|gate_failure|verification_log|status_readback|...>"
+compression_policy: "<no_compression|direct_reference_only|summary_with_pointer|summary_safe>"
+changed_paths:
+  - "<changed or inspected path>"
+verification_summary: "<compact command/check result or not_applicable reason>"
+blocker_list:
+  - "<blocking issue or empty>"
+summary: "<compact English summary>"
+critical_references:
+  - class: "<evidence class>"
+    path: "<artifact path>"
+    checksum: "sha256:<hash>"
+    retrieval_instruction: "Read exact artifact/range before deciding."
+retrieval_instructions:
+  default: "Read this packet first."
+  required_when:
+    - "checksum mismatch"
+    - "status is fail or blocked"
+    - "approval, denial, forbidden scope, or non-goal is needed"
+    - "exact failing assertion or command failure is needed"
+    - "review or final gate has blocking findings"
+invalidation_behavior:
+  invalid_if:
+    - "source artifact checksum changes"
+    - "referenced artifact is missing"
+    - "phase status changes after packet generation"
+    - "acceptance criteria, forbidden scope, approval, review finding, or gate verdict changes"
+  on_invalid: "Do not rely on packet summary; retrieve source artifact and regenerate packet."
+next_action: "<next phase/action or none>"
+```
+
+Field semantics:
+
+- `summary_id` must bind the run, phase, and source checksum prefix so a stale packet can be detected.
+- `source_artifact.path` and `source_artifact.checksum` are mandatory for reversibility. If a source artifact has no checksum yet, the packet status must stay `blocked` or `not_applicable` with a reason; it must not pretend full detail is recoverable.
+- `critical_references` must carry direct artifact path, checksum, evidence class, and retrieval instruction for every compression-forbidden item that is not repeated exactly in the packet.
+- `compression_policy` records only the KAS-declared evidence handling policy for the packet. KAB does not decide this policy, and KAH may later validate the recorded field mechanically only.
+
+#### 7.8.2 Compact run summary schema
+
+A compact run summary is a run-level index over phase packets and final critical evidence pointers. It is not a substitute for packets or source artifacts. The canonical template is `templates/run-artifacts/run-summary.yaml.tmpl`. It must preserve:
+
+```yaml
+summary_version: "token008.v1"
+summary_id: "run-summary:<run_id>:<source_checksum_prefix>"
+run_id: "<run_id>"
+task_id: "<task_id>"
+status: "<pass|fail|blocked|in_progress|not_applicable>"
+packet_validity: "<current|stale|invalid|superseded>"
+phase_packets:
+  - phase_id: "<phase>"
+    status: "<pass|fail|blocked|in_progress|not_applicable>"
+    packet_path: ".kkachi/runs/<run_id>/phase-packets/<phase>.yaml"
+    packet_checksum: "sha256:<hash>"
+changed_paths:
+  - "<changed or inspected path>"
+verification_summary: "<compact run-level verification result or not_applicable reason>"
+blocker_list:
+  - "<blocking issue or empty>"
+critical_references:
+  - class: "<evidence class>"
+    path: "<artifact path>"
+    checksum: "sha256:<hash>"
+    retrieval_instruction: "Read exact artifact/range before deciding."
+retrieval_instructions:
+  default: "Read run-summary.yaml first, then the relevant phase packet."
+  required_when:
+    - "run summary checksum or packet checksum mismatch"
+    - "run status or phase status is fail or blocked"
+    - "a decision needs compression-forbidden evidence"
+invalidation_behavior:
+  invalid_if:
+    - "any referenced phase packet checksum changes"
+    - "any referenced source artifact checksum changes"
+    - "referenced packet or artifact is missing"
+    - "run status, phase status, acceptance criteria, forbidden scope, approval, review finding, or gate verdict changes"
+  on_invalid: "Do not rely on run summary; retrieve packet/source artifacts and regenerate summary."
+next_action: "<next phase/action or none>"
+```
+
+Hermes and backend prompts may use the run summary as the first model-visible continuity surface, then retrieve the specific phase packet and source artifact/range needed for the current decision. This is a read-summary-first retrieval policy, not a runtime context-pruning, Hermes proxy, or `headroom` requirement.
+
+#### 7.8.3 Evidence classes and compression policy
+
+Compression-forbidden evidence classes must remain exact in the packet or be directly referenced with artifact path, checksum, and retrieval instructions:
+
+- acceptance criteria;
+- explicit operator approvals and denials;
+- forbidden scope and non-goals;
+- auth/token/provider/gateway/model boundaries;
+- exact failing assertions and command failures;
+- blocking review findings;
+- KAH final-gate failures and gate report paths;
+- any artifact checksum or evidence path required to prove reversibility.
+
+Compression-safe evidence classes may be summarized only when the full artifact remains preserved and directly retrievable by path and checksum:
+
+- successful repetitive logs;
+- dependency install/build noise;
+- broad unchanged inventories;
+- repeated status readbacks;
+- already-preserved artifact bodies;
+- non-critical progress chatter;
+- large passing command output with log path/checksum preserved.
+
+`summary_safe` means safe to keep out of model-visible context by default. It never means safe to delete, overwrite, or omit the underlying evidence artifact.
+
+#### 7.8.4 Retrieval and invalidation behavior
+
+KAS guidance must prefer this retrieval order for continuity and review:
+
+1. Read `run-summary.yaml` first when it exists and `packet_validity` is `current`.
+2. Read the relevant `phase-packet.yaml` next when a phase decision or phase evidence is needed.
+3. Retrieve targeted source artifact ranges when checksums mismatch, status is `fail` or `blocked`, compression-forbidden evidence is needed, review/final-gate findings are blocking, or the packet/run summary is stale, invalid, or superseded.
+
+A packet or run summary is invalid if any referenced artifact is missing, any referenced checksum changes, a phase/run status changes after generation, or acceptance criteria, forbidden scope, approval/denial, review finding, or gate verdict changes. Invalid packets and summaries must not be used as decision evidence until the source artifact is retrieved and the packet/summary is regenerated.
+
+#### 7.8.5 Layer boundaries and TOKEN deferrals
+
+KAS owns the packet/run-summary schema, evidence class vocabulary, compression policy wording, and prompt/template guidance. KAH may later validate only mechanical fields: required keys, status vocabulary, artifact existence, checksum shape/match, validity vocabulary, and required references. KAH must not summarize evidence meaning, judge prose quality, decide compression policy, choose verification/profile/skip policy, or implement subjective warnings.
+
+KAB remains backend/session/control evidence only. TOKEN-008 does not change backend selection, KAB activation, KAB policy, prompt-profile routing, provider/gateway/model settings, auth/token handling, or Hermes runtime behavior. Hermes may read compact packets first and then targeted source artifacts when exact evidence is needed, but TOKEN-008 does not require a Hermes runtime fork, proxy, headroom dependency, runtime context-pruning feature, or evidence discard.
+
+TOKEN-009 review bundles and no-agent fan-in watchers, and TOKEN-010 changed-path verification matrices, remain separate tasks. TOKEN-008 may mention them only to preserve boundaries and must not define their full schemas here.
 
 ### 7.9 KAS PR 9: compact review bundles and no-agent fan-in watchers
 

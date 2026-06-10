@@ -117,6 +117,83 @@ output_policy:
     - direct_codex_app_server
     - kab_mediated_backend_lanes
 
+evidence_summary_contract:
+  phase_packet_template: "templates/run-artifacts/phase-packet.yaml.tmpl"
+  run_summary_template: "templates/run-artifacts/run-summary.yaml.tmpl"
+  phase_packet_path: ".kkachi/runs/<run_id>/phase-packets/<phase>.yaml"
+  run_summary_path: ".kkachi/runs/<run_id>/run-summary.yaml"
+  purpose: "read-summary-first reversible continuity indexes; not replacements for source artifacts."
+  required_pointer_rule: "Packets and summaries preserve artifact paths, checksums, retrieval instructions, and invalidation behavior before they are used for decisions."
+  required_packet_fields:
+    - summary_id
+    - run_id
+    - task_id
+    - phase_id
+    - status
+    - packet_validity
+    - source_artifact.path
+    - source_artifact.checksum
+    - evidence_class
+    - compression_policy
+    - changed_paths
+    - verification_summary
+    - blocker_list
+    - critical_references
+    - retrieval_instructions
+    - invalidation_behavior
+    - next_action
+  required_run_summary_fields:
+    - summary_id
+    - run_id
+    - task_id
+    - status
+    - packet_validity
+    - phase_packets.phase_id
+    - phase_packets.packet_path
+    - phase_packets.packet_checksum
+    - changed_paths
+    - verification_summary
+    - blocker_list
+    - critical_references
+    - retrieval_instructions
+    - invalidation_behavior
+    - next_action
+  compression_forbidden_classes:
+    - acceptance_criteria
+    - explicit_operator_approval_or_denial
+    - forbidden_scope_or_non_goal
+    - auth_token_provider_gateway_model_boundary
+    - exact_failing_assertion_or_command_failure
+    - blocking_review_finding
+    - kah_final_gate_failure
+    - checksum_or_evidence_path_required_for_reversibility
+  compression_safe_classes:
+    - successful_repetitive_logs
+    - dependency_install_build_noise
+    - broad_unchanged_inventory
+    - repeated_status_readback
+    - already_preserved_artifact_body
+    - non_critical_progress_chatter
+    - large_passing_command_output_with_log_path_checksum
+  retrieval_order:
+    - "Read run-summary.yaml first when current."
+    - "Read the relevant phase-packets/<phase>.yaml next."
+    - "Read targeted source artifact ranges when exact evidence is needed, checksums mismatch, status is fail/blocked, or packet_validity is stale/invalid/superseded."
+  invalidation_behavior:
+    invalid_if:
+      - "referenced artifact or packet is missing"
+      - "referenced checksum changes"
+      - "phase or run status changes after packet/summary generation"
+      - "acceptance criteria, forbidden scope, approval/denial, review finding, or gate verdict changes"
+    on_invalid: "Do not rely on the compact summary; retrieve source artifacts and regenerate the packet/summary."
+  boundary_rules:
+    - "Full detail remains recoverable by direct artifact path and checksum; evidence discard is forbidden."
+    - "No Hermes proxy, headroom dependency, or runtime context-pruning requirement."
+    - "KAH may later validate mechanical fields only; no subjective summarization or compression-policy decision."
+    - "KAB remains backend/session/control evidence only; no compression-policy decision or backend-selection mutation."
+    - "No auth/token/provider/gateway/model mutation authorization."
+    - "TOKEN-009 review bundle and TOKEN-010 changed-path matrix scope remains deferred except boundary mentions."
+
 codegraph_policy:
   first_task_completion_command: "codegraph init -i"
   new_task_start_command: "codegraph index"
@@ -413,12 +490,16 @@ phases:
       - "When feedback changes code/docs, rerun affected verification."
     gate: feedback_handling_gate
   final_verify:
-    intent: "Hermes proves the run is complete from phase_plan, checklist.md, artifacts, KAH gates, KAB evidence, CodeGraph evidence, repo state, required reviews, and user-facing report readiness before commit."
+    intent: "Hermes proves the run is complete from phase_plan, checklist.md, artifacts, KAH gates, KAB evidence, CodeGraph evidence, repo state, required reviews, reversible packet/run-summary indexes when present, and user-facing report readiness before commit."
     owner_role: hermes
     applicability: required
     expected_outputs:
       - verification.md
       - final-report.md
+      - run-summary.yaml_when_present
+      - phase-packets/<phase>.yaml_when_present
+    rules:
+      - "When compact summaries are present, verify packet_validity, artifact paths, checksums, retrieval instructions, invalidation behavior, and compression-forbidden direct references before relying on them."
     gate: final_gate
   improve:
     intent: "Capture project-local improvement candidates and decide whether shared KHS promotion is warranted."

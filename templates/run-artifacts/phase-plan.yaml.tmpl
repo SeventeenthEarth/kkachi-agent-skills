@@ -75,6 +75,42 @@ output_policy:
   detailed_artifact_path: ".kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md"
   fail_closed_rule: "If a backend cannot write the detailed artifact, record Status: blocked and the blocker; do not dump long plans, logs, diffs, files, reviews, or checklists into chat."
 
+evidence_summary_policy:
+  phase_packet_template: "templates/run-artifacts/phase-packet.yaml.tmpl"
+  run_summary_template: "templates/run-artifacts/run-summary.yaml.tmpl"
+  phase_packet_path: ".kkachi/runs/<run_id>/phase-packets/<phase>.yaml"
+  run_summary_path: ".kkachi/runs/<run_id>/run-summary.yaml"
+  retrieval_order:
+    - "Read run-summary.yaml first when packet_validity is current."
+    - "Read the relevant phase packet before broad source-artifact retrieval."
+    - "Retrieve targeted source artifact ranges when checksums mismatch, status is fail/blocked, compression-forbidden evidence is needed, review/final-gate findings are blocking, or packet_validity is stale/invalid/superseded."
+  retrieval_style: "read-summary-first"
+  reversible_evidence_rule: "Phase packets and run summaries are indexes; full detail remains recoverable by artifact paths and checksums, and evidence must not be discarded to save tokens."
+  required_pointer_rule: "Packets and summaries preserve artifact paths, checksums, retrieval instructions, and invalidation behavior before they are used for decisions."
+  compression_forbidden_classes:
+    - acceptance_criteria
+    - approval_or_denial
+    - forbidden_scope_or_non_goal
+    - auth_token_provider_gateway_model_boundary
+    - exact_failing_assertion_or_command_failure
+    - blocking_review_finding
+    - kah_final_gate_failure
+  compression_safe_classes:
+    - successful_repetitive_logs
+    - dependency_install_build_noise
+    - broad_unchanged_inventory
+    - repeated_status_readback
+    - already_preserved_artifact_body
+    - non_critical_progress_chatter
+    - large_passing_command_output_with_log_path_checksum
+  invalidation_rule: "Invalidate and regenerate the packet/summary when referenced artifacts are missing, referenced checksums change, phase/run status changes, or acceptance criteria, forbidden scope, approval/denial, review finding, or gate verdict changes."
+  forbidden_scope:
+    - "no evidence discard"
+    - "no Hermes proxy, headroom dependency, or runtime context-pruning requirement"
+    - "no KAH subjective summarization or compression-policy decision"
+    - "no KAB compression-policy decision or backend-selection mutation"
+    - "no auth/token/provider/gateway/model mutation authorization"
+
 task_class_gating:
   aliases:
     simple_report: simple_command_report
@@ -327,6 +363,8 @@ phases:
       - verification.md
       - final-report.md
       - checklist.md
+      - run-summary.yaml
+      - phase-packets/<phase>.yaml
     check: "kkachi-agent-helper gate final {{ run_id }} --json"
     skip_reason: ""
   - phase: improve

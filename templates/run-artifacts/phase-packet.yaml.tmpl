@@ -1,0 +1,55 @@
+packet_version: "token008.v1"
+summary_id: "phase-summary:{{ run_id }}:{{ phase_id }}:{{ source_checksum_prefix }}"
+run_id: "{{ run_id }}"
+task_id: "{{ task_id }}"
+phase_id: "{{ phase_id }}"
+status: "{{ pass_fail_blocked_in_progress_or_not_applicable }}"
+packet_validity: "{{ current_stale_invalid_or_superseded }}"
+
+source_artifact:
+  path: "{{ source_artifact_path }}"
+  checksum: "sha256:{{ source_artifact_sha256 }}"
+  ranges:
+    - "{{ source_artifact_range_or_not_applicable }}"
+
+evidence_class: "{{ acceptance_criteria_approval_forbidden_scope_failure_review_finding_gate_failure_verification_log_status_readback_or_summary_safe_class }}"
+compression_policy: "{{ no_compression_direct_reference_only_summary_with_pointer_or_summary_safe }}"
+
+changed_paths:
+  - "{{ changed_or_inspected_path_or_not_applicable }}"
+verification_summary: "{{ compact_command_or_check_result_or_not_applicable_reason }}"
+blocker_list:
+  - "{{ blocker_or_empty }}"
+summary: "{{ compact_english_summary }}"
+
+critical_references:
+  - class: "{{ evidence_class }}"
+    path: "{{ exact_artifact_path }}"
+    checksum: "sha256:{{ exact_artifact_sha256 }}"
+    retrieval_instruction: "Read exact artifact/range before deciding."
+
+retrieval_instructions:
+  default: "Read this packet first."
+  required_when:
+    - "checksum mismatch"
+    - "status is fail or blocked"
+    - "approval, denial, forbidden scope, or non-goal is needed"
+    - "exact failing assertion or command failure is needed"
+    - "review or final gate has blocking findings"
+
+invalidation_behavior:
+  invalid_if:
+    - "source artifact checksum changes"
+    - "referenced artifact is missing"
+    - "phase status changes after packet generation"
+    - "acceptance criteria, forbidden scope, approval, review finding, or gate verdict changes"
+  on_invalid: "Do not rely on packet summary; retrieve source artifact and regenerate packet."
+
+next_action: "{{ next_phase_action_or_none }}"
+
+boundary_notes:
+  evidence_discard: "Forbidden: compact packets never replace or authorize deletion of source evidence."
+  kah_role: "KAH may later validate required keys, status vocabulary, artifact existence, checksums, and references mechanically only; it must not summarize evidence meaning or decide compression policy."
+  kab_role: "KAB remains backend/session/control evidence only; it must not decide compression policy or mutate backend selection."
+  hermes_role: "Hermes may read packets first, then targeted artifacts; no Hermes proxy, headroom dependency, or runtime context-pruning requirement is introduced."
+  config_boundary: "This packet does not authorize auth/token/provider/gateway/model mutation."

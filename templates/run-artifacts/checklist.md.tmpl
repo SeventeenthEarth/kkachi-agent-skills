@@ -17,6 +17,8 @@ KAB does not own this file. KAB supplies the backend-authored plan text and sour
 - Each row must name the expected artifact or evidence used to prove completion.
 - Backend console summaries must stay English and compact: Status, Summary, Files, Verification, Risks/blockers, Detailed artifact, Next action requested.
 - Detailed backend output must be artifact-first under `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md`; artifact-write blockers fail closed instead of triggering full chat dumps.
+- When compact continuity artifacts are present, use read-summary-first retrieval: read `run-summary.yaml` first, then the relevant `phase-packets/<phase>.yaml`, then targeted source artifact ranges only when a decision requires exact evidence.
+- Phase packets and run summaries must preserve source artifact paths and checksums; they never authorize evidence discard, Hermes proxy/headroom/runtime context-pruning requirements, KAH subjective summarization, KAB compression-policy decisions, or auth/token/provider/gateway/model mutation.
 - Code-change and process-changing runs must include CodeGraph refresh evidence before backend planning.
 - Code-change runs must record the selected verification profile/gate evidence after implementation, test enhancement, AI slop cleanup, and optimization whenever those stages change files. Do not assume `make test`; use the selected profile/gate id, command, timeout, applicability, status, exit code, duration, log path, log checksum, bounded failure excerpt, and deterministic failure extractor posture.
 - Hermes updates `State` after each phase and uses this file during `final_verify`.
@@ -51,7 +53,7 @@ KAB does not own this file. KAB supplies the backend-authored plan text and sour
 | handle_feedback_4 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-4.md`, `handle-feedback-4.md` | feedback handling | Required only if round 4 is requested. |
 | request_feedback_5 | conditional | skipped | feedback | TBD | `feedback-5.md` | feedback evidence | Maximum feedback round; use only when Hermes judges a fifth round necessary. |
 | handle_feedback_5 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-5.md`, `handle-feedback-5.md` | feedback handling | Required only if round 5 is requested. |
-| final_verify | yes | pending | Hermes | local + KAH evidence; KAB evidence when KAB-backed | `verification.md`, `final-report.md` | `kkachi-agent-helper gate final <run_id> --json` | Hermes verifies artifacts, gates, repo state, and final user report. Use `gate check <run_id> final --json` only as an older-helper compatibility fallback. |
+| final_verify | yes | pending | Hermes | local + KAH evidence; KAB evidence when KAB-backed | `verification.md`, `final-report.md`, `run-summary.yaml`, `phase-packets/<phase>.yaml` | `kkachi-agent-helper gate final <run_id> --json` | Hermes verifies artifacts, gates, repo state, packet/summary reversibility, and final user report. Use `gate check <run_id> final --json` only as an older-helper compatibility fallback. |
 | improve | conditional | pending | Hermes | local | `improvement-note.md` | improvement review | Record reusable lessons or explicit no-promotion decision. |
 
 ## Micro-Task Progress
@@ -78,3 +80,4 @@ Break the approved plan into small, observable work items. Keep each item tied t
 - [ ] Code-change runs include implementation/test-enhancement/slop-cleanup/optimization evidence for the selected verification profile/gate after the last relevant change, or explicit `not_applicable` reasons.
 - [ ] Roadmap completion was marked only after implementation, verification, KAH evidence, and required reviews supported completion.
 - [ ] Final verification checked KAH gates and KAB evidence when the run is KAB-backed or claims backend runtime evidence.
+- [ ] Compact phase packets and run summary, when present, are current and preserve artifact paths, checksums, retrieval instructions, invalidation behavior, and compression-forbidden direct references.

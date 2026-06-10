@@ -1,0 +1,48 @@
+summary_version: "token008.v1"
+summary_id: "run-summary:{{ run_id }}:{{ source_checksum_prefix }}"
+run_id: "{{ run_id }}"
+task_id: "{{ task_id }}"
+status: "{{ pass_fail_blocked_in_progress_or_not_applicable }}"
+packet_validity: "{{ current_stale_invalid_or_superseded }}"
+
+phase_packets:
+  - phase_id: "{{ phase_id }}"
+    status: "{{ pass_fail_blocked_in_progress_or_not_applicable }}"
+    packet_path: ".kkachi/runs/{{ run_id }}/phase-packets/{{ phase_id }}.yaml"
+    packet_checksum: "sha256:{{ phase_packet_sha256 }}"
+
+changed_paths:
+  - "{{ changed_or_inspected_path_or_not_applicable }}"
+verification_summary: "{{ compact_run_level_verification_result_or_not_applicable_reason }}"
+blocker_list:
+  - "{{ blocker_or_empty }}"
+
+critical_references:
+  - class: "{{ evidence_class }}"
+    path: "{{ exact_artifact_path }}"
+    checksum: "sha256:{{ exact_artifact_sha256 }}"
+    retrieval_instruction: "Read exact artifact/range before deciding."
+
+retrieval_instructions:
+  default: "Read run-summary.yaml first, then the relevant phase packet."
+  required_when:
+    - "run summary checksum or packet checksum mismatch"
+    - "run status or phase status is fail or blocked"
+    - "a decision needs compression-forbidden evidence"
+
+invalidation_behavior:
+  invalid_if:
+    - "any referenced phase packet checksum changes"
+    - "any referenced source artifact checksum changes"
+    - "referenced artifact or packet is missing"
+    - "run status, phase status, acceptance criteria, forbidden scope, approval, review finding, or gate verdict changes"
+  on_invalid: "Do not rely on run summary; retrieve packet/source artifacts and regenerate summary."
+
+next_action: "{{ next_phase_action_or_none }}"
+
+boundary_notes:
+  evidence_discard: "Forbidden: run summaries are indexes over packets and source artifacts, not replacements."
+  kah_role: "KAH may later validate required keys, status vocabulary, artifact existence, checksums, and references mechanically only; it must not summarize evidence meaning or decide compression policy."
+  kab_role: "KAB remains backend/session/control evidence only; it must not decide compression policy or mutate backend selection."
+  hermes_role: "Hermes may read summaries first, then phase packets and targeted artifacts; no Hermes proxy, headroom dependency, or runtime context-pruning requirement is introduced."
+  config_boundary: "This summary does not authorize auth/token/provider/gateway/model mutation."

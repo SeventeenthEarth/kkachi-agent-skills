@@ -427,3 +427,188 @@ func requireContainsNone(t *testing.T, rel string, forbidden []string, message s
 		}
 	}
 }
+
+func TestToken008SOTDefinesReversibleEvidenceSummaryContract(t *testing.T) {
+	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{
+		"KAS PR 8: reversible evidence summaries and compact phase packets",
+		"A compact phase packet is a per-phase reversible index, not a replacement for the source artifact.",
+		"A compact run summary is a run-level index over phase packets and final critical evidence pointers.",
+		"templates/run-artifacts/phase-packet.yaml.tmpl",
+		"templates/run-artifacts/run-summary.yaml.tmpl",
+		"summary_id",
+		"run_id",
+		"task_id",
+		"phase_id",
+		"status",
+		"packet_validity",
+		"source_artifact:",
+		"path: \".kkachi/runs/<run_id>/<artifact>\"",
+		"checksum: \"sha256:<hash>\"",
+		"evidence_class",
+		"compression_policy",
+		"changed_paths",
+		"verification_summary",
+		"blocker_list",
+		"critical_references",
+		"retrieval_instructions",
+		"invalidation_behavior",
+		"next_action",
+		"Full detail remains recoverable by artifact path and checksum; KAS must not discard evidence to save tokens.",
+	})
+}
+
+func TestToken008SOTDefinesCompressionForbiddenAndSafeClasses(t *testing.T) {
+	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{
+		"Compression-forbidden evidence classes must remain exact in the packet or be directly referenced with artifact path, checksum, and retrieval instructions:",
+		"acceptance criteria;",
+		"explicit operator approvals and denials;",
+		"forbidden scope and non-goals;",
+		"auth/token/provider/gateway/model boundaries;",
+		"exact failing assertions and command failures;",
+		"blocking review findings;",
+		"KAH final-gate failures and gate report paths;",
+		"any artifact checksum or evidence path required to prove reversibility.",
+		"Compression-safe evidence classes may be summarized only when the full artifact remains preserved and directly retrievable by path and checksum:",
+		"successful repetitive logs;",
+		"dependency install/build noise;",
+		"broad unchanged inventories;",
+		"repeated status readbacks;",
+		"already-preserved artifact bodies;",
+		"non-critical progress chatter;",
+		"large passing command output with log path/checksum preserved.",
+		"`summary_safe` means safe to keep out of model-visible context by default. It never means safe to delete, overwrite, or omit the underlying evidence artifact.",
+	})
+}
+
+func TestToken008TemplatesPreserveRequiredFieldsAndRetrievalPointers(t *testing.T) {
+	packet := "templates/run-artifacts/phase-packet.yaml.tmpl"
+	runSummary := "templates/run-artifacts/run-summary.yaml.tmpl"
+
+	requireContainsAll(t, packet, []string{
+		"packet_version: \"token008.v1\"",
+		"summary_id:",
+		"run_id:",
+		"task_id:",
+		"phase_id:",
+		"status:",
+		"packet_validity:",
+		"source_artifact:",
+		"path:",
+		"checksum: \"sha256:",
+		"evidence_class:",
+		"compression_policy:",
+		"changed_paths:",
+		"verification_summary:",
+		"blocker_list:",
+		"critical_references:",
+		"retrieval_instruction: \"Read exact artifact/range before deciding.\"",
+		"retrieval_instructions:",
+		"invalidation_behavior:",
+		"next_action:",
+		"Do not rely on packet summary; retrieve source artifact and regenerate packet.",
+	})
+
+	requireContainsAll(t, runSummary, []string{
+		"summary_version: \"token008.v1\"",
+		"summary_id:",
+		"run_id:",
+		"task_id:",
+		"status:",
+		"packet_validity:",
+		"phase_packets:",
+		"phase_id:",
+		"packet_path:",
+		"packet_checksum: \"sha256:",
+		"changed_paths:",
+		"verification_summary:",
+		"blocker_list:",
+		"critical_references:",
+		"retrieval_instruction: \"Read exact artifact/range before deciding.\"",
+		"retrieval_instructions:",
+		"invalidation_behavior:",
+		"next_action:",
+		"Do not rely on run summary; retrieve packet/source artifacts and regenerate summary.",
+	})
+}
+
+func TestToken008GuidanceSurfacesUseReadSummaryFirstRetrieval(t *testing.T) {
+	for _, rel := range []string{
+		"templates/run-artifacts/phase-plan.yaml.tmpl",
+		"templates/run-artifacts/checklist.md.tmpl",
+		"templates/run-artifacts/prompt.md.tmpl",
+		"templates/run-artifacts/plan.md.tmpl",
+		"registries/phase-contracts.yaml",
+	} {
+		requireContainsAll(t, rel, []string{
+			"run-summary.yaml",
+			"phase-packets/<phase>.yaml",
+			"read-summary-first",
+			"artifact paths",
+			"checksums",
+			"retrieval instructions",
+			"invalidation",
+		})
+	}
+
+	requireContainsAll(t, "registries/phase-contracts.yaml", []string{
+		"evidence_summary_contract:",
+		"required_packet_fields:",
+		"required_run_summary_fields:",
+		"compression_forbidden_classes:",
+		"compression_safe_classes:",
+		"source_artifact.path",
+		"source_artifact.checksum",
+		"phase_packets.packet_path",
+		"phase_packets.packet_checksum",
+		"No auth/token/provider/gateway/model mutation authorization.",
+		"TOKEN-009 review bundle and TOKEN-010 changed-path matrix scope remains deferred except boundary mentions.",
+	})
+}
+
+func TestToken008InvalidationBehaviorIsExplicit(t *testing.T) {
+	for _, rel := range []string{
+		tokenEconomyAgentInstructionSOT,
+		"templates/run-artifacts/phase-packet.yaml.tmpl",
+		"templates/run-artifacts/run-summary.yaml.tmpl",
+		"registries/phase-contracts.yaml",
+	} {
+		requireContainsAll(t, rel, []string{
+			"invalidation_behavior",
+			"referenced artifact",
+			"checksum",
+			"status",
+			"acceptance criteria",
+			"forbidden scope",
+			"approval",
+			"review finding",
+			"gate verdict",
+			"Do not rely",
+		})
+	}
+}
+
+func TestToken008BoundaryNegativeClaimsAbsent(t *testing.T) {
+	for _, rel := range []string{
+		tokenEconomyAgentInstructionSOT,
+		"templates/run-artifacts/phase-packet.yaml.tmpl",
+		"templates/run-artifacts/run-summary.yaml.tmpl",
+		"templates/run-artifacts/phase-plan.yaml.tmpl",
+		"templates/run-artifacts/checklist.md.tmpl",
+		"templates/run-artifacts/prompt.md.tmpl",
+		"templates/run-artifacts/plan.md.tmpl",
+		"registries/phase-contracts.yaml",
+	} {
+		requireContainsNone(t, rel, []string{
+			"discard evidence to save tokens is allowed",
+			"evidence may be discarded after summarization",
+			"headroom is required",
+			"Hermes proxy required",
+			"Hermes proxy is required",
+			"KAH summarizes evidence meaning",
+			"KAH decides compression policy",
+			"KAB decides compression policy",
+			"auth/token/provider/gateway/model mutation is authorized",
+			"provider/gateway/model mutation is authorized",
+		}, "contains TOKEN-008 forbidden boundary claim")
+	}
+}

@@ -13,6 +13,8 @@ Prompt profile: `{{ prompt_profile }}@{{ prompt_profile_version }}`
 - `selected-cli.json`
 - `capability-check.md`
 - `context-pack.md`
+- `run-summary.yaml` when present and current
+- `phase-packets/<phase>.yaml` when present and current
 - project overlay: `{{ project_overlay_path }}`
 
 ## Output policy
@@ -30,6 +32,8 @@ Next action requested: <approval/review/none>
 ```
 
 Detailed plans, logs, diffs, reviews, findings, and file excerpts belong in `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md` or the concrete phase artifact requested by KHS. Do not paste long plans, full diffs, full logs, full file contents, long reviews, or exhaustive checklist text into chat. If the detailed artifact cannot be written, report `Status: blocked` with the artifact-write blocker and do not dump the full detail into chat.
+
+Continuity retrieval must be read-summary-first when compact artifacts exist: read `run-summary.yaml`, then the relevant `phase-packets/<phase>.yaml`, then targeted source artifact ranges only when checksums mismatch, status is fail/blocked, compression-forbidden evidence is needed, review/final-gate findings are blocking, or packet validity is stale/invalid/superseded. Compact packets and summaries are reversible indexes; they must preserve artifact paths, checksums, retrieval instructions, and invalidation behavior, and must not discard evidence, require Hermes proxy/headroom/runtime context pruning, give KAH subjective summarization authority, give KAB compression-policy authority, or authorize auth/token/provider/gateway/model mutation.
 
 ## Prompt body
 
@@ -55,3 +59,5 @@ KHS will parse and normalize that seed into `checklist.md`; the backend's seed i
 - verification contract preserved from task contract: `<yes|no>`
 - English compact output policy preserved: `<yes|no>`
 - artifact-first detail policy preserved: `<yes|no>`
+- read-summary-first packet retrieval policy preserved when compact artifacts exist: `<yes|no>`
+- direct artifact path/checksum preservation maintained: `<yes|no>`

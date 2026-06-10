@@ -19,6 +19,8 @@ When a KAB planner lane is used, copy KAB response field `plan.plan_text` into t
 
 Planner console output must use the English compact schema: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Detailed plans belong in this artifact, `.kkachi/runs/<run_id>/artifacts/plan/backend-plan.md`, or the general phase pattern `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md`; if the artifact cannot be written, the planner must report the blocker compactly and must not dump the full plan into chat.
 
+When `run-summary.yaml` or `phase-packets/<phase>.yaml` exist, use them as read-summary-first indexes only. They must preserve artifact paths, checksums, retrieval instructions, and invalidation behavior. Retrieve targeted source artifact ranges before deciding on acceptance criteria, approvals/denials, forbidden scope, auth/token/provider/gateway/model boundaries, exact failures, blocking review findings, or KAH final-gate failures. Do not discard evidence or introduce a Hermes proxy, headroom dependency, runtime context-pruning requirement, KAH subjective summarization, KAB compression-policy decision, or auth/token/provider/gateway/model mutation.
+
 For Claude, GLM, and Codex, `plan approve` starts implementation immediately, so capture must happen while the session is in `plan_pending_approval` and before approval.
 
 For Gemini and OpenCode, capture is valid in `plan_pending_approval` or `plan_approved_waiting_for_start`; implementation must not start until the plan is preserved here and checklist.md is created/updated.
