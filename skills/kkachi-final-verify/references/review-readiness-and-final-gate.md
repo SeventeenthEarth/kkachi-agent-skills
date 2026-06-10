@@ -28,7 +28,7 @@ Reject any run where the only bridge proof is `send` success.
 - Produce `final-report.md`.
 - Check `graph-evidence.md` when graph state affected the run or graph-managed workflow was requested.
 - Confirm final `phase-plan.yaml` and `checklist.md` state.
-- Preserve the final gate verdict, Korean report source summary, CodeGraph refresh evidence or explicit unavailable/degraded reason, final `make test` evidence after the last relevant change, and the review-ready pre-commit repo state summary.
+- Preserve the final gate verdict, Korean report source summary, CodeGraph refresh evidence or explicit unavailable/degraded reason, final selected verification profile/gate evidence after the last relevant change, and the review-ready pre-commit repo state summary.
 - Run `kkachi-agent-helper gate final <run_id> --json`; use `gate check <run_id> final --json` only as an older-helper compatibility fallback.
 
 ## Gate freshness and commit-approval sequence

@@ -301,7 +301,7 @@ phases:
       rules:
         - "Skipped or not-applicable phases must keep a row with an explicit reason."
         - "Code-change runs include optimize by default; skipping optimize requires a reason."
-        - "Code-change runs include CodeGraph refresh evidence, implementation `make test`, test-enhancement `make test`, slop-cleanup `make test`, and optimization `make test` rows unless explicitly not applicable."
+        - "Code-change runs include CodeGraph refresh evidence and selected verification profile/gate evidence after implementation, test-enhancement, slop-cleanup, and optimization rows unless explicitly not applicable."
         - "Feedback must run at least once and at most five times; rounds 2..5 are optional continuation rounds only."
         - "Final verification must use checklist.md to prove every required phase has evidence."
     gate: plan_gate
@@ -336,24 +336,24 @@ phases:
       - diff.patch
       - impl-log.md
       - cli-output.md
-      - verification_after_implementation_make_test
+      - verification_after_implementation_selected_profile_gate
     rules:
-      - "After implementation changes, run the repository aggregate test command, normally `make test`, before marking implementation complete."
+      - "After implementation changes, run the selected verification profile/gate command before marking implementation complete; record selected_profile_id, selected_gate_id, command, timeout, applicability, status, exit code, duration, log path, log checksum, bounded failure excerpt, and deterministic failure extractor posture."
     gate: implementation_gate
   enhance_test:
-    intent: "Add or improve unit, integration, and e2e regression coverage where risk warrants it, then re-run the aggregate verification command."
+    intent: "Add or improve unit, integration, and e2e regression coverage where risk warrants it, then run the selected verification profile/gate command."
     owner_role: implementer_backend
     applicability: conditional
     skip_rule: "Allowed only when phase_plan and checklist.md record why no test enhancement is useful."
     expected_outputs:
       - test-plan.md
       - test-log.md
-      - verification_after_test_enhancement_make_test
+      - verification_after_test_enhancement_selected_profile_gate
     rules:
       - "Assess unit, integration, and e2e coverage separately for the changed behavior."
       - "Integration tests should use mocks/fakes/stubs instead of production external resources."
       - "E2E tests must use isolated test environments and must not affect live Hermes, Discord, gateway, auth, or production user state."
-      - "Run `make test` after test enhancement changes before completing this phase."
+      - "Run the selected verification profile/gate command after test enhancement changes before completing this phase."
     gate: test_gate
   optimize:
     intent: "Perform bounded cleanup after behavior is protected: run AI slop cleanup, remove duplication, remove unnecessary abstraction, and simplify or optimize internal algorithms without broad rewrites."
@@ -367,8 +367,8 @@ phases:
       - verification_after_cleanup
     rules:
       - "Treat AI slop cleanup as an explicit micro-stage before structural optimization when a backend/code actor is used."
-      - "After slop cleanup, run `make test` before proceeding to broader optimization when files changed."
-      - "After duplication/abstraction/algorithm optimization, run `make test` again before completing optimize."
+      - "After slop cleanup, run the selected verification profile/gate command before proceeding to broader optimization when files changed."
+      - "After duplication/abstraction/algorithm optimization, run the selected verification profile/gate command again before completing optimize."
     gate: regression_gate
   update_docs:
     intent: "Update durable project docs or record why no update is needed."
@@ -379,7 +379,7 @@ phases:
     rules:
       - "A no-docs-change decision is still an artifact, not an omitted phase."
       - "When a roadmap task is completed, update the roadmap status only after implementation, verification, KAH evidence, and required reviews support completion."
-      - "Run `make test` or the docs validation target after docs changes when docs participate in generated outputs, examples, or tested contracts."
+      - "Run the selected verification profile/gate command or the docs validation target after docs changes when docs participate in generated outputs, examples, or tested contracts."
     gate: docs_gate
   request_feedback:
     intent: "Request independent read-only feedback for every KHS run, with optional continuation rounds 2..5 when useful feedback risk remains."

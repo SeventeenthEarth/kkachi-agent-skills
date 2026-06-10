@@ -16,6 +16,6 @@ The checklist must include:
 - explicit skip reason for any skipped or not-applicable phase
 - micro-task rows derived from the approved plan
 - CodeGraph refresh evidence when required
-- repeated `make test` checkpoints after implementation, test enhancement, AI slop cleanup, and optimization when those stages change files
+- repeated selected verification profile/gate checkpoints after implementation, test enhancement, AI slop cleanup, and optimization when those stages change files
 
 For code-change runs, include an `optimize` row by default. It may be skipped only with a reason. For feedback, include round 1 as required and rounds 2..5 as conditional continuation rounds; do not exceed five feedback/handle-feedback pairs.

@@ -269,6 +269,7 @@ func TestTokenRoadmapSeparatesCompletedToken004FromToken005Writes(t *testing.T) 
 	requireRoadmapTaskStatus(t, "TOKEN-004", "Completed")
 	requireRoadmapTaskStatus(t, "TOKEN-005", "Completed")
 	requireRoadmapTaskStatus(t, "TOKEN-006", "Completed")
+	requireRoadmapTaskStatus(t, "TOKEN-007", "Completed")
 	requireContainsAll(t, "docs/roadmap.md", []string{
 		"TOKEN-003 | Implement English repo-local agent instruction templates | Completed",
 		"`AGENTS.md` and `CLAUDE.md` templates use English managed blocks, preserve project-local content, and encode KAS/KAH/KAB boundaries without blind overwrite.",
@@ -300,6 +301,106 @@ func TestTokenRoadmapSeparatesCompletedToken004FromToken005Writes(t *testing.T) 
 		"KAS PR 4: project KAS lifecycle UX and read-only planner surface",
 		"KAS PR 5: approved lifecycle writes, update apply, and uninstall with vault backup",
 	})
+}
+
+func TestToken007SOTDefinesVerificationProfileAndRunnerEvidence(t *testing.T) {
+	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{
+		"KAS PR 7: project verification profiles and no-agent command runners",
+		"avoids a global `make test` assumption",
+		"aggregate, prepare, unit, integration, e2e, docs, or task-specific verification commands",
+		"selected profile/gate id",
+		"`selected_profile_id` plus `selected_gate_id`",
+		"command, timeout, applicability",
+		"Result vocabulary is exactly `pass`, `fail`, or `not_applicable`",
+		"full stdout/stderr as an artifact",
+		"full-log artifact preservation and compact console/model-visible summary contract",
+		"compact console/model-visible summary",
+		"exit code, duration, log path, log checksum",
+		"bounded failure excerpt",
+		"deterministic failure extractor posture",
+		"Go, Python/pytest, JavaScript/Vitest/Jest, Playwright, and generic traceback/error patterns",
+		"KAS owns policy/profile selection",
+		"KAH may later validate only mechanical evidence fields",
+		"TOKEN-007 does not define the TOKEN-010 changed-path skip matrix",
+		"KAB/Hermes runtime behavior, profile/auth/token/provider/gateway/model configuration, headroom/proxy dependencies, and KAH gate implementation are out of scope",
+	})
+}
+
+func TestToken007GuidanceSurfacesUseSelectedVerificationProfile(t *testing.T) {
+	verificationSurfaces := []string{
+		"templates/run-artifacts/phase-plan.yaml.tmpl",
+		"templates/run-artifacts/checklist.md.tmpl",
+		"registries/phase-contracts.yaml",
+		"skills/kkachi-implement/SKILL.md",
+		"skills/kkachi-enhance-test/SKILL.md",
+		"skills/kkachi-optimize/SKILL.md",
+		"skills/kkachi-final-verify/SKILL.md",
+	}
+	for _, rel := range verificationSurfaces {
+		requireContainsAll(t, rel, []string{
+			"selected verification profile/gate",
+		})
+	}
+
+	requireContainsAll(t, "templates/run-artifacts/phase-plan.yaml.tmpl", []string{
+		"verification_profile:",
+		"selected_profile_id:",
+		"selected_gate_id:",
+		"command:",
+		"timeout:",
+		"applicability:",
+		"not_applicable_reason:",
+		"not_applicable_note:",
+		"When status is not_applicable, preserve selected_profile_id, selected_gate_id, command, timeout, applicability, and not_applicable_reason; leave execution evidence fields empty/null because no command ran.",
+		"status:",
+		"exit_code:",
+		"duration:",
+		"log_path:",
+		"log_checksum:",
+		"bounded_failure_excerpt:",
+		"deterministic_failure_extractor_posture:",
+		"pass_fail_or_not_applicable",
+		"exit_code_or_null_when_command_ran_no_value_when_not_run",
+		"duration_or_null_when_command_ran_no_value_when_not_run",
+		"full_log_artifact_path_or_null_when_command_ran_no_value_when_not_run",
+		"sha256_or_null_when_command_ran_no_value_when_not_run",
+	})
+	requireContainsNone(t, "templates/run-artifacts/phase-plan.yaml.tmpl", []string{
+		"exit_code_or_not_applicable",
+		"duration_or_not_applicable",
+		"full_log_artifact_path_or_not_applicable",
+		"sha256_or_not_applicable",
+	}, "contains TOKEN-007 fake not_applicable execution-evidence placeholder")
+	requireContainsNone(t, "registries/phase-contracts.yaml", []string{
+		"re-run the aggregate verification command",
+	}, "contains TOKEN-007 aggregate-only verification wording")
+}
+
+func TestToken007DoesNotHardcodeGlobalMakeTestOrForbiddenRuntimeScope(t *testing.T) {
+	requireContainsNone(t, "templates/run-artifacts/phase-plan.yaml.tmpl", []string{
+		"aggregate: \"make test\"",
+		"prepare: \"make test-prepare\"",
+		"unit: \"make test-unit\"",
+		"integration: \"make test-int\"",
+		"e2e: \"make test-e2e\"",
+	}, "contains TOKEN-007 forbidden hard-coded verification command")
+
+	for _, rel := range []string{
+		tokenEconomyAgentInstructionSOT,
+		"templates/run-artifacts/phase-plan.yaml.tmpl",
+		"templates/run-artifacts/checklist.md.tmpl",
+		"registries/phase-contracts.yaml",
+	} {
+		requireContainsNone(t, rel, []string{
+			"KAH selects the verification profile",
+			"KAH decides whether verification can be skipped",
+			"KAB activates the no-agent runner",
+			"Hermes runtime patch is required",
+			"headroom is required",
+			"profile/auth/token/provider/gateway/model configuration mutation is authorized",
+			"warning-only verification state",
+		}, "contains TOKEN-007 forbidden scope claim")
+	}
 }
 
 func TestToken003DoesNotInstallRootInstructionFiles(t *testing.T) {

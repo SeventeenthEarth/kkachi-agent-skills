@@ -24,7 +24,7 @@ All terminal commands issued or requested during implementation must run with th
 
 Implementation starts only after `plan`, `ask`, `phase-plan.yaml`, and `checklist.md` are complete. For KAB-backed lanes, backend selection, capability check, and prompt composition must also be complete. For Stage 1 direct Codex app-server baseline work, record the direct Codex session/prompt evidence and no-KAB-Codex rationale instead. Hermes may auto-start only low-risk work after notifying the master. Require explicit master approval for API, DB/schema/migration, security/auth/secrets, dependency, architecture, SOT, large diff/broad fanout, low confidence, or unresolved ask ambiguity.
 
-For code-changing tasks, implementation is not complete until the repository aggregate verification command, normally `make test`, succeeds after the implementation changes. If `make test` fails, capture the failing command, exit status, and relevant output; route the evidence back to the implementer backend for analysis/fix; then rerun the failing target and the aggregate command.
+For code-changing tasks, implementation is not complete until the selected verification profile/gate command succeeds after the implementation changes, or the gate is explicitly `not_applicable` with a reason in the phase plan. Do not assume a global `make test` command. Capture `selected_profile_id`, `selected_gate_id`, command, timeout, applicability, status, exit code, duration, log path, log checksum, bounded failure excerpt, and deterministic failure extractor posture. If the selected gate fails, route the compact evidence plus full-log artifact pointer back to the implementer backend for analysis/fix; then rerun the failing target and any selected aggregate/scoped gate required by the active profile.
 
 Implementation-task review is not complete after first color review alone. After implementation changes, run first Blue + Red/Orange/Gray color review, handle any findings, then run official GLM Octo review as the next feedback round unless 주군 explicitly waives it before start. Official GLM Octo must be KAB-backed even if implementation used the direct Codex app-server/no-KAB lane: use a KAB GLM session, submit `/octo:review` as the first prompt command, constrain the prompt to requirements plus implemented code only, forbid tests/linters/builds/installs/package managers/network probes/service starts/runtime verification commands, capture `prompt_confirmed: true`, and record KAB session/readback/event evidence plus permission rejections for any out-of-scope command request. Direct `glm` CLI review output is not official Octo evidence, and an Octo run that executes a forbidden command fails closed unless 주군 explicitly waives the boundary. After Octo feedback is handled, rerun affected verification and request post-Octo Blue + Red/Orange/Gray re-review before final/pre-commit reporting.
 
@@ -37,7 +37,7 @@ See `references/bridge-observation-and-start-rules.md` for the valid KAB observa
 - `impl-log.md`
 - `bridge-session-snapshot.json`
 - `bridge-events.md`
-- `make test` evidence after implementation changes
+- selected verification profile/gate evidence after implementation changes
 - KAH phase/gate events, when supported
 
 `bridge-events.md` must say which KAB observation mode was used: `cli_loop`, `retained_stream`, or `hybrid`. For stream-backed evidence, include stream cursor/epoch information when available and record daemon-restart discontinuities as evidence gaps, not as durable replay.

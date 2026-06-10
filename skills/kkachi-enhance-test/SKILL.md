@@ -21,12 +21,12 @@ Expected test lane meanings:
 - `test-int` or `test-integration`: component integration with mocks/fakes/stubs and no production external resources.
 - `test-e2e`: end-to-end checks in an isolated test environment that cannot affect live Hermes, Discord, gateway, auth, or production user state.
 
-After test enhancement changes, run the relevant target(s) and then `make test`. Do not mark this phase complete without aggregate verification evidence unless the phase is explicitly skipped with a reason.
+After test enhancement changes, run the relevant target(s) and then the selected verification profile/gate command. Do not assume a global `make test`. Do not mark this phase complete without selected profile/gate evidence unless the phase or gate is explicitly `not_applicable` with a reason.
 
 ## Outputs
 
 - `test-plan.md`
 - `test-log.md`
 - updated diff when tests are added
-- `make test` evidence after test enhancement changes
+- selected verification profile/gate evidence after test enhancement changes
 - KAH phase/gate events, when supported

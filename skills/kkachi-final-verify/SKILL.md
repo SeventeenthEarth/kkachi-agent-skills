@@ -17,7 +17,7 @@ Completion is artifact-backed and Hermes-owned. Do not claim done when required 
 For 주군's KAS/Kkachi development pipeline, final verification happens before commit and must also confirm:
 
 - CodeGraph was refreshed at task start (`codegraph index <repo>` when `.codegraph/` exists, or `codegraph init -i <repo>` when source code already exists but no index exists), or a no-code bootstrap deferral / explicit unavailable-degraded reason was recorded.
-- Implementation, test-enhance, AI-slop-cleaner, optimize, and docs-affecting passes each have `make test` evidence after the final relevant change, or an explicit skip/blocker reason.
+- Implementation, test-enhance, AI-slop-cleaner, optimize, and docs-affecting passes each have evidence for the selected verification profile/gate after the final relevant change, or an explicit `not_applicable`/blocker reason. Do not assume a global `make test`; final verification must preserve the selected profile/gate id, command, timeout, applicability, status, exit code, duration, log path, log checksum, bounded failure excerpt, and deterministic failure extractor posture.
 - Docs under `docs/` and the roadmap were updated, or a no-change/no-roadmap-update artifact explains why.
 - Blue completed a first review and any actionable fixes were routed back to the selected implementer lane or responsible shaping/docs lane.
 - Plan authorship and substantive repository mutations followed the selected implementer lane: Stage 1 direct Codex app-server, Stage 2 KAB Codex-first through `native_codex`, or Stage 3 selected KAB backend produced the plan draft/revisions and applied code/test/build/task-doc changes, while Blue/Red/Orange/Gray only supervised/reviewed/verified unless a 주군-approved direct-role exception is recorded.
@@ -64,7 +64,7 @@ Final verification must also confirm selected backend caveats were handled:
 - `graph-evidence.md` check when graph state affected the run or graph-managed workflow was requested
 - `phase-plan.yaml` final state check
 - `checklist.md` final state check
-- final gate verdict, Korean report source summary, CodeGraph refresh evidence or explicit unavailable/degraded reason, final `make test` evidence after the last relevant change, and the review-ready pre-commit repo state summary
+- final gate verdict, Korean report source summary, CodeGraph refresh evidence or explicit unavailable/degraded reason, final selected verification profile/gate evidence after the last relevant change, and the review-ready pre-commit repo state summary
 - `kkachi-agent-helper gate final <run_id> --json` result; use `gate check <run_id> final --json` only as an older-helper compatibility fallback
 - before asking for commit approval, use the standardized pre-commit completion report format in `references/pre-commit-completion-report-template.md`; for implementation tasks include official GLM Octo evidence and post-Octo re-review evidence, and for non-implementation tasks include not-applicable reasons when Octo was not requested/declared/run
 - official GLM Octo evidence and the post-Octo Blue/Red/Orange/Gray re-review are required for implementation tasks and for any other workflow where Octo was requested/declared/run

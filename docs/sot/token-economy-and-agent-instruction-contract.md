@@ -340,12 +340,17 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- KAS defines a project verification profile contract that avoids a global `make test` assumption and lets each project declare aggregate, prepare, unit, integration, e2e, docs, or task-specific verification commands.
-- KAS phase guidance records the selected verification profile id, selected gate id, command, timeout, applicability, and `not_applicable` reason when a gate is out of scope.
-- No-agent command runners are preferred for mechanical test/build/check execution; full stdout/stderr is preserved as an artifact while model-visible output stays compact.
-- Success output includes command, exit code, duration, log path, checksum, and status. Failure output includes command, exit code, bounded failure excerpt, likely failing target when deterministically extractable, full log path, checksum, and status.
-- Deterministic failure extraction covers common Go, Python/pytest, JavaScript/Vitest/Jest, Playwright, and generic traceback/error patterns before LLM review.
-- Verification proves the runner contract does not require Hermes runtime patches, KAB policy changes, auth/token/provider/model mutation, or KAH subjective summarization.
+- KAS defines a project verification profile contract that avoids a global `make test` assumption and lets each project declare aggregate, prepare, unit, integration, e2e, docs, or task-specific verification commands. A profile is policy selected by KAS from project SOT, task contract, or approved run guidance; it is not inferred by KAH and it is not a Hermes runtime feature.
+- Each selected gate record must preserve the selected profile/gate id as `selected_profile_id` plus `selected_gate_id`, the gate kind, command, timeout, applicability, and `not_applicable` reason when a gate is out of scope.
+- Applicability vocabulary is `required`, `conditional`, `optional`, or `not_applicable`. Result vocabulary is exactly `pass`, `fail`, or `not_applicable` for mechanical verification evidence; warning-only states are not introduced.
+- No-agent command runners are preferred for mechanical test/build/check execution. The runner executes the selected command directly, without asking a coding agent or review backend to run the command, and must preserve full stdout/stderr as an artifact while returning only a compact console/model-visible summary. This is the full-log artifact preservation and compact console/model-visible summary contract.
+- Every no-agent runner result must include command, timeout, applicability, exit code, duration, log path, log checksum, bounded failure excerpt, deterministic failure extractor posture, and status. When the result is `not_applicable`, the record must keep selected ids plus the reason and must not fake exit code, duration, log path, or checksum evidence.
+- Success output includes command, exit code, duration, log path, log checksum, and status. Failure output includes command, exit code, duration, bounded failure excerpt, likely failing target when deterministically extractable, full log path, log checksum, extractor posture, and status.
+- The bounded failure excerpt is a compact excerpt for console/model visibility only. The full log artifact remains authoritative and must be recoverable by log path plus checksum.
+- Deterministic failure extraction covers common Go, Python/pytest, JavaScript/Vitest/Jest, Playwright, and generic traceback/error patterns before LLM review. Extractor posture must say which deterministic extractor ran, whether it found a likely failing target, and whether extraction was `extracted`, `not_found`, or `not_applicable`; KAH later validates those fields mechanically and must not summarize log meaning.
+- TOKEN-007 does not define the TOKEN-010 changed-path skip matrix. It may record selected gates and `not_applicable` reasons, but changed-path classification, skipped-gate policy, and final aggregate preservation rules remain TOKEN-010 scope.
+- KAS owns policy/profile selection. KAH may later validate only mechanical evidence fields, artifact existence, checksums, status vocabulary, and required reasons. KAB/Hermes runtime behavior, profile/auth/token/provider/gateway/model configuration, headroom/proxy dependencies, and KAH gate implementation are out of scope.
+- Verification proves the runner contract does not require Hermes runtime patches, KAB policy changes, auth/token/provider/gateway/model mutation, profile mutation, a Hermes proxy/headroom dependency, or KAH subjective summarization.
 
 ### 7.8 KAS PR 8: reversible evidence summaries and compact phase packets
 
@@ -404,7 +409,7 @@ KAH must expose only mechanically checkable results: `pass`, `fail`, or `not_app
 
 Gate candidates:
 
-- selected verification profile id, selected gate id, command, timeout, applicability, exit code, duration, log path, checksum, and status exist when verification-profile evidence is in scope;
+- selected verification profile id, selected gate id, command, timeout, applicability, exit code, duration, log path, log checksum, and status exist when verification-profile evidence is in scope;
 - full log artifacts exist for no-agent runner output, and failure summaries contain bounded excerpts plus full-log pointers without requiring KAH to summarize the failure;
 - compact phase packet artifacts match the KAS-declared schema and referenced artifact paths/checksums exist;
 - compression-forbidden fields are present as required markers or artifact references when the task contract says they are in scope;

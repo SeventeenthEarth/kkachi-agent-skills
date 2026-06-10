@@ -18,7 +18,7 @@ KAB does not own this file. KAB supplies the backend-authored plan text and sour
 - Backend console summaries must stay English and compact: Status, Summary, Files, Verification, Risks/blockers, Detailed artifact, Next action requested.
 - Detailed backend output must be artifact-first under `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md`; artifact-write blockers fail closed instead of triggering full chat dumps.
 - Code-change and process-changing runs must include CodeGraph refresh evidence before backend planning.
-- Code-change runs must record `make test` evidence after implementation, test enhancement, AI slop cleanup, and optimization whenever those stages change files.
+- Code-change runs must record the selected verification profile/gate evidence after implementation, test enhancement, AI slop cleanup, and optimization whenever those stages change files. Do not assume `make test`; use the selected profile/gate id, command, timeout, applicability, status, exit code, duration, log path, log checksum, bounded failure excerpt, and deterministic failure extractor posture.
 - Hermes updates `State` after each phase and uses this file during `final_verify`.
 
 ## State Values
@@ -36,10 +36,10 @@ KAB does not own this file. KAB supplies the backend-authored plan text and sour
 | codegraph_refresh | conditional | pending | Hermes | local | `codegraph status` output or `graph-evidence.md` note | `codegraph index <repo>` or `codegraph init -i <repo>` when required | Required before planning for code/process-changing tasks; record unavailable/degraded reason if skipped. |
 | plan | yes | pending | planner | TBD | `plan.md`, `checklist.md`, `acceptance-criteria.md` | `kkachi-agent-helper gate check <run_id> plan --json` | Final plan and this checklist must both exist before implementation; Red plan approval is required when project policy says so. |
 | ask | yes | pending | planner + Hermes | TBD | `ask.md` or `plan.md#Decision Clarifications` | decision review | Record no open questions if none remain. |
-| implement | conditional | pending | implementer | TBD | `diff.patch`, `impl-log.md`, `cli-output.md`, `make test` log | implementation evidence + aggregate test | Required for code/docs changes that execute work; run `make test` after implementation changes. |
-| enhance_test | conditional | pending | implementer | TBD | `test-plan.md`, `test-log.md`, test changes if any, `make test` log | unit/int/e2e coverage decision + aggregate test | Assess unit, integration, and e2e; use mocks/fakes/stubs for integration and isolated test envs for e2e. |
-| ai_slop_cleanup | conditional | pending | implementer | TBD | `slop-cleanup-log.md`, `make test` log if changed | slop cleanup + aggregate test | Remove AI-ish artifacts/noisy abstractions/speculative text before broader optimization when code actor support exists. |
-| optimize | conditional | pending | implementer | TBD | `optimize-log.md`, `diff.patch` update if changed, `make test` log | regression check | Strongly recommended when code changed; remove duplication, unnecessary abstraction, and avoidable algorithmic/structural waste. |
+| implement | conditional | pending | implementer | TBD | `diff.patch`, `impl-log.md`, `cli-output.md`, selected verification profile/gate log artifact | implementation evidence + selected aggregate/scoped gate | Required for code/docs changes that execute work; run the selected verification gate after implementation changes. |
+| enhance_test | conditional | pending | implementer | TBD | `test-plan.md`, `test-log.md`, test changes if any, selected verification profile/gate log artifact | unit/int/e2e coverage decision + selected aggregate/scoped gate | Assess unit, integration, and e2e; use mocks/fakes/stubs for integration and isolated test envs for e2e. |
+| ai_slop_cleanup | conditional | pending | implementer | TBD | `slop-cleanup-log.md`, selected verification profile/gate log artifact if changed | slop cleanup + selected regression gate | Remove AI-ish artifacts/noisy abstractions/speculative text before broader optimization when code actor support exists. |
+| optimize | conditional | pending | implementer | TBD | `optimize-log.md`, `diff.patch` update if changed, selected verification profile/gate log artifact | selected regression gate | Strongly recommended when code changed; remove duplication, unnecessary abstraction, and avoidable algorithmic/structural waste. |
 | update_docs | conditional | pending | implementer | TBD | `docs-update.md`, `roadmap-update.md` | docs decision | Update docs and roadmap completion state when evidence supports it, or record no-change reason. |
 | request_feedback_1 | yes | pending | feedback | TBD | `feedback-request.md`, `feedback-1.md` | feedback evidence | Minimum one feedback request for every KHS run. |
 | handle_feedback_1 | yes | pending | implementer + Hermes | TBD | `feedback-triage-1.md`, `handle-feedback-1.md` | feedback handling | Record no actionable feedback if applicable. |
@@ -75,6 +75,6 @@ Break the approved plan into small, observable work items. Keep each item tied t
 - [ ] Every completed phase links to evidence.
 - [ ] CodeGraph refresh evidence exists for code/process-changing tasks, or an explicit unavailable/degraded reason is recorded.
 - [ ] Feedback rounds are between 1 and 5.
-- [ ] Code-change runs include implementation/test-enhancement/slop-cleanup/optimization `make test` evidence after the last relevant change, or explicit skip reasons.
+- [ ] Code-change runs include implementation/test-enhancement/slop-cleanup/optimization evidence for the selected verification profile/gate after the last relevant change, or explicit `not_applicable` reasons.
 - [ ] Roadmap completion was marked only after implementation, verification, KAH evidence, and required reviews supported completion.
 - [ ] Final verification checked KAH gates and KAB evidence when the run is KAB-backed or claims backend runtime evidence.

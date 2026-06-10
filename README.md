@@ -204,17 +204,17 @@ orchestrate
   -> backend-select
   -> prompt-compose
   -> plan / ask / required Red plan approval when project policy requires it
-  -> implement / make test
-  -> enhance-test(unit, integration, e2e) / make test
-  -> AI slop cleanup / make test
-  -> optimize(duplication, abstraction, algorithm/structure) / make test
+  -> implement / selected verification profile or gate
+  -> enhance-test(unit, integration, e2e) / selected verification profile or gate
+  -> AI slop cleanup / selected verification profile or gate
+  -> optimize(duplication, abstraction, algorithm/structure) / selected verification profile or gate
   -> docs-update / roadmap-update
   -> Blue first review / request-feedback(하후연, 여몽, 진궁 when required) / handle-feedback
   -> verify / final-verify
   -> improve
 ```
 
-The user selects the target roadmap task for each run. Hermes manages, approves risk, and final-verifies. KAB backend roles perform substantive planning, implementation, docs, feedback, and feedback handling only for KAB-backed phases. Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when explicitly authorized and recorded, but must not claim backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence. For development-path runs, the default commander workflow is plan-first, fixed-plan, backend implementation, repeated `make test` checkpoints, test enhancement, AI slop cleanup, bounded optimization, docs/roadmap update, Blue review, required role reviews, and review-ready pre-commit reporting. For research/evidence, docs-only, simple command/report, bootstrap/config, and collaboration/review tasks, the selected light spine must fit the class and the final report must say which development phases were skipped and why.
+The user selects the target roadmap task for each run. Hermes manages, approves risk, and final-verifies. KAB backend roles perform substantive planning, implementation, docs, feedback, and feedback handling only for KAB-backed phases. Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when explicitly authorized and recorded, but must not claim backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence. For development-path runs, the default commander workflow is plan-first, fixed-plan, backend implementation, selected verification profile/gate checkpoints, test enhancement, AI slop cleanup, bounded optimization, docs/roadmap update, Blue review, required role reviews, and review-ready pre-commit reporting. The selected aggregate gate may be `make test` for this repository when the task contract/profile requires it, but KHS must not assume that globally. For research/evidence, docs-only, simple command/report, bootstrap/config, and collaboration/review tasks, the selected light spine must fit the class and the final report must say which development phases were skipped and why.
 
 ## Install Flow
 
