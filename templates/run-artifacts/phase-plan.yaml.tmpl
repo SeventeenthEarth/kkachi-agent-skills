@@ -187,6 +187,27 @@ verification_profile:
     - "Korean product-output check scoped to backend prompts, run artifacts, and relevant registries"
     - "forbidden broad long-output dumping wording search"
 
+change_verification_matrix:
+  template: "templates/run-artifacts/change-verification-matrix.yaml.tmpl"
+  artifact_path: ".kkachi/runs/<run_id>/change-verification-matrix.yaml"
+  contract_version: "token010.v1"
+  required_when: "Changed-path classification affects selected/scoped/skipped verification or final aggregate preservation."
+  policy_owner: "KAS"
+  kah_validation_role: "mechanical_recorded_evidence_only"
+  required_fields:
+    - selected_rule_id
+    - changed_paths
+    - changed_path_set_classes
+    - selected_verification_commands
+    - scoped_verification
+    - skipped_gates
+    - skip_reason
+    - no_skipped_gates_reason_when_skipped_gates_is_empty
+    - deterministic_evidence_refs_with_checksums
+    - final_aggregate_preservation.status
+  final_aggregate_rule: "Development tasks preserve final aggregate verification unless task contract or responsible approval explicitly marks it not_applicable with deterministic evidence."
+  boundary_rule: "KAH validates recorded deterministic evidence only; KAH must not decide skip policy or choose tests to skip."
+
 phases:
   - phase: plan
     applicability: required

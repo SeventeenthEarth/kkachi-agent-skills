@@ -561,7 +561,7 @@ func TestToken008GuidanceSurfacesUseReadSummaryFirstRetrieval(t *testing.T) {
 		"phase_packets.packet_path",
 		"phase_packets.packet_checksum",
 		"No auth/token/provider/gateway/model mutation authorization.",
-		"TOKEN-009 review bundle and TOKEN-010 changed-path matrix scope remains deferred except boundary mentions.",
+		"TOKEN-009 review bundle and TOKEN-010 changed-path matrix scope is owned by adjacent contracts, not by TOKEN-008 evidence summaries.",
 	})
 }
 
@@ -764,5 +764,215 @@ func TestToken009BoundaryNegativeClaimsAbsent(t *testing.T) {
 			"auth/token/provider/gateway/model mutation is authorized",
 			"auth, token, provider, gateway, or model mutation is authorized",
 		}, "contains TOKEN-009 forbidden boundary claim")
+	}
+}
+
+func TestToken010SOTDefinesChangeAwareVerificationMatrixContract(t *testing.T) {
+	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{
+		"KAS PR 10: change-aware verification matrix",
+		"change-aware verification matrix",
+		"matrix_version: \"token010.v1\"",
+		"change-verification-matrix.yaml",
+		"selected_rule_id",
+		"changed_paths",
+		"selected_verification_commands",
+		"scoped_verification",
+		"skipped_gates",
+		"skip_reason",
+		"changed_path_set_classes",
+		"no_skipped_gates_reason",
+		"deterministic_evidence_refs",
+		"checksum: \"sha256:<hash>\"",
+		"final_aggregate_preservation",
+		"final_aggregate_preservation.status",
+		"KAS owns verification-selection policy.",
+		"KAH validates recorded deterministic evidence only.",
+		"KAH must not decide skip policy or choose tests to skip.",
+		"Development tasks preserve final aggregate verification unless the active task contract or responsible approval explicitly marks it `not_applicable` with deterministic evidence.",
+	})
+}
+
+func TestToken010RoadmapMarkedCompletedAfterAcceptedReview(t *testing.T) {
+	requireRoadmapTaskStatus(t, "TOKEN-010", "Completed")
+}
+
+func TestToken010SOTDefinesAllChangeClassesAndEvidence(t *testing.T) {
+	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{
+		"`no-change`",
+		"`docs-only`",
+		"`source-code`",
+		"`template`",
+		"`schema`",
+		"`test-only`",
+		"`artifact-only`",
+		"`review-comment-only`",
+		"prior pass evidence",
+		"unchanged-path evidence",
+		"File extension alone must not imply a skip.",
+		"focused unit/integration/e2e or task-specific verification evidence",
+		"template consumer or docs-contract verification evidence",
+		"schema/registry path set",
+		"Test-only changes do not automatically make aggregate verification not applicable.",
+		"artifact path/checksum/schema evidence",
+		"role/finding disposition pointers",
+		"Each `rules.change_class` value must be a single value",
+		"`docs-only+schema+template+test-only` are invalid",
+		"`skipped_gates: []` is valid only when no selected or aggregate gate was",
+		"no_skipped_gates_reason",
+	})
+}
+
+func TestToken010TemplateAndPhasePlanExposeMatrixArtifact(t *testing.T) {
+	matrixTemplate := "templates/run-artifacts/change-verification-matrix.yaml.tmpl"
+	requireContainsAll(t, matrixTemplate, []string{
+		"matrix_version: \"token010.v1\"",
+		"policy_owner: \"KAS\"",
+		"verification_selection_policy_owner: \"KAS\"",
+		"kah_validation_role: \"mechanical_recorded_evidence_only\"",
+		"changed_path_source:",
+		"changed_paths:",
+		"change_class:",
+		"changed_path_set_classes:",
+		"deterministic_evidence_refs:",
+		"selected_rule_id:",
+		"selected_verification_commands:",
+		"selected_profile_id:",
+		"selected_gate_id:",
+		"command:",
+		"timeout:",
+		"applicability:",
+		"status:",
+		"evidence_ref:",
+		"scoped_verification:",
+		"scope_reason:",
+		"skipped_gates:",
+		"skip_reason:",
+		"no_skipped_gates_reason:",
+		"final_aggregate_preservation:",
+		"not_applicable_reason:",
+		"rule_semantics:",
+		"composite class strings are invalid.",
+		"skipped_gates: [] means no selected or aggregate gate was skipped",
+		"change_class_rules:",
+		"no-change:",
+		"docs-only:",
+		"source-code:",
+		"template:",
+		"schema:",
+		"test-only:",
+		"artifact-only:",
+		"review-comment-only:",
+		"KAS owns verification-selection policy.",
+		"KAH validates recorded deterministic evidence only.",
+		"KAH must not decide skip policy or choose tests to skip.",
+		"No KAB/Hermes runtime or provider/auth/token/gateway/model/profile settings mutation.",
+	})
+	requireContainsAll(t, "templates/run-artifacts/phase-plan.yaml.tmpl", []string{
+		"change_verification_matrix:",
+		"templates/run-artifacts/change-verification-matrix.yaml.tmpl",
+		".kkachi/runs/<run_id>/change-verification-matrix.yaml",
+		"contract_version: \"token010.v1\"",
+		"selected_rule_id",
+		"changed_paths",
+		"changed_path_set_classes",
+		"selected_verification_commands",
+		"scoped_verification",
+		"skipped_gates",
+		"skip_reason",
+		"no_skipped_gates_reason_when_skipped_gates_is_empty",
+		"deterministic_evidence_refs_with_checksums",
+		"final_aggregate_preservation.status",
+		"KAH validates recorded deterministic evidence only; KAH must not decide skip policy or choose tests to skip.",
+	})
+	requireContainsAll(t, "templates/run-artifacts/checklist.md.tmpl", []string{
+		"change-verification-matrix.yaml",
+		"templates/run-artifacts/change-verification-matrix.yaml.tmpl",
+		"selected rule id",
+		"changed paths",
+		"changed path set classes",
+		"selected verification commands",
+		"scoped verification",
+		"skipped gates",
+		"skip reasons or no-skipped-gates reason",
+		"deterministic evidence refs/checksums",
+		"final aggregate preservation status",
+		"KAS owns verification-selection policy.",
+		"KAH validates recorded deterministic evidence only and must not decide skip policy or choose tests to skip.",
+	})
+}
+
+func TestToken010PhaseContractsRegisterMatrixMechanicalBoundaries(t *testing.T) {
+	requireContainsAll(t, "registries/phase-contracts.yaml", []string{
+		"change_verification_matrix_contract:",
+		"contract_version: \"token010.v1\"",
+		"templates/run-artifacts/change-verification-matrix.yaml.tmpl",
+		".kkachi/runs/<run_id>/change-verification-matrix.yaml",
+		"policy_owner: KAS",
+		"verification_selection_policy_owner: KAS",
+		"kah_validation_role: mechanical_recorded_evidence_only",
+		"required_fields:",
+		"matrix_version",
+		"rules.selected_rule_id",
+		"changed_paths.path",
+		"changed_paths.change_class",
+		"rules.changed_path_set_classes",
+		"rules.selected_verification_commands.command",
+		"rules.scoped_verification.command",
+		"rules.skipped_gates.skip_reason",
+		"rules.no_skipped_gates_reason",
+		"rules.final_aggregate_preservation.status",
+		"rule_change_class:",
+		"composite strings are invalid.",
+		"no_skip_semantics:",
+		"skipped_gates: [] is valid only when no selected or aggregate gate was skipped",
+		"change_classes:",
+		"no-change:",
+		"docs-only:",
+		"source-code:",
+		"template:",
+		"schema:",
+		"test-only:",
+		"artifact-only:",
+		"review-comment-only:",
+		"final_aggregate_preservation_rule:",
+		"Development tasks preserve final aggregate verification unless task contract or responsible approval explicitly marks it not_applicable with deterministic evidence.",
+		"mechanical_validation_allowed_scopes:",
+		"artifact existence",
+		"checksum shape and match",
+		"recorded approval/evidence references",
+		"KAS owns verification-selection policy.",
+		"KAH validates recorded deterministic evidence only.",
+		"KAH must not decide skip policy or choose tests to skip.",
+	})
+}
+
+func TestToken010BoundaryNegativeClaimsAbsent(t *testing.T) {
+	for _, rel := range []string{
+		tokenEconomyAgentInstructionSOT,
+		"templates/run-artifacts/change-verification-matrix.yaml.tmpl",
+		"templates/run-artifacts/phase-plan.yaml.tmpl",
+		"templates/run-artifacts/checklist.md.tmpl",
+		"registries/phase-contracts.yaml",
+	} {
+		requireContainsNone(t, rel, []string{
+			"KAH decides whether verification can be skipped",
+			"KAH chooses tests to skip",
+			"KAH selects skipped gates",
+			"file extension automatically skips aggregate verification",
+			"docs-only changes never need final aggregate verification",
+			"test-only changes make aggregate verification not_applicable",
+			"warning-only gates are allowed",
+			"warnings are sufficient for KAH gates",
+			"hidden fallback is allowed",
+			"fallback when verification evidence is missing",
+			"KAH judges prose quality",
+			"subjective KAH prose judgment is allowed",
+			"evidence may be discarded after matrix generation",
+			"discard verification evidence to save tokens is allowed",
+			"KAB runtime mutation is authorized",
+			"Hermes runtime mutation is authorized",
+			"auth/token/provider/gateway/model mutation is authorized",
+			"provider/auth/token/gateway/model/profile settings mutation is authorized",
+		}, "contains TOKEN-010 forbidden boundary claim")
 	}
 }

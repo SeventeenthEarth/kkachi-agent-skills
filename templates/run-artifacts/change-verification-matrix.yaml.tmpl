@@ -1,0 +1,135 @@
+matrix_version: "token010.v1"
+task_id: "{{ task_id }}"
+run_id: "{{ run_id }}"
+policy_owner: "KAS"
+verification_selection_policy_owner: "KAS"
+kah_validation_role: "mechanical_recorded_evidence_only"
+kah_forbidden_decisions:
+  - "decide skip policy"
+  - "choose tests to skip"
+  - "infer skips from file extensions"
+
+changed_path_source:
+  source_type: "{{ git_diff_status_artifact_manifest_review_artifact_or_not_applicable }}"
+  source_ref: "{{ changed_path_source_command_or_artifact }}"
+  source_checksum: "sha256:{{ changed_path_source_hash }}"
+
+changed_paths:
+  - path: "{{ changed_or_inspected_path_or_not_applicable }}"
+    change_class: "{{ no-change_docs-only_source-code_template_schema_test-only_artifact-only_review-comment-only }}"
+    deterministic_evidence_refs:
+      - path: "{{ changed_path_evidence_artifact }}"
+        checksum: "sha256:{{ changed_path_evidence_hash }}"
+
+rules:
+  - selected_rule_id: "{{ token010_rule_id }}"
+    change_class: "{{ single_change_class_or_not_applicable_for_changed_path_set_rule }}"
+    changed_path_set_classes:
+      - "{{ changed_paths_change_class_covered_by_rule }}"
+    selected_verification_commands:
+      - selected_profile_id: "{{ selected_verification_profile_id }}"
+        selected_gate_id: "{{ selected_verification_gate_id }}"
+        command: "{{ verification_command_or_not_applicable }}"
+        timeout: "{{ timeout_or_not_applicable }}"
+        applicability: "{{ required_conditional_optional_or_not_applicable }}"
+        status: "{{ pass_fail_or_not_applicable }}"
+        evidence_ref:
+          path: "{{ log_artifact_path_or_empty_when_not_run }}"
+          checksum: "sha256:{{ log_hash_or_empty_when_not_run }}"
+    scoped_verification:
+      - command: "{{ scoped_command_or_not_applicable }}"
+        scope_reason: "{{ why_scoped_check_covers_changed_path_set }}"
+        status: "{{ pass_fail_or_not_applicable }}"
+        evidence_ref:
+          path: "{{ scoped_verification_artifact }}"
+          checksum: "sha256:{{ scoped_verification_hash }}"
+    skipped_gates:
+      - selected_profile_id: "{{ skipped_profile_id }}"
+        selected_gate_id: "{{ skipped_gate_id }}"
+        skip_reason: "{{ explicit_deterministic_skip_reason }}"
+        deterministic_evidence_refs:
+          - path: "{{ prior_pass_unchanged_path_task_contract_or_approval_artifact }}"
+            checksum: "sha256:{{ deterministic_skip_evidence_hash }}"
+    no_skipped_gates_reason: "{{ required_deterministic_reason_when_skipped_gates_is_empty_array }}"
+    final_aggregate_preservation:
+      status: "{{ preserved_required_or_not_applicable }}"
+      not_applicable_reason: "{{ only_populated_when_status_is_not_applicable_empty_otherwise }}"
+      deterministic_evidence_refs:
+        - path: "{{ aggregate_log_task_contract_approval_or_equivalent_artifact }}"
+          checksum: "sha256:{{ final_aggregate_evidence_hash }}"
+
+rule_semantics:
+  rule_change_class: "Use exactly one changed_paths.change_class value, or not_applicable only when changed_path_set_classes records every class covered by a changed-path-set rule; composite class strings are invalid."
+  no_skip_semantics: "skipped_gates: [] means no selected or aggregate gate was skipped, and requires no_skipped_gates_reason."
+
+change_class_rules:
+  no-change:
+    required_evidence:
+      - empty_or_unchanged_path_evidence
+      - prior_pass_evidence
+      - unchanged_path_evidence
+      - explicit_skip_reason
+      - final_aggregate_preservation_status
+  docs-only:
+    required_evidence:
+      - changed_docs_path_set
+      - docs_or_scoped_verification_command_evidence
+      - selected_rule_id
+      - skipped_gate_reasons
+      - explicit_final_aggregate_status
+    rule: "File extension alone must not imply a skip."
+  source-code:
+    required_evidence:
+      - changed_source_path_set
+      - focused_unit_integration_e2e_or_task_specific_evidence
+      - selected_verification_command_evidence
+      - skipped_gate_reasons
+      - final_aggregate_preservation_for_development_tasks
+  template:
+    required_evidence:
+      - changed_template_path_set
+      - template_consumer_or_docs_contract_verification_evidence
+      - selected_verification_command_evidence
+      - skipped_gate_reasons
+      - final_aggregate_preservation_status
+  schema:
+    required_evidence:
+      - changed_schema_or_registry_path_set
+      - schema_or_registry_validation_evidence
+      - dependent_docs_contract_evidence
+      - selected_verification_command_evidence
+      - skipped_gate_reasons
+      - final_aggregate_preservation_status
+  test-only:
+    required_evidence:
+      - changed_test_path_set
+      - focused_changed_test_command_evidence
+      - selected_verification_command_evidence
+      - skipped_gate_reasons
+      - explicit_aggregate_policy
+    rule: "Test-only changes do not automatically make aggregate verification not_applicable."
+  artifact-only:
+    required_evidence:
+      - changed_artifact_path_set
+      - artifact_path_checksum_schema_evidence
+      - selected_command_evidence_or_not_applicable_reason
+      - skipped_gate_reasons
+      - no_product_source_completion_claim
+  review-comment-only:
+    required_evidence:
+      - changed_review_comment_or_disposition_artifact_evidence
+      - role_and_finding_disposition_pointers
+      - selected_command_evidence_or_not_applicable_reason
+      - skipped_gate_reasons
+      - no_replacement_for_implementation_kah_evidence_or_final_verification
+
+boundary_notes:
+  - "KAS owns verification-selection policy."
+  - "KAH validates recorded deterministic evidence only."
+  - "KAH must not decide skip policy or choose tests to skip."
+  - "Development tasks preserve final aggregate verification unless task contract or responsible approval explicitly marks it not_applicable with deterministic evidence."
+  - "No hidden fallback."
+  - "No warning-only gates."
+  - "No subjective KAH prose judgment."
+  - "No evidence discard."
+  - "No KAB/Hermes runtime or provider/auth/token/gateway/model/profile settings mutation."

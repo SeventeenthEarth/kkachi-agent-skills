@@ -21,6 +21,9 @@ KAB does not own this file. KAB supplies the backend-authored plan text and sour
 - Phase packets and run summaries must preserve source artifact paths and checksums; they never authorize evidence discard, Hermes proxy/headroom/runtime context-pruning requirements, KAH subjective summarization, KAB compression-policy decisions, or auth/token/provider/gateway/model mutation.
 - Code-change and process-changing runs must include CodeGraph refresh evidence before backend planning.
 - Code-change runs must record the selected verification profile/gate evidence after implementation, test enhancement, AI slop cleanup, and optimization whenever those stages change files. Do not assume `make test`; use the selected profile/gate id, command, timeout, applicability, status, exit code, duration, log path, log checksum, bounded failure excerpt, and deterministic failure extractor posture.
+- When changed-path classification affects selected, scoped, skipped, or final aggregate verification, create `change-verification-matrix.yaml` from `templates/run-artifacts/change-verification-matrix.yaml.tmpl` and record selected rule id, changed paths, changed path set classes, selected verification commands, scoped verification, skipped gates, skip reasons or no-skipped-gates reason, deterministic evidence refs/checksums, and final aggregate preservation status.
+- KAS owns verification-selection policy. KAH validates recorded deterministic evidence only and must not decide skip policy or choose tests to skip.
+- Development tasks preserve final aggregate verification unless the task contract or responsible approval explicitly marks it `not_applicable` with deterministic evidence.
 - Hermes updates `State` after each phase and uses this file during `final_verify`.
 
 ## State Values
@@ -78,6 +81,8 @@ Break the approved plan into small, observable work items. Keep each item tied t
 - [ ] CodeGraph refresh evidence exists for code/process-changing tasks, or an explicit unavailable/degraded reason is recorded.
 - [ ] Feedback rounds are between 1 and 5.
 - [ ] Code-change runs include implementation/test-enhancement/slop-cleanup/optimization evidence for the selected verification profile/gate after the last relevant change, or explicit `not_applicable` reasons.
+- [ ] Change-aware verification matrix evidence exists when changed-path classification affected selected/scoped/skipped verification or final aggregate preservation.
+- [ ] Final aggregate verification is preserved for development tasks, or `not_applicable` has task-contract/responsible-approval evidence with checksums.
 - [ ] Roadmap completion was marked only after implementation, verification, KAH evidence, and required reviews supported completion.
 - [ ] Final verification checked KAH gates and KAB evidence when the run is KAB-backed or claims backend runtime evidence.
 - [ ] Compact phase packets and run summary, when present, are current and preserve artifact paths, checksums, retrieval instructions, invalidation behavior, and compression-forbidden direct references.

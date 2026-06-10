@@ -192,7 +192,7 @@ evidence_summary_contract:
     - "KAH may later validate mechanical fields only; no subjective summarization or compression-policy decision."
     - "KAB remains backend/session/control evidence only; no compression-policy decision or backend-selection mutation."
     - "No auth/token/provider/gateway/model mutation authorization."
-    - "TOKEN-009 review bundle and TOKEN-010 changed-path matrix scope remains deferred except boundary mentions."
+    - "TOKEN-009 review bundle and TOKEN-010 changed-path matrix scope is owned by adjacent contracts, not by TOKEN-008 evidence summaries."
 
 review_bundle_contract:
   contract_version: "token009.v1"
@@ -283,6 +283,140 @@ fan_in_watcher_contract:
     - "No Hermes proxy/headroom requirement."
     - "No KAB policy/runtime mutation."
     - "No auth/token/provider/gateway/model mutation."
+
+change_verification_matrix_contract:
+  contract_version: "token010.v1"
+  template: "templates/run-artifacts/change-verification-matrix.yaml.tmpl"
+  artifact_path: ".kkachi/runs/<run_id>/change-verification-matrix.yaml"
+  purpose: "KAS-owned changed-path verification-selection record for selected, scoped, skipped, and final aggregate verification evidence."
+  policy_owner: KAS
+  verification_selection_policy_owner: KAS
+  kah_validation_role: mechanical_recorded_evidence_only
+  kah_must_not:
+    - decide skip policy
+    - choose tests to skip
+    - infer skips from file extensions
+    - judge prose quality
+    - create warning-only gates
+  required_fields:
+    - matrix_version
+    - task_id
+    - run_id
+    - policy_owner
+    - verification_selection_policy_owner
+    - kah_validation_role
+    - changed_path_source.source_type
+    - changed_path_source.source_ref
+    - changed_path_source.source_checksum
+    - changed_paths.path
+    - changed_paths.change_class
+    - changed_paths.deterministic_evidence_refs.path
+    - changed_paths.deterministic_evidence_refs.checksum
+    - rules.selected_rule_id
+    - rules.change_class
+    - rules.changed_path_set_classes
+    - rules.selected_verification_commands.selected_profile_id
+    - rules.selected_verification_commands.selected_gate_id
+    - rules.selected_verification_commands.command
+    - rules.selected_verification_commands.timeout
+    - rules.selected_verification_commands.applicability
+    - rules.selected_verification_commands.status
+    - rules.selected_verification_commands.evidence_ref.path
+    - rules.selected_verification_commands.evidence_ref.checksum
+    - rules.scoped_verification.command
+    - rules.scoped_verification.scope_reason
+    - rules.scoped_verification.status
+    - rules.scoped_verification.evidence_ref.path
+    - rules.scoped_verification.evidence_ref.checksum
+    - rules.skipped_gates.selected_profile_id
+    - rules.skipped_gates.selected_gate_id
+    - rules.skipped_gates.skip_reason
+    - rules.skipped_gates.deterministic_evidence_refs.path
+    - rules.skipped_gates.deterministic_evidence_refs.checksum
+    - rules.no_skipped_gates_reason
+    - rules.final_aggregate_preservation.status
+    - rules.final_aggregate_preservation.not_applicable_reason
+    - rules.final_aggregate_preservation.deterministic_evidence_refs.path
+    - rules.final_aggregate_preservation.deterministic_evidence_refs.checksum
+  rule_change_class: "rules.change_class must be one allowed changed_paths.change_class value, or not_applicable only when changed_path_set_classes records every covered class; composite strings are invalid."
+  no_skip_semantics: "skipped_gates: [] is valid only when no selected or aggregate gate was skipped and rules.no_skipped_gates_reason records that deterministic fact."
+  change_classes:
+    no-change:
+      required_evidence:
+        - empty_or_unchanged_path_evidence
+        - prior_pass_evidence
+        - unchanged_path_evidence
+        - explicit_skip_reason
+        - final_aggregate_preservation_status
+    docs-only:
+      required_evidence:
+        - changed_docs_path_set
+        - docs_or_scoped_verification_command_evidence
+        - selected_rule_id
+        - skipped_gate_reasons
+        - explicit_final_aggregate_status
+      rule: "File extension alone must not imply a skip."
+    source-code:
+      required_evidence:
+        - changed_source_path_set
+        - focused_unit_integration_e2e_or_task_specific_evidence
+        - selected_verification_command_evidence
+        - skipped_gate_reasons
+        - final_aggregate_preservation_for_development_tasks
+    template:
+      required_evidence:
+        - changed_template_path_set
+        - template_consumer_or_docs_contract_verification_evidence
+        - selected_verification_command_evidence
+        - skipped_gate_reasons
+        - final_aggregate_preservation_status
+    schema:
+      required_evidence:
+        - changed_schema_or_registry_path_set
+        - schema_or_registry_validation_evidence
+        - dependent_docs_contract_evidence
+        - selected_verification_command_evidence
+        - skipped_gate_reasons
+        - final_aggregate_preservation_status
+    test-only:
+      required_evidence:
+        - changed_test_path_set
+        - focused_changed_test_command_evidence
+        - selected_verification_command_evidence
+        - skipped_gate_reasons
+        - explicit_aggregate_policy
+      rule: "Test-only changes do not automatically make aggregate verification not_applicable."
+    artifact-only:
+      required_evidence:
+        - changed_artifact_path_set
+        - artifact_path_checksum_schema_evidence
+        - selected_command_evidence_or_not_applicable_reason
+        - skipped_gate_reasons
+        - no_product_source_completion_claim
+    review-comment-only:
+      required_evidence:
+        - changed_review_comment_or_disposition_artifact_evidence
+        - role_and_finding_disposition_pointers
+        - selected_command_evidence_or_not_applicable_reason
+        - skipped_gate_reasons
+        - no_replacement_for_implementation_kah_evidence_or_final_verification
+  final_aggregate_preservation_rule: "Development tasks preserve final aggregate verification unless task contract or responsible approval explicitly marks it not_applicable with deterministic evidence."
+  mechanical_validation_allowed_scopes:
+    - required key presence
+    - allowed change-class vocabulary
+    - allowed status vocabulary
+    - artifact existence
+    - checksum shape and match
+    - recorded approval/evidence references
+  boundary_rules:
+    - "KAS owns verification-selection policy."
+    - "KAH validates recorded deterministic evidence only."
+    - "KAH must not decide skip policy or choose tests to skip."
+    - "No hidden fallback."
+    - "No warning-only gates."
+    - "No subjective KAH prose judgment."
+    - "No evidence discard."
+    - "No KAB/Hermes runtime or provider/auth/token/gateway/model/profile settings mutation."
 
 codegraph_policy:
   first_task_completion_command: "codegraph init -i"

@@ -497,13 +497,13 @@ KAS guidance must prefer this retrieval order for continuity and review:
 
 A packet or run summary is invalid if any referenced artifact is missing, any referenced checksum changes, a phase/run status changes after generation, or acceptance criteria, forbidden scope, approval/denial, review finding, or gate verdict changes. Invalid packets and summaries must not be used as decision evidence until the source artifact is retrieved and the packet/summary is regenerated.
 
-#### 7.8.5 Layer boundaries and TOKEN deferrals
+#### 7.8.5 Layer boundaries and adjacent TOKEN contracts
 
 KAS owns the packet/run-summary schema, evidence class vocabulary, compression policy wording, and prompt/template guidance. KAH may later validate only mechanical fields: required keys, status vocabulary, artifact existence, checksum shape/match, validity vocabulary, and required references. KAH must not summarize evidence meaning, judge prose quality, decide compression policy, choose verification/profile/skip policy, or implement subjective warnings.
 
 KAB remains backend/session/control evidence only. TOKEN-008 does not change backend selection, KAB activation, KAB policy, prompt-profile routing, provider/gateway/model settings, auth/token handling, or Hermes runtime behavior. Hermes may read compact packets first and then targeted source artifacts when exact evidence is needed, but TOKEN-008 does not require a Hermes runtime fork, proxy, headroom dependency, runtime context-pruning feature, or evidence discard.
 
-TOKEN-009 review bundles and no-agent fan-in watchers, and TOKEN-010 changed-path verification matrices, remain separate tasks. TOKEN-008 may mention them only to preserve boundaries and must not define their full schemas here.
+TOKEN-009 review bundles and no-agent fan-in watchers, and TOKEN-010 changed-path verification matrices, remain separate contracts. TOKEN-008 may mention them only to preserve boundaries and must not define their full schemas here.
 
 ### 7.9 KAS PR 9: compact review bundle and role fan-in watcher
 
@@ -610,14 +610,142 @@ subjective review judgment or review-quality decision is authorized.
 
 ### 7.10 KAS PR 10: change-aware verification matrix
 
-Acceptance criteria:
+TOKEN-010 defines the KAS-owned change-aware verification matrix. The matrix
+records why a run selected particular verification commands for the actual
+changed path set, what scoped verification ran, what gates were skipped, why
+they were skipped, which deterministic evidence proves that decision, and how
+final aggregate verification was preserved.
 
-- KAS defines changed-path classification evidence for no-change, docs-only, source-code, template, schema, test-only, artifact-only, and review-comment-only changes.
-- The matrix records selected rule id, changed path set, selected verification command(s), skipped gate(s), skip reasons, and whether final aggregate verification remains required.
-- Development tasks preserve final aggregate verification unless the active task contract or responsible approval explicitly marks it not applicable with deterministic evidence.
-- No-change phases may avoid redundant full test reruns only when prior pass evidence, unchanged-path evidence, and skip reason are recorded.
-- Docs-only or scoped changes may use docs/scoped verification first, but final gate policy must be explicit rather than implied by file extension.
-- Verification proves changed-path classification is KAS policy; KAH may validate recorded evidence but must not decide whether a test should be skipped.
+KAS owns verification-selection policy. KAH validates recorded deterministic
+evidence only. KAH must not decide skip policy or choose tests to skip.
+
+KAS run guidance must write the matrix as `change-verification-matrix.yaml`
+when changed-path classification affects verification selection. The canonical
+matrix contract is `token010.v1`:
+
+```yaml
+matrix_version: "token010.v1"
+task_id: "<task id>"
+run_id: "<KAH run id>"
+policy_owner: "KAS"
+verification_selection_policy_owner: "KAS"
+kah_validation_role: "mechanical_recorded_evidence_only"
+kah_forbidden_decisions:
+  - "decide skip policy"
+  - "choose tests to skip"
+  - "infer skips from file extensions"
+changed_path_source:
+  source_type: "<git diff|git status|artifact manifest|review artifact|not_applicable>"
+  source_ref: "<command/artifact path>"
+  source_checksum: "sha256:<hash>"
+changed_paths:
+  - path: "<path or not_applicable>"
+    change_class: "<no-change|docs-only|source-code|template|schema|test-only|artifact-only|review-comment-only>"
+    deterministic_evidence_refs:
+      - path: "<artifact path>"
+        checksum: "sha256:<hash>"
+rules:
+  - selected_rule_id: "<token010.rule.id>"
+    change_class: "<single change class or not_applicable when the rule covers a changed path set>"
+    changed_path_set_classes:
+      - "<one changed_paths.change_class value covered by this rule>"
+    selected_verification_commands:
+      - selected_profile_id: "<profile id>"
+        selected_gate_id: "<gate id>"
+        command: "<command or not_applicable>"
+        timeout: "<timeout or not_applicable>"
+        applicability: "<required|conditional|optional|not_applicable>"
+        status: "<pass|fail|not_applicable>"
+        evidence_ref:
+          path: "<log/artifact path or empty when not run>"
+          checksum: "sha256:<hash or empty when not run>"
+    scoped_verification:
+      - command: "<scoped command or not_applicable>"
+        scope_reason: "<why this scoped check covers the changed path set>"
+        status: "<pass|fail|not_applicable>"
+        evidence_ref:
+          path: "<artifact path>"
+          checksum: "sha256:<hash>"
+    skipped_gates:
+      - selected_profile_id: "<profile id>"
+        selected_gate_id: "<gate id>"
+        skip_reason: "<explicit deterministic reason>"
+        deterministic_evidence_refs:
+          - path: "<prior pass, unchanged-path evidence, task contract, or approval artifact>"
+            checksum: "sha256:<hash>"
+    no_skipped_gates_reason: "<required deterministic reason when skipped_gates is []>"
+    final_aggregate_preservation:
+      status: "<preserved|required|not_applicable>"
+      not_applicable_reason: "<only populated when status is not_applicable; empty otherwise>"
+      deterministic_evidence_refs:
+        - path: "<aggregate log, task contract, approval, or equivalent artifact>"
+          checksum: "sha256:<hash>"
+boundary_notes:
+  - "KAS owns verification-selection policy."
+  - "KAH validates recorded deterministic evidence only."
+  - "KAH must not decide skip policy or choose tests to skip."
+  - "Development tasks preserve final aggregate verification unless the active task contract or responsible approval explicitly marks it `not_applicable` with deterministic evidence."
+```
+
+Required matrix fields are `selected_rule_id`, `changed_paths`,
+`selected_verification_commands`, `scoped_verification`, `skipped_gates`,
+`skip_reason`, deterministic evidence refs with checksums,
+`changed_path_set_classes`, `no_skipped_gates_reason` when
+`skipped_gates: []`, and `final_aggregate_preservation.status`.
+
+#### 7.10.1 Change classes and required evidence
+
+The matrix supports exactly these `changed_paths.change_class` values:
+
+- `no-change`: empty or unchanged path evidence, prior pass evidence,
+  unchanged-path evidence, explicit skip reason, and final aggregate
+  preservation status. This class can avoid redundant reruns only when all
+  deterministic evidence refs are recorded.
+- `docs-only`: changed docs path set, docs/scoped verification command
+  evidence, selected verification rule, skipped gate reasons, and explicit
+  final aggregate status. File extension alone must not imply a skip.
+- `source-code`: changed source path set, focused unit/integration/e2e or task-specific verification evidence, selected verification command evidence, skipped gate reasons, and final aggregate preservation for development tasks.
+- `template`: changed template path set, template consumer or docs-contract verification evidence, selected command evidence, skipped gate reasons, and final aggregate preservation status.
+- `schema`: changed schema/registry path set, schema or registry validation evidence, dependent docs-contract evidence, selected command evidence, skipped gate reasons, and final aggregate preservation status.
+- `test-only`: changed test path set, focused changed-test command evidence, selected command evidence, skipped gate reasons, and explicit aggregate policy. Test-only changes do not automatically make aggregate verification not applicable.
+- `artifact-only`: changed run/review/evidence artifact path set, artifact path/checksum/schema evidence, selected command evidence or not_applicable reason, skipped gate reasons, and a boundary note that artifact-only evidence does not claim product-source completion.
+- `review-comment-only`: changed review comment or review disposition artifact evidence, role/finding disposition pointers, selected command evidence or not_applicable reason, skipped gate reasons, and a boundary note that review comments do not replace implementation, KAH evidence, or final verification.
+
+Each `rules.change_class` value must be a single value from that vocabulary, or
+`not_applicable` only when the selected rule applies to the changed path set
+rather than one class. Rules that cover multiple path classes must record every
+covered class in `changed_path_set_classes`; composite strings such as
+`docs-only+schema+template+test-only` are invalid.
+
+`skipped_gates: []` is valid only when no selected or aggregate gate was
+skipped, and the rule records `no_skipped_gates_reason` with deterministic
+evidence wording. When any gate is skipped, each skipped gate entry must carry
+its own `skip_reason` and deterministic evidence refs.
+
+#### 7.10.2 Final aggregate preservation rule
+
+Development tasks preserve final aggregate verification unless the active task
+contract or responsible approval explicitly marks it `not_applicable` with
+deterministic evidence. A matrix may record scoped verification first, but it
+must not convert scoped verification into an implicit aggregate skip. A
+`not_applicable` final aggregate status requires a task contract or responsible
+approval artifact path and checksum.
+
+#### 7.10.3 Layer boundaries
+
+KAS owns the change classes, selected-rule vocabulary, verification-selection
+policy, skip-policy wording, and matrix template. KAH may later validate only
+mechanical fields: required keys, allowed class/status vocabulary, artifact
+existence, checksum shape/match, and recorded approval/evidence references.
+KAH must not decide skip policy, choose tests to skip, infer skips from file
+extensions, judge prose quality, or create warning-only gates.
+
+KAB remains backend/session/control evidence only. TOKEN-010 does not change
+KAB policy, backend selection, prompt-profile routing, provider/gateway/model
+settings, auth/token handling, Hermes runtime behavior, context pruning,
+proxy/headroom behavior, or KAH gate implementation. Full verification evidence
+remains recoverable by artifact path and checksum; evidence discard is
+forbidden.
 
 ## 8. KAH PR boundaries
 
@@ -653,6 +781,10 @@ Gate candidates:
 - changed-path classification evidence records rule id, changed paths, selected/scoped/skipped verification, skip reason, and final aggregate preservation status;
 - no broad KAB/Hermes runtime/config mutation claim is made without explicit approval evidence.
 
+KAS owns verification-selection policy for the change-aware matrix. KAH validates
+recorded deterministic evidence only. KAH must not decide skip policy or choose
+tests to skip.
+
 KAH must not choose verification profiles, decide skip policy, judge review quality, summarize logs, operate watchers as orchestration policy, or activate KAB/Hermes runtime behavior. It validates required fields, files, paths, checksums, statuses, and approval/evidence records only.
 
 ## 9. Non-goals and hard boundaries
@@ -665,6 +797,7 @@ This workstream does not authorize:
 - unapproved profile skill installation or operational rollout;
 - removal of existing project-local agent instructions, local-only files, or unmanifested project-suite files without approval;
 - replacing color review, KAH gates, or 주군 approvals with token-saving shortcuts;
+- replacing final aggregate verification for development tasks unless the task contract or responsible approval explicitly marks it `not_applicable` with deterministic evidence;
 - treating cache-read-heavy token accounting as proof that all work is wasteful.
 
 ## 10. Verification expectations
@@ -678,6 +811,7 @@ For each PR in this workstream, reports must include:
 - `git diff --check`;
 - focused docs-contract tests when present;
 - repository test gate when the changed surface requires it;
+- change-aware verification matrix evidence when changed-path classification affects selected/scoped/skipped verification or final aggregate preservation;
 - color review / KAH gate evidence when required by task class.
 
 ## 11. Acceptance record
