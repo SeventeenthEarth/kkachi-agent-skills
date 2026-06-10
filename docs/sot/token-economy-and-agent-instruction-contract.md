@@ -2,12 +2,12 @@
 
 Date: 2026-06-09
 Owner: KAS workflow/policy layer
-Confirming role: Red, Orange, and Gray token-economy review accepted after blue fixes; color-team install discussion accepted by Red `t_a77d3f90`, Orange `t_8e09b65d`, and Gray `t_bf292f75`; English/lifecycle UX update accepted by Red `t_f76ff099`, Orange `t_c7d1e291`, and Gray `t_2092ddac`.
+Confirming role: Red, Orange, and Gray token-economy review accepted after blue fixes; color-team install discussion accepted by Red `t_a77d3f90`, Orange `t_8e09b65d`, and Gray `t_bf292f75`; English/lifecycle UX update accepted by Red `t_f76ff099`, Orange `t_c7d1e291`, and Gray `t_2092ddac`; TOKEN-007 through TOKEN-010 extension review accepted by Red `t_8726167f`, Orange `t_c037afad`, and focused Gray re-review `t_148f5ff0` after Gray `t_32211704` requested traceability fixes.
 Status: accepted SOT for the token-economy, English KAS product-output, repo-local agent-instruction, and color-team project KAS lifecycle workstream; no implementation, unapproved profile mutation, KAB activation, KAH code change, auth/token/gateway/provider/model config mutation, install/update/repair/uninstall approval, or operational rollout is authorized by this document alone
 Authority level: accepted source of truth for KAS-managed token-economy policy, English compact backend output contracts, project KAS lifecycle UX, and `AGENTS.md` / `CLAUDE.md` management expectations
 Scope: `kkachi-hermes-skills` KAS docs, skills, templates, registries, prompt guidance, CLI/human-output guidance, project-overlay templates, and KAH mechanical gate requirements. KAB remains a backend bridge/interface, KAH remains deterministic evidence/gate support, and Hermes runtime remains unmodified stock Hermes.
 Related docs: `docs/README.md`, `docs/roadmap.md`, `docs/sot/khs-architecture-and-integration.md`, `docs/sot/interface-contract.md`, `docs/sot/phase-orchestration-policy.md`, `docs/sot/kas-cli-contract.md`, `docs/sot/project-specific-kas-install-contract.md`, `docs/sot/project-kas-sync-state.md`, repository `AGENTS.md`
-Evidence/source paths: 주군 Discord direction on 2026-06-09; local branch check `git rev-parse --abbrev-ref HEAD` => `main`; observed Hermes/KAS token analysis showed high Hermes-side fixed prompt/tool/context overhead with cache-read dominating billed-looking token counts; public baseline checked from `forrestchang/andrej-karpathy-skills` `CLAUDE.md` for caution/simplicity/surgical-change/goal-driven coding guardrails; Red review `t_e7eb185b` ACCEPT; Orange review `t_c6074150` REQUEST_CHANGES resolved by focused re-review `t_65daf094` ACCEPT; Gray review `t_0166733a` REQUEST_CHANGES resolved by focused re-review `t_87b1e208` ACCEPT; color-team install discussion Red `t_a77d3f90` ACCEPT, Orange `t_8e09b65d` ACCEPT, Gray `t_bf292f75` ACCEPT; English/lifecycle UX review Red `t_f76ff099` ACCEPT, Orange `t_c7d1e291` ACCEPT, Gray `t_2092ddac` ACCEPT.
+Evidence/source paths: 주군 Discord direction on 2026-06-09; local branch check `git rev-parse --abbrev-ref HEAD` => `main`; observed Hermes/KAS token analysis showed high Hermes-side fixed prompt/tool/context overhead with cache-read dominating billed-looking token counts; public baseline checked from `forrestchang/andrej-karpathy-skills` `CLAUDE.md` for caution/simplicity/surgical-change/goal-driven coding guardrails; Red review `t_e7eb185b` ACCEPT; Orange review `t_c6074150` REQUEST_CHANGES resolved by focused re-review `t_65daf094` ACCEPT; Gray review `t_0166733a` REQUEST_CHANGES resolved by focused re-review `t_87b1e208` ACCEPT; color-team install discussion Red `t_a77d3f90` ACCEPT, Orange `t_8e09b65d` ACCEPT, Gray `t_bf292f75` ACCEPT; English/lifecycle UX review Red `t_f76ff099` ACCEPT, Orange `t_c7d1e291` ACCEPT, Gray `t_2092ddac` ACCEPT; TOKEN-007 through TOKEN-010 extension review Red `t_8726167f` ACCEPT, Orange `t_c037afad` ACCEPT, Gray `t_32211704` REQUEST_CHANGES on acceptance/evidence traceability resolved by focused Gray re-review `t_148f5ff0` ACCEPT.
 
 ## 1. Decision summary
 
@@ -21,7 +21,12 @@ The selected work plan is:
 4. KAS PR 4: project KAS lifecycle UX and read-only planner surface.
 5. KAS PR 5: approved lifecycle writes, update apply, and uninstall with vault backup.
 6. KAS PR 6: skill slimming and reference split for high-token KAS guidance surfaces.
-7. KAH PR 1: mechanical token-economy / English-output / project KAS lifecycle evidence gates.
+7. KAS PR 7: project verification profiles and no-agent command runners.
+8. KAS PR 8: reversible evidence summaries and compact phase packets.
+9. KAS PR 9: compact review bundles and no-agent fan-in watchers.
+10. KAS PR 10: change-aware verification matrix.
+11. KAH PR 1: mechanical token-economy / English-output / project KAS lifecycle evidence gates.
+12. KAH PR 2: mechanical verification-profile, evidence-summary, review-bundle, watcher, and change-aware verification gates.
 
 The same KAS contract must apply to direct Codex app-server lanes and KAB-mediated backend lanes. KAB must stay a connection interface; KAS owns prompt/policy semantics; KAH validates only mechanically checkable evidence.
 
@@ -279,7 +284,7 @@ This SOT update authorizes only consensus wording and docs-contract protection. 
 Acceptance criteria:
 
 - This SOT or accepted successor is present and discoverable from docs indexes.
-- The six KAS PRs plus one dependent KAH PR work plan is recorded without claiming implementation.
+- The ten KAS PRs plus two dependent KAH PR work plan is recorded without claiming implementation.
 - The contract states no Hermes fork, no KAB policy change, and KAH mechanical-only gates.
 - A docs-contract test or equivalent verification checks critical terms for token-economy, English KAS product output, compact console, artifact-first detail, project KAS lifecycle UX, `AGENTS.md`, `CLAUDE.md`, and layer boundaries.
 
@@ -331,9 +336,52 @@ Acceptance criteria:
 - Guidance still remains discoverable through linked files and related skills.
 - Verification compares before/after high-frequency guidance size or at least records changed skill surfaces and expected token-impact rationale.
 
-## 8. KAH PR boundary
+### 7.7 KAS PR 7: project verification profiles and no-agent command runners
 
-### 8.1 KAH PR 1: mechanical gates
+Acceptance criteria:
+
+- KAS defines a project verification profile contract that avoids a global `make test` assumption and lets each project declare aggregate, prepare, unit, integration, e2e, docs, or task-specific verification commands.
+- KAS phase guidance records the selected verification profile id, selected gate id, command, timeout, applicability, and `not_applicable` reason when a gate is out of scope.
+- No-agent command runners are preferred for mechanical test/build/check execution; full stdout/stderr is preserved as an artifact while model-visible output stays compact.
+- Success output includes command, exit code, duration, log path, checksum, and status. Failure output includes command, exit code, bounded failure excerpt, likely failing target when deterministically extractable, full log path, checksum, and status.
+- Deterministic failure extraction covers common Go, Python/pytest, JavaScript/Vitest/Jest, Playwright, and generic traceback/error patterns before LLM review.
+- Verification proves the runner contract does not require Hermes runtime patches, KAB policy changes, auth/token/provider/model mutation, or KAH subjective summarization.
+
+### 7.8 KAS PR 8: reversible evidence summaries and compact phase packets
+
+Acceptance criteria:
+
+- KAS defines compact phase packets or equivalent run summaries for each phase, including run id, task id, phase, status, changed paths, verification summaries, blocker list, artifact paths, checksums where applicable, and next phase/action.
+- Full detail remains recoverable by artifact path and checksum; KAS must not discard evidence to save tokens.
+- The contract names compression-forbidden fields, including acceptance criteria, explicit operator approvals/denials, forbidden scope, auth/token/provider/gateway boundaries, exact failing assertions, blocking review findings, and KAH final-gate failures.
+- The contract names compression-safe fields, including successful repetitive logs, dependency install/build noise, broad unchanged inventories, repeated status readbacks, and already-preserved artifact bodies.
+- KAS guidance uses artifact-first retrieval: read compact packets first, then targeted artifact ranges only when the decision requires them.
+- Verification proves the summary/packet contract remains reversible and does not introduce a `headroom` dependency, Hermes proxy, or runtime context-pruning requirement.
+
+### 7.9 KAS PR 9: compact review bundles and no-agent fan-in watchers
+
+Acceptance criteria:
+
+- KAS defines a compact review bundle schema for Red/Orange/Gray review requests, including task id, run id, acceptance reference, diff artifact/checksum, changed paths, verification summaries, forbidden scope, requested verdict vocabulary, role verdicts, finding dispositions, and artifact pointers.
+- Review results are structured enough for Blue synthesis to record each lane verdict, blocking finding, and disposition without pasting full raw review prose into model context by default.
+- No-agent fan-in watcher guidance is limited to collection/notification: pending state emits no output, terminal state emits a compact report with artifact pointers, and watcher output never replaces Kanban comments, KAH evidence, review cards, or Blue synthesis.
+- Watchers may cover review fan-in, long-running verification completion, Codex/KAB completion signals, or blocked-condition probes only when the condition is mechanically checkable.
+- Verification proves the review/watcher contract does not create warning-only gate states, subjective KAH review logic, hidden fallback, or Discord/channel delivery claims without evidence.
+
+### 7.10 KAS PR 10: change-aware verification matrix
+
+Acceptance criteria:
+
+- KAS defines changed-path classification evidence for no-change, docs-only, source-code, template, schema, test-only, artifact-only, and review-comment-only changes.
+- The matrix records selected rule id, changed path set, selected verification command(s), skipped gate(s), skip reasons, and whether final aggregate verification remains required.
+- Development tasks preserve final aggregate verification unless the active task contract or responsible approval explicitly marks it not applicable with deterministic evidence.
+- No-change phases may avoid redundant full test reruns only when prior pass evidence, unchanged-path evidence, and skip reason are recorded.
+- Docs-only or scoped changes may use docs/scoped verification first, but final gate policy must be explicit rather than implied by file extension.
+- Verification proves changed-path classification is KAS policy; KAH may validate recorded evidence but must not decide whether a test should be skipped.
+
+## 8. KAH PR boundaries
+
+### 8.1 KAH PR 1: token-economy, English-output, and lifecycle mechanical gates
 
 KAH must expose only mechanically checkable results: `pass`, `fail`, or `not_applicable`. No warning-only state is introduced by this workstream.
 
@@ -349,6 +397,23 @@ Gate candidates:
 - no broad KAB/Hermes runtime/config mutation claim is made without explicit approval evidence.
 
 KAH must not judge prose quality or rewrite instructions. It validates required fields, files, markers, paths, and approval/evidence records only.
+
+### 8.2 KAH PR 2: verification, evidence-summary, review-bundle, watcher, and change-aware mechanical gates
+
+KAH must expose only mechanically checkable results: `pass`, `fail`, or `not_applicable`. No warning-only state is introduced by this workstream.
+
+Gate candidates:
+
+- selected verification profile id, selected gate id, command, timeout, applicability, exit code, duration, log path, checksum, and status exist when verification-profile evidence is in scope;
+- full log artifacts exist for no-agent runner output, and failure summaries contain bounded excerpts plus full-log pointers without requiring KAH to summarize the failure;
+- compact phase packet artifacts match the KAS-declared schema and referenced artifact paths/checksums exist;
+- compression-forbidden fields are present as required markers or artifact references when the task contract says they are in scope;
+- review bundle artifacts contain required role/review fields, requested verdict vocabulary, diff/evidence pointers, forbidden scope, and finding-disposition fields;
+- watcher terminal reports are present only for terminal conditions, include compact status and artifact pointers, and do not claim to replace Kanban/KAH evidence;
+- changed-path classification evidence records rule id, changed paths, selected/scoped/skipped verification, skip reason, and final aggregate preservation status;
+- no broad KAB/Hermes runtime/config mutation claim is made without explicit approval evidence.
+
+KAH must not choose verification profiles, decide skip policy, judge review quality, summarize logs, operate watchers as orchestration policy, or activate KAB/Hermes runtime behavior. It validates required fields, files, paths, checksums, statuses, and approval/evidence records only.
 
 ## 9. Non-goals and hard boundaries
 
@@ -379,7 +444,7 @@ For each PR in this workstream, reports must include:
 
 This SOT is accepted. Acceptance evidence includes:
 
-1. responsible review accepted the six KAS PRs plus one dependent KAH PR structure and SOT wording;
+1. responsible review accepted the ten KAS PRs plus two dependent KAH PR structure and SOT wording;
 2. docs indexes include this SOT as the active token-economy / agent-instruction authority;
 3. docs-contract verification protects the core terms;
 4. required color review accepted the docs/spec boundary;

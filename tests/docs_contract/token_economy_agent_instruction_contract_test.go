@@ -156,7 +156,7 @@ func TestTokenEconomyAgentInstructionDocsRegistrationAndRoadmap(t *testing.T) {
 	requireContainsAll(t, "docs/README.md", []string{
 		"sot/token-economy-and-agent-instruction-contract.md",
 		"Accepted token-economy and agent-instruction SOT",
-		"selected 6 KAS PR + 1 dependent KAH PR workstream",
+		"selected 10 KAS PR + 2 dependent KAH PR workstream",
 		"English KAS-generated prompt/CLI/console/artifact-template output",
 		"compact console output",
 		"artifact-first details",
@@ -172,7 +172,7 @@ func TestTokenEconomyAgentInstructionDocsRegistrationAndRoadmap(t *testing.T) {
 		"sot/token-economy-and-agent-instruction-contract.md",
 		"EPIC: TOKEN — KAS token economy and English operator surfaces",
 		"TOKEN-001 | Accept token-economy, English output, and lifecycle UX SOT",
-		"6 KAS PRs plus 1 dependent KAH PR",
+		"10 KAS PRs plus 2 dependent KAH PR",
 		"English KAS-generated prompt/CLI/console/artifact-template output",
 		"does not authorize implementation, unapproved profile mutation, KAB activation, Hermes runtime changes, or auth/token/provider/gateway/model mutation by itself",
 	})
