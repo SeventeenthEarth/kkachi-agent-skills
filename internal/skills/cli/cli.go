@@ -14,6 +14,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kasstate"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
 )
 
 var installPromptInput io.Reader = os.Stdin
@@ -34,7 +35,10 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, or uninstall command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, uninstall, or version command", "", false, "")
+	}
+	if isVersionArg(argv[0]) {
+		return runVersion(argv[1:], stdout, stderr)
 	}
 	if isHelpArg(argv[0]) {
 		printRootHelp(stdout)
@@ -53,6 +57,8 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runRepair(argv[1:], stdout, stderr, env)
 	case "uninstall":
 		return runUninstall(argv[1:], stdout, stderr, env)
+	case "version":
+		return runVersion(argv[1:], stdout, stderr)
 	case "sync-project-kas":
 		return runSyncProjectKAS(argv[1:], stdout, stderr, env)
 	case "install-project-kas":
@@ -62,8 +68,32 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 	case "migrate-project-kas":
 		return runMigrateProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, and uninstall commands are routine public lifecycle commands", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
 	}
+}
+
+func runVersion(argv []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("version", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "version does not accept positional arguments", "version", *jsonOutput, "Rerun as kkachi-agent-skills version or kkachi-agent-skills version --json.")
+	}
+	if *jsonOutput {
+		_ = writeJSON(stdout, version.Current())
+	} else {
+		fmt.Fprintln(stdout, version.Human())
+	}
+	return 0
 }
 
 func runList(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
@@ -780,6 +810,10 @@ func isHelpArg(arg string) bool {
 	return arg == "-h" || arg == "--help" || arg == "-help"
 }
 
+func isVersionArg(arg string) bool {
+	return arg == "--version" || arg == "-version"
+}
+
 func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "Usage: kkachi-agent-skills <command> [options]")
 	fmt.Fprintln(w)
@@ -790,6 +824,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
 	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
 	fmt.Fprintln(w, "  uninstall  Plan project-suite removal without writing")
+	fmt.Fprintln(w, "  version  Print CLI version information")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Compatibility commands:")
 	fmt.Fprintln(w, "  sync-project-kas, install-project-kas, repair-project-kas, migrate-project-kas")

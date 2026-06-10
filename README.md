@@ -70,6 +70,8 @@ backend runtime/control layer.
 CLIMVP implements the profile-scoped minimum CLI surface:
 
 ```bash
+kkachi-agent-skills --version
+kkachi-agent-skills version [--json]
 kkachi-agent-skills list [--repo <path>] [--profile <profile>] [--category <name>] [--json]
 kkachi-agent-skills install [--repo <path>] --profile <profile> <pack-id>... --dry-run [--json]
 kkachi-agent-skills install [--repo <path>] --profile <profile> <pack-id>... --approve dry-run:<hash> [--json]
@@ -86,6 +88,10 @@ kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <projec
 kkachi-agent-skills uninstall --profile <profile> --project <project> --dry-run [--json]
 kkachi-agent-skills uninstall --profile <profile> --project <project> --apply dry-run:sha256:<hash> --backup-vault-root <abs-path> [--json]
 ```
+
+`--version` / `version` prints the CLI release before any profile or source-repo
+discovery. `version --json` also reports Go build metadata such as module version,
+VCS revision, and dirty-state evidence when available from the binary.
 
 `list` discovers source KAS packs from `skills/`, reports direct-layout packs
 as category `core`, supports future `skills/<category>/<skill>/SKILL.md`

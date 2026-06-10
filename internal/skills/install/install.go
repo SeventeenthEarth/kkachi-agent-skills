@@ -14,10 +14,11 @@ import (
 	"time"
 
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
 )
 
 const (
-	CLIVersion         = "0.1.0"
+	CLIVersion         = version.CLIVersion
 	ManifestVersion    = "0.1"
 	ManifestKind       = "kas_profile_skill_manifest"
 	KABBoundaryMessage = "KAB is not required for the minimum install dry-run; execution-runtime work remains KAB-gated."

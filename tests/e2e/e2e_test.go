@@ -56,6 +56,18 @@ func assertNoHangul(t *testing.T, out string) {
 	}
 }
 
+func TestRootInstalledBinaryVersion(t *testing.T) {
+	binary := buildRootBinary(t)
+	cmd := exec.Command(binary, "--version")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("root binary --version failed: %v\n%s", err, out)
+	}
+	if strings.TrimSpace(string(out)) != "kkachi-agent-skills 0.1.1" {
+		t.Fatalf("unexpected --version output: %q", out)
+	}
+}
+
 func TestRootInstalledBinaryUsesEmbeddedSourceOutsideRepo(t *testing.T) {
 	binary := buildRootBinary(t)
 	workdir := t.TempDir()

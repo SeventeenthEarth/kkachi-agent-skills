@@ -71,7 +71,7 @@ func TestCreatePlanIsNoWriteAndHashIncludesSOTFields(t *testing.T) {
 		t.Fatalf("dry-run created profile root: %v", err)
 	}
 
-	if !result.OK || result.Command != "install" || result.Mode != "dry_run" || result.CLIVersion != "0.1.0" {
+	if !result.OK || result.Command != "install" || result.Mode != "dry_run" || result.CLIVersion != CLIVersion {
 		t.Fatalf("unexpected result basics: %+v", result)
 	}
 	if result.Requested.PackIDs[0] != "alpha" || len(result.Requested.CategoryExpansions) != 0 {
@@ -102,7 +102,7 @@ func TestCreatePlanIsNoWriteAndHashIncludesSOTFields(t *testing.T) {
 	if result.ProvenanceContractVersion == "" || result.SourceInventorySnapshot.Summary.CountsBySourceClass == nil || result.TargetProfileInventory.Summary.CountsBySourceClass == nil {
 		t.Fatalf("missing provenance inventory fields: %+v %+v", result.SourceInventorySnapshot, result.TargetProfileInventory)
 	}
-	if result.CanonicalPlan["command_mode"] != "install:dry_run" || result.CanonicalPlan["cli_version"] != "0.1.0" {
+	if result.CanonicalPlan["command_mode"] != "install:dry_run" || result.CanonicalPlan["cli_version"] != CLIVersion {
 		t.Fatalf("unexpected canonical plan: %+v", result.CanonicalPlan)
 	}
 	if result.CanonicalPlan["source_inventory_snapshot"] == nil || result.CanonicalPlan["target_profile_inventory"] == nil {

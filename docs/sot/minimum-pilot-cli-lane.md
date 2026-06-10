@@ -79,12 +79,13 @@ Symlink mode:
 
 The safe minimum user path is:
 
-1. `kkachi-agent-skills list [--profile <profile>] [--category <name>]`
-2. `kkachi-agent-skills install --profile <profile> <pack-id>... --dry-run`
-3. operator approval for the reported changed paths
-4. `kkachi-agent-skills install --profile <profile> <pack-id>... --approve <evidence-ref>` with manifest/checksum and recovery report
-5. `kkachi-agent-skills doctor --profile <profile> [--project <path>]`
-6. next-action report that clearly says whether the user is in the minimum/pilot lane or must use the full KHS+KAH+KAB execution-runtime lane
+1. `kkachi-agent-skills --version` or `kkachi-agent-skills version --json` for release/build evidence
+2. `kkachi-agent-skills list [--profile <profile>] [--category <name>]`
+3. `kkachi-agent-skills install --profile <profile> <pack-id>... --dry-run`
+4. operator approval for the reported changed paths
+5. `kkachi-agent-skills install --profile <profile> <pack-id>... --approve <evidence-ref>` with manifest/checksum and recovery report
+6. `kkachi-agent-skills doctor --profile <profile> [--project <path>]`
+7. next-action report that clearly says whether the user is in the minimum/pilot lane or must use the full KHS+KAH+KAB execution-runtime lane
 
 ## Self-improvement ledger split
 

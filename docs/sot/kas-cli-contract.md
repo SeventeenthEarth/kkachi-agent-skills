@@ -5,7 +5,7 @@ Owner: KAS workflow/policy layer
 Confirming role: Kkachi-team review accepted; 주유 harness review accepted; 사마의 final Red review accepted
 Status: accepted SOT for `CLIMVP-001` and KABADOPT-001 stage-selector closure; implemented surfaces remain bounded by their roadmap evidence
 Authority level: command-surface and manifest/checksum contract for the KHS+KAH minimum/pilot CLI lane
-Scope: `kkachi-agent-skills` / KAS profile-scoped skill-pack `list`, `install --dry-run`, approved copy install, and `doctor`; no KAB runtime, KHC command/control, Doksuri integration, or KAH install-command expansion
+Scope: `kkachi-agent-skills` / KAS profile-scoped skill-pack `version`, `list`, `install --dry-run`, approved copy install, and `doctor`; no KAB runtime, KHC command/control, Doksuri integration, or KAH install-command expansion
 Related docs: `docs/sot/minimum-pilot-cli-lane.md`, `docs/sot/interface-contract.md`, `docs/sot/khs-architecture-and-integration.md`, `docs/sot/project-specific-kas-install-contract.md`, `docs/README.md`, `docs/roadmap.md`, repository `README.md`
 Evidence/source paths: KAH run `run-20260525T161641Z-4160f06cf1be`; populated artifacts include `intake-classification.md`, `sot-basis.md`, `plan.md`, `context-pack.md`, `docs-update.md`, `sot-update.md`, `roadmap-update.md`, `verification.md`, `review.md`, and `final-report.md`; review tasks are 하후연 `t_2fd07174`, 여몽 `t_e04116b6` plus re-review `t_abc30909`, 진궁 `t_b8db3ead` plus re-review `t_e652a24c`, 주유 `t_6cc40c59`, and 사마의 `t_e479171c`
 
@@ -14,13 +14,15 @@ Evidence/source paths: KAH run `run-20260525T161641Z-4160f06cf1be`; populated ar
 `CLIMVP-001` defines a narrow KAS-owned CLI contract for profile-scoped skill-pack operations:
 
 ```text
+kkachi-agent-skills --version
+kkachi-agent-skills version [--json]
 kkachi-agent-skills list [--profile <profile>] [--category <name>]
 kkachi-agent-skills install --profile <profile> <pack-id>... --dry-run
 kkachi-agent-skills install --profile <profile> <pack-id>... --approve <evidence-ref>
 kkachi-agent-skills doctor --profile <profile> [--project <path>]
 ```
 
-This CLI is a KAS minimum/pilot harness lane. It helps users inspect available KAS skill packs, preview profile-scoped copies, perform approved copy installs, and verify installed state. It is not a Kkachi runner and must not control KAB sessions, KHC authority, Doksuri integration, backend execution, or KAH deterministic state beyond reading KAH availability/project status for `doctor` reporting.
+This CLI is a KAS minimum/pilot harness lane. It helps users inspect CLI release/build evidence, inspect available KAS skill packs, preview profile-scoped copies, perform approved copy installs, and verify installed state. It is not a Kkachi runner and must not control KAB sessions, KHC authority, Doksuri integration, backend execution, or KAH deterministic state beyond reading KAH availability/project status for `doctor` reporting.
 
 KAH remains the deterministic project-local state/evidence layer and currently advertises `install_command=false`. Therefore KAS owns this profile-scoped list/install/doctor surface; KAH must not be described as the skill installer.
 
@@ -28,7 +30,7 @@ KAH remains the deterministic project-local state/evidence layer and currently a
 
 This contract is derived from these current sources of truth:
 
-- `minimum-pilot-cli-lane.md`: keeps the KHS+KAH minimum/pilot harness lane distinct from the full KHS+KAH+KAB execution-runtime lane; permits profile-scoped `list`, `install`, `doctor`, `sync`, and `proposal`, while this CLIMVP task scopes only the first four MVP surfaces from `roadmap.md`.
+- `minimum-pilot-cli-lane.md`: keeps the KHS+KAH minimum/pilot harness lane distinct from the full KHS+KAH+KAB execution-runtime lane; permits profile-scoped release evidence plus `list`, `install`, `doctor`, `sync`, and `proposal`, while this CLIMVP task scopes only the implemented MVP surfaces from `roadmap.md`.
 - `interface-contract.md`: records KAH 0.1.4 `install_command=false`, KAS/KAH/KAB layer ownership, reality-first command evidence, and the rule that unsupported future surfaces must be recorded as gaps rather than claimed.
 - `khs-architecture-and-integration.md`: defines KAS as the skill/process layer, KAH as deterministic state/evidence, KAB as backend runtime, and the profile-scoped installed-copy model.
 - `docs/README.md`: defines the documentation authority ladder, status vocabulary, and promotion rule for candidate SOTs.
@@ -80,6 +82,7 @@ This extends the profile-scoped manifest vocabulary. The current CLI implements 
 The recommended first-run operator path is:
 
 ```bash
+kkachi-agent-skills --version
 kkachi-agent-skills list --profile <profile>
 kkachi-agent-skills install --profile <profile> <pack-id>... --dry-run
 # operator reviews changed_paths, counts, conflicts, and dry_run_plan_hash
@@ -112,6 +115,8 @@ All commands should support:
 
 Rules:
 
+- `--version` and `version` must not require source-repo discovery, profile access, KAH state, or KAB runtime availability.
+- `version --json` must include stable `ok`, `command`, `cli_version`, `module_path`, `module_version`, `git_commit`, and `dirty` fields. Build metadata may be empty or `(devel)` when Go does not provide VCS/module data for a local development binary.
 - `--profile-root` is for tests/harness and must be rejected in normal production use unless paired with an explicit test/harness mode or documented environment guard.
 - Human output must be Korean-friendly in summaries, but JSON field names stay stable English.
 - JSON output must include `ok`, `command`, `source_repo`, `target_profile` when applicable, `changed_paths` when applicable, `diagnostics`, and `next_action`.

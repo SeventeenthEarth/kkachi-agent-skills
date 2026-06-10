@@ -64,6 +64,7 @@ KAS CLI is installed if `kkachi-agent-skills` is on `PATH`:
 
 ```bash
 which kkachi-agent-skills
+kkachi-agent-skills --version
 kkachi-agent-skills list --json
 ```
 

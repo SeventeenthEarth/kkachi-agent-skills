@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
 )
 
 const (
@@ -352,7 +353,7 @@ func baseProjectActionResult(command string, mode string, sourceRepo string, pro
 	}
 }
 
-func CLIVersionForKASPROJ004() string { return "0.1.0" }
+func CLIVersionForKASPROJ004() string { return version.CLIVersion }
 
 func resolvedProjectActionSourcePack(opts ProjectSuiteOptions) (string, string) {
 	if opts.SourcePack == "" {

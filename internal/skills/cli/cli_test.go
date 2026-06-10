@@ -142,7 +142,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := stdout.String()
-			for _, want := range []string{"list", "install", "update", "doctor", "repair", "uninstall"} {
+			for _, want := range []string{"list", "install", "update", "doctor", "repair", "uninstall", "version"} {
 				if !strings.Contains(out, want) {
 					t.Fatalf("root help did not list public command %s: %q", want, out)
 				}
@@ -150,13 +150,53 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 			if !strings.Contains(out, "Compatibility commands:") || !strings.Contains(out, "sync-project-kas") || !strings.Contains(out, "migrate-project-kas") {
 				t.Fatalf("root help did not list available commands: %q", out)
 			}
-			if !strings.Contains(out, "update   Classify project KAS updates without writing") || !strings.Contains(out, "Compatibility commands:") {
+			if !strings.Contains(out, "update   Classify project KAS updates without writing") || !strings.Contains(out, "version  Print CLI version information") || !strings.Contains(out, "Compatibility commands:") {
 				t.Fatalf("root help did not prioritize public dry-run lifecycle UX over legacy sync/migrate verbs: %q", out)
 			}
 			if stderr.Len() != 0 {
 				t.Fatalf("expected root help on stdout only, got stderr=%q", stderr.String())
 			}
 		})
+	}
+}
+
+func TestRootVersionExitsZeroAndPrintsVersion(t *testing.T) {
+	for _, args := range [][]string{{"--version"}, {"-version"}, {"version"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := Main(args, &stdout, &stderr, nil)
+			if code != 0 {
+				t.Fatalf("code=%d stderr=%s", code, stderr.String())
+			}
+			out := strings.TrimSpace(stdout.String())
+			if out != "kkachi-agent-skills 0.1.1" {
+				t.Fatalf("unexpected version output: %q", out)
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("expected version on stdout only, got stderr=%q", stderr.String())
+			}
+		})
+	}
+}
+
+func TestVersionJSONIncludesBuildMetadata(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"version", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%s", code, stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["command"] != "version" || payload["cli_version"] != "0.1.1" {
+		t.Fatalf("unexpected version payload: %+v", payload)
+	}
+	if payload["module_path"] == "" || payload["module_version"] == "" || payload["git_commit"] == nil || payload["dirty"] == nil {
+		t.Fatalf("version payload missing build metadata: %+v", payload)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected version JSON on stdout only, got stderr=%q", stderr.String())
 	}
 }
 
