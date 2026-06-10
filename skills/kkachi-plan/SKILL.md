@@ -24,17 +24,9 @@ When 주군 asks to run KAS/Kkachi development work and the task is classified a
 
 Official GLM Octo review is independent of these planning stages. It remains a KAB GLM feedback lane when required or requested; it does not change the plan/implementation backend and is not satisfied by selecting GLM as an implementation backend.
 
-Plan-first loop requirements:
-
-1. refresh CodeGraph evidence before planning;
-2. ask the Stage 1 direct Codex app-server planner, Stage 2 KAB Codex planner, or Stage 3 selected KAB planner for a plan-only response; do not allow implementation before plan capture;
-3. copy the fixed plan into `.kkachi/runs/<run_id>/plan.md` and normalize `checklist.md` from the plan plus KHS phase contract;
-4. Blue vets the backend-produced plan for SOT alignment, acceptance criteria, evidence, phase rows, and verification clarity, but must not directly author or rewrite the substantive implementation plan in place of the Stage 1 direct Codex app-server planner, Stage 2 KAB Codex planner, or Stage 3 selected KAB planner output unless 주군 explicitly requests direct Blue planning or the work is outside the roadmap/KAS+KAH path;
-5. require Red plan vet/approval from 하후연 before implementation when the work is KAS/Kkachi code-development or another risk-bearing project run;
-6. route Blue or Red `REQUEST_CHANGES` back to the same planner lane for a revised plan, then repeat Blue/Red vetting;
-7. only after Blue+Red approval, approve/start the implementer backend.
-
 Plan drafts must include a fallback audit note before Blue/Red review. Ask the planner to identify any fallback paths it proposes, remove unnecessary fallback behavior, and prefer fail-closed handling when capability, evidence, approval, or safe state is missing. Allow a fallback only when no safe direct handling exists, the fallback is tightly bounded/evidenced, and the required code/docs delta is genuinely small. If the only viable fallback would add broad code, new state machinery, or unclear policy, stop and report options to 주군 instead of letting the planner quietly add it.
+
+Before backend planning for a code-changing or process-changing task, refresh CodeGraph evidence for the target repository. If `.codegraph/` already exists, run `codegraph index <repo>` and preserve `codegraph status <repo>` output. If CodeGraph is due for first initialization after the first completed task and `.codegraph/` is missing, run `codegraph init -i <repo>` and preserve status evidence. If CodeGraph is unavailable, record the missing capability as a blocker or degraded-evidence reason instead of silently planning from stale code context.
 
 ## KASREL provenance/dependency evidence gate
 
@@ -46,7 +38,7 @@ Record deviations in `phase-plan.yaml`, `checklist.md`, and the final report ins
 
 Planner product output for both Stage 1 direct Codex app-server and KAB-mediated lanes must be English and compact: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Write detailed planning content to `plan.md` and, when backend-authored phase detail is needed, `.kkachi/runs/<run_id>/artifacts/plan/backend-plan.md` or the equivalent requested phase artifact. If the artifact cannot be written, report `Status: blocked` with the artifact-write blocker; do not paste full plans, logs, diffs, files, reviews, or exhaustive checklists into chat.
 
-Before backend planning for a code-changing or process-changing task, refresh CodeGraph evidence for the target repository. If `.codegraph/` already exists, run `codegraph index <repo>` and preserve `codegraph status <repo>` output. If CodeGraph is due for first initialization after the first completed task and `.codegraph/` is missing, run `codegraph init -i <repo>` and preserve status evidence. If CodeGraph is unavailable, record the missing capability as a blocker or degraded-evidence reason instead of silently planning from stale code context.
+See `references/planner-lane-and-capture.md` for the full Stage 1/2/3 plan-first loop, fallback-audit capture prompt, KAB plan capture rule, and backend timing details. See `references/checklist-normalization.md` for the mandatory `checklist.md` transform rules.
 
 ## Inputs
 
@@ -62,62 +54,6 @@ Before backend planning for a code-changing or process-changing task, refresh Co
 - `checklist.md`
 - `graph-evidence.md` mapping requirement when the plan initializes, validates, explains, diffs, proposes, applies, or otherwise relies on graph state
 - KAH phase/gate events, when supported
-
-## KAB plan capture rule
-
-When a KAB planner lane is used, do not manually reconstruct the plan from chat. Ask the backend planner to include a clearly delimited `KHS Checklist Seed` section inside the plan, then capture the backend plan surface before implementation starts:
-
-Required planner prompt clause:
-
-```text
-Include a section titled "KHS Checklist Seed" with unchecked markdown tasks. Each task must include phase, expected evidence artifact, and verification/check condition. Do not start implementation.
-Include a section titled "Fallback Audit" that lists every proposed fallback path, says whether it should be removed or retained, and explains any retained fallback using the KAS fail-closed/default-no-fallback policy.
-```
-
-Then read the plan:
-
-```bash
-kkachi-agent-bridge plan start --session <session_id> "Plan only: propose the change; do not edit until approved"
-kkachi-agent-bridge plan read --session <session_id>
-# or: GET /api/plan/<session_id>
-```
-
-Copy the response field `plan.plan_text` into `plan.md` when a KAB planner lane is used. Preserve `plan.plan_state`, `plan.plan_ref`, and `plan.source_evidence` in `plan.md` and/or `bridge-events.md`. For explicitly authorized KAS/KAH-local planning, record the non-KAB plan source and do not claim KAB plan lifecycle evidence.
-
-Backend timing rules:
-
-- Claude / GLM / Codex: capture while `plan.plan_state=plan_pending_approval`; `plan approve` starts implementation immediately.
-- Gemini / OpenCode: capture while `plan_pending_approval` or `plan_approved_waiting_for_start`; after approval, run `plan start-approved` only after `plan.md` and `checklist.md` are preserved.
-- OpenCode: fail closed on `PLAN_AMBIGUOUS`; resolve `.sisyphus/plans/*.md` ambiguity before approving or starting.
-
-Safe order:
-
-1. `plan start`
-2. `plan read`
-3. save `plan.plan_text` to `plan.md`
-4. KHS/Hermes derives `checklist.md` from the saved plan, the `KHS Checklist Seed` section, KHS phase contract, task contract, acceptance criteria, and expected evidence
-5. when project policy requires Red plan approval, request and resolve that review before implementation
-6. then approve/start according to backend timing
-
-## Checklist rule
-
-`checklist.md` is mandatory, not optional. KAB does not directly provide the normalized KHS checklist. When a KAB planner lane is used, KAB provides `plan.plan_text`, and KHS should ask the planner to include a parse-friendly `KHS Checklist Seed` inside that plan. KHS/Hermes must transform that seed plus the KHS phase contract into a normalized KHS progress checklist and store it as the KAH `checklist.md` artifact during the plan phase, after the plan source is captured. Then update it after `ask` and after every later phase. The checklist is the operator-facing progress tracker for the KHS run.
-
-The checklist must include:
-
-- one row for every canonical KHS phase;
-- required/conditional applicability for each phase;
-- current state (`pending`, `in_progress`, `done`, `skipped`, or `blocked`);
-- owner role (`planner`, `implementer`, `feedback`, or `Hermes`);
-- backend/session when a KAB lane is used;
-- evidence artifact expected for completion;
-- gate/check command or review condition;
-- explicit skip reason for any skipped or not-applicable phase;
-- micro-task rows derived from the approved plan;
-- CodeGraph refresh evidence when required;
-- repeated `make test` checkpoints after implementation, test enhancement, AI slop cleanup, and optimization when those stages change files.
-
-For code-change runs, include an `optimize` row by default. It may be skipped only with a reason. For feedback, include round 1 as required and rounds 2..5 as conditional continuation rounds; do not exceed five feedback/handle-feedback pairs.
 
 ## Gate
 

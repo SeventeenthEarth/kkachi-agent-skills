@@ -28,31 +28,7 @@ For code-changing tasks, implementation is not complete until the repository agg
 
 Implementation-task review is not complete after first color review alone. After implementation changes, run first Blue + Red/Orange/Gray color review, handle any findings, then run official GLM Octo review as the next feedback round unless 주군 explicitly waives it before start. Official GLM Octo must be KAB-backed even if implementation used the direct Codex app-server/no-KAB lane: use a KAB GLM session, submit `/octo:review` as the first prompt command, constrain the prompt to requirements plus implemented code only, forbid tests/linters/builds/installs/package managers/network probes/service starts/runtime verification commands, capture `prompt_confirmed: true`, and record KAB session/readback/event evidence plus permission rejections for any out-of-scope command request. Direct `glm` CLI review output is not official Octo evidence, and an Octo run that executes a forbidden command fails closed unless 주군 explicitly waives the boundary. After Octo feedback is handled, rerun affected verification and request post-Octo Blue + Red/Orange/Gray re-review before final/pre-commit reporting.
 
-KAB dispatch has two valid observation modes:
-
-- CLI loop: `send` -> `wait` -> `read` or `status` -> resolve `approve` / `reject` / `answer` pendings -> repeat until terminal or accepted idle state -> `stop`.
-- Retained stream loop: `send` -> subscribe to KAB HTTP `GET /api/stream/<session_id>` and/or backfill with `GET /api/events/<session_id>` -> resolve `approve` / `reject` / `answer` pendings as stream events expose them -> confirm completion with `read` or `status` -> `stop`.
-
-`send` success only proves dispatch acceptance. Completion evidence requires either `wait` plus `read/status`, or retained stream evidence plus `read/status`.
-
-Plan mode and pending control are backend-sensitive:
-
-- Claude, GLM, and Codex plan approval can start execution immediately on supported idle-only plan lanes.
-- Gemini and OpenCode plan approval records approval but requires explicit post-approval start before implementation.
-- Plan approval never resolves tool/file/command/input pendings. Continue to handle `approve`, `reject`, and `answer` separately.
-- OpenCode question handling is valid only for real upstream API/SSE question events, not rendered `<tool_call>question` text.
-
-## Required artifacts before start
-
-- `task-contract.yaml`
-- `phase-plan.yaml`
-- `plan.md`
-- `checklist.md`
-- `ask.md` or explicit no-unresolved-decisions record
-- `selected-cli.json`
-- `capability-check.md`
-- `prompt.md`
-- `graph-evidence.md` when graph state affects implementation scope or graph-managed workflow was requested
+See `references/bridge-observation-and-start-rules.md` for the valid KAB observation modes, backend-specific post-approval start rules, required pre-start artifacts, and the Path B boundary details.
 
 ## Outputs
 
@@ -65,7 +41,3 @@ Plan mode and pending control are backend-sensitive:
 - KAH phase/gate events, when supported
 
 `bridge-events.md` must say which KAB observation mode was used: `cli_loop`, `retained_stream`, or `hybrid`. For stream-backed evidence, include stream cursor/epoch information when available and record daemon-restart discontinuities as evidence gaps, not as durable replay.
-
-## Path B boundary
-
-In Path B, this skill may only produce docs/SOT/handoff artifacts unless the run has passed into Path A.

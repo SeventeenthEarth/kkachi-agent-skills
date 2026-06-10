@@ -268,6 +268,7 @@ func TestTokenRoadmapSeparatesCompletedToken004FromToken005Writes(t *testing.T) 
 	requireRoadmapTaskStatus(t, "TOKEN-003", "Completed")
 	requireRoadmapTaskStatus(t, "TOKEN-004", "Completed")
 	requireRoadmapTaskStatus(t, "TOKEN-005", "Completed")
+	requireRoadmapTaskStatus(t, "TOKEN-006", "Completed")
 	requireContainsAll(t, "docs/roadmap.md", []string{
 		"TOKEN-003 | Implement English repo-local agent instruction templates | Completed",
 		"`AGENTS.md` and `CLAUDE.md` templates use English managed blocks, preserve project-local content, and encode KAS/KAH/KAB boundaries without blind overwrite.",
@@ -284,7 +285,14 @@ func TestTokenRoadmapSeparatesCompletedToken004FromToken005Writes(t *testing.T) 
 		"Official KAB GLM Octo session `6f72523c-a0ef-41c4-9ec0-228dd1de8831` accepted as `GLM_OCTO_PASS` with 0 blockers.",
 		"Second color review accepted: Red `t_093081cf`, Orange `t_3fc427aa`, Gray `t_a59bacce`.",
 		"KAH review gate passed as `evt-002187`; KAH final gate remains separate/not yet known.",
-		"TOKEN-006 remains `Planned`",
+		"TOKEN-006 | Slim high-frequency KAS skills and split references | Completed",
+		"run `run-20260610T014133Z-ef48803be3de`",
+		"direct Codex app-server implementation slimmed six high-frequency `SKILL.md` files by 20,578 bytes total",
+		"Linked-reference docs-contract coverage and `make test` passed.",
+		"First color review accepted: Red `t_d1aa939f`, Orange `t_33620d98`, Gray `t_5da311bc`.",
+		"Official KAB GLM Octo session `0b104960-3729-43b5-b834-9bef3ded5745` accepted as `GLM_OCTO_PASS` with 0 blockers and required Codex rework `no`.",
+		"Second color review accepted: Red `t_bf2a5dfd`, Orange `t_ec226e53`, Gray `t_1059dace`.",
+		"Verification/review gates passed; KAH final gate remains separate/not yet known.",
 	})
 	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{
 		"KAS PR 3: English agent instruction templates and management workflow",

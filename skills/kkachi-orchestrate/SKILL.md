@@ -55,21 +55,17 @@ plan -> ask -> implement -> enhance-test -> optimize -> docs-update -> request-f
 
 This full spine is the default only for `development` tasks. Path B replaces production code implementation with shaping, SOT, roadmap, acceptance, and handoff artifacts until Path A gates pass.
 
-## User-confirmed operating policy
+## Operating policy
 
 - The master selects the roadmap task id or task item for each KHS run; do not auto-pick the next task by default.
-- All terminal commands for an active KAS/KAH run must execute with the real user home, not a Hermes role/profile home. Use `HOME=<real-user-home> ...` in reusable prompts/artifacts. This applies to every shell command, including `git status`, `git add`, `git commit`, tests, KAH/KAB/Hermes/Kanban commands, and Codex probes, so Git global config, Codex auth/config, and user-level tool config are read from the user's real home.
-- KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. Stage 1 direct Codex app-server work through Hermes/KAS/KAH is a no-KAB-Codex lane unless the task explicitly selects KAB Codex; Stage 2 replaces that direct Codex transport with KAB Codex-first execution; Stage 3 enables capability-gated backend selection among eligible KAB backends.
-- Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when the master or roadmap authorizes that lane; record the no-KAB rationale and do not claim KAB runtime support.
-- For KAS/KAH roadmap-task work, the selected implementer lane is the actor that drafts/revises the implementation plan and performs substantive code, test, build, and task-bound docs mutations: Stage 1 direct Codex app-server, Stage 2 KAB Codex-first through `native_codex`, or Stage 3 selected KAB backend. Blue/Red/Orange/Gray roles supervise, review, record evidence, ask/answer, and verify; they must not directly author the plan or patch repository artifacts as a substitute for the selected implementer unless 주군 explicitly asks for direct role editing or the work is outside the roadmap/KAS+KAH path. Record any exception and its no-Codex/backend rationale in KAH artifacts and the final report.
-- Blue and Red own the plan vet/approval gate. The normal loop is: Blue asks the Stage 1 direct Codex app-server planner, Stage 2 KAB Codex planner, or Stage 3 selected KAB planner for a plan-only draft; the backend returns the plan; Blue and Red vet the plan; REQUEST_CHANGES is routed back to the same planner lane for a revised plan; only Blue+Red approval unlocks implementation. Do not let Blue or Red rewrite the substantive plan as a shortcut.
-- Blue/Red plan vet and later color reviews must include fallback audit. The preferred outcome is no fallback and fail-closed behavior for missing capability/evidence/approval/safe state. Accept fallback only when it is unavoidable, bounded, evidence-backed, approval-safe, and very small; broad fallback design or unclear policy must be reported to 주군 for a decision instead of merged into the run silently.
-- Logical backend roles are planner (`plan`, `ask`), implementer (`implement`, `enhance-test`, `optimize`, `docs-update`, `handle-feedback`), and feedback (`request-feedback`). They may map to the same or different physical backends.
-- `ask`, `request-feedback-1`, `handle-feedback-1`, and `final-verify` are mandatory for every KHS run.
-- First color review is the default review gate for every active KAS/KAH run that creates or changes durable repository artifacts, even when the task class is `docs_only`, `research_evidence`, `bootstrap_config`, or `collaboration_review` rather than implementation. Capture Blue self-review plus durable Red/Orange/Gray role-review evidence, or mark the review phase `not_applicable` with a concrete reason only for pure read-only/direct command runs where no durable project artifact changed.
-- `optimize` is conditional but strongly recommended for code-change runs to remove AI slop, duplication, and small structural waste; skipping requires a reason.
+- All terminal commands for an active KAS/KAH run must execute with the real user home, not a Hermes role/profile home. Use `HOME=<real-user-home> ...` in reusable prompts/artifacts, including Git, tests, KAH/KAB/Hermes/Kanban commands, and Codex probes.
+- KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. Stage 1 direct Codex app-server work is a no-KAB-Codex lane unless the task explicitly selects KAB Codex; Stage 2 replaces that direct Codex transport with KAB Codex-first execution; Stage 3 enables capability-gated backend selection among eligible KAB backends.
+- Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when that lane is explicitly authorized and recorded; do not claim KAB runtime support in those cases.
+- `ask`, `request-feedback-1`, `handle-feedback-1`, and `final-verify` are mandatory for every KHS run. `optimize` is conditional but strongly recommended for code-change runs, and skipping it requires a reason.
 - Feedback runs at least once and at most five rounds. Round 1 is the normal first color review/feedback round. Rounds 2..5 are optional continuation rounds, and each requested feedback round must have a matching handle-feedback round.
-- Official GLM Octo review is required for `development` / implementation tasks after first color review and feedback handling, even when implementation used a direct no-KAB lane, unless the master explicitly waives Octo before start. Official Octo is the exception to the direct no-KAB lane: it must run through a KAB GLM session with KAB session/readback/event evidence, real-user-HOME KAB/GLM path preflight, `/octo:review` as the first submitted command, an explicit requirements-and-implemented-code-only review scope for requirements plus implemented code, an explicit ban on tests/linters/builds/installs/package managers/network probes/service starts/runtime verification commands, and `prompt_confirmed: true`; direct `glm` CLI review output is preflight-only and fails closed as official Octo evidence, as does any Octo run that executes a forbidden command without an explicit master waiver. For non-implementation durable-change runs, run Octo only when the master explicitly requests Octo/GLM feedback, a project-local approved workflow declares it required, or a recorded high-risk policy gate opts in. When Octo runs, handling its feedback and a fresh post-Octo Blue + Red/Orange/Gray re-review are mandatory before final report/commit approval.
+- Official GLM Octo review is required for `development` / implementation tasks after first color review and feedback handling, even when implementation used a direct no-KAB lane, unless the master explicitly waives Octo before start. Official Octo is a requirements-and-implemented-code-only review lane for requirements plus implemented code and must explicitly forbid tests, linters, builds, installs, package managers, network probes, service starts, or runtime verification commands. Direct `glm` CLI review output is preflight-only and fails closed as official Octo evidence. For non-implementation durable-change runs, run Octo only when the master explicitly requests Octo/GLM feedback, a project-local approved workflow declares it required, or a recorded high-risk policy gate opts in.
+
+See `references/run-operating-policy.md` for the full Stage 1/2/3 lane ownership rules, Blue/Red plan-vet loop, fallback-audit expectations, and the complete Octo escalation details.
 
 ## Implementation approval policy
 
@@ -77,17 +73,16 @@ After plan and ask are complete, Hermes may start low-risk implementation automa
 
 ## Required responsibilities
 
-- classify task class before Path A/Path B (`development`, `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`)
-- classify Path A or Path B
-- select Standard or Light mode from the task class
+- classify task class before Path A/Path B
+- classify Path A or Path B and select Standard or Light mode
 - invoke `kkachi-task-contract`
-- run the graph capability preflight before using `.kkachi-workflow.yaml`: same effective binary, `kkachi-agent-helper --version`, `capabilities --json`, `graph --help`, then `graph validate/explain` for existing graph state or `graph init --from-template` only when graph creation is intended
-- create `phase-plan.yaml` from `templates/run-artifacts/phase-plan.yaml.tmpl` and keep it as run-local execution state/evidence
-- fail closed into a gap record when graph capability/help evidence is missing; do not use `kah graph` alias text or direct `.kkachi-workflow.yaml` edit fallback
-- invoke `kkachi-backend-select` only when a KAB-backed lane is selected or bridge evidence is claimed; for Stage 1 direct Codex app-server baseline, record direct Codex session evidence instead; for Stage 2, select KAB Codex-first rather than broad backend selection;
-- invoke `kkachi-prompt-compose` before KAB delivery
+- run graph capability preflight before using `.kkachi-workflow.yaml`
+- create and maintain `.kkachi/runs/<run_id>/phase-plan.yaml`
+- invoke `kkachi-backend-select` and `kkachi-prompt-compose` only when the selected lane requires them
 - use `kkachi-phase-state` and KAH at every phase boundary
-- preserve user-facing Korean reports and English run artifacts
+- preserve Korean commander reports and English run artifacts
+
+See `references/orchestration-responsibilities.md` for the exact preflight sequence, fail-closed graph boundary, and per-lane backend invocation details.
 
 ## Output
 
