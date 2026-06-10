@@ -12,6 +12,12 @@
   "execution_mode": "{{ execution_mode }}",
   "prompt_profile": "{{ prompt_profile }}",
   "prompt_profile_version": "{{ prompt_profile_version }}",
+  "stage1_direct_codex_runner": {
+    "template_path": "templates/runners/direct-codex-sdk-appserver-runner.py.tmpl",
+    "sdk_app_server_mode": "openai_codex -> codex app-server --listen stdio://",
+    "forbidden_as_stage1_evidence": ["codex exec", "generic openai Python SDK", "raw ws/unix/rest app-server transport", "KAB native_codex session evidence"],
+    "required_evidence": ["runner_metadata", "thread_id", "prompt_path", "output_path", "codex_version", "openai_codex_import", "no_kab_codex_rationale"]
+  },
   "selection_reason": "{{ selection_reason }}",
   "user_preference": {
     "provided": "{{ user_preference_provided }}",

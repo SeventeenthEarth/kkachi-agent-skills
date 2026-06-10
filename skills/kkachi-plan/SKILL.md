@@ -18,7 +18,7 @@ Plan from durable authority, not chat-only instruction. Path A plans prepare imp
 
 When 주군 asks to run KAS/Kkachi development work and the task is classified as `development`, treat the preferred default as a Codex-led plan-first loop, with the transport determined by the current KAS KAB adoption stage:
 
-- **Stage 1:** direct Codex app-server planner, with direct Codex evidence and no-KAB-Codex rationale.
+- **Stage 1:** direct Codex SDK/app-server planner through `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl`; the runner imports `openai_codex` and lets the SDK start `codex app-server --listen stdio://`, with direct Codex evidence and no-KAB-Codex rationale. Do not use `codex exec` or generic `openai` SDK evidence.
 - **Stage 2:** KAB Codex-first planner through `native_codex`; this replaces direct Codex app-server calls without changing the KAS/KAH phase or review scenario.
 - **Stage 3:** KAB backend-selected planner after backend selection chooses an eligible backend from task requirements, project policy, capability evidence, and user preference after gates.
 
@@ -36,7 +36,7 @@ Render planner prompts so every command example uses the real user home, for exa
 
 Record deviations in `phase-plan.yaml`, `checklist.md`, and the final report instead of silently using a lighter path. For `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`, use the selected light spine from `task-contract.yaml`; do not manufacture implementation/test/optimize phases unless the classification changes to `development`.
 
-Planner product output for both Stage 1 direct Codex app-server and KAB-mediated lanes must be English and compact: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Write detailed planning content to `plan.md` and, when backend-authored phase detail is needed, `.kkachi/runs/<run_id>/artifacts/plan/backend-plan.md` or the equivalent requested phase artifact. If the artifact cannot be written, report `Status: blocked` with the artifact-write blocker; do not paste full plans, logs, diffs, files, reviews, or exhaustive checklists into chat.
+Planner product output for both Stage 1 direct Codex SDK/app-server runner and KAB-mediated lanes must be English and compact: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Write detailed planning content to `plan.md` and, when backend-authored phase detail is needed, `.kkachi/runs/<run_id>/artifacts/plan/backend-plan.md` or the equivalent requested phase artifact. If the artifact cannot be written, report `Status: blocked` with the artifact-write blocker and do not dump full plans into chat.
 
 See `references/planner-lane-and-capture.md` for the full Stage 1/2/3 plan-first loop, fallback-audit capture prompt, KAB plan capture rule, and backend timing details. See `references/checklist-normalization.md` for the mandatory `checklist.md` transform rules.
 

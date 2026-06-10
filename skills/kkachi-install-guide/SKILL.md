@@ -192,7 +192,7 @@ overlay/backend-policy must be rewritten; otherwise record the new stage in the
 installed/project-specific KAS guidance and next run's task/phase evidence. KAH
 does not need to interpret the stage beyond carrying the backend-policy text and
 project overlay/reference state. Missing or ambiguous stage selection fails
-closed to Stage 1 direct Codex app-server baseline behavior; do not claim KAB
+closed to Stage 1 direct Codex SDK/app-server runner baseline behavior; do not claim KAB
 Codex execution unless Stage 2 or Stage 3 is explicitly selected and evidenced.
 
 After project init, update repository ignores for local runtime/tool state before verification:
@@ -256,7 +256,7 @@ Pitfall: phrases like “apply to the kan-plugin KAS first, promote to KAS later
 Reference: `references/kas-kab-adoption-stage-boundary.md` captures the Stage
 1/2/3 marker pattern, preferred installed-profile location, and KAH boundary.
 Reference: `references/kas-kab-adoption-stage-runbook.md` captures the Stage 1
-direct Codex evidence posture, Stage 2 KAB `native_codex` evidence posture, and
+direct Codex SDK/app-server runner evidence posture, Stage 2 KAB `native_codex` evidence posture, and
 break-glass handling. Do not duplicate the full runbook in phase skills; point
 operators to the marker plus this reference.
 

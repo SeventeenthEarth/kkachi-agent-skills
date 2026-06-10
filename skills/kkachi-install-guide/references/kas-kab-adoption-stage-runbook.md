@@ -20,14 +20,18 @@ Before selecting planner or implementer lanes, record:
 If the marker is missing or ambiguous, fail closed to Stage 1 claims: direct
 Codex evidence may be recorded, but KAB Codex execution must not be claimed.
 
-## Stage 1 — direct Codex app-server baseline
+## Stage 1 — direct Codex SDK/app-server runner baseline
 
 Stage 1 is the default KAS/KAH development lane.
 
 Required evidence posture:
 
-- direct Codex app-server prompt, session, and output evidence for plan,
-  implementation, docs/fix, cleanup, and verification support;
+- direct Codex SDK/app-server runner prompt, thread, output, and metadata evidence for plan,
+  implementation, docs/fix, cleanup, and verification support through
+  `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl`
+  (`openai_codex` -> SDK-managed `codex app-server --listen stdio://`);
+- explicit rejection of `codex exec`, generic `openai` SDK output, raw
+  app-server transport, or KAB `native_codex` evidence as Stage 1 proof;
 - a no-KAB-Codex rationale explaining why KAB `native_codex` was not used;
 - KAH task/phase artifacts, checklist, gates, tests, and final verification as
   required by the task class;
@@ -40,7 +44,7 @@ does not turn the implementation lane into Stage 2.
 
 ## Stage 2 — KAB Codex-first execution
 
-Stage 2 replaces direct Codex app-server execution for KAS/KAH implementation,
+Stage 2 replaces direct Codex SDK/app-server runner execution for KAS/KAH implementation,
 fix, and docs-bound work with KAB-backed Codex execution through `native_codex`.
 Codex remains the selected implementation/planning backend; Stage 2 does not
 broaden backend selection to Claude, GLM, or other KAB backends.
@@ -58,7 +62,7 @@ Required evidence posture:
 - KAH task/phase artifacts, checklist, gates, tests, and final verification as
   required by the task class.
 
-Direct Codex app-server use during a Stage 2 run is break-glass only. It
+Direct Codex SDK/app-server runner use during a Stage 2 run is break-glass only. It
 requires recorded approval, rationale, scope, and evidence explaining why KAB
 `native_codex` could not safely complete that slice. It must not be silent
 fallback and must not be reported as KAB Codex execution evidence.

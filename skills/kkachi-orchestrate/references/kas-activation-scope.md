@@ -12,7 +12,7 @@ KAS mode starts only when at least one activation trigger is present:
 - KHS is being applied to a project directory;
 - a durable repo artifact under a governed Kkachi project is being changed;
 - phase/gate/evidence tracking is requested;
-- KAB-backed execution, KAB plan lifecycle, bridge evidence, or backend identity through KAB is claimed; Stage 1 direct Codex app-server baseline work records no-KAB-Codex evidence instead;
+- KAB-backed execution, KAB plan lifecycle, bridge evidence, or backend identity through KAB is claimed; Stage 1 direct Codex SDK/app-server runner baseline work records `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` evidence and no-KAB-Codex rationale instead;
 - long-lived team-member collaboration or durable review routing is required.
 
 Inside active KAS mode, classify the task before selecting phases. Outside KAS mode, do not force `task_class` or create KAH runs for ordinary chat.

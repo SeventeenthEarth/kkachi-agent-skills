@@ -5,7 +5,7 @@ This reference expands the operating-policy bullets in `../SKILL.md`.
 ## Lane ownership and mutation policy
 
 - The selected implementer lane drafts and revises the substantive implementation plan and performs code, test, build, and task-bound docs mutations:
-  - Stage 1 direct Codex app-server
+  - Stage 1 direct Codex SDK/app-server runner via `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` (`openai_codex` -> `codex app-server --listen stdio://`), not `codex exec` or generic `openai` SDK
   - Stage 2 KAB Codex-first through `native_codex`
   - Stage 3 selected eligible KAB backend
 - Blue/Red/Orange/Gray supervise, review, record evidence, ask/answer, and verify. They must not directly author the plan or patch repository artifacts as a substitute for the selected implementer unless 주군 explicitly asks for direct role editing or the work is outside the roadmap/KAS+KAH path.

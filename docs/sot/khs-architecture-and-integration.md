@@ -14,6 +14,7 @@ Related docs:
 - `docs/sot/workflow-graph-integration.md`
 - `docs/sot/minimum-pilot-cli-lane.md`
 - `docs/sot/kas-cli-contract.md`
+- `docs/sot/stage1-direct-codex-sdk-appserver-runner.md`
 - `docs/roadmap.md`
 Evidence/source paths:
 - Kanban parent readiness and scope decision: `t_5d35ee82`
@@ -193,11 +194,13 @@ KAS owns the operating policy for applying KAB to KAS/KAH development runs. KAH 
 
 | Stage | Name | KAS/KAH development execution lane | Backend choice posture | Evidence posture |
 |---|---|---|---|---|
-| 1 | Direct Codex app-server baseline | Direct Codex app-server calls handle plan, implementation, feedback fixes, task-bound docs, cleanup, and verification support. | Codex is fixed by the direct lane. | Record direct Codex prompt/session/output evidence and a no-KAB-Codex rationale. Do not claim KAB Codex execution evidence. |
+| 1 | Direct Codex SDK/app-server baseline | Direct Codex SDK/app-server runner calls handle plan, implementation, feedback fixes, task-bound docs, cleanup, and verification support. The supported Stage 1 control path is KAS Python runner template -> `openai_codex` SDK -> SDK-managed `codex app-server --listen stdio://`; `codex exec` and generic `openai` SDK usage are not valid Stage 1 evidence. | Codex is fixed by the direct lane. | Record direct Codex runner prompt/session/output evidence and a no-KAB-Codex rationale. Do not claim KAB Codex execution evidence. |
 | 2 | KAB Codex-first execution | Replace direct Codex app-server calls with KAB-backed Codex execution through `native_codex` while preserving the same KAS/KAH phases and review scenarios. | Codex remains the default planning/implementation backend; do not broaden backend selection yet. | Record KAB Codex session, selected CLI/capability, plan/read/status/wait/watch or retained event evidence, and bridge events. |
 | 3 | KAB backend-selected execution | Run planning/implementation/fix lanes through a selected KAB backend. | Select among eligible Codex, Claude, and GLM backends from task requirements, project policy, compatibility evidence, and user preference after capability gates. | Record the selected backend's KAB evidence and rejected-backend reasons; fail closed when capability evidence is missing or stale. |
 
 Stage 2 is a transport migration from direct Codex app-server to KAB Codex. Stage 3 is a backend orchestration policy. Do not collapse these stages: proving KAB Codex-first execution is the prerequisite for safely expanding backend selection.
+
+The Stage 1 direct runner contract is detailed by `docs/sot/stage1-direct-codex-sdk-appserver-runner.md`. KAS Stage 1 support means a shared Python runner template at `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` uses `openai_codex` so the SDK starts `codex app-server --listen stdio://` and records direct runner evidence. Raw app-server transports and long-lived daemons are not ordinary Stage 1 KAS guidance; those belong to KAB/wrapper or explicit infrastructure work. When an installed/project marker selects Stage 2, the Stage 1 runner must not be used as a silent fallback.
 
 Fallback posture is fail-closed by default across the KAS/KAH development loop. Codex or KAB-authored plans must surface proposed fallback paths for Blue/Red review; Blue, Red, Orange, Gray, and optional GLM/Octo review must request removal of unnecessary fallback paths rather than preserve convenience behavior. A fallback is acceptable only when there is no safe direct handling, the fallback is narrowly bounded, evidence-backed, approval-safe, and very small to implement. If avoiding fallback is impossible and the required fallback would add broad code or new policy/state complexity, the run reports options to 주군 instead of quietly implementing it.
 

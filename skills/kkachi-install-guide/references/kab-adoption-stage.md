@@ -8,7 +8,7 @@ Use this file shape for an installed project-specific KAS suite such as:
 
 It records the selected KAS/KAH development operating stage for that installed project suite:
 
-- Stage 1: direct Codex app-server baseline
+- Stage 1: direct Codex SDK/app-server runner baseline
 - Stage 2: KAB Codex-first via `native_codex`
 - Stage 3: reserved/backend-selected only when separately authorized
 

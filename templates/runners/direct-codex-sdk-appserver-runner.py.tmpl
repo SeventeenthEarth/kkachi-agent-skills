@@ -1,0 +1,309 @@
+#!/usr/bin/env python3
+"""KAS Stage 1 direct Codex SDK/app-server runner template.
+
+Control path: this runner imports `openai_codex`; the SDK starts
+`codex app-server --listen stdio://` and drives JSON-RPC thread/run APIs.
+It must not shell out to `codex exec`, must not use the generic `openai` SDK,
+and must not claim KAB `native_codex` evidence.
+
+Render/copy this template into a KAH run artifact before execution so the exact
+runner content used by the run is preserved with the prompt/output metadata.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import traceback
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+DEFAULT_CODEX_BIN = "/Users/draccoon/.nvm/versions/node/v24.15.0/bin/codex"
+DEFAULT_CODEX_SDK_SRC = "/Users/draccoon/Workspace/Tools/ai-cli/codex/sdk/python/src"
+DEFAULT_REAL_HOME = "/Users/draccoon"
+DEFAULT_CODEX_HOME = "/Users/draccoon/.codex"
+SDK_APP_SERVER_MODE = "openai_codex -> codex app-server --listen stdio://"
+SUPPORTED_STAGE_MARKERS = {
+    "stage1_direct_codex_app_server_baseline",
+    "stage1_direct_codex_sdk_appserver_runner",
+    "stage1_direct_codex_sdk_app_server_runner",
+}
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def ensure_parent(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def enum_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    return getattr(value, "value", str(value))
+
+
+def metadata_base(args: argparse.Namespace) -> dict[str, Any]:
+    prompt_path = Path(args.prompt_path).resolve()
+    output_path = Path(args.output_path).resolve()
+    rendered_runner_path = Path(args.rendered_runner_path).resolve() if args.rendered_runner_path else None
+    return {
+        "schema_version": "kas.stage1_direct_codex_runner.v1",
+        "started_at": utc_now(),
+        "runner_template_path": args.runner_template_path,
+        "rendered_runner_path": str(rendered_runner_path) if rendered_runner_path else None,
+        "project_dir": str(Path(args.project_dir).resolve()),
+        "phase": args.phase,
+        "run_id": args.run_id,
+        "prompt_path": str(prompt_path),
+        "prompt_sha256": sha256_file(prompt_path) if prompt_path.exists() else None,
+        "output_path": str(output_path),
+        "metadata_path": str(Path(args.metadata_path).resolve()),
+        "error_path": str(Path(args.error_path).resolve()) if args.error_path else None,
+        "codex_bin": args.codex_bin,
+        "codex_sdk_src": args.codex_sdk_src,
+        "home": args.home,
+        "codex_home": args.codex_home,
+        "sdk_app_server_mode": SDK_APP_SERVER_MODE,
+        "not_stage1_evidence": [
+            "codex exec",
+            "generic openai Python SDK",
+            "raw ws/unix/rest app-server transport",
+            "KAB native_codex session evidence",
+        ],
+        "no_kab_codex_rationale": args.no_kab_codex_rationale,
+        "stage_marker": args.stage_marker,
+        "thread_id_input": args.thread_id,
+        "thread_action": "resume" if args.thread_id else "start",
+        "sandbox": args.sandbox,
+        "approval_mode": args.approval_mode,
+        "model": args.model,
+        "effort": args.effort,
+        "summary": args.summary,
+        "preflight_only": args.preflight_only,
+        "exit_code": None,
+        "status": "started",
+    }
+
+
+def write_json(path: Path, data: dict[str, Any]) -> None:
+    ensure_parent(path)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def write_error(path: Path | None, text: str) -> None:
+    if path is None:
+        return
+    ensure_parent(path)
+    path.write_text(text, encoding="utf-8")
+
+
+def preflight(args: argparse.Namespace, meta: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
+    if args.stage_marker and args.stage_marker not in SUPPORTED_STAGE_MARKERS:
+        raise RuntimeError(
+            f"unsupported stage marker {args.stage_marker!r}; this runner is Stage 1 only and must not silently replace Stage 2/3"
+        )
+    if not args.no_kab_codex_rationale:
+        raise RuntimeError("--no-kab-codex-rationale is required for Stage 1 direct Codex evidence")
+
+    prompt_path = Path(args.prompt_path)
+    if not prompt_path.exists():
+        raise FileNotFoundError(f"prompt artifact not found: {prompt_path}")
+    project_dir = Path(args.project_dir)
+    if not project_dir.exists() or not project_dir.is_dir():
+        raise FileNotFoundError(f"project directory not found: {project_dir}")
+    codex_bin = Path(args.codex_bin)
+    if not codex_bin.exists():
+        raise FileNotFoundError(f"Codex binary not found: {codex_bin}")
+    codex_sdk_src = Path(args.codex_sdk_src)
+    if not codex_sdk_src.exists():
+        raise FileNotFoundError(f"Codex SDK src path not found: {codex_sdk_src}")
+
+    codex_version = subprocess.run(
+        [str(codex_bin), "--version"],
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={**os.environ, "HOME": args.home, "CODEX_HOME": args.codex_home},
+    )
+    meta["codex_version_exit_code"] = codex_version.returncode
+    meta["codex_version_stdout"] = codex_version.stdout.strip()
+    meta["codex_version_stderr"] = codex_version.stderr.strip()
+    if codex_version.returncode != 0:
+        raise RuntimeError("codex --version failed; refusing to start Stage 1 runner")
+
+    sys.path.insert(0, str(codex_sdk_src))
+    try:
+        from openai_codex import ApprovalMode, Codex, CodexConfig, Sandbox  # type: ignore
+        import openai_codex  # type: ignore
+    except Exception as exc:
+        raise RuntimeError(
+            "failed to import openai_codex; install the Codex Python SDK dependencies before running Stage 1"
+        ) from exc
+
+    meta["openai_codex_module"] = getattr(openai_codex, "__file__", None)
+    meta["openai_codex_version"] = getattr(openai_codex, "__version__", None)
+    return ApprovalMode, Codex, CodexConfig, Sandbox
+
+
+def run_codex(args: argparse.Namespace, meta: dict[str, Any]) -> dict[str, Any]:
+    ApprovalMode, Codex, CodexConfig, Sandbox = preflight(args, meta)
+    if args.preflight_only:
+        meta["status"] = "preflight_pass"
+        meta["exit_code"] = 0
+        return meta
+
+    prompt = Path(args.prompt_path).read_text(encoding="utf-8")
+    output_path = Path(args.output_path)
+    ensure_parent(output_path)
+
+    env = os.environ.copy()
+    env.update({
+        "HOME": args.home,
+        "CODEX_HOME": args.codex_home,
+        "PATH": str(Path(args.codex_bin).parent) + os.pathsep + env.get("PATH", ""),
+    })
+    for item in args.env:
+        key, sep, value = item.partition("=")
+        if not sep:
+            raise ValueError(f"--env must be KEY=VALUE, got {item!r}")
+        env[key] = value
+
+    sandbox = {
+        "read_only": Sandbox.read_only,
+        "workspace_write": Sandbox.workspace_write,
+    }[args.sandbox]
+    approval_mode = {
+        "deny_all": ApprovalMode.deny_all,
+        "auto_review": ApprovalMode.auto_review,
+    }[args.approval_mode]
+
+    cfg = CodexConfig(
+        codex_bin=args.codex_bin,
+        cwd=args.project_dir,
+        env=env,
+        config_overrides=tuple(args.config_override),
+        client_name=args.client_name,
+        client_title=args.client_title,
+    )
+    with Codex(cfg) as codex:
+        if args.thread_id:
+            thread = codex.thread_resume(
+                args.thread_id,
+                approval_mode=approval_mode,
+                cwd=args.project_dir,
+                sandbox=sandbox,
+                model=args.model,
+            )
+        else:
+            thread = codex.thread_start(
+                approval_mode=approval_mode,
+                base_instructions=args.base_instructions,
+                developer_instructions=args.developer_instructions,
+                cwd=args.project_dir,
+                sandbox=sandbox,
+                model=args.model,
+            )
+        result = thread.run(
+            prompt,
+            approval_mode=approval_mode,
+            cwd=args.project_dir,
+            sandbox=sandbox,
+            model=args.model,
+            effort=args.effort,
+            summary=args.summary,
+        )
+
+    text = result.final_response or ""
+    output_path.write_text(text, encoding="utf-8")
+    meta.update({
+        "status": enum_value(result.status),
+        "exit_code": 0,
+        "thread_id": thread.id,
+        "turn_id": result.id,
+        "turn_status": enum_value(result.status),
+        "turn_error": str(result.error) if result.error is not None else None,
+        "started_at_ms": result.started_at,
+        "completed_at_ms": result.completed_at,
+        "duration_ms": result.duration_ms,
+        "output_sha256": sha256_file(output_path),
+        "output_chars": len(text),
+        "usage": getattr(result.usage, "model_dump", lambda **_: result.usage)(mode="json") if result.usage is not None else None,
+        "completed_at": utc_now(),
+    })
+    return meta
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="KAS Stage 1 direct Codex SDK/app-server runner")
+    parser.add_argument("--project-dir", required=True)
+    parser.add_argument("--phase", required=True)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--prompt-path", required=True)
+    parser.add_argument("--output-path", required=True)
+    parser.add_argument("--metadata-path", required=True)
+    parser.add_argument("--error-path")
+    parser.add_argument("--runner-template-path", default="templates/runners/direct-codex-sdk-appserver-runner.py.tmpl")
+    parser.add_argument("--rendered-runner-path")
+    parser.add_argument("--codex-bin", default=os.environ.get("CODEX_BIN", DEFAULT_CODEX_BIN))
+    parser.add_argument("--codex-sdk-src", default=os.environ.get("CODEX_SDK_SRC", DEFAULT_CODEX_SDK_SRC))
+    parser.add_argument("--home", default=DEFAULT_REAL_HOME)
+    parser.add_argument("--codex-home", default=DEFAULT_CODEX_HOME)
+    parser.add_argument("--stage-marker", default="stage1_direct_codex_sdk_appserver_runner")
+    parser.add_argument("--thread-id")
+    parser.add_argument("--sandbox", choices=("read_only", "workspace_write"), required=True)
+    parser.add_argument("--approval-mode", choices=("deny_all", "auto_review"), default="auto_review")
+    parser.add_argument("--model")
+    parser.add_argument("--effort", choices=("minimal", "low", "medium", "high"))
+    parser.add_argument("--summary", choices=("auto", "concise", "detailed", "none"), default="auto")
+    parser.add_argument("--base-instructions")
+    parser.add_argument("--developer-instructions")
+    parser.add_argument("--client-name", default="kas_stage1_direct_codex_runner")
+    parser.add_argument("--client-title", default="KAS Stage 1 Direct Codex Runner")
+    parser.add_argument("--config-override", action="append", default=[])
+    parser.add_argument("--env", action="append", default=[])
+    parser.add_argument("--no-kab-codex-rationale", required=True)
+    parser.add_argument("--preflight-only", action="store_true")
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    meta_path = Path(args.metadata_path)
+    err_path = Path(args.error_path) if args.error_path else None
+    meta = metadata_base(args)
+    try:
+        meta = run_codex(args, meta)
+        return int(meta.get("exit_code") or 0)
+    except Exception:
+        tb = traceback.format_exc()
+        meta.update({
+            "status": "failed",
+            "exit_code": 1,
+            "completed_at": utc_now(),
+            "failure_excerpt": tb[-4000:],
+        })
+        write_error(err_path, tb)
+        return 1
+    finally:
+        write_json(meta_path, meta)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

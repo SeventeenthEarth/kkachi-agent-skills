@@ -6,17 +6,17 @@ version: 0.1.0
 
 # Kkachi Backend Select
 
-Use this skill after `task-contract.yaml` exists and before composing any KAB prompt. Do not use it for Stage 1 direct Codex app-server baseline work unless the run explicitly selects KAB or claims bridge evidence.
+Use this skill after `task-contract.yaml` exists and before composing any KAB prompt. Do not use it for Stage 1 direct Codex SDK/app-server runner baseline work unless the run explicitly selects KAB or claims bridge evidence.
 
 Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an explicit master request has selected KHS/Kkachi for the work. Do not trigger it for ordinary direct Hermes edits, quick one-file fixes, typo/config patches, or read-only explanations unless the master explicitly asks for KHS/Kkachi or delegates the work to a KHS-using commander such as 조운 or 마초.
 
 ## Core rule
 
-Capability and project-policy gates run before user preference. Preference ranks eligible KAB backends; it cannot make an ineligible backend safe. If KAB runtime is not implemented/ready for the project, select the explicit Stage 1 no-KAB-Codex direct Codex app-server baseline lane outside this KAB backend-selection skill and record the rationale in task/phase artifacts.
+Capability and project-policy gates run before user preference. Preference ranks eligible KAB backends; it cannot make an ineligible backend safe. If KAB runtime is not implemented/ready for the project, select the explicit Stage 1 no-KAB-Codex direct Codex SDK/app-server runner baseline lane outside this KAB backend-selection skill and record the runner metadata/no-KAB-Codex rationale in task/phase artifacts.
 
 Apply KAS's KAB adoption stage before broad backend selection:
 
-- **Stage 1 — Direct Codex app-server baseline:** do not use this skill for the direct Codex lane unless the run separately claims KAB evidence, such as official GLM Octo review. Record direct Codex evidence and no-KAB-Codex rationale instead.
+- **Stage 1 — Direct Codex SDK/app-server runner baseline:** do not use this skill for the direct Codex lane unless the run separately claims KAB evidence, such as official GLM Octo review. Record `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` evidence (`openai_codex` -> SDK-managed `codex app-server --listen stdio://`) and no-KAB-Codex rationale instead; do not use `codex exec`, generic `openai` SDK output, raw app-server transport, or KAB `native_codex` evidence as Stage 1 proof.
 - **Stage 2 — KAB Codex-first execution:** select Codex through KAB (`backend_type=codex`, `adapter_type=native_codex`) by default for KAS/KAH plan/implementation/fix/docs lanes. Do not broaden to Claude/GLM implementation backend selection in Stage 2 unless 주군 explicitly assigns a Stage 3 backend-selection experiment. Official GLM Octo review remains an independent KAB GLM feedback lane, not the implementation backend selection.
 - **Stage 3 — KAB backend-selected execution:** select among eligible KAB backends such as Codex, Claude, and GLM according to capability evidence, project policy, task requirements, and user preference after gates.
 

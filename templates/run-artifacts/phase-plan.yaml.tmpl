@@ -59,6 +59,20 @@ kab_usage:
   rationale: "{{ kab_usage_rationale }}"
   no_kab_exception: "{{ no_kab_exception_reason }}"
 
+stage1_direct_codex_runner:
+  template_path: "templates/runners/direct-codex-sdk-appserver-runner.py.tmpl"
+  sdk_app_server_mode: "openai_codex -> codex app-server --listen stdio://"
+  rendered_runner_path: "{{ stage1_direct_codex_rendered_runner_path }}"
+  metadata_path: "{{ stage1_direct_codex_metadata_path }}"
+  output_path: "{{ stage1_direct_codex_output_path }}"
+  thread_id: "{{ stage1_direct_codex_thread_id }}"
+  no_kab_codex_rationale: "{{ stage1_direct_codex_no_kab_rationale }}"
+  forbidden_as_stage1_evidence:
+    - codex exec
+    - generic openai Python SDK
+    - raw ws/unix/rest app-server transport
+    - KAB native_codex session evidence
+
 output_policy:
   language: english_product_and_backend_output
   applies_to:

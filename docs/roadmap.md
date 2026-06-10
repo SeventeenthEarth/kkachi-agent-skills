@@ -6,7 +6,7 @@ Confirming role: Responsible approver / governance evidence record; INITDOC post
 Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced; KAS integration work remains separately gated
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -49,6 +49,7 @@ INITDOC-003
   -> GRAPHMVP-001..004
   -> STALECLEAN-001..004
   -> KABADOPT-001..004
+  -> CODEXSDK-001..003
   -> KASUPD-001..004
   -> KASREL-001..004
   -> KASPROJ-001..006
@@ -132,6 +133,18 @@ Deferred from GRAPHMVP unless separately approved: graph `apply` automation, dec
 
 KABADOPT deferrals unless separately approved: Stage 3 backend-selected implementation, Antigravity lane work, non-Codex KAB implementation backends for KAS/KAH development, silent fallback from Stage 2 to direct Codex, and mutation of auth/tokens/gateway/model/provider config.
 
+### EPIC: CODEXSDK — Stage 1 direct Codex SDK/app-server runner support
+
+> Goal: make Stage 1 direct Codex app-server usage unambiguous and reproducible by adding a KAS-owned Python runner contract, then implementing a shared runner template that uses `openai_codex` to control `codex app-server --listen stdio://` with artifacted evidence. This epic prevents drift to `codex exec`, generic `openai` SDK calls, raw app-server transport control, or accidental KAB Stage 2 claims.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| CODEXSDK-001 | Specify Stage 1 direct Codex SDK/app-server runner SOT | In Review | `docs/sot/stage1-direct-codex-sdk-appserver-runner.md` defines the supported Stage 1 control path as KAS Python runner template -> `openai_codex` SDK -> SDK-managed `codex app-server --listen stdio://`; rejects `codex exec`, generic `openai` SDK usage, ordinary raw `ws://`/`unix://`/REST-like app-server control, and silent Stage 2 fallback; registers the SOT in docs indexes and roadmap. | Local evidence: SOT/docs registration, docs-map YAML parse, focused docs-contract coverage, `git diff --check`, and `make test` passed. Pending Red/Orange/Gray review and responsible approval before marking Completed. No profile mutation, KAB activation, auth/token/gateway/provider/model change, or live runtime state change is authorized by this docs/spec task. |
+| CODEXSDK-002 | Implement shared Python runner template | In Review | Add `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` or the approved equivalent. The template imports `openai_codex`, runs with real-user `HOME`, starts/resumes Codex threads through the SDK-managed app-server path, supports read-only vs workspace-write sandbox selection, writes compact/detail artifacts, records `thread_id`, preflight, exit code, and no-KAB-Codex rationale, and fails closed on missing/stale prerequisites. | Local template and docs-contract/readback evidence exists; Python compile/help/preflight failure-path smoke, real read-only Codex turn smoke via `uv run --with 'pydantic>=2.12'`, and repository test gate passed. Model-specific override `gpt-5.1-codex-mini` failed under ChatGPT-account Codex and is not used as default. Pending review/final gates and commit approval. |
+| CODEXSDK-003 | Wire Stage 1 runner guidance into KAS skills/templates | In Review | Phase skills and run-artifact/prompt templates point Stage 1 direct Codex work to the shared runner template and evidence checklist, while Stage 2/3 KAB guidance remains separate. KAS guidance rejects `codex exec` and generic `openai` SDK as Stage 1 evidence and rejects silent fallback from Stage 2 to Stage 1. | Local evidence: affected skill/template readback, focused docs-contract coverage, `git diff --check`, and `make test` passed. Pending Red/Orange/Gray review, final KAH gate, and commit approval. |
+
+CODEXSDK deferrals unless separately approved: persistent shared app-server daemon, raw websocket/unix-socket app-server control, a REST-like app-server proxy, KAB `native_codex` adapter changes, Stage 2 activation, Stage 3 backend selection, auth/token/gateway/provider/model mutation, and operational rollout to installed project KAS suites.
+
 ### EPIC: KASUPD — project-specific KAS upstream sync and semantic-port workflow
 
 > Goal: let KAN, KLM, `kan-plugin`, `kan-control`, and other project-specific KAS suites adopt new shared KAS policy without overwriting project-local authority, roadmap IDs, test commands, or role boundaries. This epic records the static state YAML first, then implements dry-run evidence, three-way classification, semantic-port prompting, and one approved pilot. The roadmap entry itself is not write authorization for any installed profile or project-specific KAS suite.
@@ -200,6 +213,7 @@ TOKEN deferrals unless separately approved: Hermes runtime context-pruning chang
 - KAS write-capable sync behavior after KASUPD dry-run/state/semantic-port evidence, approval, recovery spec, and Red/operator review.
 - Broad `proposal` CLI mapping across profile install ledgers, project overlays, KAH graph proposals, run-local improvement notes, and shared KAS promotion gates.
 - KAB context/prompt alignment with applied graph version/checksum.
+- Stage 1 direct Codex SDK/app-server runner support is in review under CODEXSDK after adding the SOT, Python runner template, phase-skill/template guidance, and a real read-only default-model Codex turn smoke; completion still requires post-fix Red/Orange/Gray closure review, final gates, and commit approval.
 - KAS/KAH development Stage 2 KAB Codex-first adoption remains planned under KABADOPT until selector implementation, marker/runbook references, and one approved pilot provide evidence.
 - Project-specific KAS upstream sync remains planned under KASUPD until state YAML, dry-run classification, semantic-port packet, and one approved pilot provide evidence.
 - Automated review-by-different-tool transport and evidence; this remains `kab_later`.
