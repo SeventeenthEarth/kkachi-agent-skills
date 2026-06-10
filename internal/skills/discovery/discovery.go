@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +15,19 @@ import (
 )
 
 const NextListAction = "Run install --dry-run before any profile writes."
+
+var (
+	embeddedSourceFS    fs.FS
+	embeddedSourceID    = "embedded://github.com/SeventeenthEarth/kkachi-agent-skills"
+	errNoEmbeddedSource = errors.New("embedded KAS source is not configured")
+)
+
+func ConfigureEmbeddedSource(source fs.FS, sourceID string) {
+	embeddedSourceFS = source
+	if strings.TrimSpace(sourceID) != "" {
+		embeddedSourceID = strings.TrimSpace(sourceID)
+	}
+}
 
 type SourcePack struct {
 	PackID                     string
@@ -75,6 +89,10 @@ type manifestInstall struct {
 }
 
 func FindSourceRepo(start string) (string, error) {
+	implicit := start == ""
+	if implicit && embeddedSourceFS != nil {
+		return materializeEmbeddedSourceRepo()
+	}
 	if start == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -88,6 +106,11 @@ func FindSourceRepo(start string) (string, error) {
 	}
 	info, err := os.Stat(abs)
 	if err != nil {
+		if implicit {
+			if embedded, embeddedErr := materializeEmbeddedSourceRepo(); embeddedErr == nil {
+				return embedded, nil
+			}
+		}
 		return "", fmt.Errorf("source repo path does not exist: %s", abs)
 	}
 	current := abs
@@ -104,7 +127,124 @@ func FindSourceRepo(start string) (string, error) {
 		}
 		current = parent
 	}
+	if implicit {
+		if embedded, embeddedErr := materializeEmbeddedSourceRepo(); embeddedErr == nil {
+			return embedded, nil
+		} else if !errors.Is(embeddedErr, errNoEmbeddedSource) {
+			return "", embeddedErr
+		}
+	}
 	return "", fmt.Errorf("source repo not found from %s", abs)
+}
+
+func materializeEmbeddedSourceRepo() (string, error) {
+	if embeddedSourceFS == nil {
+		return "", errNoEmbeddedSource
+	}
+	checksum, err := embeddedSourceChecksum(embeddedSourceFS)
+	if err != nil {
+		return "", err
+	}
+	cacheRoot, err := os.UserCacheDir()
+	if err != nil || cacheRoot == "" {
+		cacheRoot = os.TempDir()
+	}
+	short := checksum
+	if len(short) > 16 {
+		short = short[:16]
+	}
+	targetRoot := filepath.Join(cacheRoot, "kkachi-agent-skills", "embedded-source-"+short)
+	markerPath := filepath.Join(targetRoot, ".kas-embedded-source-sha256")
+	if data, err := os.ReadFile(markerPath); err == nil && strings.TrimSpace(string(data)) == checksum {
+		return targetRoot, nil
+	}
+	if err := os.RemoveAll(targetRoot); err != nil {
+		return "", err
+	}
+	if err := fs.WalkDir(embeddedSourceFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == "." {
+			return nil
+		}
+		if discoveryEmbeddedInvalidPath(path) {
+			return fmt.Errorf("embedded source contains unsafe path: %s", path)
+		}
+		targetPath := filepath.Join(targetRoot, filepath.FromSlash(path))
+		if d.IsDir() {
+			return os.MkdirAll(targetPath, 0o755)
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		data, err := fs.ReadFile(embeddedSourceFS, path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(targetPath, data, info.Mode().Perm())
+	}); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(markerPath, []byte(checksum+"\n"), 0o644); err != nil {
+		return "", err
+	}
+	_ = embeddedSourceID
+	return targetRoot, nil
+}
+
+func embeddedSourceChecksum(source fs.FS) (string, error) {
+	type entry struct {
+		Path   string `json:"path"`
+		Bytes  int    `json:"bytes"`
+		SHA256 string `json:"sha256"`
+	}
+	entries := []entry{}
+	if err := fs.WalkDir(source, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == "." || d.IsDir() {
+			return nil
+		}
+		if discoveryEmbeddedInvalidPath(path) {
+			return fmt.Errorf("embedded source contains unsafe path: %s", path)
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		data, err := fs.ReadFile(source, path)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(data)
+		entries = append(entries, entry{Path: path, Bytes: len(data), SHA256: hex.EncodeToString(sum[:])})
+		return nil
+	}); err != nil {
+		return "", err
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Path < entries[j].Path })
+	payload, err := json.Marshal(entries)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func discoveryEmbeddedInvalidPath(path string) bool {
+	return path == "" || path == "." || filepath.IsAbs(path) || strings.Contains(path, "\\") || strings.Contains(path, "../") || strings.HasPrefix(path, "../")
 }
 
 func DiscoverSourcePacks(repo string) ([]SourcePack, error) {
@@ -257,9 +397,26 @@ func PackPayload(pack SourcePack) map[string]any {
 }
 
 func SourceRepoInfo(repo string) SourceRepo {
+	if checksum, ok := embeddedSourceChecksumForMaterializedRepo(repo); ok {
+		path := embeddedSourceID + "@sha256:" + checksum
+		clean := false
+		return SourceRepo{Path: path, GitCommit: nil, Dirty: &clean}
+	}
 	commit := gitValue(repo, "rev-parse", "HEAD")
 	dirty := gitDirty(repo)
 	return SourceRepo{Path: repo, GitCommit: commit, Dirty: dirty}
+}
+
+func embeddedSourceChecksumForMaterializedRepo(repo string) (string, bool) {
+	data, err := os.ReadFile(filepath.Join(repo, ".kas-embedded-source-sha256"))
+	if err != nil {
+		return "", false
+	}
+	checksum := strings.TrimSpace(string(data))
+	if checksum == "" {
+		return "", false
+	}
+	return checksum, true
 }
 
 func IsInvalidRelativePath(value string) bool {

@@ -12,8 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/install"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 )
 
 const kabBoundaryMessage = "KAB is not required for minimum CLI doctor; KAB is required for execution-runtime/code-change KAS runs."

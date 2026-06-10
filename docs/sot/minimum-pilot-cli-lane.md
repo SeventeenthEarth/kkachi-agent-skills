@@ -5,7 +5,7 @@ Owner: KHS documentation archive
 Confirming role: Blue-confirmed project authority in kanban task `t_caee9433` for the stated scope; candidate record from `t_1af0dc98` is confirmed for that scope
 Status: Blue-confirmed SOT / roadmap record for the scoped KHS+KAH minimum/pilot harness lane
 Authority level: confirmed lane split and safety constraints; does not replace the current KHS+KAH+KAB execution-runtime SOT
-Scope: KHS docs and future `kkachi-hermes-skills` CLI planning only; no KAH code, KAB docs, runtime configs, profiles, registries, gateway settings, KHC CLI, or Doksuri integration changes
+Scope: KHS docs and future `kkachi-agent-skills` CLI planning only; no KAH code, KAB docs, runtime configs, profiles, registries, gateway settings, KHC CLI, or Doksuri integration changes
 Related docs: `interface-contract.md`, `kas-cli-contract.md`, `../roadmap.md`, `../README.md`, repository `README.md`
 Evidence/source paths: kanban task `t_caee9433` Blue confirmation, kanban task `t_3e6d8b89` Blue final synthesis, and child task `t_1af0dc98`
 
@@ -19,7 +19,7 @@ but KAH is not the skill-pack installer.
 
 KHS documentation already records the full KHS execution path as a KHS+KAH+KAB run path for code-changing KHS work. That remains valid for full Kkachi-governed execution-runtime use.
 
-The Blue-confirmed design direction in `t_caee9433`, following `t_3e6d8b89` and `t_1af0dc98`, adds a narrower lane: a KHS+KAH minimum/pilot harness where a future `kkachi-hermes-skills` CLI helps users install/profile-inject KHS skills, inspect installed state, compare/sync with explicit approval, and create/validate proposal/evidence records. This lane is not a runner or bridge controller.
+The Blue-confirmed design direction in `t_caee9433`, following `t_3e6d8b89` and `t_1af0dc98`, adds a narrower lane: a KHS+KAH minimum/pilot harness where a future `kkachi-agent-skills` CLI helps users install/profile-inject KHS skills, inspect installed state, compare/sync with explicit approval, and create/validate proposal/evidence records. This lane is not a runner or bridge controller.
 
 ## Accepted decision
 
@@ -38,17 +38,17 @@ Two lanes must be kept distinct:
 
 ## Ownership boundaries
 
-- KHS owns profile/global skill-pack content, phase and process guidance, project overlay semantics, semantic self-improvement policy, and future `kkachi-hermes-skills` CLI wording for KHS skill-pack operations.
+- KHS owns profile/global skill-pack content, phase and process guidance, project overlay semantics, semantic self-improvement policy, and future `kkachi-agent-skills` CLI wording for KHS skill-pack operations.
 - KAH owns deterministic project-local state, graph proposals, run artifacts, schemas, events, locks, gates, diagnostics, and evidence persistence. KAH is not a Hermes skill installer and must not become workflow-policy authority.
 - KAB owns backend runtime/session control, prompt dispatch, plan/question/approval/input handling, retained events, status/read evidence, and bridge execution evidence for the full execution-runtime lane.
 
 ## CLI safety constraints
 
-`kkachi-hermes-skills install`:
+`kkachi-agent-skills install`:
 
 - Default MVP mode is copy mode into `~/.hermes/profiles/<profile>/skills/<category>/<skill>/`.
-- The canonical CLIMVP-001 forms are `kkachi-hermes-skills install --profile <profile> <pack-id>... --dry-run` and `kkachi-hermes-skills install --profile <profile> <pack-id>... --approve <evidence-ref>`, as defined in `docs/sot/kas-cli-contract.md`.
-- The older positional form `kkachi-hermes-skills install <profile> <skill-or-category> --dry-run` may remain a human convenience alias only if it resolves to the same internal contract and JSON shape.
+- The canonical CLIMVP-001 forms are `kkachi-agent-skills install --profile <profile> <pack-id>... --dry-run` and `kkachi-agent-skills install --profile <profile> <pack-id>... --approve <evidence-ref>`, as defined in `docs/sot/kas-cli-contract.md`.
+- The older positional form `kkachi-agent-skills install <profile> <skill-or-category> --dry-run` may remain a human convenience alias only if it resolves to the same internal contract and JSON shape.
 - A write-capable install must support dry-run before mutation.
 - Mutation reports must name target profile, source pack/version, planned files, actual changed paths, manifest/checksum results, and recovery or rollback instructions.
 - Native `hermes -p <profile> skills install ...` may be referenced only for the single-skill identifier or direct `SKILL.md` URL behavior that has been verified; repo-root multi-skill-pack install must not be claimed until separately evidenced.
@@ -63,13 +63,13 @@ Symlink mode:
 - Deferred or developer-only.
 - It must not be the default for general users because it creates cross-profile mutation, filesystem portability, and silent drift risks.
 
-`kkachi-hermes-skills sync <profile>`:
+`kkachi-agent-skills sync <profile>`:
 
 - Must not mutate without dry-run, diff, explicit approval, and recovery path.
 - Must compare the installed profile copy against the source KHS pack and report planned changes before applying them.
 - Must fail closed when manifest/checksum or backup/recovery evidence is missing.
 
-`kkachi-hermes-skills proposal <project> ...`:
+`kkachi-agent-skills proposal <project> ...`:
 
 - May create or validate proposals and evidence records.
 - Must not automatically mutate shared KHS, profile skills, project overlays, or KAH graph state without approval/audit evidence.
@@ -79,11 +79,11 @@ Symlink mode:
 
 The safe minimum user path is:
 
-1. `kkachi-hermes-skills list [--profile <profile>] [--category <name>]`
-2. `kkachi-hermes-skills install --profile <profile> <pack-id>... --dry-run`
+1. `kkachi-agent-skills list [--profile <profile>] [--category <name>]`
+2. `kkachi-agent-skills install --profile <profile> <pack-id>... --dry-run`
 3. operator approval for the reported changed paths
-4. `kkachi-hermes-skills install --profile <profile> <pack-id>... --approve <evidence-ref>` with manifest/checksum and recovery report
-5. `kkachi-hermes-skills doctor --profile <profile> [--project <path>]`
+4. `kkachi-agent-skills install --profile <profile> <pack-id>... --approve <evidence-ref>` with manifest/checksum and recovery report
+5. `kkachi-agent-skills doctor --profile <profile> [--project <path>]`
 6. next-action report that clearly says whether the user is in the minimum/pilot lane or must use the full KHS+KAH+KAB execution-runtime lane
 
 ## Self-improvement ledger split
@@ -95,7 +95,7 @@ The safe minimum user path is:
 
 ## Rejected or deferred options
 
-- Rejected for this lane: `kkachi-hermes-skills run`, backend session control, bridge control, KHC command/control, Doksuri integration, or treating the CLI as a KAB substitute.
+- Rejected for this lane: `kkachi-agent-skills run`, backend session control, bridge control, KHC command/control, Doksuri integration, or treating the CLI as a KAB substitute.
 - Deferred: repo-root Hermes multi-skill-pack install claims until current Hermes behavior is verified.
 - Deferred or developer-only: symlink mode.
 - Developer/pilot only: `skills.external_dirs`.

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 )
 
 func repoRoot(t *testing.T) string {
@@ -34,12 +34,119 @@ func buildBinary(t *testing.T) string {
 	return binary
 }
 
+func buildRootBinary(t *testing.T) string {
+	t.Helper()
+	root := repoRoot(t)
+	binary := filepath.Join(t.TempDir(), "kkachi-agent-skills")
+	cmd := exec.Command("go", "build", "-o", binary, ".")
+	cmd.Dir = root
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("root go build failed: %v\n%s", err, output)
+	}
+	return binary
+}
+
 func assertNoHangul(t *testing.T, out string) {
 	t.Helper()
 	for _, r := range out {
 		if r >= 0xAC00 && r <= 0xD7AF {
 			t.Fatalf("expected no Korean prose in human output, got %q", out)
 		}
+	}
+}
+
+func TestRootInstalledBinaryUsesEmbeddedSourceOutsideRepo(t *testing.T) {
+	binary := buildRootBinary(t)
+	workdir := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "profiles", "e2e")
+
+	list := exec.Command(binary, "list", "--profile", "e2e", "--profile-root", profileRoot, "--json")
+	list.Dir = workdir
+	list.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	listOut, err := list.CombinedOutput()
+	if err != nil {
+		t.Fatalf("embedded-source list failed outside repo: %v\n%s", err, listOut)
+	}
+	var listPayload map[string]any
+	if err := json.Unmarshal(listOut, &listPayload); err != nil {
+		t.Fatal(err)
+	}
+	if listPayload["ok"] != true || len(listPayload["packs"].([]any)) == 0 {
+		t.Fatalf("unexpected embedded-source list payload: %+v", listPayload)
+	}
+	if sourceRepo := listPayload["source_repo"].(map[string]any); !strings.Contains(sourceRepo["path"].(string), "embedded") {
+		t.Fatalf("expected embedded source path outside repo, got %+v", sourceRepo)
+	}
+
+	install := exec.Command(binary, "install", "--profile", "e2e", "kkachi-plan", "--dry-run", "--profile-root", profileRoot, "--json")
+	install.Dir = workdir
+	install.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	installOut, err := install.CombinedOutput()
+	if err != nil {
+		t.Fatalf("embedded-source install dry-run failed outside repo: %v\n%s", err, installOut)
+	}
+	var installPayload map[string]any
+	if err := json.Unmarshal(installOut, &installPayload); err != nil {
+		t.Fatal(err)
+	}
+	if installPayload["ok"] != true || installPayload["mode"] != "dry_run" {
+		t.Fatalf("unexpected embedded-source install payload: %+v", installPayload)
+	}
+}
+
+func TestRootInstalledBinaryPrefersEmbeddedSourceOverArbitraryCwdSkills(t *testing.T) {
+	binary := buildRootBinary(t)
+	workdir := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "profiles", "e2e")
+	fakeSkillDir := filepath.Join(workdir, "skills", "fake-local-pack")
+	if err := os.MkdirAll(fakeSkillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fakeSkillDir, "SKILL.md"), []byte("---\nname: fake-local-pack\ndescription: should not be discovered by embedded root binary\n---\n# Fake\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(binary, "list", "--profile", "e2e", "--profile-root", profileRoot, "--json")
+	cmd.Dir = workdir
+	cmd.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("embedded-source list with cwd skills failed: %v\n%s", err, out)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatal(err)
+	}
+	sourceRepo := payload["source_repo"].(map[string]any)
+	if !strings.Contains(sourceRepo["path"].(string), "embedded://github.com/SeventeenthEarth/kkachi-agent-skills") {
+		t.Fatalf("expected embedded source to override cwd skills, got %+v", sourceRepo)
+	}
+	for _, pack := range payload["packs"].([]any) {
+		if pack.(map[string]any)["pack_id"] == "fake-local-pack" {
+			t.Fatalf("root binary discovered arbitrary cwd skills instead of embedded source: %+v", payload)
+		}
+	}
+}
+
+func TestRootInstalledBinaryUsesEmbeddedSkillPackForProjectDryRunOutsideRepo(t *testing.T) {
+	binary := buildRootBinary(t)
+	workdir := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "profiles", "e2e")
+
+	cmd := exec.Command(binary, "install-project-kas", "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--dry-run", "--profile-root", profileRoot, "--json")
+	cmd.Dir = workdir
+	cmd.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("embedded-source project dry-run failed outside repo: %v\n%s", err, out)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["command"] != "install-project-kas" || len(payload["planned_skills"].([]any)) == 0 {
+		t.Fatalf("unexpected embedded-source project dry-run payload: %+v", payload)
 	}
 }
 
@@ -512,8 +619,8 @@ kab_adoption_stage:
   approval_evidence: "not_applicable"
   stage2_activation: false
 upstream_kas:
-  repo: "kkachi-hermes-skills"
-  remote: "github.com/SeventeenthEarth/kkachi-hermes-skills"
+  repo: "kkachi-agent-skills"
+  remote: "github.com/SeventeenthEarth/kkachi-agent-skills"
   commit: "0123456789abcdef0123456789abcdef01234567"
   dirty: false
   synced_at: "2026-06-06T00:00:00Z"

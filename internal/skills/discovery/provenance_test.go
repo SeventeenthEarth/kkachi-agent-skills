@@ -50,7 +50,7 @@ func TestDependencyAuditUsesSkillPackRequiresAsCommandSurfaces(t *testing.T) {
 	repo := t.TempDir()
 	writeSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "Plan", "")
 	writeSkill(t, filepath.Join(repo, "skills", "kkachi-implement"), "Implement", "")
-	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(`name: kkachi-hermes-skills
+	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(`name: kkachi-agent-skills
 requires:
   kkachi-agent-helper: "latest"
   kkachi-agent-bridge: "latest"

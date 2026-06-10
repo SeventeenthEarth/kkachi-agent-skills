@@ -12,8 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/install"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 )
 
 const (
@@ -449,7 +449,7 @@ func plannedManifest(opts Options, sourceChecksum string, skills []PlannedSkill)
 		"project_suites": []map[string]any{{
 			"kind":                        ManifestKind,
 			"project":                     opts.Project,
-			"source_pack":                 map[string]any{"id": opts.SourcePack, "repo": "kkachi-hermes-skills", "checksum": sourceChecksum, "language_profile": "project-specific-prefix-render-only", "formal_registry": "skill-pack.yaml"},
+			"source_pack":                 map[string]any{"id": opts.SourcePack, "repo": "kkachi-agent-skills", "checksum": sourceChecksum, "language_profile": "project-specific-prefix-render-only", "formal_registry": "skill-pack.yaml"},
 			"drift_policy":                "manual_review_required",
 			"semantic_adaptation_claimed": false,
 			"installed_skills":            installed,

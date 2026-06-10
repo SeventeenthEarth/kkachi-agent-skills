@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 )
 
 const modeUninstallDryRun = "project_uninstall_dry_run"
@@ -114,7 +114,7 @@ func BuildProjectUninstallDryRun(opts ProjectSuiteOptions) ProjectUninstallResul
 				"Local-only and unmanifested files are skipped by default.",
 			},
 		},
-		FutureApplyCommand: fmt.Sprintf("kkachi-hermes-skills uninstall --profile %s --project %s --apply dry-run:<hash> --backup-vault-root <abs-path>", opts.Profile, opts.Project),
+		FutureApplyCommand: fmt.Sprintf("kkachi-agent-skills uninstall --profile %s --project %s --apply dry-run:<hash> --backup-vault-root <abs-path>", opts.Profile, opts.Project),
 		NextAction:         "Review uninstall dry-run evidence; removal and backup writes are TOKEN-005 behavior.",
 	}
 	if opts.Profile == "" {
@@ -658,7 +658,7 @@ func finalizeUninstall(result *ProjectUninstallResult) {
 	}
 	canonical := map[string]any{"command": result.Command, "mode": result.Mode, "dry_run": result.DryRun, "no_write": result.NoWrite, "target_profile": result.TargetProfile, "project": result.Project, "source_pack": result.SourcePack, "manifest_sha256": result.ManifestSHA256, "planned_removals": result.PlannedRemovals, "skipped_local_files": result.SkippedLocalFiles, "changed_paths": result.ChangedPaths, "backup_recovery": result.BackupRecovery, "checksums": result.Checksums, "diagnostics": result.Diagnostics}
 	result.PlanHash = checksumAny(canonical)
-	result.FutureApplyCommand = fmt.Sprintf("kkachi-hermes-skills uninstall --profile %s --project %s --apply dry-run:%s --backup-vault-root <abs-path>", result.TargetProfile.Name, result.Project.ID, result.PlanHash)
+	result.FutureApplyCommand = fmt.Sprintf("kkachi-agent-skills uninstall --profile %s --project %s --apply dry-run:%s --backup-vault-root <abs-path>", result.TargetProfile.Name, result.Project.ID, result.PlanHash)
 	result.OK = noErrorDiagnostics(result.Diagnostics)
 	result.ApprovalRequest = ApprovalRequest{Required: result.OK && len(result.ChangedPaths) > 0, EvidenceRef: "dry-run:" + result.PlanHash, DryRunPlanHash: result.PlanHash, HashIncludesProfile: true, HashIncludesManifestState: true, HashIncludesSourceSuite: true, HashIncludesNoWriteEvidence: true, HashIncludesBackupPlan: true, HashIncludesConflictsAndDiags: true}
 	if !result.OK {

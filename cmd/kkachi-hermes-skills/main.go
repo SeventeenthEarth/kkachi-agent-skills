@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/cli"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/cli"
 )
 
 func main() {

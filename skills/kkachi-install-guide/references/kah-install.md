@@ -5,7 +5,7 @@ Use this reference when `kkachi-agent-helper` is missing, out of date, or when K
 ## Authority boundary
 
 ```text
-KAS / KHS (kkachi-hermes-skills)
+KAS / KHS (`kkachi-agent-skills`, historically `kkachi-hermes-skills`)
   - Hermes skill packs, phase guidance, task contracts, backend-selection guidance,
     prompt profiles, evidence expectations, and project-specific operational suites.
 
@@ -15,7 +15,7 @@ KAH (kkachi-agent-helper)
     phase-plan and approval records, and workflow graph validation/proposal/apply.
 ```
 
-Do not invent a KAH install command. Current KAH capabilities explicitly omit an `install` surface; KAH is installed as a Go binary, and KAS/KHS profile installation belongs to Hermes native tooling or the `kkachi-hermes-skills` CLI lane.
+Do not invent a KAH install command. Current KAH capabilities explicitly omit an `install` surface; KAH is installed as a Go binary. KAS CLI installation is handled by `go install github.com/SeventeenthEarth/kkachi-agent-skills@latest`, and KAS profile skill placement remains a separate KAS/Hermes concern.
 
 ## Prerequisites
 
@@ -24,6 +24,7 @@ Do not invent a KAH install command. Current KAH capabilities explicitly omit an
 - Network access to GitHub and the Go module proxy for remote `go install`.
 - `$(go env GOPATH)/bin` or the selected Go install bin directory on `PATH`.
 - A clear target Hermes profile when verifying KAS/KHS profile installation.
+- Optional local KAS checkout only when using `kkachi-agent-skills --repo <path>` for development overrides; normal CLI installation uses the embedded source.
 
 ## Install KAH from remote module
 
@@ -89,11 +90,10 @@ KAS is not installed by KAH. Verify the KAS/KHS profile independently:
 hermes --profile <profile> skills list | grep kkachi
 ```
 
-If the `kkachi-hermes-skills` CLI is installed and the source repo is available, use its doctor lane for profile-scoped install health:
+If the `kkachi-agent-skills` CLI is installed, use its doctor lane for profile-scoped install health. Do not pass `--repo` for normal installed-binary verification; pass `--repo <local-checkout>` only when intentionally testing local development source.
 
 ```bash
-kkachi-hermes-skills doctor \
-  --repo /path/to/kkachi-hermes-skills \
+kkachi-agent-skills doctor \
   --profile <profile> \
   --json
 ```

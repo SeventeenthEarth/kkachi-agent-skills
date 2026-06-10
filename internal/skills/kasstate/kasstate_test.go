@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/install"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 )
 
 const goodChecksum = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -31,8 +31,8 @@ kab_adoption_stage:
   stage2_activation: false
 
 upstream_kas:
-  repo: "kkachi-hermes-skills"
-  remote: "github.com/SeventeenthEarth/kkachi-hermes-skills"
+  repo: "kkachi-agent-skills"
+  remote: "github.com/SeventeenthEarth/kkachi-agent-skills"
   commit: "0123456789abcdef0123456789abcdef01234567"
   dirty: false
   synced_at: "2026-06-06T00:00:00Z"
@@ -456,8 +456,8 @@ func stateYAMLForBaselines(commit string, baselines []map[string]string) string 
 		`  stage2_activation: false`,
 		``,
 		`upstream_kas:`,
-		`  repo: "kkachi-hermes-skills"`,
-		`  remote: "github.com/SeventeenthEarth/kkachi-hermes-skills"`,
+		`  repo: "kkachi-agent-skills"`,
+		`  remote: "github.com/SeventeenthEarth/kkachi-agent-skills"`,
 		`  commit: "` + commit + `"`,
 		`  dirty: false`,
 		`  synced_at: "2026-06-06T00:00:00Z"`,

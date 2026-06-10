@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/projectinstall"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
 )
 
 func writeCLITestSkill(t *testing.T, dir string, name string) {
@@ -830,8 +830,8 @@ kab_adoption_stage:
   approval_evidence: "not_applicable"
   stage2_activation: false
 upstream_kas:
-  repo: "kkachi-hermes-skills"
-  remote: "github.com/SeventeenthEarth/kkachi-hermes-skills"
+  repo: "kkachi-agent-skills"
+  remote: "github.com/SeventeenthEarth/kkachi-agent-skills"
   commit: "0123456789abcdef0123456789abcdef01234567"
   dirty: false
   synced_at: "2026-06-06T00:00:00Z"

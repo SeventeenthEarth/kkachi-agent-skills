@@ -1,4 +1,4 @@
-name: kkachi-hermes-skills
+name: kkachi-agent-skills
 version: 0.1.0
 requires:
   kkachi-agent-helper: "latest"

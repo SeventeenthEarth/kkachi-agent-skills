@@ -1,12 +1,12 @@
 ---
 name: kkachi-install-guide
-description: Install and verify Kkachi ecosystem components (KHS, KAH, KAB) on the local system, then explain how to initialize a target project through KAH project init.
+description: Install and verify Kkachi ecosystem components (KAS, KAH, KAB) on the local system, then explain how to initialize a target project through KAH project init.
 version: 0.1.0
 ---
 
 # Kkachi Install Guide
 
-Use this skill when the master asks to install, set up, or verify the Kkachi development harness (kkachi-hermes-skills, kkachi-agent-helper, kkachi-agent-bridge) on the current system.
+Use this skill when the master asks to install, set up, or verify the Kkachi development harness (kkachi-agent-skills, kkachi-agent-helper, kkachi-agent-bridge) on the current system.
 
 ## Skill structure and Progressive Disclosure
 
@@ -28,7 +28,8 @@ kkachi-install-guide/
 
 ## Core operating rule
 
-- KHS (kkachi-hermes-skills) is installed via Hermes native skill system (`hermes skills install`) or equivalent local skill placement.
+- KAS (`kkachi-agent-skills`) can be installed as a self-contained Go CLI with `go install github.com/SeventeenthEarth/kkachi-agent-skills@latest`; the binary embeds canonical KAS skills/templates/registries and normally does not require a source checkout. Use `--repo <path>` only for local development overrides.
+- KAS skills can also be installed through Hermes native skill placement when the operator explicitly wants profile-local skill files.
 - KAH (kkachi-agent-helper @latest) is installed via `go install`. This skill attempts automatic installation.
 - KAB (kkachi-agent-bridge) must be installed from a local git clone by building the Go bridge plus plugin/wrapper subprojects. Do not treat `go install` as a complete KAB install because it omits OpenCode TypeScript and Codex Rust artifacts.
 - All install/build attempts are reported to the master with clear pass/fail/status.
@@ -57,19 +58,24 @@ Before starting, identify:
 
 ## Installation flow
 
-### Step 1: Verify KHS
+### Step 1: Verify KAS
 
-KHS is already installed if this skill is running. Confirm with:
-
-```bash
-hermes skills list | grep kkachi
-```
-
-If KHS skills are not listed, install via:
+KAS CLI is installed if `kkachi-agent-skills` is on `PATH`:
 
 ```bash
-hermes skills install SeventeenthEarth/kkachi-hermes-skills/skills/kkachi-install-guide --category kkachi --yes
+which kkachi-agent-skills
+kkachi-agent-skills list --json
 ```
+
+If the CLI is not installed, install the self-contained binary via:
+
+```bash
+go install github.com/SeventeenthEarth/kkachi-agent-skills@latest
+```
+
+The installed binary embeds `skills/`, `templates/`, `registries/`, and `skill-pack.yaml`; do not require `git clone` for normal installation. If developing from a local checkout, pass `--repo <path>` to override the embedded source.
+
+If profile-local Hermes skills are required separately, install the chosen skill path via Hermes native skill placement after confirming the target profile and approval scope.
 
 ## KASREL provenance/dependency evidence gate
 
@@ -238,7 +244,7 @@ Keep the frontmatter `name` globally unique even when the directory is project-s
 When 주군 asks to apply or update KAS for a specific project, distinguish three locations before writing files:
 
 - **Installed operational KAS**: `~/.hermes/profiles/<profile>/skills/...` (or `$HERMES_HOME/skills/...`). This is the first target when the user wants the currently running Hermes/KAS behavior updated for one active profile.
-- **KAS source repository**: `kkachi-hermes-skills/skills/...`. Update this when promoting the installed/profile-local learning back into canonical KAS.
+- **KAS source repository**: `kkachi-agent-skills/skills/...` for local development, or the embedded `kkachi-agent-skills` binary source when installed via `go install`. Update the repository source when promoting the installed/profile-local learning back into canonical KAS.
 - **Project repository state**: `<project>/.kkachi/`, `<project>/.kkachi-workflow.yaml`, project docs/config. Do not create `<project>/skills/` as a stand-in for KAS unless the user explicitly asks for a project-local Hermes skill package.
 
 The preferred place for the active KAS KAB adoption stage is the installed

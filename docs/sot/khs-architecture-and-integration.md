@@ -130,7 +130,7 @@ KHS skills are profile-scoped in Hermes. The target install model is:
 - Project overlay: project-specific guidance, conventions, backend policy, docs map, and local proposals.
 - Proposal layer: run-local or project-overlay improvement proposals that may later be promoted into shared KHS only after gates.
 
-The minimum/pilot lane may provide `kkachi-hermes-skills list/install/doctor/sync/proposal` style support when implemented and evidenced. That lane is not a runner and must not claim KAB control, KHC command/control, Doksuri integration, or backend session authority.
+The minimum/pilot lane may provide `kkachi-agent-skills list/install/doctor/sync/proposal` style support when implemented and evidenced. That lane is not a runner and must not claim KAB control, KHC command/control, Doksuri integration, or backend session authority.
 
 ### 6.3 What a Hermes commander or worker receives
 
@@ -333,7 +333,7 @@ Shared KHS promotion should happen only after generalized evidence, evaluation, 
 
 ### 9.6 Thin CLI/binary surface
 
-A thin `kkachi-hermes-skills` surface is acceptable only for scoped KHS pack operations when implemented and evidenced. Candidate verbs include:
+A thin `kkachi-agent-skills` surface is acceptable only for scoped KHS pack operations when implemented and evidenced. Candidate verbs include:
 
 - `list`: inspect available skills/categories and installed profile state.
 - `install`: profile-scoped copy install with dry-run, manifest/checksum, changed-path report, and recovery path.

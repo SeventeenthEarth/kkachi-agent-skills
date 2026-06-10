@@ -1,6 +1,6 @@
-# Kkachi Hermes Skills
+# Kkachi Agent Skills
 
-Kkachi Agent Skills (KAS; repository historically named `kkachi-hermes-skills` / KHS) is the Hermes Agent skill/process pack for running
+Kkachi Agent Skills (KAS; repository now `kkachi-agent-skills`, historically `kkachi-hermes-skills` / KHS) is the Hermes Agent skill/process pack for running
 Kkachi software-development workflows.
 
 KHS does not own project state and does not replace KAB runtime control.
@@ -24,7 +24,7 @@ KHS now keeps two lanes distinct:
 
 1. KHS+KAH minimum/pilot harness lane
    - Scope: profile-scoped KHS skill-pack install/list/doctor/sync/proposal
-     support through the thin `kkachi-hermes-skills` CLI as each CLIMVP task
+     support through the thin `kkachi-agent-skills` CLI as each CLIMVP task
      lands.
    - Purpose: let users pilot KHS skill injection and KAH evidence/proposal
      workflows without requiring KAB runtime readiness.
@@ -49,7 +49,7 @@ The GLM Octo review lane is independent of these stages. Using GLM as a possible
 ## Components
 
 ```text
-KHS: kkachi-hermes-skills
+KHS: kkachi-agent-skills
   Hermes skills, prompt profiles, phase contracts, templates, and registries.
 
 KAH: kkachi-agent-helper
@@ -70,21 +70,21 @@ backend runtime/control layer.
 CLIMVP implements the profile-scoped minimum CLI surface:
 
 ```bash
-kkachi-hermes-skills list [--repo <path>] [--profile <profile>] [--category <name>] [--json]
-kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --dry-run [--json]
-kkachi-hermes-skills install [--repo <path>] --profile <profile> <pack-id>... --approve dry-run:<hash> [--json]
-kkachi-hermes-skills doctor [--repo <path>] --profile <profile> [--project <path>] [--json]
-kkachi-hermes-skills doctor [--repo <path>] --profile <profile> --project <project> --project-suite [--json]
-kkachi-hermes-skills install [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
-kkachi-hermes-skills install [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
-kkachi-hermes-skills install [--repo <path>] --profile <profile> --project <project> --from-generic --dry-run [--json]
-kkachi-hermes-skills install [--repo <path>] --profile <profile> --project <project> --from-generic --apply dry-run:sha256:<hash> [--json]
-kkachi-hermes-skills update [--repo <path>] --profile <profile> --project <project> --state <path> --dry-run [--json]
-kkachi-hermes-skills update [--repo <path>] --profile <profile> --project <project> --state <path> --apply dry-run:sha256:<hash> [--json]
-kkachi-hermes-skills repair [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
-kkachi-hermes-skills repair [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
-kkachi-hermes-skills uninstall --profile <profile> --project <project> --dry-run [--json]
-kkachi-hermes-skills uninstall --profile <profile> --project <project> --apply dry-run:sha256:<hash> --backup-vault-root <abs-path> [--json]
+kkachi-agent-skills list [--repo <path>] [--profile <profile>] [--category <name>] [--json]
+kkachi-agent-skills install [--repo <path>] --profile <profile> <pack-id>... --dry-run [--json]
+kkachi-agent-skills install [--repo <path>] --profile <profile> <pack-id>... --approve dry-run:<hash> [--json]
+kkachi-agent-skills doctor [--repo <path>] --profile <profile> [--project <path>] [--json]
+kkachi-agent-skills doctor [--repo <path>] --profile <profile> --project <project> --project-suite [--json]
+kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
+kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
+kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --from-generic --dry-run [--json]
+kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --from-generic --apply dry-run:sha256:<hash> [--json]
+kkachi-agent-skills update [--repo <path>] --profile <profile> --project <project> --state <path> --dry-run [--json]
+kkachi-agent-skills update [--repo <path>] --profile <profile> --project <project> --state <path> --apply dry-run:sha256:<hash> [--json]
+kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
+kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
+kkachi-agent-skills uninstall --profile <profile> --project <project> --dry-run [--json]
+kkachi-agent-skills uninstall --profile <profile> --project <project> --apply dry-run:sha256:<hash> --backup-vault-root <abs-path> [--json]
 ```
 
 `list` discovers source KAS packs from `skills/`, reports direct-layout packs
@@ -133,14 +133,16 @@ KAB plan lifecycle, and bridge evidence when those surfaces are in scope.
 Verification for this surface is:
 
 ```bash
-go install ./cmd/kkachi-hermes-skills
+go install .
 make test
 ```
 
-The Go module path is `github.com/SeventeenthEarth/kkachi-hermes-skills`.
-Local development installs use `go install ./cmd/kkachi-hermes-skills`; once
-versioned remotely, the natural install path is
-`go install github.com/SeventeenthEarth/kkachi-hermes-skills/cmd/kkachi-hermes-skills@<version>`.
+The Go module path is `github.com/SeventeenthEarth/kkachi-agent-skills`.
+Local development installs can use `go install .`; the remote install path is
+`go install github.com/SeventeenthEarth/kkachi-agent-skills@latest`. The root
+binary embeds `skills/`, `templates/`, `registries/`, and `skill-pack.yaml`, so
+normal installs do not require a local source checkout. Use `--repo <path>` only
+when intentionally overriding the embedded source with a local development checkout.
 
 ## When KHS Should Trigger
 
@@ -227,7 +229,7 @@ Verified constraint: current live Hermes evidence proves a single hub identifier
 or direct `SKILL.md` URL install path, not repo-root multi-skill-pack install.
 Do not claim that installing this repository root installs every KHS skill until
 that behavior is separately evidenced. For the minimum/pilot lane, the future
-`kkachi-hermes-skills install <profile> <skill-or-category>` path must default
+`kkachi-agent-skills install <profile> <skill-or-category>` path must default
 to copy mode with dry-run, manifest/checksum, changed-path report, and recovery
 instruction.
 

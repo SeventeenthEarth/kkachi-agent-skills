@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 )
 
 type manifestSkillRecord struct {
@@ -258,7 +258,7 @@ func projectSuiteManifestEntry(dryRun Result, evidenceRef string, approvedHash s
 		"dry_run_plan_hash":           dryRun.PlanHash,
 		"approved_plan_hash":          approvedHash,
 		"project":                     dryRun.Project.ID,
-		"source_pack":                 map[string]any{"id": dryRun.SourcePack.ID, "repo": "kkachi-hermes-skills", "commit": dryRun.SourceRepo.GitCommit, "checksum": dryRun.SourcePack.SuiteChecksum, "language_profile": "project-specific-prefix-render-only", "formal_registry": "skill-pack.yaml"},
+		"source_pack":                 map[string]any{"id": dryRun.SourcePack.ID, "repo": "kkachi-agent-skills", "commit": dryRun.SourceRepo.GitCommit, "checksum": dryRun.SourcePack.SuiteChecksum, "language_profile": "project-specific-prefix-render-only", "formal_registry": "skill-pack.yaml"},
 		"drift_policy":                "manual_review_required",
 		"semantic_adaptation_claimed": false,
 		"tailoring_mode":              "prefix_render_only",

@@ -59,7 +59,7 @@ kab_adoption_stage:
 
 upstream_kas:
   repo: "kkachi-hermes-skills"
-  remote: "github.com/SeventeenthEarth/kkachi-hermes-skills"
+  remote: "github.com/SeventeenthEarth/kkachi-agent-skills"
   commit: "<full-git-sha>"
   dirty: false
   synced_at: "2026-06-06T00:00:00Z"

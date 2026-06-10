@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/install"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 )
 
 const (
@@ -181,7 +181,7 @@ type Classification struct {
 
 func BuildLifecycleUpdate(opts Options) LifecycleUpdateResult {
 	sync := Build(opts)
-	doctorCommand := fmt.Sprintf("kkachi-hermes-skills doctor --profile %s --project %s --project-suite", opts.Profile, opts.Project)
+	doctorCommand := fmt.Sprintf("kkachi-agent-skills doctor --profile %s --project %s --project-suite", opts.Profile, opts.Project)
 	result := LifecycleUpdateResult{
 		OK:             sync.OK,
 		Command:        "update",

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/install"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 )
 
 var ErrExit = errors.New("fake command exit")

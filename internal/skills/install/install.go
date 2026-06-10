@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 )
 
 const (
@@ -564,7 +564,7 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 	actualChanged = append(actualChanged, manifestChanged)
 
 	result := buildApprovedResult(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, true, nil)
-	result.NextAction = "Install complete. Next: kkachi-hermes-skills doctor --profile " + dryRun.TargetProfile.Name + " (implemented in CLIMVP-005)."
+	result.NextAction = "Install complete. Next: kkachi-agent-skills doctor --profile " + dryRun.TargetProfile.Name + " (implemented in CLIMVP-005)."
 	return result, nil
 }
 

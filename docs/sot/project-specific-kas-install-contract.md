@@ -143,7 +143,7 @@ Minimum compatible manifest shape:
       "project": "doksuri-server",
       "source_pack": {
         "id": "kas-default-project-suite",
-        "repo": "kkachi-hermes-skills",
+        "repo": "kkachi-agent-skills",
         "commit": "<sha-or-null>",
         "checksum": "sha256:<hex>",
         "language_profile": "project-specific-prefix-render-only",
@@ -196,7 +196,7 @@ Diagnostic records must include `project`, `installed_skill` when applicable,
 KASPROJ-002 implements the read-only dry-run planner surface, preserved exactly by KASPROJ-003:
 
 ```bash
-kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run [--json]
+kkachi-agent-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run [--json]
 ```
 
 The planner resolves the formal source suite `kas-default-project-suite` from repository `skill-pack.yaml` plus current source skills under repo `skills/`, renders project-prefixed installed names and target paths, reports all `target_path` changes, computes checksum and `plan_hash` evidence, and performs no profile writes. Source skill `kkachi-plan` renders to installed skill `<project>-plan` and target path `skills/<project>/<project>-plan/SKILL.md`; other source skills strip a leading `kkachi-` when present before applying the project prefix.
@@ -228,7 +228,7 @@ Generic installed skill names, missing project prefix, unsafe/escaping target pa
 KASPROJ-003 approved install surface:
 
 ```bash
-kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --approve dry-run:<plan_hash> [--json]
+kkachi-agent-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --approve dry-run:<plan_hash> [--json]
 ```
 
 Approved install recomputes the current dry-run, compares approval evidence to the recomputed `plan_hash`, and fails closed before any write unless `--approve dry-run:<plan_hash>` exactly matches the recomputed plan hash and the plan is `ok:true`. Missing both `--dry-run`/`--approve`, using both together, malformed approval evidence, unsupported write/force/repair/migrate/from-generic flags, unguarded `--profile-root`, unknown profiles, unsafe/path-traversing targets, symlink escapes, ambiguous duplicate manifest entries, duplicate installed skills/target paths, unmanifested existing targets, local modifications, and checksum mismatches must return exit 2 with `ok:false` JSON.
@@ -238,11 +238,11 @@ Safe write ordering is: preflight all source/target checksums and paths, create 
 KASPROJ-004 implemented doctor/repair/migrate forms:
 
 ```bash
-kkachi-hermes-skills doctor --profile <profile> --project <project> --project-suite [--json]
-kkachi-hermes-skills repair-project-kas --profile <profile> --project <project> --dry-run [--json]
-kkachi-hermes-skills repair-project-kas --profile <profile> --project <project> --approve dry-run:<hash> [--json]
-kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run [--json]
-kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --approve dry-run:<hash> [--json]
+kkachi-agent-skills doctor --profile <profile> --project <project> --project-suite [--json]
+kkachi-agent-skills repair-project-kas --profile <profile> --project <project> --dry-run [--json]
+kkachi-agent-skills repair-project-kas --profile <profile> --project <project> --approve dry-run:<hash> [--json]
+kkachi-agent-skills migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run [--json]
+kkachi-agent-skills migrate-project-kas --profile <profile> --project <project> --from-generic --approve dry-run:<hash> [--json]
 ```
 
 When `doctor --project-suite` is absent, `doctor --project <path>` keeps its existing KAH project-path meaning. When `--project-suite` is present, `--project` is the project suite id. Repair and migration default `source_pack` to `kas-default-project-suite`; optional explicit `--source-pack` values fail closed when unknown, and the resolved source pack is included in JSON, diagnostics, and plan-hash evidence.

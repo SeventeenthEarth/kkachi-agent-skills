@@ -98,6 +98,24 @@ func expectedPackChecksum(t *testing.T, packDir string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func TestEmbeddedSourceInvalidPathRejectsUnsafeNames(t *testing.T) {
+	cases := map[string]bool{
+		"":                true,
+		".":               true,
+		"/absolute":       true,
+		"../escape":       true,
+		"skills/../bad":   true,
+		"skills\\bad":     true,
+		"skills/good":     false,
+		"skill-pack.yaml": false,
+	}
+	for path, wantInvalid := range cases {
+		if got := discoveryEmbeddedInvalidPath(path); got != wantInvalid {
+			t.Fatalf("discoveryEmbeddedInvalidPath(%q) = %v, want %v", path, got, wantInvalid)
+		}
+	}
+}
+
 func TestDiscoversDirectSkillLayoutAsCorePack(t *testing.T) {
 	repo := t.TempDir()
 	writeSkill(t, filepath.Join(repo, "skills", "alpha"), "Alpha Pack", "Alpha description")

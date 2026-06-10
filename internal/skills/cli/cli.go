@@ -9,11 +9,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/discovery"
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/doctor"
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/install"
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/kasstate"
-	"github.com/SeventeenthEarth/kkachi-hermes-skills/internal/skills/projectinstall"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/doctor"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kasstate"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
 )
 
 var installPromptInput io.Reader = os.Stdin
@@ -781,7 +781,7 @@ func isHelpArg(arg string) bool {
 }
 
 func printRootHelp(w io.Writer) {
-	fmt.Fprintln(w, "Usage: kkachi-hermes-skills <command> [options]")
+	fmt.Fprintln(w, "Usage: kkachi-agent-skills <command> [options]")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Available commands:")
 	fmt.Fprintln(w, "  list     List available KAS skill packs")
@@ -794,7 +794,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "Compatibility commands:")
 	fmt.Fprintln(w, "  sync-project-kas, install-project-kas, repair-project-kas, migrate-project-kas")
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Use \"kkachi-hermes-skills <command> --help\" for command options.")
+	fmt.Fprintln(w, "Use \"kkachi-agent-skills <command> --help\" for command options.")
 }
 
 func emitError(w io.Writer, code string, message string, command string, jsonOutput bool, nextAction string) int {

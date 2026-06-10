@@ -5,7 +5,7 @@ Owner: KAS workflow/policy layer
 Confirming role: responsible approver / color-role governance evidence record
 Status: accepted SOT for KASREL-001; docs/spec-only contract; not implementation authorization and not installed-profile mutation approval
 Authority level: source of truth for KAS release-compatibility provenance and dependency audit fields plus KASREL guidance evidence gates
-Scope: `kkachi-hermes-skills` KAS provenance/dependency contract for `list --json`, `install --dry-run --json`, and `doctor --json` output plus KASREL-004 guidance evidence gates
+Scope: `kkachi-agent-skills` KAS provenance/dependency contract for `list --json`, `install --dry-run --json`, and `doctor --json` output plus KASREL-004 guidance evidence gates
 Related docs: `docs/roadmap.md`, `docs/sot/kas-cli-contract.md`, `docs/sot/project-kas-sync-state.md`, `docs/README.md`
 Evidence handles: KASREL color review loop round 1 `red=t_0c91b4cf`, `orange=t_cedd82fc`, `gray=t_983ce96e`; round 2 final consensus `red=t_8a90c4ef`, `orange=t_44fa2173`, `gray=t_3e1024bf`; blue final synthesis recorded on the review cards
 
@@ -131,7 +131,7 @@ Command surfaces must not be represented as fake skill dependencies. A missing c
 
 ## 9. KASREL-004 guidance evidence gate
 
-Before KAS guidance claims install health, readiness, release compatibility, orchestration safety, review PASS, verification PASS, or final completion for KAS skills, it must cite current non-secret KASREL provenance/dependency evidence from `kkachi-hermes-skills list --json`, `kkachi-hermes-skills install --dry-run --json`, or `kkachi-hermes-skills doctor --json` as appropriate. Required readback fields are `provenance_contract_version`, `source_class_evidence`, `dependency_audit`, `skill_dependencies`, `command_surface_dependencies`, and `deleted_bundle_reference` / `deleted_bundle_diagnostics` when present. Missing, ambiguous, or stale evidence fails closed to `not ready`, `blocked`, or `needs audit`; do not upgrade it to confidence by assumption.
+Before KAS guidance claims install health, readiness, release compatibility, orchestration safety, review PASS, verification PASS, or final completion for KAS skills, it must cite current non-secret KASREL provenance/dependency evidence from `kkachi-agent-skills list --json`, `kkachi-agent-skills install --dry-run --json`, or `kkachi-agent-skills doctor --json` as appropriate. Required readback fields are `provenance_contract_version`, `source_class_evidence`, `dependency_audit`, `skill_dependencies`, `command_surface_dependencies`, and `deleted_bundle_reference` / `deleted_bundle_diagnostics` when present. Missing, ambiguous, or stale evidence fails closed to `not ready`, `blocked`, or `needs audit`; do not upgrade it to confidence by assumption.
 
 Deleted-bundle references are cleanup/fail-closed diagnostics only. Do not look up stale bundle paths, substitute another bundle/hub/external/profile/KAS-managed skill, invent fallback candidates, or downgrade a required missing deleted-bundle skill to a warning. Report the `deleted_bundle_reference` or deleted-bundle diagnostic with evidence and treat it as blocking readiness when required.
 

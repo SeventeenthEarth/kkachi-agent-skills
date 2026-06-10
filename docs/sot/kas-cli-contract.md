@@ -5,7 +5,7 @@ Owner: KAS workflow/policy layer
 Confirming role: Kkachi-team review accepted; 주유 harness review accepted; 사마의 final Red review accepted
 Status: accepted SOT for `CLIMVP-001` and KABADOPT-001 stage-selector closure; implemented surfaces remain bounded by their roadmap evidence
 Authority level: command-surface and manifest/checksum contract for the KHS+KAH minimum/pilot CLI lane
-Scope: `kkachi-hermes-skills` / KAS profile-scoped skill-pack `list`, `install --dry-run`, approved copy install, and `doctor`; no KAB runtime, KHC command/control, Doksuri integration, or KAH install-command expansion
+Scope: `kkachi-agent-skills` / KAS profile-scoped skill-pack `list`, `install --dry-run`, approved copy install, and `doctor`; no KAB runtime, KHC command/control, Doksuri integration, or KAH install-command expansion
 Related docs: `docs/sot/minimum-pilot-cli-lane.md`, `docs/sot/interface-contract.md`, `docs/sot/khs-architecture-and-integration.md`, `docs/sot/project-specific-kas-install-contract.md`, `docs/README.md`, `docs/roadmap.md`, repository `README.md`
 Evidence/source paths: KAH run `run-20260525T161641Z-4160f06cf1be`; populated artifacts include `intake-classification.md`, `sot-basis.md`, `plan.md`, `context-pack.md`, `docs-update.md`, `sot-update.md`, `roadmap-update.md`, `verification.md`, `review.md`, and `final-report.md`; review tasks are 하후연 `t_2fd07174`, 여몽 `t_e04116b6` plus re-review `t_abc30909`, 진궁 `t_b8db3ead` plus re-review `t_e652a24c`, 주유 `t_6cc40c59`, and 사마의 `t_e479171c`
 
@@ -14,10 +14,10 @@ Evidence/source paths: KAH run `run-20260525T161641Z-4160f06cf1be`; populated ar
 `CLIMVP-001` defines a narrow KAS-owned CLI contract for profile-scoped skill-pack operations:
 
 ```text
-kkachi-hermes-skills list [--profile <profile>] [--category <name>]
-kkachi-hermes-skills install --profile <profile> <pack-id>... --dry-run
-kkachi-hermes-skills install --profile <profile> <pack-id>... --approve <evidence-ref>
-kkachi-hermes-skills doctor --profile <profile> [--project <path>]
+kkachi-agent-skills list [--profile <profile>] [--category <name>]
+kkachi-agent-skills install --profile <profile> <pack-id>... --dry-run
+kkachi-agent-skills install --profile <profile> <pack-id>... --approve <evidence-ref>
+kkachi-agent-skills doctor --profile <profile> [--project <path>]
 ```
 
 This CLI is a KAS minimum/pilot harness lane. It helps users inspect available KAS skill packs, preview profile-scoped copies, perform approved copy installs, and verify installed state. It is not a Kkachi runner and must not control KAB sessions, KHC authority, Doksuri integration, backend execution, or KAH deterministic state beyond reading KAH availability/project status for `doctor` reporting.
@@ -51,7 +51,7 @@ The KAS minimum CLI must not:
 
 ## 4. Terms
 
-- **Source repo:** the checked-out `kkachi-hermes-skills` repository that contains KAS `skills/`, `registries/`, `templates/`, and docs.
+- **Source repo:** the default embedded `kkachi-agent-skills` source bundled into the Go binary, or an explicit local checkout selected with `--repo <path>`, containing KAS `skills/`, `registries/`, `templates/`, and docs.
 - **Source pack:** one installable KAS skill directory under `skills/<category>/<skill>/` or the approved equivalent pack layout if this repo later adopts a different physical layout.
 - **Pack id:** stable logical id for a source pack, normally `<category>/<skill>`.
 - **Target profile:** a Hermes profile directory under `~/.hermes/profiles/<profile>/`.
@@ -80,17 +80,17 @@ This extends the profile-scoped manifest vocabulary. The current CLI implements 
 The recommended first-run operator path is:
 
 ```bash
-kkachi-hermes-skills list --profile <profile>
-kkachi-hermes-skills install --profile <profile> <pack-id>... --dry-run
+kkachi-agent-skills list --profile <profile>
+kkachi-agent-skills install --profile <profile> <pack-id>... --dry-run
 # operator reviews changed_paths, counts, conflicts, and dry_run_plan_hash
-kkachi-hermes-skills install --profile <profile> <pack-id>... --approve dry-run:<dry_run_plan_hash>
-kkachi-hermes-skills doctor --profile <profile> [--project <path>]
+kkachi-agent-skills install --profile <profile> <pack-id>... --approve dry-run:<dry_run_plan_hash>
+kkachi-agent-skills doctor --profile <profile> [--project <path>]
 ```
 
 Operator UX decision:
 
 - The stable harness contract is the explicit `--profile <profile>` form because it is unambiguous and keeps profile identity in a named field.
-- The older SOT/README form `kkachi-hermes-skills install <profile> <skill-or-category> --dry-run` may be supported as a human convenience alias, but it must resolve to the same internal contract and JSON shape.
+- The older SOT/README form `kkachi-agent-skills install <profile> <skill-or-category> --dry-run` may be supported as a human convenience alias, but it must resolve to the same internal contract and JSON shape.
 - `skill-or-category` is operator-facing wording. It resolves to one or more canonical `pack_id` values. A concrete skill resolves to one pack; a category resolves to all approved packs under that category.
 - The CLI must print the canonical command equivalent in dry-run output so the operator can copy/paste the approved next command safely.
 
@@ -102,7 +102,7 @@ All commands should support:
 
 ```text
 --json                              emit machine-readable JSON
---repo <path>                       source KAS repo path; default is the current repo when run inside it
+--repo <path>                       explicit local KAS checkout override; default is embedded source bundled in the installed binary
 --profile <profile>                Hermes target profile name where relevant
 --profile-root <path>               explicit profile root override for tests/harness only
 --kab-stage <1|2>                   select KAS/KAH development KAB adoption stage by numeric operator choice
@@ -126,7 +126,7 @@ Human output is not the stable harness contract, but each command must include e
 ```text
 상태: 조회 완료 — profile hwangchung 기준 KAS pack 12개 발견.
 설치 상태: current 4, missing 8, drifted 0, conflict 0.
-소스: /repo/kkachi-hermes-skills @ <git-sha>
+소스: /repo/kkachi-agent-skills @ <git-sha>
 다음: 설치 전 `install --profile hwangchung <pack-id> --dry-run`으로 변경 경로를 확인하세요.
 ```
 
@@ -137,7 +137,7 @@ Human output is not the stable harness contract, but each command must include e
 변경: create 3, update 0, skip 0, conflict 0, error 0.
 증거: dry-run:<dry_run_plan_hash>
 주의: 아직 파일을 쓰지 않았습니다. changed_paths를 확인한 뒤 승인하면 아래 명령을 실행하세요.
-다음: kkachi-hermes-skills install --profile hwangchung software-development/kas-codex-roadmap-development --approve dry-run:<dry_run_plan_hash>
+다음: kkachi-agent-skills install --profile hwangchung software-development/kas-codex-roadmap-development --approve dry-run:<dry_run_plan_hash>
 ```
 
 Approved install example:
@@ -147,7 +147,7 @@ Approved install example:
 변경: create 3, update 0, backup 0, manifest_update 1.
 manifest: ~/.hermes/profiles/hwangchung/.kas/skill-pack-manifest.json
 복구: backup_path 없음(create-only). update가 있으면 backup_path를 함께 출력합니다.
-다음: kkachi-hermes-skills doctor --profile hwangchung
+다음: kkachi-agent-skills doctor --profile hwangchung
 ```
 
 `doctor` example:
@@ -179,10 +179,10 @@ Canonical stage values:
 Flags:
 
 ```bash
-kkachi-hermes-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-stage 1
-kkachi-hermes-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-stage 2
-kkachi-hermes-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-adoption-stage stage1_direct_codex_app_server_baseline
-kkachi-hermes-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-adoption-stage stage2_kab_codex_first
+kkachi-agent-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-stage 1
+kkachi-agent-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-stage 2
+kkachi-agent-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-adoption-stage stage1_direct_codex_app_server_baseline
+kkachi-agent-skills install --profile <profile> <project-kas-pack-id> --dry-run --kab-adoption-stage stage2_kab_codex_first
 ```
 
 Rules:
@@ -267,7 +267,7 @@ JSON shape extension for dry-run, approved install, and doctor where relevant:
 KASUPD-002 added a bounded read-only validation surface for project-specific KAS state. KASUPD-003 extends the same `sync-project-kas --dry-run` surface: after state validation succeeds, the command performs read-only three-way classification and emits semantic-port packet content as JSON evidence.
 
 ```bash
-kkachi-hermes-skills sync-project-kas \
+kkachi-agent-skills sync-project-kas \
   --profile <profile> \
   --project <project-id> \
   --state skills/<project>/<project>-kas/references/kas-project-state.yaml \
@@ -308,7 +308,7 @@ Rules:
 TOKEN-004 public lifecycle wrapper:
 
 ```bash
-kkachi-hermes-skills update \
+kkachi-agent-skills update \
   --profile <profile> \
   --project <project-id> \
   --state skills/<project>/<project>-kas/references/kas-project-state.yaml \
@@ -358,7 +358,7 @@ Minimum JSON shape:
     "diagnostics": []
   },
   "source_repo": {
-    "path": "/repo/kkachi-hermes-skills",
+    "path": "embedded://github.com/SeventeenthEarth/kkachi-agent-skills@<version-or-checksum>",
     "git_commit": "<current-sha-or-null>",
     "dirty": false
   },
@@ -434,7 +434,7 @@ For invalid or missing YAML, JSON output must keep `ok: false`, exit non-zero, i
 Canonical form:
 
 ```bash
-kkachi-hermes-skills list [--profile <profile>] [--category <name>] [--json]
+kkachi-agent-skills list [--profile <profile>] [--category <name>] [--json]
 ```
 
 Purpose:
@@ -459,7 +459,7 @@ Minimum JSON shape:
   "ok": true,
   "command": "list",
   "source_repo": {
-    "path": "/path/to/kkachi-hermes-skills",
+    "path": "embedded://github.com/SeventeenthEarth/kkachi-agent-skills@<version-or-checksum>",
     "git_commit": "<sha-or-null>",
     "dirty": false
   },
@@ -489,14 +489,14 @@ Minimum JSON shape:
 Canonical form:
 
 ```bash
-kkachi-hermes-skills install --profile <profile> <pack-id>... --dry-run [--json]
+kkachi-agent-skills install --profile <profile> <pack-id>... --dry-run [--json]
 ```
 
 Optional convenience forms may be added later only if they resolve to the same internal contract:
 
 ```bash
-kkachi-hermes-skills install <profile> <pack-id> --dry-run
-kkachi-hermes-skills install --profile <profile> --category <category> --dry-run
+kkachi-agent-skills install <profile> <pack-id> --dry-run
+kkachi-agent-skills install --profile <profile> --category <category> --dry-run
 ```
 
 Purpose:
@@ -580,7 +580,7 @@ Minimum JSON shape:
 Canonical form:
 
 ```bash
-kkachi-hermes-skills install --profile <profile> <pack-id>... --approve <evidence-ref> [--json]
+kkachi-agent-skills install --profile <profile> <pack-id>... --approve <evidence-ref> [--json]
 ```
 
 Purpose:
@@ -657,7 +657,7 @@ Minimum JSON shape:
     "instructions": ["Restore files from backup_path", "Restore previous manifest snapshot"]
   },
   "diagnostics": [],
-  "next_action": "Run kkachi-hermes-skills doctor --profile hwangchung."
+  "next_action": "Run kkachi-agent-skills doctor --profile hwangchung."
 }
 ```
 
@@ -666,7 +666,7 @@ Minimum JSON shape:
 Canonical form:
 
 ```bash
-kkachi-hermes-skills doctor --profile <profile> [--project <path>] [--json]
+kkachi-agent-skills doctor --profile <profile> [--project <path>] [--json]
 ```
 
 Purpose:
@@ -733,7 +733,7 @@ Minimum JSON shape:
 KASPROJ project-specific install layout. KASPROJ-002 implements the dry-run planner and KASPROJ-003 implements approval-hash-bound install:
 
 ```bash
-kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --dry-run [--json]
+kkachi-agent-skills install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --dry-run [--json]
 ```
 
 The implemented source pack is `kas-default-project-suite`, resolved from repository `skill-pack.yaml` plus current discovered source skills under repo `skills/`. The command also accepts `--repo` and harness-only `--profile-root` when `KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1`. Missing both `--dry-run`/`--approve`, using both together, malformed `--approve`, missing required flags, unsupported write/force/repair/migrate/from-generic flags, and unguarded profile-root overrides fail closed with exit 2 and `ok:false` JSON when `--json` is requested.
@@ -764,7 +764,7 @@ KASPROJ-002 conflict example:
 Approved install form:
 
 ```bash
-kkachi-hermes-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --approve dry-run:<hash> [--json]
+kkachi-agent-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --approve dry-run:<hash> [--json]
 ```
 
 Approved install recomputes the current dry-run, compares the approval evidence to the recomputed `plan_hash`, and writes nothing unless the hash matches and the plan has no conflicts/errors. It preflights all targets and source checksums, rejects unsafe/path-traversing/symlink-escaping/ambiguous/duplicate/local-modified targets, backs up trusted replacements under `.kas/backups/<install_id>/`, atomically writes project skill files, verifies checksums, and writes `.kas/skill-pack-manifest.json` last. Output includes approval evidence, `install_id`, `manifest_path`, backup/recovery evidence, changed path counts/actions, and a next action to run project-suite doctor.
@@ -772,20 +772,20 @@ Approved install recomputes the current dry-run, compares the approval evidence 
 KASPROJ-004 implemented project-suite doctor/repair/migrate forms:
 
 ```bash
-kkachi-hermes-skills doctor --profile <profile> --project <project> --project-suite [--json]
-kkachi-hermes-skills repair-project-kas --profile <profile> --project <project> --dry-run [--json]
-kkachi-hermes-skills repair-project-kas --profile <profile> --project <project> --approve dry-run:<hash> [--json]
-kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run [--json]
-kkachi-hermes-skills migrate-project-kas --profile <profile> --project <project> --from-generic --approve dry-run:<hash> [--json]
+kkachi-agent-skills doctor --profile <profile> --project <project> --project-suite [--json]
+kkachi-agent-skills repair-project-kas --profile <profile> --project <project> --dry-run [--json]
+kkachi-agent-skills repair-project-kas --profile <profile> --project <project> --approve dry-run:<hash> [--json]
+kkachi-agent-skills migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run [--json]
+kkachi-agent-skills migrate-project-kas --profile <profile> --project <project> --from-generic --approve dry-run:<hash> [--json]
 ```
 
 TOKEN-004 public lifecycle forms wrap the same dry-run planners:
 
 ```bash
-kkachi-hermes-skills install --profile <profile> --project <project> --dry-run [--json]
-kkachi-hermes-skills install --profile <profile> --project <project> --from-generic --dry-run [--json]
-kkachi-hermes-skills repair --profile <profile> --project <project> --dry-run [--json]
-kkachi-hermes-skills uninstall --profile <profile> --project <project> --dry-run [--json]
+kkachi-agent-skills install --profile <profile> --project <project> --dry-run [--json]
+kkachi-agent-skills install --profile <profile> --project <project> --from-generic --dry-run [--json]
+kkachi-agent-skills repair --profile <profile> --project <project> --dry-run [--json]
+kkachi-agent-skills uninstall --profile <profile> --project <project> --dry-run [--json]
 ```
 
 In TOKEN-004, these public project forms were read-only. `install --project`
@@ -869,8 +869,8 @@ Minimum manifest fields:
     "root": "/Users/name/.hermes/profiles/hwangchung"
   },
   "source_repo": {
-    "path": "/repo/kkachi-hermes-skills",
-    "git_remote": "https://github.com/SeventeenthEarth/kkachi-hermes-skills.git",
+    "path": "embedded://github.com/SeventeenthEarth/kkachi-agent-skills@<version-or-checksum>",
+    "git_remote": "https://github.com/SeventeenthEarth/kkachi-agent-skills.git",
     "git_commit": "<sha-or-null>",
     "dirty": false
   },
