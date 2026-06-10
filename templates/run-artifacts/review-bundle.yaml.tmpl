@@ -1,0 +1,97 @@
+review_bundle_version: "token009.v1"
+task_id: "{{ task_id }}"
+run_id: "{{ run_id }}"
+
+acceptance_reference:
+  path: "{{ acceptance_reference_path }}"
+  checksum: "sha256:{{ acceptance_reference_sha256 }}"
+
+diff_artifact:
+  path: "{{ diff_artifact_path }}"
+  checksum: "sha256:{{ diff_artifact_sha256 }}"
+diff_checksum: "sha256:{{ diff_sha256 }}"
+
+changed_paths:
+  - "{{ changed_path_or_not_applicable }}"
+
+verification_summaries:
+  - phase: "{{ phase_or_command }}"
+    status: "{{ pass_fail_blocked_or_not_applicable }}"
+    artifact_path: "{{ verification_artifact_path }}"
+    artifact_checksum: "sha256:{{ verification_artifact_sha256 }}"
+
+forbidden_scope:
+  - "{{ forbidden_scope_or_non_goal }}"
+
+requested_verdict_vocabulary:
+  - accepted
+  - accepted_with_required_rework
+  - rejected
+  - blocked
+
+role_verdicts:
+  - role: "{{ reviewer_role }}"
+    verdict: "{{ accepted_accepted_with_required_rework_rejected_or_blocked }}"
+    artifact_path: "{{ role_review_artifact_path }}"
+    artifact_checksum: "sha256:{{ role_review_artifact_sha256 }}"
+
+finding_dispositions:
+  - finding_id: "{{ finding_id }}"
+    disposition: "{{ accepted_rejected_blocked_or_deferred_with_owner }}"
+    artifact_path: "{{ finding_disposition_artifact_path }}"
+    artifact_checksum: "sha256:{{ finding_disposition_artifact_sha256 }}"
+
+artifact_pointers:
+  - artifact_path: "{{ review_evidence_artifact_path }}"
+    artifact_checksum: "sha256:{{ review_evidence_artifact_sha256 }}"
+
+blue_synthesis_inputs:
+  role_verdicts: "{{ compact_role_verdict_table }}"
+  finding_dispositions: "{{ compact_finding_disposition_table }}"
+  artifact_pointers: "{{ compact_artifact_pointer_table }}"
+
+retrieval_instructions:
+  default: "Read review-bundle.yaml first, then retrieve exact source review artifacts by artifact path and checksum when needed."
+  required_when:
+    - "artifact existence cannot be confirmed"
+    - "artifact checksum mismatches"
+    - "role verdict presence is missing"
+    - "finding disposition presence is missing"
+    - "a blocking finding or forbidden scope decision is needed"
+
+invalidation_behavior:
+  invalid_if:
+    - "referenced artifact is missing"
+    - "referenced artifact checksum changes"
+    - "requested verdict vocabulary changes"
+    - "role verdict presence changes"
+    - "finding disposition presence changes"
+  on_invalid: "Do not rely on review-bundle.yaml; retrieve source review artifacts and regenerate the bundle."
+
+fan_in_watcher:
+  mode: "terminal-only"
+  validation: "mechanical"
+  watcher_status: "{{ pending_or_terminal }}"
+  pending_emit_output: false
+  pending_rule: "pending emits no output"
+  terminal_rule: "terminal emits compact report"
+  terminal_report:
+    collection_notification_only: true
+    purpose: "collection/notification only"
+    allowed_scopes:
+      - artifact existence
+      - artifact checksum
+      - role verdict presence
+      - finding disposition presence
+    allowed_scope_rule: "allowed scopes are mechanically checkable"
+    role_verdicts_collected: "{{ true_or_false }}"
+    finding_dispositions_collected: "{{ true_or_false }}"
+    artifact_pointers_collected: "{{ true_or_false }}"
+    report_artifact_path: "{{ watcher_report_artifact_path }}"
+    report_artifact_checksum: "sha256:{{ watcher_report_artifact_sha256 }}"
+
+boundary_notes:
+  evidence_recovery: "Full review evidence remains recoverable by artifact path and checksum; KAS must not discard review evidence to save tokens."
+  kah_role: "No KAH subjective review judgment or review-quality decision."
+  watcher_boundary: "The watcher is terminal-only, mechanical, and collection/notification only."
+  no_runtime_mutation: "No KAB policy/runtime mutation and no auth/token/provider/gateway/model mutation."

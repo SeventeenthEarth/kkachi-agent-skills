@@ -505,15 +505,108 @@ KAB remains backend/session/control evidence only. TOKEN-008 does not change bac
 
 TOKEN-009 review bundles and no-agent fan-in watchers, and TOKEN-010 changed-path verification matrices, remain separate tasks. TOKEN-008 may mention them only to preserve boundaries and must not define their full schemas here.
 
-### 7.9 KAS PR 9: compact review bundles and no-agent fan-in watchers
+### 7.9 KAS PR 9: compact review bundle and role fan-in watcher
 
-Acceptance criteria:
+TOKEN-009 defines a compact review bundle for Red/Orange/Gray review
+requests and a terminal-only role fan-in watcher. The bundle is a compact
+pointer index for Blue synthesis, not a replacement for review artifacts,
+Kanban comments, KAH evidence, review cards, or final synthesis.
 
-- KAS defines a compact review bundle schema for Red/Orange/Gray review requests, including task id, run id, acceptance reference, diff artifact/checksum, changed paths, verification summaries, forbidden scope, requested verdict vocabulary, role verdicts, finding dispositions, and artifact pointers.
-- Review results are structured enough for Blue synthesis to record each lane verdict, blocking finding, and disposition without pasting full raw review prose into model context by default.
-- No-agent fan-in watcher guidance is limited to collection/notification: pending state emits no output, terminal state emits a compact report with artifact pointers, and watcher output never replaces Kanban comments, KAH evidence, review cards, or Blue synthesis.
-- Watchers may cover review fan-in, long-running verification completion, Codex/KAB completion signals, or blocked-condition probes only when the condition is mechanically checkable.
-- Verification proves the review/watcher contract does not create warning-only gate states, subjective KAH review logic, hidden fallback, or Discord/channel delivery claims without evidence.
+Full review evidence remains recoverable by artifact path and checksum; KAS must not discard review evidence to save tokens.
+
+#### 7.9.1 Compact review bundle schema
+
+KAS run guidance must write the compact review bundle as
+`review-bundle.yaml` when review fan-in is requested. The schema is YAML-ish
+and must preserve the fields Blue needs without pasting full raw review prose
+into model context by default:
+
+```yaml
+review_bundle_version: "token009.v1"
+task_id: "<task id>"
+run_id: "<KAH run id>"
+acceptance_reference:
+  path: "<task contract, SOT, roadmap, issue, or review acceptance path>"
+  checksum: "sha256:<checksum>"
+diff_artifact:
+  path: "<diff or patch artifact path>"
+  checksum: "sha256:<checksum>"
+diff_checksum: "sha256:<diff checksum>"
+changed_paths:
+  - "<changed path>"
+verification_summaries:
+  - phase: "<phase or command>"
+    status: "<pass|fail|blocked|not_applicable>"
+    artifact_path: "<verification artifact path>"
+    artifact_checksum: "sha256:<checksum>"
+forbidden_scope:
+  - "<forbidden scope or non-goal>"
+requested_verdict_vocabulary:
+  - accepted
+  - accepted_with_required_rework
+  - rejected
+  - blocked
+role_verdicts:
+  - role: "<Red|Orange|Gray|other requested role>"
+    verdict: "<requested verdict vocabulary value>"
+    artifact_path: "<role review artifact path>"
+    artifact_checksum: "sha256:<checksum>"
+finding_dispositions:
+  - finding_id: "<stable finding id>"
+    disposition: "<accepted|rejected|blocked|deferred_with_owner>"
+    artifact_path: "<disposition artifact path>"
+    artifact_checksum: "sha256:<checksum>"
+artifact_pointers:
+  - artifact_path: "<review evidence path>"
+    artifact_checksum: "sha256:<checksum>"
+blue_synthesis_inputs:
+  role_verdicts: "<compact lane verdict table>"
+  finding_dispositions: "<compact disposition table>"
+  artifact_pointers: "<recoverable evidence pointers>"
+retrieval_instructions:
+  default: "Read review-bundle.yaml first, then retrieve targeted source review artifacts by path and checksum when exact evidence is needed."
+  required_when:
+    - "artifact existence cannot be confirmed"
+    - "artifact checksum mismatches"
+    - "role verdict presence is missing"
+    - "finding disposition presence is missing"
+    - "a blocking finding or forbidden scope decision is needed"
+invalidation_behavior:
+  invalid_if:
+    - "referenced artifact is missing"
+    - "referenced artifact checksum changes"
+    - "requested verdict vocabulary changes"
+    - "role verdict presence changes"
+    - "finding disposition presence changes"
+  on_invalid: "Do not rely on review-bundle.yaml; retrieve source artifacts and regenerate the bundle."
+```
+
+`task_id`, `run_id`, `acceptance_reference`, `diff_artifact`,
+`diff_checksum`, `changed_paths`, `verification_summaries`,
+`forbidden_scope`, `requested_verdict_vocabulary`, `role_verdicts`,
+`finding_dispositions`, `artifact_pointers`, `blue_synthesis_inputs`,
+`retrieval_instructions`, and `invalidation_behavior` are required review
+bundle fields.
+
+#### 7.9.2 Role fan-in watcher contract
+
+The role fan-in watcher is terminal-only and mechanical. pending emits no output; terminal emits compact report. The watcher is collection/notification only and does not replace Kanban comments, KAH evidence, review cards, review
+artifacts, or Blue synthesis.
+
+allowed scopes are mechanically checkable:
+
+- artifact existence;
+- artifact checksum;
+- role verdict presence;
+- finding disposition presence.
+
+The watcher may cover review fan-in, long-running verification completion,
+Codex/KAB completion signals, or blocked-condition probes only when the
+condition is mechanically checkable. It must not create warning-only gate
+states, subjective KAH review logic, hidden fallback, Discord/channel delivery
+completion claims, evidence discard, Hermes proxy/headroom requirements, KAB
+policy/runtime mutation, or auth/token/provider/gateway/model mutation. No KAH
+subjective review judgment or review-quality decision is authorized.
 
 ### 7.10 KAS PR 10: change-aware verification matrix
 

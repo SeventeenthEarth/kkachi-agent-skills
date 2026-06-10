@@ -194,6 +194,96 @@ evidence_summary_contract:
     - "No auth/token/provider/gateway/model mutation authorization."
     - "TOKEN-009 review bundle and TOKEN-010 changed-path matrix scope remains deferred except boundary mentions."
 
+review_bundle_contract:
+  contract_version: "token009.v1"
+  template: "templates/run-artifacts/review-bundle.yaml.tmpl"
+  artifact_path: ".kkachi/runs/<run_id>/review-bundle.yaml"
+  purpose: "Compact review fan-in pointer bundle for Blue synthesis; source review evidence remains recoverable by artifact path and checksum."
+  mechanical_validation_only: true
+  required_fields:
+    - task_id
+    - run_id
+    - acceptance_reference
+    - diff_artifact.path
+    - diff_artifact.checksum
+    - diff_checksum
+    - changed_paths
+    - verification_summaries
+    - forbidden_scope
+    - requested_verdict_vocabulary
+    - role_verdicts
+    - finding_dispositions
+    - artifact_pointers
+    - blue_synthesis_inputs
+    - retrieval_instructions
+    - invalidation_behavior
+  requested_verdict_vocabulary:
+    - accepted
+    - accepted_with_required_rework
+    - rejected
+    - blocked
+  allowed_scopes:
+    - artifact existence
+    - artifact checksum
+    - role verdict presence
+    - finding disposition presence
+  allowed_scope_rule: "allowed scopes are mechanically checkable"
+  retrieval_instructions:
+    default: "Read review-bundle.yaml first, then retrieve targeted source review artifacts by path and checksum when exact evidence is needed."
+    required_when:
+      - "artifact existence cannot be confirmed"
+      - "artifact checksum mismatches"
+      - "role verdict presence is missing"
+      - "finding disposition presence is missing"
+  invalidation_behavior:
+    invalid_if:
+      - "referenced artifact is missing"
+      - "referenced artifact checksum changes"
+      - "requested verdict vocabulary changes"
+      - "role verdict presence changes"
+      - "finding disposition presence changes"
+    on_invalid: "Do not rely on review-bundle.yaml; retrieve source artifacts and regenerate the bundle."
+  boundary_rules:
+    - "Full review evidence remains recoverable by artifact path and checksum; KAS must not discard review evidence to save tokens."
+    - "No KAH subjective review judgment or review-quality decision."
+    - "No KAB policy/runtime mutation."
+    - "No auth/token/provider/gateway/model mutation."
+
+fan_in_watcher_contract:
+  contract_version: "token009.v1"
+  purpose: "terminal-only role fan-in watcher for compact collection/notification only."
+  terminal_only: true
+  validation: mechanical
+  mechanical_validation_only: true
+  pending_behavior: "pending emits no output"
+  terminal_behavior: "terminal emits compact report"
+  notification_scope: "collection/notification only"
+  pending_emit_output: false
+  terminal_report:
+    required_fields:
+      - watcher_status
+      - collected_roles
+      - missing_roles
+      - role_verdicts
+      - finding_dispositions
+      - artifact_pointers
+      - allowed_scopes
+    allowed_scopes:
+      - artifact existence
+      - artifact checksum
+      - role verdict presence
+      - finding disposition presence
+    allowed_scope_rule: "allowed scopes are mechanically checkable"
+  disallowed_behavior:
+    - "No warning-only gate state."
+    - "No KAH subjective review judgment or review-quality decision."
+    - "No hidden fallback."
+    - "No Discord/channel delivery completion claim."
+    - "No evidence discard."
+    - "No Hermes proxy/headroom requirement."
+    - "No KAB policy/runtime mutation."
+    - "No auth/token/provider/gateway/model mutation."
+
 codegraph_policy:
   first_task_completion_command: "codegraph init -i"
   new_task_start_command: "codegraph index"

@@ -612,3 +612,157 @@ func TestToken008BoundaryNegativeClaimsAbsent(t *testing.T) {
 		}, "contains TOKEN-008 forbidden boundary claim")
 	}
 }
+
+func TestToken009SOTDefinesCompactReviewBundleSchema(t *testing.T) {
+	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{
+		"KAS PR 9: compact review bundle and role fan-in watcher",
+		"TOKEN-009",
+		"Compact review bundle schema",
+		"review_bundle_version: \"token009.v1\"",
+		"task_id",
+		"run_id",
+		"acceptance_reference",
+		"diff_artifact",
+		"diff_checksum",
+		"changed_paths",
+		"verification_summaries",
+		"forbidden_scope",
+		"requested_verdict_vocabulary",
+		"role_verdicts",
+		"finding_dispositions",
+		"artifact_pointers",
+		"blue_synthesis_inputs",
+		"retrieval_instructions",
+		"invalidation_behavior",
+		"review-bundle.yaml",
+		"Full review evidence remains recoverable by artifact path and checksum; KAS must not discard review evidence to save tokens.",
+	})
+}
+
+func TestToken009ReviewBundleKeyIsCanonicalAcrossSOTTemplateAndRegistry(t *testing.T) {
+	for _, rel := range []string{
+		tokenEconomyAgentInstructionSOT,
+		"templates/run-artifacts/review-bundle.yaml.tmpl",
+		"registries/phase-contracts.yaml",
+	} {
+		requireContainsAll(t, rel, []string{"blue_synthesis_inputs"})
+		requireContainsNone(t, rel, []string{"Blue synthesis inputs"}, "uses non-canonical review bundle key")
+	}
+}
+
+func TestToken009ReviewBundleTemplatePreservesPointerDispositionVerdictAndWatcherFields(t *testing.T) {
+	requireContainsAll(t, "templates/run-artifacts/review-bundle.yaml.tmpl", []string{
+		"review_bundle_version: \"token009.v1\"",
+		"task_id:",
+		"run_id:",
+		"acceptance_reference:",
+		"diff_artifact:",
+		"path:",
+		"checksum: \"sha256:",
+		"changed_paths:",
+		"verification_summaries:",
+		"forbidden_scope:",
+		"requested_verdict_vocabulary:",
+		"accepted",
+		"accepted_with_required_rework",
+		"rejected",
+		"blocked",
+		"role_verdicts:",
+		"role:",
+		"verdict:",
+		"finding_dispositions:",
+		"finding_id:",
+		"disposition:",
+		"artifact_pointers:",
+		"artifact_path:",
+		"artifact_checksum:",
+		"blue_synthesis_inputs:",
+		"retrieval_instructions:",
+		"invalidation_behavior:",
+		"fan_in_watcher:",
+		"watcher_status:",
+		"pending_emit_output: false",
+		"terminal_report:",
+		"collection_notification_only: true",
+		"allowed_scopes:",
+	})
+}
+
+func TestToken009PhaseContractsRegisterReviewBundleAndWatcherMechanicalBoundaries(t *testing.T) {
+	requireContainsAll(t, "registries/phase-contracts.yaml", []string{
+		"review_bundle_contract:",
+		"contract_version: \"token009.v1\"",
+		"required_fields:",
+		"task_id",
+		"run_id",
+		"acceptance_reference",
+		"diff_artifact.path",
+		"diff_artifact.checksum",
+		"changed_paths",
+		"verification_summaries",
+		"forbidden_scope",
+		"requested_verdict_vocabulary",
+		"role_verdicts",
+		"finding_dispositions",
+		"artifact_pointers",
+		"blue_synthesis_inputs",
+		"retrieval_instructions",
+		"invalidation_behavior",
+		"mechanical_validation_only",
+		"fan_in_watcher_contract:",
+		"pending emits no output",
+		"terminal emits compact report",
+		"collection/notification only",
+		"allowed_scopes",
+		"No KAH subjective review judgment or review-quality decision.",
+	})
+}
+
+func TestToken009WatcherGuidanceIsTerminalOnlyAndMechanical(t *testing.T) {
+	for _, rel := range []string{
+		tokenEconomyAgentInstructionSOT,
+		"templates/run-artifacts/review-bundle.yaml.tmpl",
+		"registries/phase-contracts.yaml",
+	} {
+		requireContainsAll(t, rel, []string{
+			"terminal-only",
+			"mechanical",
+			"pending emits no output",
+			"terminal emits compact report",
+			"collection/notification only",
+			"allowed scopes are mechanically checkable",
+			"artifact existence",
+			"artifact checksum",
+			"role verdict presence",
+			"finding disposition presence",
+		})
+	}
+}
+
+func TestToken009BoundaryNegativeClaimsAbsent(t *testing.T) {
+	for _, rel := range []string{
+		tokenEconomyAgentInstructionSOT,
+		"templates/run-artifacts/review-bundle.yaml.tmpl",
+		"registries/phase-contracts.yaml",
+	} {
+		requireContainsNone(t, rel, []string{
+			"warning-only gate state is accepted",
+			"warnings are sufficient for review gates",
+			"KAH decides review quality",
+			"KAH makes subjective review judgment",
+			"hidden fallback is allowed",
+			"fallback when review evidence is missing",
+			"Discord delivery proves review completion",
+			"channel delivery proves review completion",
+			"evidence may be discarded after review bundling",
+			"discard review evidence to save tokens is allowed",
+			"headroom is required",
+			"Hermes proxy required",
+			"Hermes proxy is required",
+			"KAB policy mutation is authorized",
+			"KAB runtime mutation is authorized",
+			"auth/token/provider/gateway/model mutation is authorized",
+			"auth, token, provider, gateway, or model mutation is authorized",
+		}, "contains TOKEN-009 forbidden boundary claim")
+	}
+}
