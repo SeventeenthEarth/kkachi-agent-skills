@@ -1,11 +1,14 @@
 package e2e
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -63,8 +66,131 @@ func TestRootInstalledBinaryVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("root binary --version failed: %v\n%s", err, out)
 	}
-	if strings.TrimSpace(string(out)) != "kkachi-agent-skills 0.1.1" {
+	if strings.TrimSpace(string(out)) != "kkachi-agent-skills 0.1.2" {
 		t.Fatalf("unexpected --version output: %q", out)
+	}
+}
+
+func writeFakeKAH(t *testing.T) string {
+	t.Helper()
+	binDir := t.TempDir()
+	helper := filepath.Join(binDir, "kkachi-agent-helper")
+	script := `#!/bin/sh
+case "$*" in
+  "--version")
+    echo "kkachi-agent-helper 0.1.9"
+    ;;
+  "capabilities --json")
+    echo '{"commands":["graph validate","graph explain"],"flags":["workflow_graph_readonly","workflow_graph_diagnostics","workflow_graph_no_direct_yaml_fallback","workflow_graph_configurable_feedback_intake"]}'
+    ;;
+  "graph --help")
+    echo "Usage: graph"
+    echo "  validate"
+    echo "  explain"
+    ;;
+  "graph validate --file .kkachi-workflow.yaml --json")
+    echo '{"ok":true,"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.1.0","checksum":"sha256:e2e"}'
+    ;;
+  "graph explain --file .kkachi-workflow.yaml --json")
+    echo '{"ok":true,"graph":{"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.1.0","checksum":"sha256:e2e"}}'
+    ;;
+  *)
+    echo "unexpected kkachi-agent-helper call: $*" >&2
+    exit 9
+    ;;
+esac
+`
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return binDir
+}
+
+func treeHash(t *testing.T, root string) string {
+	t.Helper()
+	entries := []string{}
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		return "missing"
+	}
+	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		if entry.IsDir() {
+			entries = append(entries, "dir:"+filepath.ToSlash(rel))
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(data)
+		entries = append(entries, "file:"+filepath.ToSlash(rel)+":"+hex.EncodeToString(sum[:]))
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(entries)
+	sum := sha256.Sum256([]byte(strings.Join(entries, "\n")))
+	return hex.EncodeToString(sum[:])
+}
+
+func TestWorkflowGraphDoctorE2ENoWrite(t *testing.T) {
+	root := repoRoot(t)
+	binary := buildRootBinary(t)
+	fakeKAHBin := writeFakeKAH(t)
+	project := t.TempDir()
+	if err := os.WriteFile(filepath.Join(project, ".kkachi-workflow.yaml"), []byte("version: workflow-graph/v1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before := treeHash(t, project)
+	cmd := exec.Command(binary, "doctor", "--repo", root, "--project", project, "--workflow-graph", "--json")
+	cmd.Env = append(os.Environ(), "PATH="+fakeKAHBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("workflow graph doctor failed: %v\n%s", err, out)
+	}
+	if after := treeHash(t, project); after != before {
+		t.Fatalf("workflow graph doctor mutated project tree: before=%s after=%s", before, after)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["mode"] != "workflow_graph_doctor" || payload["no_write"] != true || payload["status"] != "pass" {
+		t.Fatalf("unexpected workflow graph doctor payload: %+v", payload)
+	}
+
+	missingProject := t.TempDir()
+	before = treeHash(t, missingProject)
+	missing := exec.Command(binary, "doctor", "--repo", root, "--project", missingProject, "--workflow-graph", "--json")
+	missing.Env = append(os.Environ(), "PATH="+fakeKAHBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	missingOut, err := missing.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected missing graph to exit non-zero, got output %s", missingOut)
+	}
+	if after := treeHash(t, missingProject); after != before {
+		t.Fatalf("missing graph doctor mutated project tree: before=%s after=%s", before, after)
+	}
+	var missingPayload map[string]any
+	if err := json.Unmarshal(missingOut, &missingPayload); err != nil {
+		t.Fatal(err)
+	}
+	if missingPayload["status"] != "graph_missing" {
+		t.Fatalf("unexpected missing graph payload: %+v", missingPayload)
+	}
+	if _, err := os.Stat(filepath.Join(missingProject, ".kkachi-workflow.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("missing graph doctor created graph file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(missingProject, ".kkachi")); !os.IsNotExist(err) {
+		t.Fatalf("missing graph doctor created .kkachi directory: %v", err)
 	}
 }
 

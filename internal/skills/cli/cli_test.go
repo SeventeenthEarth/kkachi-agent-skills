@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -21,6 +22,15 @@ func writeCLITestSkill(t *testing.T, dir string, name string) {
 	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: "+name+"\n---\n# "+name+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func cliRepoRoot(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
 }
 
 func assertNoHangul(t *testing.T, out string) {
@@ -111,6 +121,41 @@ func assertNoWriteEvidence(t *testing.T, payload map[string]any) {
 	}
 }
 
+func installCLITestFakeKAH(t *testing.T) {
+	t.Helper()
+	binDir := t.TempDir()
+	helper := filepath.Join(binDir, "kkachi-agent-helper")
+	script := `#!/bin/sh
+case "$*" in
+  "--version")
+    echo "kkachi-agent-helper 0.1.9"
+    ;;
+  "capabilities --json")
+    echo '{"commands":["graph validate","graph explain"],"flags":["workflow_graph_readonly","workflow_graph_diagnostics","workflow_graph_no_direct_yaml_fallback","workflow_graph_configurable_feedback_intake"]}'
+    ;;
+  "graph --help")
+    echo "Usage: graph"
+    echo "  validate"
+    echo "  explain"
+    ;;
+  "graph validate --file .kkachi-workflow.yaml --json")
+    echo '{"ok":true,"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.1.0"}'
+    ;;
+  "graph explain --file .kkachi-workflow.yaml --json")
+    echo '{"ok":true,"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.1.0"}'
+    ;;
+  *)
+    echo "unexpected kkachi-agent-helper call: $*" >&2
+    exit 9
+    ;;
+esac
+`
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
 func TestPublicLifecycleFailClosedHumanErrorsAreEnglish(t *testing.T) {
 	for name, args := range map[string][]string{
 		"update-missing-dry-run": {
@@ -169,7 +214,7 @@ func TestRootVersionExitsZeroAndPrintsVersion(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := strings.TrimSpace(stdout.String())
-			if out != "kkachi-agent-skills 0.1.1" {
+			if out != "kkachi-agent-skills 0.1.2" {
 				t.Fatalf("unexpected version output: %q", out)
 			}
 			if stderr.Len() != 0 {
@@ -189,7 +234,7 @@ func TestVersionJSONIncludesBuildMetadata(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload["ok"] != true || payload["command"] != "version" || payload["cli_version"] != "0.1.1" {
+	if payload["ok"] != true || payload["command"] != "version" || payload["cli_version"] != "0.1.2" {
 		t.Fatalf("unexpected version payload: %+v", payload)
 	}
 	if payload["module_path"] == "" || payload["module_version"] == "" || payload["git_commit"] == nil || payload["dirty"] == nil {
@@ -216,6 +261,57 @@ func TestSubcommandHelpExitsZero(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDoctorWorkflowGraphJSONAndFlagValidation(t *testing.T) {
+	installCLITestFakeKAH(t)
+	project := t.TempDir()
+	if err := os.WriteFile(filepath.Join(project, ".kkachi-workflow.yaml"), []byte("version: workflow-graph/v1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"doctor", "--repo", cliRepoRoot(t), "--project", project, "--workflow-graph", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("workflow graph doctor code=%d stderr=%s", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected workflow graph doctor on stdout only, got stderr=%q", stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["command"] != "doctor" || payload["mode"] != "workflow_graph_doctor" || payload["no_write"] != true || payload["status"] != "pass" {
+		t.Fatalf("unexpected workflow graph doctor payload: %+v", payload)
+	}
+	if payload["kas"].(map[string]any)["cli_version"] != "0.1.2" || payload["kah"].(map[string]any)["graph_help_state"] != "ok" {
+		t.Fatalf("missing KAS/KAH evidence: %+v", payload)
+	}
+	for _, raw := range payload["kah"].(map[string]any)["compatibility_flags"].([]any) {
+		flag := raw.(map[string]any)["flag"]
+		if flag == "graph_validate_json" || flag == "graph_explain_json" {
+			t.Fatalf("validate/explain JSON support should be command evidence, not pseudo-flag evidence: %+v", payload)
+		}
+	}
+	if payload["graph"].(map[string]any)["schema_version"] != "workflow-graph/v1" {
+		t.Fatalf("missing graph evidence: %+v", payload)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"doctor", "--repo", cliRepoRoot(t), "--workflow-graph", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected missing project failure, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "project_required")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"doctor", "--repo", cliRepoRoot(t), "--project", project, "--workflow-graph", "--project-suite", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected ambiguous doctor mode failure, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "doctor_mode_ambiguous")
 }
 
 func TestPublicLifecycleWrappersJSONDryRunOnly(t *testing.T) {

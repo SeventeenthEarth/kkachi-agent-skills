@@ -115,7 +115,8 @@ func TestGRSYNC001DocsAndRoadmapRegisterCompatibilityRegistry(t *testing.T) {
 		"Status: accepted SOT for KAS v0.1.2 graph workflow sync support",
 		graphWorkflowSyncRegistry,
 		"GRSYNC-001 implements the KAS-side machine-readable compatibility source",
-		"GRSYNC-002/003",
+		"GRSYNC-002 read-only workflow graph doctor is implemented",
+		"GRSYNC-003",
 	})
 	requireContainsAll(t, "docs/README.md", []string{
 		"sot/graph-workflow-sync-compatibility.md",
@@ -128,7 +129,7 @@ func TestGRSYNC001DocsAndRoadmapRegisterCompatibilityRegistry(t *testing.T) {
 		graphWorkflowSyncRegistry,
 	})
 	requireRoadmapTaskStatus(t, "GRSYNC-001", "Completed")
-	requireRoadmapTaskStatus(t, "GRSYNC-002", "Planned")
+	requireRoadmapTaskStatus(t, "GRSYNC-002", "Completed")
 	requireRoadmapTaskStatus(t, "GRSYNC-003", "Planned")
 	requireContainsAll(t, "docs/roadmap.md", []string{
 		"docs-contract coverage validates registry existence/content",
@@ -137,6 +138,34 @@ func TestGRSYNC001DocsAndRoadmapRegisterCompatibilityRegistry(t *testing.T) {
 		"Gray `t_5b798056`",
 		"Blue synthesis `t_d2d19ec6`",
 		"No KAH code, KAB runtime, profile mutation",
+	})
+}
+
+func TestGRSYNC002ReadOnlyDoctorDocsContract(t *testing.T) {
+	requireRoadmapTaskStatus(t, "GRSYNC-002", "Completed")
+	requireContainsAll(t, "docs/roadmap.md", []string{
+		"post-Octo re-review cards Red `t_f30b1b15`, Orange `t_a52dd584`, Gray `t_8c4e5d3e` all accepted after feedback handling",
+		"GRSYNC-003 | Implement proposal/apply orchestration and periodic check guidance | Planned",
+	})
+	requireContainsAll(t, graphWorkflowSyncSOT, []string{
+		"GRSYNC-002 read-only workflow graph doctor is implemented",
+		"doctor --project <path> --workflow-graph --json",
+		"must not call KAH `graph init`, `graph diff`, `graph propose`, `graph apply`, or `graph export`",
+	})
+	requireContainsAll(t, "docs/sot/kas-cli-contract.md", []string{
+		"doctor --project <path> --workflow-graph --json",
+		"mode: workflow_graph_doctor",
+		"no_write:true",
+		"graph_missing",
+		"graph_conflict",
+	})
+	requireContainsAll(t, "README.md", []string{
+		"doctor [--repo <path>] --project <path> --workflow-graph --json",
+		"without calling graph init/diff/propose/apply/export",
+	})
+	requireContainsAll(t, "docs/README.md", []string{
+		"GRSYNC-002 implements `doctor --project <path> --workflow-graph --json`",
+		"proposal/apply orchestration and periodic check posture remain scoped to GRSYNC-003",
 	})
 }
 

@@ -77,6 +77,7 @@ kkachi-agent-skills install [--repo <path>] --profile <profile> <pack-id>... --d
 kkachi-agent-skills install [--repo <path>] --profile <profile> <pack-id>... --approve dry-run:<hash> [--json]
 kkachi-agent-skills doctor [--repo <path>] --profile <profile> [--project <path>] [--json]
 kkachi-agent-skills doctor [--repo <path>] --profile <profile> --project <project> --project-suite [--json]
+kkachi-agent-skills doctor [--repo <path>] --project <path> --workflow-graph --json
 kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
 kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
 kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --from-generic --dry-run [--json]
@@ -129,6 +130,12 @@ writes.
 `doctor` verifies source pack integrity, installed profile state,
 manifest/checksum consistency, KAH availability/version/capabilities, optional
 project bootstrap/doctor status, and the KAB boundary for the requested lane.
+`doctor --project <path> --workflow-graph --json` is a separate read-only
+workflow graph supportability check: it reads KAS compatibility metadata,
+effective KAH version/capabilities/help, and KAH graph validate/explain evidence
+for `.kkachi-workflow.yaml`; it classifies pass/custom-supported/update/graph
+states without calling graph init/diff/propose/apply/export or writing project,
+profile, KAH, KAB, auth, provider, gateway, token, or model state.
 KAB is not required for this profile-scoped minimum CLI lane. KAB remains
 required for backend execution, automated review-by-different-tool transport,
 KAB plan lifecycle, and bridge evidence when those surfaces are in scope.

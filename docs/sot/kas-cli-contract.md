@@ -20,9 +20,12 @@ kkachi-agent-skills list [--profile <profile>] [--category <name>]
 kkachi-agent-skills install --profile <profile> <pack-id>... --dry-run
 kkachi-agent-skills install --profile <profile> <pack-id>... --approve <evidence-ref>
 kkachi-agent-skills doctor --profile <profile> [--project <path>]
+kkachi-agent-skills doctor --project <path> --workflow-graph --json
 ```
 
 This CLI is a KAS minimum/pilot harness lane. It helps users inspect CLI release/build evidence, inspect available KAS skill packs, preview profile-scoped copies, perform approved copy installs, and verify installed state. It is not a Kkachi runner and must not control KAB sessions, KHC authority, Doksuri integration, backend execution, or KAH deterministic state beyond reading KAH availability/project status for `doctor` reporting.
+
+GRSYNC-002 extends `doctor` with a project workflow graph supportability mode: `doctor --project <path> --workflow-graph --json`. In that mode `--project` is a filesystem path, `--profile` is optional, `--project-suite` is rejected, and the command is read-only. It reports JSON fields `ok`, `command`, `mode: workflow_graph_doctor`, `no_write:true`, `status`, project graph path/presence, KAS compatibility registry readback, KAH version/capabilities/help evidence, KAH graph validate/explain evidence when applicable, diagnostics, reason codes, remediation, and next action. It may classify `pass`, `custom_supported`, `update_kah_required`, `update_kah_recommended`, `update_kas_recommended`, `graph_missing`, `graph_stale`, `graph_broken`, `graph_conflict`, or `unsupported`; only `pass`, `custom_supported`, and non-blocking future update recommendations are success exits. It must not call KAH graph init/diff/propose/apply/export or write `.kkachi-workflow.yaml`, `.kkachi/`, profile files, KAH state, KAB state, auth, token, provider, gateway, model, or project source files.
 
 KAH remains the deterministic project-local state/evidence layer and currently advertises `install_command=false`. Therefore KAS owns this profile-scoped list/install/doctor surface; KAH must not be described as the skill installer.
 

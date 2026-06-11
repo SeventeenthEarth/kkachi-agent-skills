@@ -323,6 +323,7 @@ func runDoctor(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	profile := fs.String("profile", "", "Hermes target profile name")
 	project := fs.String("project", "", "KAH project path to inspect; project suite id when --project-suite is present")
 	projectSuite := fs.Bool("project-suite", false, "interpret --project as a project-specific KAS suite id")
+	workflowGraph := fs.Bool("workflow-graph", false, "inspect project .kkachi-workflow.yaml supportability without writing")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
 	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
@@ -336,6 +337,30 @@ func runDoctor(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	}
 	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "doctor", *jsonOutput, "")
+	}
+	if *workflowGraph {
+		if *projectSuite {
+			return emitError(stderr, "doctor_mode_ambiguous", "doctor --workflow-graph cannot be combined with --project-suite.", "doctor", *jsonOutput, "Rerun with either doctor --project <path> --workflow-graph --json or doctor --project <project> --project-suite.")
+		}
+		if *project == "" {
+			return emitError(stderr, "project_required", "doctor --workflow-graph requires --project <path>.", "doctor", *jsonOutput, "")
+		}
+		result, err := doctor.BuildWorkflowGraph(*repo, doctor.WorkflowGraphOptions{Project: *project})
+		if err != nil {
+			return emitError(stderr, "doctor_failed", err.Error(), "doctor", *jsonOutput, "")
+		}
+		out := stdout
+		code := 0
+		if !result.OK {
+			out = stderr
+			code = 2
+		}
+		if *jsonOutput {
+			_ = writeJSON(out, result)
+		} else {
+			fmt.Fprintln(out, doctor.RenderHumanWorkflowGraph(result))
+		}
+		return code
 	}
 	if *profile == "" {
 		return emitError(stderr, "profile_required", "doctor requires --profile <profile>.", "doctor", *jsonOutput, "")

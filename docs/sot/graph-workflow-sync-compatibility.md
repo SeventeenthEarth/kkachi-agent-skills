@@ -3,7 +3,7 @@
 Date: 2026-06-11
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record pending
-Status: accepted SOT for KAS v0.1.2 graph workflow sync support; GRSYNC-001 compatibility metadata is implemented by `registries/graph-workflow-sync-compatibility.yaml`, while doctor/repair/apply behavior remains planned until GRSYNC-002/003 pass evidence and release gates
+Status: accepted SOT for KAS v0.1.2 graph workflow sync support; GRSYNC-001 compatibility metadata is implemented by `registries/graph-workflow-sync-compatibility.yaml`, GRSYNC-002 read-only workflow graph doctor is implemented by `doctor --project <path> --workflow-graph --json`, and repair/apply behavior remains planned until GRSYNC-003 passes evidence and release gates
 Authority level: KAS-side planning authority for KAS/KAH version compatibility, workflow graph supportability checks, proposal-first sync orchestration, and periodic hardening posture
 Scope: `kkachi-agent-skills` docs, registries, CLI doctor/repair/update guidance, workflow graph support envelope, run evidence guidance; no KAH deterministic implementation, KAB runtime behavior, Hermes profile mutation, auth/token/provider/gateway/model change, or automatic apply without approval
 Related docs: `docs/sot/workflow-graph-integration.md`, `docs/sot/graph-template-registry.md`, `registries/graph-workflow-sync-compatibility.yaml`, `docs/sot/kas-cli-contract.md`, `docs/roadmap.md`, KAH `docs/sot/graph-workflow-sync-diagnostics-and-repair.md`, KAH `docs/compatibility.md`
@@ -56,7 +56,7 @@ The metadata should separate general KAS CLI usability from graph workflow sync 
 
 ### 1. Read-only workflow graph doctor
 
-KAS must provide a read-only project check, likely through `doctor --project <path> --workflow-graph --json` or the approved lifecycle equivalent. The check must gather evidence from the same effective environment that will run the project workflow:
+KAS provides a read-only project check through `doctor --project <path> --workflow-graph --json`. The check gathers evidence from the same effective environment that will run the project workflow:
 
 1. `kkachi-agent-skills --version` or equivalent KAS version evidence.
 2. KAS compatibility metadata readback.
@@ -68,6 +68,8 @@ KAS must provide a read-only project check, likely through `doctor --project <pa
 8. Optional run-local `phase-plan.yaml` compatibility checks when a run is in scope.
 
 The doctor must not mutate `.kkachi-workflow.yaml`, `.kkachi/`, Hermes profiles, KAH binaries, KAB state, or project source files.
+
+GRSYNC-002 implementation boundary: the doctor may call only KAH read-only version/capability/help/validate/explain evidence commands. It must not call KAH `graph init`, `graph diff`, `graph propose`, `graph apply`, or `graph export`; missing/stale/broken graph states are classified and reported without proposal/apply orchestration.
 
 ### 2. Classification vocabulary
 
