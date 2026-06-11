@@ -130,7 +130,7 @@ func TestGRSYNC001DocsAndRoadmapRegisterCompatibilityRegistry(t *testing.T) {
 	})
 	requireRoadmapTaskStatus(t, "GRSYNC-001", "Completed")
 	requireRoadmapTaskStatus(t, "GRSYNC-002", "Completed")
-	requireRoadmapTaskStatus(t, "GRSYNC-003", "Planned")
+	requireRoadmapTaskStatus(t, "GRSYNC-003", "Completed")
 	requireContainsAll(t, "docs/roadmap.md", []string{
 		"docs-contract coverage validates registry existence/content",
 		"Red `t_be0c21da`",
@@ -145,7 +145,7 @@ func TestGRSYNC002ReadOnlyDoctorDocsContract(t *testing.T) {
 	requireRoadmapTaskStatus(t, "GRSYNC-002", "Completed")
 	requireContainsAll(t, "docs/roadmap.md", []string{
 		"post-Octo re-review cards Red `t_f30b1b15`, Orange `t_a52dd584`, Gray `t_8c4e5d3e` all accepted after feedback handling",
-		"GRSYNC-003 | Implement proposal/apply orchestration and periodic check guidance | Planned",
+		"GRSYNC-003 | Implement proposal/apply orchestration and periodic check guidance | Completed",
 	})
 	requireContainsAll(t, graphWorkflowSyncSOT, []string{
 		"GRSYNC-002 read-only workflow graph doctor is implemented",
@@ -165,7 +165,41 @@ func TestGRSYNC002ReadOnlyDoctorDocsContract(t *testing.T) {
 	})
 	requireContainsAll(t, "docs/README.md", []string{
 		"GRSYNC-002 implements `doctor --project <path> --workflow-graph --json`",
-		"proposal/apply orchestration and periodic check posture remain scoped to GRSYNC-003",
+		"proposal/apply orchestration and periodic check posture are implemented by GRSYNC-003 after review/final gates",
+	})
+}
+
+func TestGRSYNC003ProposalApplyDocsContract(t *testing.T) {
+	requireRoadmapTaskStatus(t, "GRSYNC-003", "Completed")
+	requireContainsAll(t, "docs/roadmap.md", []string{
+		"GRSYNC-003 | Implement proposal/apply orchestration and periodic check guidance | Completed",
+		"KAH final gate, `make test`, `go test ./... -count=1`, and `git diff --check` all passed before commit approval",
+	})
+	requireContainsAll(t, graphWorkflowSyncSOT, []string{
+		"GRSYNC-003 proposal/apply orchestration is implemented",
+		"repair --project <path> --workflow-graph --propose --reason <reason> --json",
+		"refuse `pass`, `custom_supported`, `update_kah_required`, `update_kah_recommended`, `update_kas_recommended`, `graph_conflict`, and `unsupported` states",
+		"call KAH `graph diff` only when a valid existing graph can serve as the semantic-diff base",
+		"semantic_diff.state: not_applicable_missing_or_invalid_base",
+		"repair --project <path> --workflow-graph --apply-proposal <proposal-id> --approval <ref> --json",
+		"The periodic default is read-only doctor/report",
+		"Apply is never automatic",
+	})
+	requireContainsAll(t, "docs/sot/kas-cli-contract.md", []string{
+		"mode: workflow_graph_repair_propose",
+		"status: proposal_available",
+		"semantic_diff.state: not_applicable_missing_or_invalid_base",
+		"mode: workflow_graph_repair_apply",
+		"cannot be combined with project-suite repair flags",
+	})
+	requireContainsAll(t, "README.md", []string{
+		"repair [--repo <path>] --project <path> --workflow-graph --propose --reason <reason> [--json]",
+		"repair [--repo <path>] --project <path> --workflow-graph --apply-proposal <proposal-id> --approval <approval-ref> [--json]",
+		"automatic from cron or CI",
+	})
+	requireContainsAll(t, "docs/README.md", []string{
+		"proposal/apply orchestration and periodic check posture are implemented by GRSYNC-003 after review/final gates",
+		"GRSYNC-003 implemented KAH proposal/apply orchestration",
 	})
 }
 

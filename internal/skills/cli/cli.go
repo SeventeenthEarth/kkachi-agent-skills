@@ -11,6 +11,7 @@ import (
 
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/doctor"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/graphsync"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kasstate"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
@@ -412,6 +413,11 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	project := fs.String("project", "", "project-specific KAS id")
 	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
+	workflowGraph := fs.Bool("workflow-graph", false, "orchestrate workflow graph proposal/apply through KAH")
+	propose := fs.Bool("propose", false, "create a KAH workflow graph proposal without applying it")
+	reason := fs.String("reason", "", "proposal reason for workflow graph repair")
+	applyProposal := fs.String("apply-proposal", "", "KAH workflow graph proposal id to apply")
+	graphApproval := fs.String("approval", "", "approval evidence ref for workflow graph apply")
 	dryRun := fs.Bool("dry-run", false, "report planned repairs without writing")
 	approve := fs.String("approve", "", "compatibility alias for --apply dry-run:sha256:<hash>")
 	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash> for approved lifecycle writes")
@@ -424,6 +430,9 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	}
 	if err := fs.Parse(argv); err != nil {
 		return 2
+	}
+	if *workflowGraph {
+		return runWorkflowGraphRepair(*repo, *project, *propose, *reason, *applyProposal, *graphApproval, *dryRun, *approve, *apply, *profile, *sourcePack, *profileRoot, hasFlag(argv, "--source-pack"), hasFlag(argv, "--profile-root"), *jsonOutput, stdout, stderr)
 	}
 	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "repair", *jsonOutput, "")
@@ -461,6 +470,46 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	result.Command = "repair"
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return projectinstall.RenderHumanProjectAction(result)
+	})
+}
+
+func runWorkflowGraphRepair(repo string, project string, propose bool, reason string, applyProposal string, approval string, dryRun bool, approve string, apply string, profile string, sourcePack string, profileRoot string, sourcePackExplicit bool, profileRootExplicit bool, jsonOutput bool, stdout io.Writer, stderr io.Writer) int {
+	if dryRun || approve != "" || apply != "" || profile != "" || sourcePackExplicit || profileRootExplicit || profileRoot != "" {
+		return emitError(stderr, "workflow_graph_repair_mode_ambiguous", "repair --workflow-graph cannot be combined with project-suite repair flags.", "repair", jsonOutput, "Rerun with either repair --workflow-graph --propose or the project-suite repair lifecycle.")
+	}
+	if project == "" {
+		return emitError(stderr, "project_required", "repair --workflow-graph requires --project <project-path>.", "repair", jsonOutput, "")
+	}
+	if propose && applyProposal != "" {
+		return emitError(stderr, "workflow_graph_repair_mode_ambiguous", "repair --workflow-graph accepts either --propose or --apply-proposal, not both.", "repair", jsonOutput, "")
+	}
+	if !propose && applyProposal == "" {
+		return emitError(stderr, "workflow_graph_repair_mode_required", "repair --workflow-graph requires --propose or --apply-proposal <proposal-id>.", "repair", jsonOutput, "Run doctor first, then choose proposal or approved apply.")
+	}
+	if propose && strings.TrimSpace(reason) == "" {
+		return emitError(stderr, "reason_required", "repair --workflow-graph --propose requires --reason <reason>.", "repair", jsonOutput, "")
+	}
+	if applyProposal != "" && strings.TrimSpace(approval) == "" {
+		result, err := graphsync.Apply(graphsync.Options{Repo: repo, Project: project, Proposal: applyProposal, Approval: approval})
+		if err != nil {
+			return emitError(stderr, "workflow_graph_repair_failed", err.Error(), "repair", jsonOutput, "")
+		}
+		return emitResult(stdout, stderr, false, jsonOutput, result, func() string {
+			return graphsync.RenderHuman(result)
+		})
+	}
+	var result graphsync.Result
+	var err error
+	if propose {
+		result, err = graphsync.Propose(graphsync.Options{Repo: repo, Project: project, Reason: reason})
+	} else {
+		result, err = graphsync.Apply(graphsync.Options{Repo: repo, Project: project, Proposal: applyProposal, Approval: approval})
+	}
+	if err != nil {
+		return emitError(stderr, "workflow_graph_repair_failed", err.Error(), "repair", jsonOutput, "")
+	}
+	return emitResult(stdout, stderr, result.OK, jsonOutput, result, func() string {
+		return graphsync.RenderHuman(result)
 	})
 }
 

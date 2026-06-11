@@ -86,6 +86,8 @@ kkachi-agent-skills update [--repo <path>] --profile <profile> --project <projec
 kkachi-agent-skills update [--repo <path>] --profile <profile> --project <project> --state <path> --apply dry-run:sha256:<hash> [--json]
 kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
 kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
+kkachi-agent-skills repair [--repo <path>] --project <path> --workflow-graph --propose --reason <reason> [--json]
+kkachi-agent-skills repair [--repo <path>] --project <path> --workflow-graph --apply-proposal <proposal-id> --approval <approval-ref> [--json]
 kkachi-agent-skills uninstall --profile <profile> --project <project> --dry-run [--json]
 kkachi-agent-skills uninstall --profile <profile> --project <project> --apply dry-run:sha256:<hash> --backup-vault-root <abs-path> [--json]
 ```
@@ -136,6 +138,16 @@ effective KAH version/capabilities/help, and KAH graph validate/explain evidence
 for `.kkachi-workflow.yaml`; it classifies pass/custom-supported/update/graph
 states without calling graph init/diff/propose/apply/export or writing project,
 profile, KAH, KAB, auth, provider, gateway, token, or model state.
+`repair --project <path> --workflow-graph --propose --reason <reason> --json`
+is the explicit opt-in proposal path: it runs the read-only doctor first,
+requires the KAH graph diff/propose/apply capability envelope, writes a complete
+candidate graph from the reviewed KAS template input, calls KAH graph
+diff/propose, and reports proposal evidence without applying the graph.
+`repair --project <path> --workflow-graph --apply-proposal <proposal-id>
+--approval <approval-ref> --json` is the approval-gated apply path: it reruns
+preflight, calls KAH graph apply, then reruns KAH validate/explain. Periodic
+checks must default to doctor/report only; proposal is opt-in and apply is never
+automatic from cron or CI.
 KAB is not required for this profile-scoped minimum CLI lane. KAB remains
 required for backend execution, automated review-by-different-tool transport,
 KAB plan lifecycle, and bridge evidence when those surfaces are in scope.

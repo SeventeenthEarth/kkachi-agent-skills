@@ -3,7 +3,7 @@
 Date: 2026-06-11
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record pending
-Status: accepted SOT for KAS v0.1.2 graph workflow sync support; GRSYNC-001 compatibility metadata is implemented by `registries/graph-workflow-sync-compatibility.yaml`, GRSYNC-002 read-only workflow graph doctor is implemented by `doctor --project <path> --workflow-graph --json`, and repair/apply behavior remains planned until GRSYNC-003 passes evidence and release gates
+Status: accepted SOT for KAS v0.1.2 graph workflow sync support; GRSYNC-001 compatibility metadata is implemented by `registries/graph-workflow-sync-compatibility.yaml`, GRSYNC-002 read-only workflow graph doctor is implemented by `doctor --project <path> --workflow-graph --json`, and GRSYNC-003 proposal/apply orchestration is implemented through `repair --workflow-graph --propose` plus approval-gated `--apply-proposal` after review/final gates
 Authority level: KAS-side planning authority for KAS/KAH version compatibility, workflow graph supportability checks, proposal-first sync orchestration, and periodic hardening posture
 Scope: `kkachi-agent-skills` docs, registries, CLI doctor/repair/update guidance, workflow graph support envelope, run evidence guidance; no KAH deterministic implementation, KAB runtime behavior, Hermes profile mutation, auth/token/provider/gateway/model change, or automatic apply without approval
 Related docs: `docs/sot/workflow-graph-integration.md`, `docs/sot/graph-template-registry.md`, `registries/graph-workflow-sync-compatibility.yaml`, `docs/sot/kas-cli-contract.md`, `docs/roadmap.md`, KAH `docs/sot/graph-workflow-sync-diagnostics-and-repair.md`, KAH `docs/compatibility.md`
@@ -98,19 +98,22 @@ Classification rules:
 
 ### 3. Proposal-first sync orchestration
 
-KAS may provide `repair --workflow-graph --propose` or an approved lifecycle equivalent. Proposal generation must:
+KAS provides `repair --project <path> --workflow-graph --propose --reason <reason> --json`. Proposal generation must:
 
 - run the read-only doctor first;
 - refuse to propose when KAH is below the required graph workflow sync version;
 - generate only complete candidate graph files, never partial patches;
 - preserve user-custom graph intent when the existing graph is supported;
-- call KAH `graph diff` and `graph propose` for stale/broken supported repair cases;
+- call KAH `graph diff` only when a valid existing graph can serve as the semantic-diff base, such as stale supported repair cases;
+- call KAH `graph propose` for missing, stale, or broken supported repair cases, with `semantic_diff.state: not_applicable_missing_or_invalid_base` when the current graph is missing or invalid and no valid base diff can be run;
 - output proposal id/path, semantic diff, risk flags, approval requirement, and next command;
 - avoid applying changes by default.
+- refuse `pass`, `custom_supported`, `update_kah_required`, `update_kah_recommended`, `update_kas_recommended`, `graph_conflict`, and `unsupported` states.
+- preserve that normalized no-diff evidence instead of fabricating a KAH diff for missing or invalid bases.
 
 ### 4. Approval-gated apply orchestration
 
-KAS may provide `repair --workflow-graph --apply --approval <ref>` or an approved lifecycle equivalent. Apply orchestration must:
+KAS provides the safer approved equivalent `repair --project <path> --workflow-graph --apply-proposal <proposal-id> --approval <ref> --json`, avoiding collision with project-suite lifecycle `--apply dry-run:sha256:<hash>`. Apply orchestration must:
 
 - require explicit approval evidence;
 - call KAH apply rather than directly writing `.kkachi-workflow.yaml`;
@@ -119,9 +122,11 @@ KAS may provide `repair --workflow-graph --apply --approval <ref>` or an approve
 - report backup/recovery/audit references returned by KAH;
 - fail closed on KAH drift, proposal mismatch, missing approval, or unsupported graph state.
 
+Normalized apply output must preserve `proposal_id`, `approval_ref`, audit event ids/path, backup/recovery refs when KAH returns them, post-apply checksum/version, validation/explain states, and the next action.
+
 ### 5. Periodic hardening posture
 
-KAS should support safe periodic graph checks through CI, cron, or no-agent runners. The periodic default is read-only doctor/report. Proposal generation is opt-in. Apply is never automatic without explicit approval evidence.
+KAS supports safe periodic graph checks through CI, cron, or no-agent runners by documenting `doctor --project <path> --workflow-graph --json` as the default. The periodic default is read-only doctor/report. Proposal generation is opt-in through `repair --workflow-graph --propose`. Apply is never automatic and requires explicit human approval evidence through `--apply-proposal <proposal-id> --approval <ref>`.
 
 Periodic checks should help detect:
 

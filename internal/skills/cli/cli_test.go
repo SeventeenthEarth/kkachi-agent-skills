@@ -156,6 +156,62 @@ esac
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
+func installCLIWorkflowGraphRepairFakeKAH(t *testing.T) {
+	t.Helper()
+	binDir := t.TempDir()
+	helper := filepath.Join(binDir, "kkachi-agent-helper")
+	script := `#!/bin/sh
+case "$*" in
+  "--version")
+    echo "kkachi-agent-helper 0.1.9"
+    ;;
+  "capabilities --json")
+    echo '{"commands":["graph validate","graph explain","graph diff","graph propose","graph apply"],"flags":["workflow_graph_readonly","workflow_graph_diagnostics","workflow_graph_no_direct_yaml_fallback","workflow_graph_configurable_feedback_intake","workflow_graph_apply"]}'
+    ;;
+  "graph --help")
+    echo "Usage: graph"
+    echo "  validate"
+    echo "  explain"
+    echo "  diff"
+    echo "  propose"
+    echo "  apply"
+    ;;
+  "graph validate --file .kkachi-workflow.yaml --json")
+    if grep -q applied .kkachi-workflow.yaml 2>/dev/null; then
+      echo '{"ok":true,"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.1.0","checksum":"sha256:new"}'
+    else
+      echo '{"ok":true,"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.0.9","checksum":"sha256:old"}'
+    fi
+    ;;
+  "graph explain --file .kkachi-workflow.yaml --json")
+    if grep -q applied .kkachi-workflow.yaml 2>/dev/null; then
+      echo '{"ok":true,"graph":{"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.1.0","checksum":"sha256:new"}}'
+    else
+      echo '{"ok":true,"graph":{"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.0.9","checksum":"sha256:old"}}'
+    fi
+    ;;
+  "graph diff --from .kkachi-workflow.yaml --to .kkachi/graph/candidates/kas-default-9e933dd77ff2c95c.yaml --semantic --json")
+    echo '{"ok":true,"summary":"semantic diff ready","risk_flags":["phase_path_change"],"reason_codes":["graph_stale"]}'
+    ;;
+  "graph propose --candidate-file .kkachi/graph/candidates/kas-default-9e933dd77ff2c95c.yaml --reason repair --json")
+    echo '{"ok":true,"proposal_id":"prop-1","proposal_path":".kkachi/graph/proposals/prop-1.yaml","approval_required":true,"risk_flags":["phase_path_change"],"reason_codes":["proposal_recorded"]}'
+    ;;
+  "graph apply --proposal prop-1 --approval approved:1 --json")
+    printf 'version: workflow-graph/v1\napplied: true\n' > .kkachi-workflow.yaml
+    echo '{"ok":true,"proposal_id":"prop-1","approval_ref":"approved:1","audit_event_ids":["evt-1"],"audit_path":".kkachi/events/evt-1.json","backup_path":".kkachi/graph/backups/old.yaml","recovery_path":".kkachi/graph/recovery/prop-1.md"}'
+    ;;
+  *)
+    echo "unexpected kkachi-agent-helper call: $*" >&2
+    exit 9
+    ;;
+esac
+`
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
 func TestPublicLifecycleFailClosedHumanErrorsAreEnglish(t *testing.T) {
 	for name, args := range map[string][]string{
 		"update-missing-dry-run": {
@@ -261,6 +317,74 @@ func TestSubcommandHelpExitsZero(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRepairWorkflowGraphProposeAndApplyJSON(t *testing.T) {
+	installCLIWorkflowGraphRepairFakeKAH(t)
+	project := t.TempDir()
+	if err := os.WriteFile(filepath.Join(project, ".kkachi-workflow.yaml"), []byte("version: workflow-graph/v1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"repair", "--repo", cliRepoRoot(t), "--project", project, "--workflow-graph", "--propose", "--reason", "repair", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("workflow graph propose failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var proposal map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &proposal); err != nil {
+		t.Fatal(err)
+	}
+	if proposal["ok"] != true || proposal["mode"] != "workflow_graph_repair_propose" || proposal["status"] != "proposal_available" {
+		t.Fatalf("unexpected proposal payload: %+v", proposal)
+	}
+	if proposal["proposal"].(map[string]any)["id"] != "prop-1" || proposal["semantic_diff"].(map[string]any)["state"] != "completed" {
+		t.Fatalf("proposal missing normalized evidence: %+v", proposal)
+	}
+	if !strings.Contains(proposal["next_command"].(string), "--apply-proposal prop-1 --approval <approval-ref>") {
+		t.Fatalf("proposal missing safe next command: %+v", proposal)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair", "--repo", cliRepoRoot(t), "--project", project, "--workflow-graph", "--apply-proposal", "prop-1", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected missing approval to fail closed, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var missingApproval map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &missingApproval); err != nil {
+		t.Fatal(err)
+	}
+	if missingApproval["status"] != "blocked_for_approval" {
+		t.Fatalf("unexpected missing approval payload: %+v", missingApproval)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair", "--repo", cliRepoRoot(t), "--project", project, "--workflow-graph", "--apply-proposal", "prop-1", "--approval", "approved:1", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("workflow graph apply failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var applied map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &applied); err != nil {
+		t.Fatal(err)
+	}
+	if applied["ok"] != true || applied["mode"] != "workflow_graph_repair_apply" || applied["status"] != "applied" {
+		t.Fatalf("unexpected apply payload: %+v", applied)
+	}
+	if applied["post_apply"].(map[string]any)["graph_checksum"] != "sha256:new" {
+		t.Fatalf("apply missing post-apply checksum: %+v", applied)
+	}
+}
+
+func TestRepairWorkflowGraphRejectsProjectSuiteFlags(t *testing.T) {
+	installCLIWorkflowGraphRepairFakeKAH(t)
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"repair", "--repo", cliRepoRoot(t), "--project", t.TempDir(), "--workflow-graph", "--propose", "--reason", "repair", "--profile", "kwanwoo", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected mixed workflow/project repair flags to fail, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "workflow_graph_repair_mode_ambiguous")
 }
 
 func TestDoctorWorkflowGraphJSONAndFlagValidation(t *testing.T) {

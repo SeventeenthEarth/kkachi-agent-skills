@@ -90,6 +90,20 @@ kkachi-agent-helper graph apply --proposal <proposal-id> --approval <evidence-re
 kkachi-agent-helper graph export --format mermaid|plantuml [--output <path>] [--json]
 ```
 
+KAS exposes those KAH repair mechanics through:
+
+```text
+kkachi-agent-skills repair --project <path> --workflow-graph --propose --reason <reason> [--json]
+kkachi-agent-skills repair --project <path> --workflow-graph --apply-proposal <proposal-id> --approval <approval-ref> [--json]
+```
+
+The KAS proposal command runs the read-only workflow graph doctor first,
+generates a complete candidate graph file from reviewed KAS template input, and
+delegates diff/propose to KAH. The KAS apply command requires approval evidence,
+delegates apply to KAH, and reruns KAH validate/explain. Periodic checks must
+use read-only `doctor --project <path> --workflow-graph --json` by default;
+proposal is opt-in and apply is never automatic.
+
 Forbidden as normal KAS guidance:
 
 ```text

@@ -106,6 +106,74 @@ esac
 	return binDir
 }
 
+func writeFakeKAHGraphRepair(t *testing.T) string {
+	t.Helper()
+	binDir := t.TempDir()
+	helper := filepath.Join(binDir, "kkachi-agent-helper")
+	script := `#!/bin/sh
+case "$*" in
+  "--version")
+    echo "kkachi-agent-helper 0.1.9"
+    ;;
+  "capabilities --json")
+    echo '{"commands":["graph validate","graph explain","graph diff","graph propose","graph apply"],"flags":["workflow_graph_readonly","workflow_graph_diagnostics","workflow_graph_no_direct_yaml_fallback","workflow_graph_configurable_feedback_intake","workflow_graph_apply"]}'
+    ;;
+  "graph --help")
+    echo "Usage: graph"
+    echo "  validate"
+    echo "  explain"
+    echo "  diff"
+    echo "  propose"
+    echo "  apply"
+    ;;
+  "graph validate --file .kkachi-workflow.yaml --json")
+    if grep -q applied .kkachi-workflow.yaml 2>/dev/null; then
+      echo '{"ok":true,"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.1.0","checksum":"sha256:e2e-new"}'
+    else
+      echo '{"ok":true,"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.0.9","checksum":"sha256:e2e-old"}'
+    fi
+    ;;
+  "graph explain --file .kkachi-workflow.yaml --json")
+    if grep -q applied .kkachi-workflow.yaml 2>/dev/null; then
+      echo '{"ok":true,"graph":{"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.1.0","checksum":"sha256:e2e-new"}}'
+    else
+      echo '{"ok":true,"graph":{"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.0.9","checksum":"sha256:e2e-old"}}'
+    fi
+    ;;
+  "graph diff --from .kkachi-workflow.yaml --to .kkachi/graph/candidates/kas-default-9e933dd77ff2c95c.yaml --semantic --json")
+    echo '{"ok":true,"summary":"semantic diff ready","risk_flags":["phase_path_change"],"reason_codes":["graph_stale"]}'
+    ;;
+  "graph propose --candidate-file .kkachi/graph/candidates/kas-default-9e933dd77ff2c95c.yaml --reason repair --json")
+    mkdir -p .kkachi/graph/proposals
+    printf 'proposal: prop-1\n' > .kkachi/graph/proposals/prop-1.yaml
+    echo '{"ok":true,"proposal_id":"prop-1","proposal_path":".kkachi/graph/proposals/prop-1.yaml","approval_required":true,"risk_flags":["phase_path_change"],"reason_codes":["proposal_recorded"]}'
+    ;;
+  "graph apply --proposal prop-1 --approval approved:1 --json")
+    printf 'version: workflow-graph/v1\napplied: true\n' > .kkachi-workflow.yaml
+    echo '{"ok":true,"proposal_id":"prop-1","approval_ref":"approved:1","audit_event_ids":["evt-1"],"audit_path":".kkachi/events/evt-1.json","backup_path":".kkachi/graph/backups/old.yaml","recovery_path":".kkachi/graph/recovery/prop-1.md"}'
+    ;;
+  *)
+    echo "unexpected kkachi-agent-helper call: $*" >&2
+    exit 9
+    ;;
+esac
+`
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return binDir
+}
+
+func fileHash(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
 func treeHash(t *testing.T, root string) string {
 	t.Helper()
 	entries := []string{}
@@ -191,6 +259,51 @@ func TestWorkflowGraphDoctorE2ENoWrite(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(missingProject, ".kkachi")); !os.IsNotExist(err) {
 		t.Fatalf("missing graph doctor created .kkachi directory: %v", err)
+	}
+}
+
+func TestWorkflowGraphRepairProposalAndApplyE2E(t *testing.T) {
+	root := repoRoot(t)
+	binary := buildRootBinary(t)
+	fakeKAHBin := writeFakeKAHGraphRepair(t)
+	project := t.TempDir()
+	graphPath := filepath.Join(project, ".kkachi-workflow.yaml")
+	if err := os.WriteFile(graphPath, []byte("version: workflow-graph/v1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	beforeGraph := fileHash(t, graphPath)
+	propose := exec.Command(binary, "repair", "--repo", root, "--project", project, "--workflow-graph", "--propose", "--reason", "repair", "--json")
+	propose.Env = append(os.Environ(), "PATH="+fakeKAHBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	proposeOut, err := propose.CombinedOutput()
+	if err != nil {
+		t.Fatalf("workflow graph propose failed: %v\n%s", err, proposeOut)
+	}
+	if afterPropose := fileHash(t, graphPath); afterPropose != beforeGraph {
+		t.Fatalf("proposal mutated target graph: before=%s after=%s", beforeGraph, afterPropose)
+	}
+	var proposal map[string]any
+	if err := json.Unmarshal(proposeOut, &proposal); err != nil {
+		t.Fatal(err)
+	}
+	if proposal["status"] != "proposal_available" || proposal["proposal"].(map[string]any)["id"] != "prop-1" {
+		t.Fatalf("unexpected proposal payload: %+v", proposal)
+	}
+
+	apply := exec.Command(binary, "repair", "--repo", root, "--project", project, "--workflow-graph", "--apply-proposal", "prop-1", "--approval", "approved:1", "--json")
+	apply.Env = append(os.Environ(), "PATH="+fakeKAHBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	applyOut, err := apply.CombinedOutput()
+	if err != nil {
+		t.Fatalf("workflow graph apply failed: %v\n%s", err, applyOut)
+	}
+	if afterApply := fileHash(t, graphPath); afterApply == beforeGraph {
+		t.Fatalf("apply did not mutate target graph through fake KAH")
+	}
+	var applied map[string]any
+	if err := json.Unmarshal(applyOut, &applied); err != nil {
+		t.Fatal(err)
+	}
+	if applied["status"] != "applied" || applied["post_apply"].(map[string]any)["graph_checksum"] != "sha256:e2e-new" {
+		t.Fatalf("unexpected apply payload: %+v", applied)
 	}
 }
 
