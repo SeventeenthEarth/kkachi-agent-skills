@@ -1,0 +1,93 @@
+registry_version: 0.1.0
+kind: kas_graph_workflow_sync_compatibility
+status: implemented
+owner:
+  team: blue
+  role: hwangchung
+authority:
+  sot: docs/sot/graph-workflow-sync-compatibility.md
+  roadmap: docs/roadmap.md
+  docs_map: docs/kkachi-docs-map.yaml
+  graph_template_registry: registries/graph-template-registry.yaml
+target:
+  kas_version: 0.1.2
+  feature: graph_workflow_sync
+kah_dependency:
+  package: kkachi-agent-helper
+  min_required: 0.1.9
+  recommended: 0.1.9
+  tested:
+    - 0.1.9
+required_kah_capability_envelope:
+  command_groups:
+    - kkachi-agent-helper capabilities --json
+    - kkachi-agent-helper graph --help
+    - kkachi-agent-helper graph validate --json
+    - kkachi-agent-helper graph explain --json
+    - kkachi-agent-helper graph diff
+    - kkachi-agent-helper graph propose
+    - kkachi-agent-helper graph apply
+    - kkachi-agent-helper graph export
+  subcommands:
+    graph:
+      - init --from-template
+      - validate
+      - explain
+      - diff
+      - propose
+      - apply
+      - export
+  required_flags:
+    - json_output_for_capabilities
+    - graph_validate_json
+    - graph_explain_json
+    - proposal_first_graph_repair
+    - approval_gated_graph_apply
+    - graph_audit_checksum_evidence
+supported_workflow_graph_schema_versions:
+  - workflow-graph/v1
+supported_kas_graph_templates:
+  - id: kas-default
+    version: 0.1.0
+    path: templates/workflow-graphs/kas-default.yaml
+    source_registry: registries/graph-template-registry.yaml
+    status: implemented
+status_vocabulary:
+  - status: pass
+    remediation: No graph workflow sync remediation required.
+  - status: custom_supported
+    remediation: Preserve the custom graph; do not force replacement with the default template.
+  - status: update_kah_required
+    remediation: Update kkachi-agent-helper to at least 0.1.9 before graph workflow sync repair.
+  - status: update_kah_recommended
+    remediation: Recommend kkachi-agent-helper 0.1.9 when the effective helper is older than the tested release.
+  - status: update_kas_recommended
+    remediation: Recommend newer KAS when the graph schema or policy is newer than KAS 0.1.2 understands.
+  - status: graph_missing
+    remediation: Offer proposal-first graph initialization through KAH after capability checks pass.
+  - status: graph_stale
+    remediation: Offer proposal-first repair through KAH diff/propose after validating the current graph.
+  - status: graph_broken
+    remediation: Offer proposal-first repair only when KAH diagnostics identify a supported repair path.
+  - status: graph_conflict
+    remediation: Fail closed and record diagnostics when KAS metadata and KAH graph evidence disagree.
+  - status: proposal_available
+    remediation: Present proposal id/path, semantic diff, risk flags, approval requirement, and next command.
+  - status: blocked_for_approval
+    remediation: Require explicit approval evidence before KAH graph apply.
+  - status: unsupported
+    remediation: Fail closed; require KAS/KAH support update or manual governance decision.
+release_evidence_notes:
+  kas_release: 0.1.2
+  kah_release: 0.1.9
+  support_claim: KAS v0.1.2 graph workflow sync support is tied to KAH v0.1.9 graph diagnostics and repair substrate.
+  registry_validation: docs-contract readback validates this registry against the SOT, roadmap, docs map, and active kas-default template registry entry.
+  boundaries:
+    - no KAH code change
+    - no KAB runtime state mutation
+    - no Hermes profile mutation
+    - no auth/token/provider/gateway/model mutation
+    - no automatic KAH binary update
+    - no automatic graph apply from cron or CI
+    - no direct .kkachi-workflow.yaml edit fallback
+    - no Kkachi v2 workflow fallback

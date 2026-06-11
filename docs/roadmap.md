@@ -54,6 +54,7 @@ INITDOC-003
   -> KASREL-001..004
   -> KASPROJ-001..006
   -> TOKEN-001..010
+  -> GRSYNC-001..003
 ```
 
 INITDOC is closed before implementation begins so the temporary transition SOT does not become new legacy. `BOOTSTRAP` should happen first because it gives later KAS work a deterministic KAH project state and doctor evidence. `STALECLEAN` may run in parallel with late CLIMVP/GRAPHMVP tasks only when the touched surfaces do not overlap.
@@ -189,6 +190,21 @@ KASREL deferrals unless separately approved: automatic profile repair, binary re
 
 KASPROJ deferrals unless separately approved: broad migration of all existing profile skills, automatic rewrite of generic KAS installs, shared global `skills.external_dirs` behavior, Stage 2/Stage 3 KAB activation, KAH project-state writes, auth/token/gateway/provider/model mutation, and any fallback from a missing project-specific suite to generic global skills.
 
+
+### EPIC: GRSYNC — KAS/KAH workflow graph compatibility sync
+
+> Goal: let KAS v0.1.2 know and enforce the KAH version/capability envelope it supports, periodically check whether a project `.kkachi-workflow.yaml` is supportable by both KAS and KAH, recommend KAH/KAS updates before unsafe repair, and orchestrate KAH proposal/apply repair without overwriting supported user-custom graphs.
+>
+> Source of truth: `docs/sot/graph-workflow-sync-compatibility.md`; dependent KAH planning SOT: KAH `docs/sot/graph-workflow-sync-diagnostics-and-repair.md`. Target release pair: KAH `v0.1.9` first, then KAS `v0.1.2`.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| GRSYNC-001 | Add KAS/KAH graph workflow sync compatibility registry | Completed | KAS has machine-readable metadata for KAS `0.1.2`, KAH `min_required=0.1.9`, `recommended=0.1.9`, `tested=[0.1.9]`, required graph capabilities, supported workflow graph schema versions, supported template ids/versions, status vocabulary, and remediation guidance. | Completed by `registries/graph-workflow-sync-compatibility.yaml` plus SOT/readback updates; docs-contract coverage validates registry existence/content against the SOT, roadmap, docs README/map, and active `kas-default` template registry entry. Final-gate evidence still includes Blue-run `make test` and color review cards Red `t_be0c21da`, Orange `t_7c7854e7`, Gray `t_5b798056`, and Blue synthesis `t_d2d19ec6`. No KAH code, KAB runtime, profile mutation, auth/token/gateway/provider/model mutation, automatic KAH update, direct graph edit fallback, or graph apply behavior. |
+| GRSYNC-002 | Implement read-only workflow graph doctor | Planned | `doctor --project <path> --workflow-graph --json` or approved equivalent gathers KAS version/metadata, effective KAH version/capabilities/help, graph validate/explain/diagnostics, and classifies pass/custom-supported/update-kah-required/update-kas-recommended/graph-missing/stale/broken/conflict/unsupported without writing files. | Unit/CLI/e2e no-write fixtures for old KAH, current KAH, missing/stale/broken/custom graph, and unsupported schema; docs update; `make test`; color review. |
+| GRSYNC-003 | Implement proposal/apply orchestration and periodic check guidance | Planned | KAS proposes complete candidate graph repairs only after doctor passes KAH version gates, calls KAH diff/propose, requires approval evidence before KAH apply, reruns validate/explain after apply, preserves graph evidence for active runs, and documents periodic checks as read-only by default with proposal/apply opt-in. | Integration/e2e fixtures with KAH v0.1.9, approval-gated apply tests, no direct YAML edit fallback search, docs/release guidance, `make test`, KAH evidence readback, and review gates. |
+
+GRSYNC deferrals unless separately approved: automatic KAH binary update, automatic graph apply from cron/CI, direct `.kkachi-workflow.yaml` edit fallback, KAB graph policy authority, Kkachi v2 workflow merge/fallback, Stage 2/3 KAB execution changes, and auth/token/gateway/provider/model mutation.
+
 ### EPIC: TOKEN — KAS token economy and English operator surfaces
 
 > Goal: reduce Hermes-side KAS orchestration token cost without Hermes runtime patches, KAB policy changes, or KAH subjective judgment by making KAS-generated prompt/CLI/console/artifact-template surfaces English-only, compact, artifact-first, and operator-simple across the project KAS lifecycle.
@@ -211,6 +227,7 @@ TOKEN deferrals unless separately approved: Hermes runtime context-pruning chang
 ## Deferred / non-MVP work
 
 - KAS write-capable sync behavior after KASUPD dry-run/state/semantic-port evidence, approval, recovery spec, and Red/operator review.
+- Graph workflow sync compatibility work is now planned under GRSYNC-001..003 with KAH v0.1.9 as the graph workflow sync `min_required`, `recommended`, and `tested` helper version for KAS v0.1.2.
 - Broad `proposal` CLI mapping across profile install ledgers, project overlays, KAH graph proposals, run-local improvement notes, and shared KAS promotion gates.
 - KAB context/prompt alignment with applied graph version/checksum.
 - Stage 1 direct Codex SDK/app-server runner support is in review under CODEXSDK after adding the SOT, Python runner template, phase-skill/template guidance, and a real read-only default-model Codex turn smoke; completion still requires post-fix Red/Orange/Gray closure review, final gates, and commit approval.
