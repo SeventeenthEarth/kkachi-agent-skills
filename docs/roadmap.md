@@ -6,7 +6,7 @@ Confirming role: Responsible approver / governance evidence record; INITDOC post
 Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced; KAS integration work remains separately gated
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -55,11 +55,15 @@ INITDOC-003
   -> KASPROJ-001..006
   -> TOKEN-001..010
   -> GRSYNC-001..003
+  -> WFLOW-001..004 paired with KAH DAGSM-001..003
 ```
 
 INITDOC is closed before implementation begins so the temporary transition SOT does not become new legacy. `BOOTSTRAP` should happen first because it gives later KAS work a deterministic KAH project state and doctor evidence. `STALECLEAN` may run in parallel with late CLIMVP/GRAPHMVP tasks only when the touched surfaces do not overlap.
 
 ## Active roadmap
+
+Section order below is historical/topic grouping and may differ from the delivery sequence. Use `MVP delivery order` and each epic's explicit dependency notes as the authoritative implementation order.
+
 
 ### EPIC: INITDOC — post-KAH KAS authority reset and MVP roadmap completion
 
@@ -204,6 +208,23 @@ KASPROJ deferrals unless separately approved: broad migration of all existing pr
 | GRSYNC-003 | Implement proposal/apply orchestration and periodic check guidance | Completed | `repair --project <path> --workflow-graph --propose --reason <reason> --json` runs read-only doctor first, requires KAH v0.1.9 graph propose/apply capability evidence plus KAH diff evidence only when a valid existing graph is available as a semantic-diff base, creates complete KAS-template candidate graphs, refuses pass/custom-supported/update/conflict/unsupported states, and reports normalized proposal evidence; `repair --workflow-graph --apply-proposal <proposal-id> --approval <approval-ref> --json` requires approval evidence, calls KAH apply, and reruns validate/explain. Periodic checks default to read-only doctor/report; proposal is opt-in and apply is never automatic. | Implemented in `internal/skills/graphsync` and `internal/skills/cli` with unit/CLI/e2e fake-KAH coverage for old KAH, missing/stale/broken/custom-supported graphs, proposal success, missing approval, apply success, command order, no diff for missing/broken bases, and no direct `.kkachi-workflow.yaml` proposal writes. Cleanup/enhance/docs evidence is complete; Red `t_c1458e4f`, Orange `t_219b5f2a`, Gray `t_8436a065` plus Gray closure `t_6d0364f0`, official KAB GLM Octo session `7962fd1b-556d-4d1f-b56d-72d6ee9103a6`, post-Octo Red `t_40eb5b01`, Orange `t_94f929b2`, Gray `t_d27ffdf2`, KAH final gate, `make test`, `go test ./... -count=1`, and `git diff --check` all passed before commit approval. No KAH source, KAB runtime, profile, auth/token/gateway/provider/model mutation, automatic apply, or direct graph edit fallback. |
 
 GRSYNC deferrals unless separately approved: automatic KAH binary update, automatic graph apply from cron/CI, direct `.kkachi-workflow.yaml` edit fallback, KAB graph policy authority, Kkachi v2 workflow merge/fallback, Stage 2/3 KAB execution changes, and auth/token/gateway/provider/model mutation.
+
+### EPIC: WFLOW — KAS task-DAG workflow policy and custom triggers
+
+> Goal: let one project support multiple task DAG workflows through deterministic KAS selector/node-contract policy, generic trigger skills, and approval-gated custom workflow scaffolding while KAH owns task-DAG state/order/evidence enforcement.
+>
+> Source of truth: `docs/sot/task-dag-workflow-contract.md`. Paired KAH substrate epic: `DAGSM` in `kkachi-agent-helper/docs/roadmap.md` and KAH SOT `docs/sot/task-dag-state-machine.md`. The KAH SOT/docs registration is a `WFLOW-001` companion planning commit, not completion of KAH `DAGSM-001`.
+>
+> Cross-repo linear order: `WFLOW-001 -> DAGSM-001 -> DAGSM-002 -> WFLOW-002 -> WFLOW-003 -> DAGSM-003 -> WFLOW-004`.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| WFLOW-001 | Accept task-DAG workflow policy and paired planning SOTs | Completed | `docs/sot/task-dag-workflow-contract.md` defines KAS/KAH/KAB/Kanban/KAO boundaries, multiple workflow DAG support, selector result handling, node agent/role/backend contracts, generic/thin/custom trigger posture, custom workflow creator dry-run/apply rules, non-goals, and the seven-PR cross-repo order. KAS docs index/map and roadmap register the KAS SOT; the paired KAH planning SOT/docs registration is committed as a `WFLOW-001` companion and does not complete KAH `DAGSM-001`. | Docs readback, docs-map parse, `git diff --check`, KAS/KAH test gates, and official Kanban Red/Orange/Gray review acceptance. No KAH code, KAB runtime, profile mutation, auth/token/gateway/provider/model change, automatic graph apply, trigger implementation, or `DAGSM-001` implementation support claim is authorized by this docs task. |
+| WFLOW-002 | Implement explicit workflow trigger skill | Planned | Add a generic KAS trigger entrypoint for explicit `workflow_id` plus explicit node-contract source/ref only. It checks KAH DAGSM capabilities, validates/resumes a workflow instance, reads ready nodes, renders node dispatch packets from the supplied contract source, and must not implement selector search or complete nodes without KAH evidence. | Depends on `DAGSM-002`. Evidence: skill/template readback, explicit-workflow scenarios, missing-contract/blocker scenario, no selector-search claim, no-direct-KAH-state-edit search, verification gate, color review. |
+| WFLOW-003 | Implement selector and node contract registry | Planned | Add KAS metadata for task class, labels, changed surfaces, risk, required agents/capabilities, node owner roles, execution lanes, required inputs/outputs, approvals, fallback posture, and verification conditions. Unique selector match may proceed; zero/multiple matches fail closed. | Depends on `WFLOW-002` and `DAGSM-002`. Evidence: registry/schema tests, selector fixtures for 0/1/N candidates, node-contract validation, KAH compatibility readback, Red/Orange/Gray review. |
+| WFLOW-004 | Implement custom workflow creator and thin trigger scaffolding | Planned | Provide dry-run-first custom workflow creation for `dag_only`, `thin_trigger`, and exceptional `full_trigger` modes. Dry-run emits a compact operator summary plus the full machine packet, including candidate DAG/catalog/node-contract/trigger paths and a canonical `sha256` approval hash over deterministic UTF-8 JSON with sorted keys and normalized relative paths. The hash binds target paths, generated content, selector metadata, KAH/KAS capability-version evidence, base graph/catalog checksums, changed-path set, conflicts/diagnostics, and no-write evidence; apply recomputes the hash and delegates KAH validation/proposal/apply where graph state is authoritative. | Depends on `WFLOW-003` and `DAGSM-003`. Evidence: no-write dry-run tests, compact-summary readback, approval-hash mismatch tests, generated SKILL.md validation, KAH proposal/apply evidence for project graph changes, no automatic fallback/apply, color review. |
+
+WFLOW deferrals unless separately approved: dynamic node generation during execution, retry/rollback automation, arbitrary webhook runtime, automatic workflow choice when selector is ambiguous, automatic fallback agent/backend selection, KAB graph authority, Kkachi v2 workflow merge/fallback, profile/provider/gateway/auth/token/model mutation, and broad promotion of custom skills into shared KAS source without review.
 
 ### EPIC: TOKEN — KAS token economy and English operator surfaces
 
