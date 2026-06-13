@@ -7,6 +7,7 @@ sot_docs:
   - "docs/sot/stage1-direct-codex-sdk-appserver-runner.md"
   - "docs/sot/kas-cli-contract.md"
   - "docs/sot/project-specific-kas-install-contract.md"
+  - "docs/sot/role-aware-project-suite-contract.md"
   - "docs/sot/project-kas-sync-state.md"
   - "docs/sot/graph-workflow-sync-compatibility.md"
   - "docs/sot/task-dag-workflow-contract.md"

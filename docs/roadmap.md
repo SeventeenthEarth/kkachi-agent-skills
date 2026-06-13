@@ -3,10 +3,10 @@
 Date: 2026-05-25
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record; INITDOC post-KAH reset
-Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced; KAS integration work remains separately gated
+Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced; KAS integration work remains separately gated; role-aware project suite cleanup is a pre-DAGSM/WFLOW implementation gate
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/role-aware-project-suite-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -55,7 +55,8 @@ INITDOC-003
   -> KASPROJ-001..006
   -> TOKEN-001..010
   -> GRSYNC-001..003
-  -> WFLOW-001..004 paired with KAH DAGSM-001..003
+  -> KASROLE-001..004
+  -> WFLOW-002..004 paired with KAH DAGSM-001..003 (WFLOW-001 planning SOT already completed)
 ```
 
 INITDOC is closed before implementation begins so the temporary transition SOT does not become new legacy. `BOOTSTRAP` should happen first because it gives later KAS work a deterministic KAH project state and doctor evidence. `STALECLEAN` may run in parallel with late CLIMVP/GRAPHMVP tasks only when the touched surfaces do not overlap.
@@ -209,13 +210,30 @@ KASPROJ deferrals unless separately approved: broad migration of all existing pr
 
 GRSYNC deferrals unless separately approved: automatic KAH binary update, automatic graph apply from cron/CI, direct `.kkachi-workflow.yaml` edit fallback, KAB graph policy authority, Kkachi v2 workflow merge/fallback, Stage 2/3 KAB execution changes, and auth/token/gateway/provider/model mutation.
 
+### EPIC: KASROLE — role-aware project suite subsets before DAGSM/WFLOW implementation
+
+> Goal: prevent KAS/KAH local development from using over-installed Red/Orange/Gray project suites as the normal review baseline. Blue commander profiles may hold the full project suite, but reviewer/scribe profiles must receive only role-selected project skills or no project suite at all until role-subset support is implemented.
+>
+> Source of truth: `docs/sot/role-aware-project-suite-contract.md`. This epic gates normal use of color-profile project KAS suites for KAH `DAGSM` and KAS `WFLOW` implementation after the already-completed WFLOW-001 planning SOT.
+>
+> Required order before normal DAGSM/WFLOW implementation: `KASROLE-001 -> KASROLE-002 -> KASROLE-003 -> KASROLE-004 -> DAGSM-001 / WFLOW-002+`.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| KASROLE-001 | Accept role-aware project suite SOT and registry plan | Completed | `docs/sot/role-aware-project-suite-contract.md` defines Blue full-suite versus Red/Orange/Gray subset policy, current over-install defect, role registry path `registries/project-suite-roles.yaml`, unknown-role fail-closed behavior, manifest vocabulary, doctor/repair/prune semantics, and the immediate KAH/DAGSM development gate. `docs/README.md`, `docs/kkachi-docs-map.yaml`, roadmap, and docs-contract coverage register the SOT. | Completed with docs readback, docs-map YAML parse, `git diff --check`, docs-contract validation, aggregate `make test`, and Red/Orange/Gray review. Initial color evidence: Red `t_bfad026c`, Orange `t_21f593c9`, Gray `t_acc68322`, Blue synthesis `t_a971aa92`; post-fix re-review evidence: Red `t_b1c90f10`, Orange `t_58e4a345`, Gray `t_0ec6c0e9`, Blue synthesis `t_efa48325`. No profile cleanup or CLI implementation is authorized by this docs task alone. |
+| KASROLE-002 | Implement role-aware project install and manifest vocabulary | Planned | `install --project --suite-role <role> --dry-run/--apply` or the approved equivalent requires explicit role selection, fails closed for unknown roles, selects only registry-declared role skills, hash-binds role selection, selected/excluded skills, role registry checksum, source suite checksum, changed paths, conflicts/diagnostics, and no-write evidence, and records `suite_mode` / `suite_role` in `project_suites[]`. Human output includes operator-readable role labels and selected/excluded counts. | Depends on KASROLE-001. Requires unit/CLI/e2e no-write and approval-hash tests, manifest readback, forbidden out-of-role install fixtures, unknown-role fail-closed fixtures, `make test`, and color review. No auth/token/gateway/provider/model/KAH/KAB mutation. |
+| KASROLE-003 | Implement role-aware project-suite doctor | Planned | `doctor --project-suite` treats selected role skills as required, missing unselected full-suite skills as healthy for role subsets, and out-of-role extra KAS-managed skills as diagnostics. Legacy Red/Orange/Gray full suites and manifests missing or carrying unknown `suite_role` are not reported healthy. | Depends on KASROLE-002. Requires fixtures for Blue full suite, Red/Orange/Gray subsets, missing selected skill, extra out-of-role skill, unknown personal skill, legacy full-suite diagnostics, and missing/unknown `suite_role`; `make test`; color review. |
+| KASROLE-004 | Implement approval-gated repair/prune and clean approved KAH development color profiles | Planned | `repair --project --suite-role <role> --prune-extra --dry-run/--apply` or the approved equivalent backs up and removes only manifest-tracked out-of-role project skills after approval-hash match, rewrites the manifest last, reports compact keep/create/update/remove counts plus backup/vault/recovery/no-spillover evidence, and proves hahuyeon/yeomong/jingung are either healthy role subsets or explicitly no-suite/fail-closed before DAGSM/WFLOW implementation uses them. | Depends on KASROLE-003 and explicit 주군 operational approval for exact profile/project mutation. Requires named approval owner, backup/recovery evidence, dry-run/apply hash evidence, doctor after cleanup, no-spillover scan, `make test`, Red/Orange/Gray review, and Blue final report. |
+
+KASROLE deferrals unless separately approved: dynamic subset derivation from DAGSM node contracts, broad rollout across all Kkachi profiles, deletion of unknown personal skills, custom role provider/model routing, KAB Stage 2/3 activation, KAH DAGSM state changes, auth/token/gateway/provider/model mutation, and treating overlay-only role restriction as a healthy install state.
+
 ### EPIC: WFLOW — KAS task-DAG workflow policy and custom triggers
 
 > Goal: let one project support multiple task DAG workflows through deterministic KAS selector/node-contract policy, generic trigger skills, and approval-gated custom workflow scaffolding while KAH owns task-DAG state/order/evidence enforcement.
 >
 > Source of truth: `docs/sot/task-dag-workflow-contract.md`. Paired KAH substrate epic: `DAGSM` in `kkachi-agent-helper/docs/roadmap.md` and KAH SOT `docs/sot/task-dag-state-machine.md`. The KAH SOT/docs registration is a `WFLOW-001` companion planning commit, not completion of KAH `DAGSM-001`.
 >
-> Cross-repo linear order: `WFLOW-001 -> DAGSM-001 -> DAGSM-002 -> WFLOW-002 -> WFLOW-003 -> DAGSM-003 -> WFLOW-004`.
+> Cross-repo linear order after the pre-WFLOW corrective gate: `KASROLE-001..004 -> DAGSM-001 -> DAGSM-002 -> WFLOW-002 -> WFLOW-003 -> DAGSM-003 -> WFLOW-004`. `WFLOW-001` remains the already-completed planning SOT acceptance.
 
 | Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
 |---|---|---|---|---|
