@@ -198,7 +198,7 @@ func buildUpdatedProjectManifest(dryRun Result, evidenceRef string, approvedHash
 		right := projectSuites[j].(map[string]any)
 		return fmt.Sprint(left["project"], sourcePackIDFromProjectSuite(left)) < fmt.Sprint(right["project"], sourcePackIDFromProjectSuite(right))
 	})
-	return map[string]any{
+	manifest := map[string]any{
 		"version": ManifestVersion,
 		"kind":    ProfileManifestKind,
 		"profile": map[string]any{
@@ -213,7 +213,21 @@ func buildUpdatedProjectManifest(dryRun Result, evidenceRef string, approvedHash
 		},
 		"installs":       installs,
 		"project_suites": projectSuites,
-	}, nil
+	}
+	if strings.Contains(dryRun.Command, "repair") {
+		manifest["last_repair"] = map[string]any{
+			"repair_id":             installID,
+			"approval_evidence_ref": evidenceRef,
+			"dry_run_plan_hash":     dryRun.PlanHash,
+			"approved_plan_hash":    approvedHash,
+			"project":               dryRun.Project.ID,
+			"source_pack_id":        dryRun.SourcePack.ID,
+			"suite_role":            dryRun.SuiteRole,
+			"backup_path":           backupRoot,
+			"backup_manifest_path":  previousManifestPath,
+		}
+	}
+	return manifest, nil
 }
 
 func projectSuiteManifestEntry(dryRun Result, evidenceRef string, approvedHash string, installID string, backupRoot string, previousManifestPath string, changed []ChangedPath) map[string]any {

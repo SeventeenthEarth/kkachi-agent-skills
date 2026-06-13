@@ -1186,7 +1186,11 @@ func TestProjectRepairDefaultsSourcePackDryRunApprovalAndUnknownExplicit(t *test
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
 		t.Fatalf("wrong repair approval wrote skill: %v", err)
 	}
-	repaired, err := ApplyApprovedRepair(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot}, repairDryRun.ApprovalRequest.EvidenceRef)
+	vault := filepath.Join(t.TempDir(), "vault")
+	if err := os.MkdirAll(vault, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	repaired, err := ApplyApprovedRepair(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot, BackupVaultRoot: vault}, repairDryRun.ApprovalRequest.EvidenceRef)
 	if err != nil || !repaired.OK || repaired.RepairID == "" || repaired.Recovery == nil {
 		t.Fatalf("approved repair failed: result=%+v err=%v", repaired, err)
 	}
@@ -1200,6 +1204,219 @@ func TestProjectRepairDefaultsSourcePackDryRunApprovalAndUnknownExplicit(t *test
 	}
 	if unknown.OK || firstProjectActionDiagnosticCode(unknown) != "unknown_source_pack" {
 		t.Fatalf("unknown explicit source-pack must fail closed: %+v", unknown)
+	}
+}
+
+func TestProjectRepairRoleAwarePrune(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{
+		"kkachi-review":       "---\nname: kkachi-review\n---\n# kkachi-review\n",
+		"kkachi-verify":       "---\nname: kkachi-verify\n---\n# kkachi-verify\n",
+		"kkachi-implement":    "---\nname: kkachi-implement\n---\n# kkachi-implement\n",
+		"kkachi-final-verify": "---\nname: kkachi-final-verify\n---\n# kkachi-final-verify\n",
+	})
+	project := "doksuri-server"
+	profileRoot := installProjectSuite(t, repo, project, "blue_commander")
+	role := "red_reviewer"
+	setManifestSuiteRole(t, profileRoot, project, &role)
+	personal := filepath.Join(profileRoot, "skills", project, "doksuri-server-local-note", "SKILL.md")
+	writeProjectInstallFile(t, personal, "personal\n")
+
+	missingRole, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: project, ProfileRoot: profileRoot, PruneExtra: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missingRole.OK || firstProjectActionDiagnosticCode(missingRole) != "suite_role_required" {
+		t.Fatalf("missing suite_role must fail closed: %+v", missingRole)
+	}
+
+	unknownRole, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: "purple_reviewer", ProfileRoot: profileRoot, PruneExtra: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unknownRole.OK || firstProjectActionDiagnosticCode(unknownRole) != "unknown_suite_role" {
+		t.Fatalf("unknown suite_role must fail closed: %+v", unknownRole)
+	}
+
+	mismatch, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: "gray_scribe", ProfileRoot: profileRoot, PruneExtra: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mismatch.OK || !hasProjectActionDiagnostic(mismatch, "suite_role_mismatch") {
+		t.Fatalf("manifest/request role mismatch must fail closed: %+v", mismatch)
+	}
+
+	noPrune, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: role, ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if noPrune.OK || !hasProjectActionDiagnostic(noPrune, "out_of_role_kas_managed_skill") {
+		t.Fatalf("out-of-role extras without --prune-extra must remain blocked: %+v", noPrune)
+	}
+	for _, action := range noPrune.PlannedActions {
+		if action.Action == "remove" {
+			t.Fatalf("repair without --prune-extra planned removal: %+v", noPrune.PlannedActions)
+		}
+	}
+
+	prune, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: role, ProfileRoot: profileRoot, PruneExtra: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !prune.OK || !prune.ApprovalRequest.Required {
+		t.Fatalf("role-aware prune should be approvable: %+v", prune)
+	}
+	if prune.SuiteRole != role || prune.SuiteMode != SuiteModeRoleSubset || prune.RoleLabel == "" || !prune.ApprovalRequest.HashIncludesRoleFields {
+		t.Fatalf("missing role-bound evidence: %+v", prune)
+	}
+	if prune.Summary.CountsByAction["remove"] != 2 || prune.Summary.CountsByAction["skip"] != 2 {
+		t.Fatalf("unexpected compact counts: %+v", prune.Summary)
+	}
+	for _, removed := range []string{"doksuri-server-final-verify", "doksuri-server-implement"} {
+		assertProjectAction(t, prune, "remove", filepath.ToSlash(filepath.Join("skills", project, removed, "SKILL.md")))
+	}
+	if !containsString(prune.NoSpillover.UnknownPersonalSkillsPreserved, filepath.ToSlash(filepath.Join("skills", project, "doksuri-server-local-note", "SKILL.md"))) {
+		t.Fatalf("unknown personal skill was not preserved in no-spillover evidence: %+v", prune.NoSpillover)
+	}
+	human := RenderHumanProjectAction(prune)
+	assertNoHangul(t, human)
+	countsLine := "Counts: keep 2, create 0, update 0, remove 2"
+	if !strings.Contains(human, countsLine) || strings.Index(human, countsLine) > strings.Index(human, "Action:") {
+		t.Fatalf("human output must show compact counts before detailed actions:\n%s", human)
+	}
+	if !strings.Contains(human, "Backup: apply requires explicit absolute --backup-vault-root") ||
+		!strings.Contains(human, "Recovery: manifest write last") ||
+		!strings.Contains(human, "No-spillover: preserved unknown personal skills 1") {
+		t.Fatalf("human output missing backup/recovery/no-spillover evidence:\n%s", human)
+	}
+
+	repeated, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: role, ProfileRoot: profileRoot, PruneExtra: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repeated.PlanHash != prune.PlanHash {
+		t.Fatalf("plan hash must be deterministic: %s != %s", repeated.PlanHash, prune.PlanHash)
+	}
+	if _, err := os.Stat(personal); err != nil {
+		t.Fatalf("dry-run touched personal skill: %v", err)
+	}
+}
+
+func TestProjectRepairRoleAwareApply(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{
+		"kkachi-review":    "---\nname: kkachi-review\n---\n# kkachi-review\n",
+		"kkachi-verify":    "---\nname: kkachi-verify\n---\n# kkachi-verify\n",
+		"kkachi-implement": "---\nname: kkachi-implement\n---\n# kkachi-implement\n",
+	})
+	project := "doksuri-server"
+	profileRoot := installProjectSuite(t, repo, project, "blue_commander")
+	role := "red_reviewer"
+	setManifestSuiteRole(t, profileRoot, project, &role)
+	personal := filepath.Join(profileRoot, "skills", project, "doksuri-server-local-note", "SKILL.md")
+	writeProjectInstallFile(t, personal, "personal\n")
+	opts := ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: role, ProfileRoot: profileRoot, PruneExtra: true}
+	dryRun, err := BuildProjectRepairDryRun(repo, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !dryRun.OK || dryRun.Summary.CountsByAction["remove"] != 1 {
+		t.Fatalf("unexpected dry-run: %+v", dryRun)
+	}
+
+	malformed, err := ApplyApprovedRepair(repo, opts, "not-a-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if malformed.OK || firstProjectActionDiagnosticCode(malformed) != "approval_evidence_malformed" {
+		t.Fatalf("malformed approval must fail closed: %+v", malformed)
+	}
+	missingVault, err := ApplyApprovedRepair(repo, opts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missingVault.OK || firstProjectActionDiagnosticCode(missingVault) != "backup_vault_root_rejected" {
+		t.Fatalf("apply without explicit backup vault root must fail closed: %+v", missingVault)
+	}
+	relativeVault := opts
+	relativeVault.BackupVaultRoot = "relative"
+	unsafeVault, err := ApplyApprovedRepair(repo, relativeVault, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unsafeVault.OK || firstProjectActionDiagnosticCode(unsafeVault) != "backup_vault_root_rejected" {
+		t.Fatalf("relative backup vault root must fail closed: %+v", unsafeVault)
+	}
+	wrong, err := ApplyApprovedRepair(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: role, ProfileRoot: profileRoot, PruneExtra: true, BackupVaultRoot: t.TempDir()}, "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wrong.OK || firstProjectActionDiagnosticCode(wrong) != "approval_plan_hash_mismatch" {
+		t.Fatalf("wrong hash must fail closed: %+v", wrong)
+	}
+	removeTarget := filepath.Join(profileRoot, "skills", project, "doksuri-server-implement", "SKILL.md")
+	if _, err := os.Stat(removeTarget); err != nil {
+		t.Fatalf("failed approvals removed target: %v", err)
+	}
+
+	driftRoot := installProjectSuite(t, repo, project, "blue_commander")
+	setManifestSuiteRole(t, driftRoot, project, &role)
+	driftOpts := ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: role, ProfileRoot: driftRoot, PruneExtra: true}
+	driftDryRun, err := BuildProjectRepairDryRun(repo, driftOpts)
+	if err != nil || !driftDryRun.OK {
+		t.Fatalf("drift dry-run failed: result=%+v err=%v", driftDryRun, err)
+	}
+	if err := os.WriteFile(filepath.Join(driftRoot, "skills", project, "doksuri-server-implement", "SKILL.md"), []byte("local drift\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	driftVault := t.TempDir()
+	driftApply, err := ApplyApprovedRepair(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: role, ProfileRoot: driftRoot, PruneExtra: true, BackupVaultRoot: driftVault}, driftDryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if driftApply.OK || firstProjectActionDiagnosticCode(driftApply) != "approval_plan_hash_mismatch" {
+		t.Fatalf("checksum drift must change current plan hash before writes: %+v", driftApply)
+	}
+
+	badVault := t.TempDir()
+	if err := os.WriteFile(filepath.Join(badVault, "kas-backups"), []byte("not a directory\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifestBackupFail, err := ApplyApprovedRepair(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: role, ProfileRoot: profileRoot, PruneExtra: true, BackupVaultRoot: badVault}, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifestBackupFail.OK || firstProjectActionDiagnosticCode(manifestBackupFail) != "previous_manifest_backup_failed" {
+		t.Fatalf("manifest backup failure must fail before profile mutation: %+v", manifestBackupFail)
+	}
+	if _, err := os.Stat(removeTarget); err != nil {
+		t.Fatalf("manifest backup failure mutated target before failing: %v", err)
+	}
+
+	vault := t.TempDir()
+	applyOpts := opts
+	applyOpts.BackupVaultRoot = vault
+	applied, err := ApplyApprovedRepair(repo, applyOpts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil || !applied.OK || applied.RepairID == "" || applied.Recovery == nil {
+		t.Fatalf("approved repair prune failed: result=%+v err=%v", applied, err)
+	}
+	if _, err := os.Stat(removeTarget); !os.IsNotExist(err) {
+		t.Fatalf("approved repair did not remove out-of-role target or unexpected stat error: %v", err)
+	}
+	if _, err := os.Stat(personal); err != nil {
+		t.Fatalf("approved repair touched personal skill: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(applied.BackupPath, "files", "skills", project, "doksuri-server-implement", "SKILL.md")); err != nil {
+		t.Fatalf("approved repair did not back up removed skill: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(applied.BackupPath, "skill-pack-manifest.json.before")); err != nil {
+		t.Fatalf("approved repair did not back up manifest before mutation: %v", err)
+	}
+	manifest := readProjectInstallManifest(t, filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json"))
+	suite := manifest["project_suites"].([]any)[0].(map[string]any)
+	if suite["suite_role"] != role || len(suite["installed_skills"].([]any)) != 2 || manifest["last_repair"] == nil {
+		t.Fatalf("manifest was not written last with selected role subset evidence: %+v", manifest)
+	}
+	if !containsString(applied.NoSpillover.UnknownPersonalSkillsPreserved, filepath.ToSlash(filepath.Join("skills", project, "doksuri-server-local-note", "SKILL.md"))) {
+		t.Fatalf("apply missing no-spillover evidence: %+v", applied.NoSpillover)
 	}
 }
 
@@ -1264,6 +1481,25 @@ func firstProjectActionDiagnosticCode(result ProjectActionResult) string {
 func hasProjectActionDiagnostic(result ProjectActionResult, code string) bool {
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+func assertProjectAction(t *testing.T, result ProjectActionResult, action string, targetPath string) {
+	t.Helper()
+	for _, planned := range result.PlannedActions {
+		if planned.Action == action && planned.TargetPath == targetPath {
+			return
+		}
+	}
+	t.Fatalf("missing action=%s target=%s in %+v", action, targetPath, result.PlannedActions)
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
 			return true
 		}
 	}

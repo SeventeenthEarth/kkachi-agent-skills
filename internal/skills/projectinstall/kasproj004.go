@@ -25,6 +25,9 @@ const (
 type ProjectSuiteOptions struct {
 	Profile            string
 	Project            string
+	SuiteRole          string
+	PruneExtra         bool
+	BackupVaultRoot    string
 	SourcePack         string
 	SourcePackExplicit bool
 	ProfileRoot        string
@@ -96,12 +99,21 @@ type ProjectActionResult struct {
 	TargetProfile           discovery.TargetProfile  `json:"target_profile"`
 	Project                 Project                  `json:"project"`
 	SourcePack              SourcePack               `json:"source_pack"`
+	SuiteRole               string                   `json:"suite_role,omitempty"`
+	SuiteMode               string                   `json:"suite_mode,omitempty"`
+	RoleLabel               string                   `json:"role_label,omitempty"`
+	RoleRegistry            RoleRegistryEvidence     `json:"role_registry,omitempty"`
+	SelectedSkills          []RoleSkillEvidence      `json:"selected_skills,omitempty"`
+	ExcludedSkills          []RoleSkillEvidence      `json:"excluded_skills,omitempty"`
+	PruneExtra              bool                     `json:"prune_extra"`
+	Summary                 Summary                  `json:"summary"`
 	ManifestPath            string                   `json:"manifest_path"`
 	ProjectSuiteDiagnostics []ProjectSuiteDiagnostic `json:"project_suite_diagnostics"`
 	PlannedActions          []PlannedAction          `json:"planned_actions"`
 	PlannedSkills           []PlannedSkill           `json:"planned_skills,omitempty"`
 	ChangedPaths            []ChangedPath            `json:"changed_paths"`
 	BackupPlan              []BackupEntry            `json:"backup_plan"`
+	NoSpillover             NoSpilloverEvidence      `json:"no_spillover"`
 	Checksums               Checksums                `json:"checksums"`
 	PlanHash                string                   `json:"plan_hash"`
 	ApprovalRequest         ApprovalRequest          `json:"approval_request"`
@@ -113,6 +125,17 @@ type ProjectActionResult struct {
 	ManualSemanticPortTasks []ManualSemanticPortTask `json:"manual_semantic_port_tasks"`
 	Diagnostics             []discovery.Diagnostic   `json:"diagnostics"`
 	NextAction              string                   `json:"next_action"`
+}
+
+type NoSpilloverEvidence struct {
+	ScopeProfile                    string   `json:"scope_profile"`
+	ScopeProject                    string   `json:"scope_project"`
+	UnknownPersonalSkillsPreserved  []string `json:"unknown_personal_skills_preserved"`
+	UnrelatedProjectSuitesPreserved []string `json:"unrelated_project_suites_preserved"`
+	UnrelatedProfilesMutated        int      `json:"unrelated_profiles_mutated"`
+	KAHStateWriteCount              int      `json:"kah_state_write_count"`
+	KABRuntimeMutationCount         int      `json:"kab_runtime_mutation_count"`
+	ManifestWriteLast               bool     `json:"manifest_write_last"`
 }
 
 type projectSuiteManifestInfo struct {
@@ -242,15 +265,20 @@ func RenderHumanProjectAction(result ProjectActionResult) string {
 	lines := []string{
 		fmt.Sprintf("Status: %s %s - profile %s / project %s.", result.Command, status, result.TargetProfile.Name, result.Project.ID),
 		fmt.Sprintf("Source pack: %s", result.SourcePack.ID),
+		fmt.Sprintf("Role: %s (%s); prune_extra:%t.", result.RoleLabel, result.SuiteRole, result.PruneExtra),
 		fmt.Sprintf("Plan: actions %d, manual tasks %d, plan_hash %s", len(result.PlannedActions), len(result.ManualSemanticPortTasks), result.PlanHash),
+		fmt.Sprintf("Counts: keep %d, create %d, update %d, remove %d, manifest_update %d.", result.Summary.CountsByAction["skip"], result.Summary.CountsByAction["create"], result.Summary.CountsByAction["update"], result.Summary.CountsByAction["remove"], result.Summary.CountsByAction["manifest_update"]),
 	}
 	if result.DryRun {
 		lines = append(lines, "Writes: dry-run only; profile/manifest/KAH/KAB/auth/provider writes 0.")
 		lines = append(lines, fmt.Sprintf("Approval required: %t", result.ApprovalRequest.Required))
 		lines = append(lines, "Approval evidence: "+result.ApprovalRequest.EvidenceRef)
+		lines = append(lines, "Backup: apply requires explicit absolute --backup-vault-root; dry-run writes no backup files.")
 	} else {
 		lines = append(lines, "Approval evidence: "+result.Approval.EvidenceRef, "Recovery: "+result.BackupPath)
 	}
+	lines = append(lines, fmt.Sprintf("Recovery: manifest write last:%t; rollback uses backup path for changed/removed files.", result.NoSpillover.ManifestWriteLast))
+	lines = append(lines, fmt.Sprintf("No-spillover: preserved unknown personal skills %d; unrelated profiles mutated %d; KAH writes %d; KAB runtime mutations %d.", len(result.NoSpillover.UnknownPersonalSkillsPreserved), result.NoSpillover.UnrelatedProfilesMutated, result.NoSpillover.KAHStateWriteCount, result.NoSpillover.KABRuntimeMutationCount))
 	for _, diagnostic := range result.ProjectSuiteDiagnostics {
 		lines = append(lines, humanProjectSuiteDiagnosticLine(diagnostic))
 	}
@@ -336,15 +364,43 @@ func buildProjectActionDryRun(repo string, opts ProjectSuiteOptions, command str
 		return result, nil
 	}
 	populateSourcePackEvidence(&result.SourcePack, packs, registrySHA)
+	selectedPacks := packs
+	roleAwareRepair := !migrate && (strings.TrimSpace(opts.SuiteRole) != "" || opts.PruneExtra)
+	if roleAwareRepair {
+		roleRegistry, role, rolePacks, selected, excluded, roleConflicts, roleDiagnostics := resolveProjectSuiteRole(sourceRepo, opts.SuiteRole, packs, opts.Project)
+		result.RoleRegistry = roleRegistry
+		result.RoleLabel = role.DisplayLabel
+		if role.SelectionMode == "full_source_suite" {
+			result.SuiteMode = SuiteModeFull
+		} else if role.ID != "" {
+			result.SuiteMode = SuiteModeRoleSubset
+		}
+		result.SelectedSkills = selected
+		result.ExcludedSkills = excluded
+		for _, c := range roleConflicts {
+			result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: c.Severity, Code: c.Condition, Message: c.Message})
+		}
+		result.Diagnostics = append(result.Diagnostics, roleDiagnostics...)
+		if len(roleConflicts) > 0 || len(roleDiagnostics) > 0 {
+			finalizeProjectAction(&result)
+			return result, nil
+		}
+		selectedPacks = rolePacks
+	}
 	info := inspectProjectSuite(profileRoot, opts.Project, sourcePackID, packs, !migrate)
 	result.TargetProfile.PreviousManifestSHA256 = info.ManifestSHA
 	result.TargetProfile.ManifestState = info.State
 	result.ProjectSuiteDiagnostics = append(result.ProjectSuiteDiagnostics, info.Diagnostics...)
+	if roleAwareRepair {
+		result.ProjectSuiteDiagnostics = append(result.ProjectSuiteDiagnostics, roleAwareProjectSuiteDoctorDiagnostics(sourceRepo, profileRoot, opts.Project, packs, info)...)
+		addRequestedRoleManifestDiagnostics(&result, info)
+		result.NoSpillover = scanProjectActionNoSpillover(opts.Profile, profileRoot, opts.Project, info)
+	}
 
 	if migrate {
 		planMigrationActions(&result, sourceRepo, profileRoot, opts.Project, packs)
 	} else {
-		planRepairActions(&result, sourceRepo, profileRoot, opts.Project, packs, info)
+		planRepairActions(&result, sourceRepo, profileRoot, opts.Project, selectedPacks, packs, info)
 	}
 	finalizeProjectAction(&result)
 	return result, nil
@@ -363,12 +419,18 @@ func baseProjectActionResult(command string, mode string, sourceRepo string, pro
 		TargetProfile:           discovery.TargetProfile{Name: opts.Profile, Root: profileRoot, ManifestPath: manifestPath, ManifestState: manifestState(manifestPath)},
 		Project:                 Project{ID: opts.Project, TargetSuitePath: "skills/" + opts.Project},
 		SourcePack:              SourcePack{ID: sourcePackID, Source: source, ResolvedFrom: source, SourceRepo: discovery.SourceRepoInfo(sourceRepo), PackChecksums: map[string]string{}, FormalRegistry: "skill-pack.yaml"},
+		SuiteRole:               opts.SuiteRole,
+		RoleRegistry:            RoleRegistryEvidence{Path: RoleRegistryPath},
+		SelectedSkills:          []RoleSkillEvidence{},
+		ExcludedSkills:          []RoleSkillEvidence{},
+		PruneExtra:              opts.PruneExtra,
 		ManifestPath:            manifestPath,
 		ProjectSuiteDiagnostics: []ProjectSuiteDiagnostic{},
 		PlannedActions:          []PlannedAction{},
 		PlannedSkills:           []PlannedSkill{},
 		ChangedPaths:            []ChangedPath{},
 		BackupPlan:              []BackupEntry{},
+		NoSpillover:             NoSpilloverEvidence{ScopeProfile: opts.Profile, ScopeProject: opts.Project, UnrelatedProfilesMutated: 0, KAHStateWriteCount: 0, KABRuntimeMutationCount: 0, ManifestWriteLast: true},
 		ManualSemanticPortTasks: []ManualSemanticPortTask{},
 		Diagnostics:             []discovery.Diagnostic{},
 		NextAction:              "Review dry-run evidence and approve with " + command + " --approve dry-run:<hash>; rerun doctor --project-suite after approved changes.",
@@ -691,10 +753,86 @@ func suiteState(profileRoot string, project string, info projectSuiteManifestInf
 	return ProjectSuiteState{ManifestState: info.State, PhysicalState: physical, InstalledSkillCount: len(info.Records), FilesChecked: filesChecked}
 }
 
-func planRepairActions(result *ProjectActionResult, sourceRepo string, profileRoot string, project string, packs []discovery.SourcePack, info projectSuiteManifestInfo) {
+func addRequestedRoleManifestDiagnostics(result *ProjectActionResult, info projectSuiteManifestInfo) {
+	if info.Suite == nil {
+		return
+	}
+	manifestRole, _ := info.Suite["suite_role"].(string)
+	if strings.TrimSpace(manifestRole) == "" {
+		result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: "missing_suite_role", Message: "project suite manifest is missing suite_role; repair/prune requires explicit manifest role evidence."})
+		return
+	}
+	if manifestRole != result.SuiteRole {
+		result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: "suite_role_mismatch", Message: fmt.Sprintf("requested suite_role %q does not match manifest suite_role %q.", result.SuiteRole, manifestRole)})
+	}
+}
+
+func scanProjectActionNoSpillover(profile string, profileRoot string, project string, info projectSuiteManifestInfo) NoSpilloverEvidence {
+	evidence := NoSpilloverEvidence{ScopeProfile: profile, ScopeProject: project, UnknownPersonalSkillsPreserved: []string{}, UnrelatedProjectSuitesPreserved: []string{}, UnrelatedProfilesMutated: 0, KAHStateWriteCount: 0, KABRuntimeMutationCount: 0, ManifestWriteLast: true}
+	manifested := map[string]bool{}
+	for target := range info.Records {
+		manifested[target] = true
+	}
+	root := filepath.Join(profileRoot, "skills", project)
+	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || entry.Name() != "SKILL.md" {
+			return nil
+		}
+		rel, err := filepath.Rel(profileRoot, path)
+		if err != nil {
+			return nil
+		}
+		rel = filepath.ToSlash(rel)
+		if !manifested[rel] {
+			evidence.UnknownPersonalSkillsPreserved = append(evidence.UnknownPersonalSkillsPreserved, rel)
+		}
+		return nil
+	})
+	if info.Payload != nil {
+		if rawSuites, ok := info.Payload["project_suites"].([]any); ok {
+			for _, raw := range rawSuites {
+				suite, ok := raw.(map[string]any)
+				if !ok || suite["project"] == project {
+					continue
+				}
+				evidence.UnrelatedProjectSuitesPreserved = append(evidence.UnrelatedProjectSuitesPreserved, fmt.Sprint(suite["project"]))
+			}
+		}
+	}
+	sort.Strings(evidence.UnknownPersonalSkillsPreserved)
+	sort.Strings(evidence.UnrelatedProjectSuitesPreserved)
+	return evidence
+}
+
+func planRepairActions(result *ProjectActionResult, sourceRepo string, profileRoot string, project string, packs []discovery.SourcePack, allPacks []discovery.SourcePack, info projectSuiteManifestInfo) {
+	pruneTargets := map[string]bool{}
+	if result.PruneExtra {
+		for _, removal := range plannedRolePruneActions(result, profileRoot, project, allPacks, info) {
+			pruneTargets[removal.TargetPath] = true
+			result.PlannedActions = append(result.PlannedActions, removal)
+			prev := removal.PreviousSHA256
+			result.ChangedPaths = append(result.ChangedPaths, ChangedPath{Path: removal.TargetPath, Action: "remove", InstalledSkill: removal.InstalledSkill, SourcePackID: removal.SourcePackID, PreviousSHA256: prev, Bytes: removal.Bytes})
+			if prev != nil {
+				result.BackupPlan = append(result.BackupPlan, BackupEntry{Path: removal.TargetPath, BackupPath: filepath.ToSlash(filepath.Join("<backup-vault-root>", "dry-run", "files", filepath.FromSlash(removal.TargetPath))), PreviousSHA256: *prev, Bytes: removal.Bytes})
+			}
+		}
+	}
 	for _, diag := range info.Diagnostics {
+		if result.PruneExtra && diag.Condition == "out_of_role_kas_managed_skill" && pruneTargets[diag.TargetPath] {
+			continue
+		}
 		if diag.Severity == "error" && !repairableProjectCondition(diag.Condition) {
 			result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: diag.Condition, Message: diag.Message})
+		}
+	}
+	for _, diag := range result.ProjectSuiteDiagnostics {
+		if result.PruneExtra && diag.Condition == "out_of_role_kas_managed_skill" && pruneTargets[diag.TargetPath] {
+			continue
+		}
+		if diag.Severity == "error" && !repairableProjectCondition(diag.Condition) {
+			if !hasDiagnosticCode(result.Diagnostics, diag.Condition) {
+				result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: diag.Condition, Message: diag.Message})
+			}
 		}
 	}
 	for _, pack := range packs {
@@ -721,10 +859,58 @@ func planRepairActions(result *ProjectActionResult, sourceRepo string, profileRo
 			result.PlannedActions[len(result.PlannedActions)-1].BackupPath = backup.BackupPath
 		}
 	}
-	if manifestNeedsProjectRepair(result, info) {
+	if manifestNeedsProjectRepair(result, info) || len(pruneTargets) > 0 || (result.SuiteRole != "" && manifestRoleNeedsRepair(result, info)) {
 		result.PlannedActions = append(result.PlannedActions, PlannedAction{Action: "manifest_update", Project: project, TargetPath: ".kas/skill-pack-manifest.json", Reason: "refresh_project_suite_manifest"})
 	}
 	sortProjectActionResult(result)
+}
+
+func plannedRolePruneActions(result *ProjectActionResult, profileRoot string, project string, packs []discovery.SourcePack, info projectSuiteManifestInfo) []PlannedAction {
+	selectedTargets := map[string]bool{}
+	for _, skill := range result.SelectedSkills {
+		selectedTargets[skill.TargetPath] = true
+	}
+	managedByTarget := map[string]RoleSkillEvidence{}
+	for _, pack := range packs {
+		sourceSkill := sourceSkillID(pack.PackID)
+		installed := renderInstalledSkill(project, sourceSkill)
+		target := filepath.ToSlash(filepath.Join("skills", project, installed, "SKILL.md"))
+		managedByTarget[target] = RoleSkillEvidence{SourceSkill: sourceSkill, InstalledSkill: installed, SourcePackID: pack.PackID, TargetPath: target}
+	}
+	actions := []PlannedAction{}
+	for target, record := range info.Records {
+		if selectedTargets[target] {
+			continue
+		}
+		managed := managedByTarget[target]
+		if managed.TargetPath == "" || record.Checksum == "" {
+			continue
+		}
+		current, size, err := existingFileChecksumAndSize(filepath.Join(profileRoot, filepath.FromSlash(target)))
+		if err != nil || current != record.Checksum {
+			continue
+		}
+		prev := current
+		actions = append(actions, PlannedAction{Action: "remove", Project: project, InstalledSkill: record.InstalledSkill, SourcePackID: managed.SourcePackID, SourceSkill: managed.SourceSkill, TargetPath: target, Reason: "prune_manifest_tracked_out_of_role_kas_managed_skill", PreviousSHA256: &prev, Bytes: size, BackupPath: filepath.ToSlash(filepath.Join("<backup-vault-root>", "dry-run", "files", filepath.FromSlash(target)))})
+	}
+	sort.Slice(actions, func(i, j int) bool { return actions[i].TargetPath < actions[j].TargetPath })
+	return actions
+}
+
+func hasDiagnosticCode(diagnostics []discovery.Diagnostic, code string) bool {
+	for _, diag := range diagnostics {
+		if diag.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+func manifestRoleNeedsRepair(result *ProjectActionResult, info projectSuiteManifestInfo) bool {
+	if info.Suite == nil {
+		return false
+	}
+	return info.Suite["suite_role"] != result.SuiteRole || info.Suite["suite_mode"] != result.SuiteMode
 }
 
 func plannedRepairSkill(sourceRepo string, profileRoot string, project string, pack discovery.SourcePack, info projectSuiteManifestInfo) (PlannedSkill, ChangedPath) {
@@ -974,26 +1160,47 @@ func applyApprovedProjectAction(repo string, opts ProjectSuiteOptions, evidenceR
 	}
 	operationID := makeProjectActionID(command, dryRun.PlanHash, time.Now().UTC())
 	backupRoot := filepath.Join(dryRun.TargetProfile.Root, ".kas", "backups", operationID)
-	relativeBackupRoot := filepath.ToSlash(filepath.Join(".kas", "backups", operationID))
-	if err := preflightProjectAction(dryRun, relativeBackupRoot); err != nil {
+	if command == "repair-project-kas" {
+		validated, err := validateBackupVaultRoot(opts.BackupVaultRoot, dryRun.TargetProfile.Root, dryRun.TargetProfile.Name, dryRun.Project.ID, operationID)
+		if err != nil {
+			return projectActionApprovalFailure(dryRun, evidenceRef, approvedHash, approvedMode, "backup_vault_root_rejected", err.Error()), nil
+		}
+		backupRoot = validated
+	}
+	if err := preflightProjectAction(dryRun, ""); err != nil {
 		return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, nil, false, []discovery.Diagnostic{{Level: "error", Code: "project_action_preflight_failed", Message: err.Error()}}), nil
 	}
 	actualChanged := []ChangedPath{}
+	previousManifestPath := ""
+	if dryRun.TargetProfile.PreviousManifestSHA256 != nil {
+		previousManifestPath = filepath.Join(backupRoot, "skill-pack-manifest.json.before")
+		if err := copyAbsoluteFile(dryRun.TargetProfile.ManifestPath, previousManifestPath); err != nil {
+			return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, actualChanged, false, []discovery.Diagnostic{{Level: "error", Code: "previous_manifest_backup_failed", Message: err.Error()}}), nil
+		}
+	}
 	backupByPath := map[string]string{}
 	for _, entry := range dryRun.ChangedPaths {
-		if entry.Action != "update" {
+		if entry.Action != "update" && entry.Action != "remove" {
 			continue
 		}
-		backupRel := filepath.ToSlash(filepath.Join(relativeBackupRoot, filepath.FromSlash(entry.Path)))
-		if err := copyProfileFile(dryRun.TargetProfile.Root, entry.Path, backupRel); err != nil {
+		source, err := safeProfilePath(dryRun.TargetProfile.Root, entry.Path)
+		if err != nil {
 			return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, actualChanged, false, []discovery.Diagnostic{{Level: "error", Code: "backup_failed", Message: err.Error()}}), nil
+		}
+		backupAbs := filepath.Join(backupRoot, "files", filepath.FromSlash(entry.Path))
+		if err := copyAbsoluteFile(source, backupAbs); err != nil {
+			return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, actualChanged, false, []discovery.Diagnostic{{Level: "error", Code: "backup_failed", Message: err.Error()}}), nil
+		}
+		sum, err := checksumFile(backupAbs)
+		if err != nil || entry.PreviousSHA256 == nil || sum != *entry.PreviousSHA256 {
+			return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, actualChanged, false, []discovery.Diagnostic{{Level: "error", Code: "backup_failed", Message: "backup checksum verification failed for " + entry.Path}}), nil
 		}
 		backup := entry
 		backup.Action = "backup"
 		backup.NewSHA256 = ""
-		backup.BackupPath = backupRel
+		backup.BackupPath = backupAbs
 		actualChanged = append(actualChanged, backup)
-		backupByPath[entry.Path] = backupRel
+		backupByPath[entry.Path] = backupAbs
 	}
 	for _, entry := range dryRun.ChangedPaths {
 		if entry.Action != "create" && entry.Action != "update" {
@@ -1019,20 +1226,24 @@ func applyApprovedProjectAction(repo string, opts ProjectSuiteOptions, evidenceR
 		}
 		actualChanged = append(actualChanged, entry)
 	}
-	previousManifestPath := ""
-	if dryRun.TargetProfile.PreviousManifestSHA256 != nil {
-		previousManifestPath = filepath.Join(backupRoot, "skill-pack-manifest.json.previous")
-		previousRel, err := filepath.Rel(dryRun.TargetProfile.Root, previousManifestPath)
+	for _, entry := range dryRun.ChangedPaths {
+		if entry.Action != "remove" {
+			continue
+		}
+		target, err := safeProfileWritePath(dryRun.TargetProfile.Root, entry.Path)
 		if err != nil {
-			return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, actualChanged, false, []discovery.Diagnostic{{Level: "error", Code: "previous_manifest_backup_failed", Message: err.Error()}}), nil
+			return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, actualChanged, false, []discovery.Diagnostic{{Level: "error", Code: "unsafe_target_path", Message: err.Error()}}), nil
 		}
-		previousTarget, err := safeProfileWritePath(dryRun.TargetProfile.Root, filepath.ToSlash(previousRel))
-		if err != nil {
-			return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, actualChanged, false, []discovery.Diagnostic{{Level: "error", Code: "previous_manifest_backup_failed", Message: err.Error()}}), nil
+		if err := os.Remove(target); err != nil {
+			return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, actualChanged, false, []discovery.Diagnostic{{Level: "error", Code: "remove_failed", Message: err.Error()}}), nil
 		}
-		if err := copyAbsoluteFile(dryRun.TargetProfile.ManifestPath, previousTarget); err != nil {
-			return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, actualChanged, false, []discovery.Diagnostic{{Level: "error", Code: "previous_manifest_backup_failed", Message: err.Error()}}), nil
+		if _, err := os.Lstat(target); !os.IsNotExist(err) {
+			return approvedProjectActionResult(dryRun, evidenceRef, approvedHash, approvedMode, operationID, backupRoot, actualChanged, false, []discovery.Diagnostic{{Level: "error", Code: "remove_verify_failed", Message: "removed file is still present: " + entry.Path}}), nil
 		}
+		if backupRel := backupByPath[entry.Path]; backupRel != "" {
+			entry.BackupPath = backupRel
+		}
+		actualChanged = append(actualChanged, entry)
 	}
 	manifest, err := buildUpdatedProjectManifest(projectActionAsInstallResult(dryRun), evidenceRef, approvedHash, operationID, backupRoot, previousManifestPath, actualChanged)
 	if err != nil {
@@ -1065,7 +1276,7 @@ func approvedProjectActionResult(dryRun ProjectActionResult, evidenceRef string,
 		}
 		return changed[i].Action < changed[j].Action
 	})
-	counts := map[string]int{"create": 0, "update": 0, "skip": 0, "conflict": 0, "error": 0, "backup": 0, "manifest_update": 0}
+	counts := map[string]int{"create": 0, "update": 0, "remove": 0, "skip": 0, "conflict": 0, "error": 0, "backup": 0, "manifest_update": 0}
 	for _, entry := range changed {
 		counts[entry.Action]++
 	}
@@ -1073,11 +1284,14 @@ func approvedProjectActionResult(dryRun ProjectActionResult, evidenceRef string,
 	result.OK = ok
 	result.Mode = approvedMode
 	result.DryRun = false
-	result.NoWrite = NoWriteEvidence{Guaranteed: false, ProfileWriteCount: counts["create"] + counts["update"], SkillWriteCount: counts["create"] + counts["update"], ManifestWriteCount: counts["manifest_update"], KASDirectoryWriteCount: counts["manifest_update"]}
+	result.NoWrite = NoWriteEvidence{Guaranteed: false, ProfileWriteCount: counts["create"] + counts["update"] + counts["remove"], SkillWriteCount: counts["create"] + counts["update"] + counts["remove"], ManifestWriteCount: counts["manifest_update"], KASDirectoryWriteCount: counts["manifest_update"]}
+	result.Summary.CountsByAction = counts
+	result.Summary.TotalFiles = len(changed)
+	result.Summary.DiagnosticCount = len(diagnostics)
 	result.ChangedPaths = changed
 	result.Approval = ApprovalEvidence{EvidenceRef: evidenceRef, DryRunPlanHash: dryRun.PlanHash, ApprovedPlanHash: approvedHash, MatchedCurrentPlan: approvedHash == dryRun.PlanHash}
 	result.BackupPath = backupRoot
-	result.Recovery = &Recovery{RollbackSupported: true, BackupPath: backupRoot, PreviousManifestSHA256: dryRun.TargetProfile.PreviousManifestSHA256, Instructions: []string{"Restore updated files from backup_path when present.", "Restore previous manifest snapshot when present.", "Created project files may be removed manually if rollback is needed; generic source files are not deleted by KASPROJ-004."}}
+	result.Recovery = &Recovery{RollbackSupported: true, BackupPath: backupRoot, PreviousManifestSHA256: dryRun.TargetProfile.PreviousManifestSHA256, Instructions: []string{"Restore updated or removed files from backup_path when present.", "Restore previous manifest snapshot when present.", "Created project files may be removed manually if rollback is needed; unknown personal skills are not deleted by KASROLE-004 repair/prune."}}
 	result.Diagnostics = diagnostics
 	if strings.Contains(approvedMode, "repair") {
 		result.RepairID = operationID
@@ -1092,10 +1306,10 @@ func approvedProjectActionResult(dryRun ProjectActionResult, evidenceRef string,
 	return result
 }
 
-func preflightProjectAction(dryRun ProjectActionResult, relativeBackupRoot string) error {
+func preflightProjectAction(dryRun ProjectActionResult, _ string) error {
 	seenPaths := map[string]bool{}
 	for _, entry := range dryRun.ChangedPaths {
-		if entry.Action != "create" && entry.Action != "update" && entry.Action != "skip" {
+		if entry.Action != "create" && entry.Action != "update" && entry.Action != "remove" && entry.Action != "skip" {
 			return fmt.Errorf("plan contains non-writable action: %s %s", entry.Action, entry.Path)
 		}
 		if seenPaths[entry.Path] {
@@ -1114,7 +1328,7 @@ func preflightProjectAction(dryRun ProjectActionResult, relativeBackupRoot strin
 			if actual != nil {
 				return fmt.Errorf("target appeared after dry-run: %s", entry.Path)
 			}
-		case "update", "skip":
+		case "update", "remove", "skip":
 			if actual == nil {
 				return fmt.Errorf("target disappeared after dry-run: %s", entry.Path)
 			}
@@ -1122,28 +1336,18 @@ func preflightProjectAction(dryRun ProjectActionResult, relativeBackupRoot strin
 				return fmt.Errorf("target checksum changed after dry-run: %s", entry.Path)
 			}
 		}
-		if entry.Action == "update" {
-			backupRel := filepath.ToSlash(filepath.Join(relativeBackupRoot, filepath.FromSlash(entry.Path)))
-			if _, err := safeProfileWritePath(dryRun.TargetProfile.Root, backupRel); err != nil {
+		if entry.Action == "create" || entry.Action == "update" {
+			content, err := renderedContentForProjectAction(dryRun, entry)
+			if err != nil {
 				return err
 			}
-		}
-		content, err := renderedContentForProjectAction(dryRun, entry)
-		if err != nil {
-			return err
-		}
-		if sha256Bytes(content) != entry.NewSHA256 {
-			return fmt.Errorf("source checksum changed after dry-run: %s", entry.Path)
+			if sha256Bytes(content) != entry.NewSHA256 {
+				return fmt.Errorf("source checksum changed after dry-run: %s", entry.Path)
+			}
 		}
 	}
 	if _, err := safeProfileWritePath(dryRun.TargetProfile.Root, ".kas/skill-pack-manifest.json"); err != nil {
 		return err
-	}
-	if dryRun.TargetProfile.PreviousManifestSHA256 != nil {
-		previousRel := filepath.ToSlash(filepath.Join(relativeBackupRoot, "skill-pack-manifest.json.previous"))
-		if _, err := safeProfileWritePath(dryRun.TargetProfile.Root, previousRel); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -1163,7 +1367,7 @@ func renderedContentForProjectAction(result ProjectActionResult, entry ChangedPa
 }
 
 func projectActionAsInstallResult(action ProjectActionResult) Result {
-	return Result{OK: action.OK, Command: action.Command, Mode: action.Mode, CLIVersion: action.CLIVersion, DryRun: action.DryRun, NoWrite: action.NoWrite, SourceRepo: action.SourceRepo, TargetProfile: action.TargetProfile, Project: action.Project, SourcePack: action.SourcePack, PlannedSkills: action.PlannedSkills, ChangedPaths: action.ChangedPaths, BackupPlan: action.BackupPlan, PlanHash: action.PlanHash, Diagnostics: action.Diagnostics}
+	return Result{OK: action.OK, Command: action.Command, Mode: action.Mode, CLIVersion: action.CLIVersion, DryRun: action.DryRun, NoWrite: action.NoWrite, SourceRepo: action.SourceRepo, TargetProfile: action.TargetProfile, Project: action.Project, SourcePack: action.SourcePack, SuiteRole: action.SuiteRole, SuiteMode: action.SuiteMode, RoleLabel: action.RoleLabel, RoleRegistry: action.RoleRegistry, SelectedSkills: action.SelectedSkills, ExcludedSkills: action.ExcludedSkills, PlannedSkills: action.PlannedSkills, ChangedPaths: action.ChangedPaths, BackupPlan: action.BackupPlan, PlanHash: action.PlanHash, Diagnostics: action.Diagnostics}
 }
 
 func makeProjectActionID(command string, planHash string, now time.Time) string {
@@ -1179,13 +1383,20 @@ func makeProjectActionID(command string, planHash string, now time.Time) string 
 }
 
 func finalizeProjectAction(result *ProjectActionResult) {
+	sortProjectActionResult(result)
+	sortProjectActionDiagnostics(result)
+	counts := map[string]int{"create": 0, "update": 0, "skip": 0, "conflict": 0, "error": 0, "backup": 0, "manifest_update": 0, "remove": 0}
+	for _, changed := range result.ChangedPaths {
+		counts[changed.Action]++
+	}
+	result.Summary = Summary{TotalSkills: len(result.PlannedSkills), TotalFiles: len(result.ChangedPaths), SelectedSkills: len(result.SelectedSkills), ExcludedSkills: len(result.ExcludedSkills), CountsByAction: counts, ConflictCount: 0, DiagnosticCount: len(result.Diagnostics)}
 	result.Checksums = Checksums{SourcePack: result.SourcePack.SuiteChecksum, PlannedManifest: checksumAny(projectActionPlannedManifest(*result)), PlannedSkills: checksumAny(result.PlannedSkills), ChangedPaths: checksumAny(result.ChangedPaths)}
-	canonical := map[string]any{"command": result.Command, "mode": result.Mode, "cli_version": result.CLIVersion, "dry_run": result.DryRun, "no_write": result.NoWrite, "source_repo": result.SourceRepo, "target_profile": result.TargetProfile, "manifest_path": result.ManifestPath, "previous_manifest_sha256": result.TargetProfile.PreviousManifestSHA256, "project": result.Project, "source_pack": result.SourcePack, "project_suite_diagnostics": result.ProjectSuiteDiagnostics, "planned_actions": result.PlannedActions, "planned_skills": result.PlannedSkills, "changed_paths": result.ChangedPaths, "backup_plan": result.BackupPlan, "checksums": result.Checksums, "manual_semantic_port_tasks": result.ManualSemanticPortTasks, "diagnostics": result.Diagnostics}
+	canonical := map[string]any{"command": result.Command, "mode": result.Mode, "cli_version": result.CLIVersion, "dry_run": result.DryRun, "no_write": result.NoWrite, "source_repo": result.SourceRepo, "target_profile": result.TargetProfile, "manifest_path": result.ManifestPath, "previous_manifest_sha256": result.TargetProfile.PreviousManifestSHA256, "project": result.Project, "source_pack": result.SourcePack, "suite_role": result.SuiteRole, "suite_mode": result.SuiteMode, "role_label": result.RoleLabel, "role_registry": result.RoleRegistry, "selected_skills": result.SelectedSkills, "excluded_skills": result.ExcludedSkills, "prune_extra": result.PruneExtra, "summary": result.Summary, "project_suite_diagnostics": result.ProjectSuiteDiagnostics, "planned_actions": result.PlannedActions, "planned_skills": result.PlannedSkills, "changed_paths": result.ChangedPaths, "backup_plan": result.BackupPlan, "no_spillover": result.NoSpillover, "checksums": result.Checksums, "manual_semantic_port_tasks": result.ManualSemanticPortTasks, "diagnostics": result.Diagnostics}
 	result.PlanHash = checksumAny(canonical)
 	blocking := noErrorDiagnostics(result.Diagnostics)
 	result.OK = blocking
 	requiresApproval := result.OK && hasWritableProjectAction(result.PlannedActions)
-	result.ApprovalRequest = ApprovalRequest{Required: requiresApproval, EvidenceRef: "dry-run:" + result.PlanHash, DryRunPlanHash: result.PlanHash, HashIncludesProfile: true, HashIncludesManifestState: true, HashIncludesSourceSuite: true, HashIncludesNoWriteEvidence: true, HashIncludesBackupPlan: true, HashIncludesConflictsAndDiags: true}
+	result.ApprovalRequest = ApprovalRequest{Required: requiresApproval, EvidenceRef: "dry-run:" + result.PlanHash, DryRunPlanHash: result.PlanHash, HashIncludesProfile: true, HashIncludesManifestState: true, HashIncludesSourceSuite: true, HashIncludesRoleFields: result.SuiteRole != "", HashIncludesNoWriteEvidence: true, HashIncludesBackupPlan: true, HashIncludesConflictsAndDiags: true}
 	if !result.OK {
 		result.ApprovalRequest.Required = false
 		result.NextAction = "Resolve diagnostics and rerun dry-run; approved project-suite writes fail closed until the current plan is ok:true."
@@ -1197,12 +1408,16 @@ func finalizeProjectAction(result *ProjectActionResult) {
 }
 
 func projectActionPlannedManifest(result ProjectActionResult) map[string]any {
-	return plannedManifest(Options{Profile: result.TargetProfile.Name, Project: result.Project.ID, SourcePack: result.SourcePack.ID}, result.SourcePack.SuiteChecksum, result.PlannedSkills, Result{})
+	return plannedManifest(Options{Profile: result.TargetProfile.Name, Project: result.Project.ID, SuiteRole: result.SuiteRole, SourcePack: result.SourcePack.ID}, result.SourcePack.SuiteChecksum, result.PlannedSkills, projectActionRoleManifestResult(result))
+}
+
+func projectActionRoleManifestResult(action ProjectActionResult) Result {
+	return Result{SuiteRole: action.SuiteRole, SuiteMode: action.SuiteMode, RoleLabel: action.RoleLabel, RoleRegistry: action.RoleRegistry, SelectedSkills: action.SelectedSkills, ExcludedSkills: action.ExcludedSkills}
 }
 
 func hasWritableProjectAction(actions []PlannedAction) bool {
 	for _, action := range actions {
-		if action.Action == "create" || action.Action == "update" || action.Action == "manifest_update" {
+		if action.Action == "create" || action.Action == "update" || action.Action == "remove" || action.Action == "manifest_update" {
 			return true
 		}
 	}
@@ -1218,6 +1433,34 @@ func sortProjectActionResult(result *ProjectActionResult) {
 			return result.PlannedActions[i].Action < result.PlannedActions[j].Action
 		}
 		return result.PlannedActions[i].TargetPath < result.PlannedActions[j].TargetPath
+	})
+}
+
+func sortProjectActionDiagnostics(result *ProjectActionResult) {
+	sort.Slice(result.ProjectSuiteDiagnostics, func(i, j int) bool {
+		left := result.ProjectSuiteDiagnostics[i]
+		right := result.ProjectSuiteDiagnostics[j]
+		if left.TargetPath != right.TargetPath {
+			return left.TargetPath < right.TargetPath
+		}
+		if left.Condition != right.Condition {
+			return left.Condition < right.Condition
+		}
+		if left.InstalledSkill != right.InstalledSkill {
+			return left.InstalledSkill < right.InstalledSkill
+		}
+		return left.Message < right.Message
+	})
+	sort.Slice(result.Diagnostics, func(i, j int) bool {
+		left := result.Diagnostics[i]
+		right := result.Diagnostics[j]
+		if left.Code != right.Code {
+			return left.Code < right.Code
+		}
+		if left.Level != right.Level {
+			return left.Level < right.Level
+		}
+		return left.Message < right.Message
 	})
 }
 

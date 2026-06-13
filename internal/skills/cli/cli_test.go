@@ -865,6 +865,198 @@ func TestInstallProjectKASConflictJSONExitsTwo(t *testing.T) {
 	}
 }
 
+func TestPublicRepairRoleAwarePrune(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-review"), "kkachi-review")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-verify"), "kkachi-verify")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-implement"), "kkachi-implement")
+	writeCLITestSkillPackYAML(t, repo, "kkachi-review", "kkachi-verify", "kkachi-implement")
+	profileRoot := filepath.Join(dir, "profile")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("install dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var installDryRun map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &installDryRun); err != nil {
+		t.Fatal(err)
+	}
+	evidence := installDryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "blue_commander", "--apply", evidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("install apply failed: code=%d stderr=%s", code, stderr.String())
+	}
+	setCLIManifestSuiteRole(t, profileRoot, "doksuri-server", "red_reviewer")
+	writeCLITestSkill(t, filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-local-note"), "doksuri-server-local-note")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--prune-extra", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected missing suite-role fail closed, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "suite_role_required")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "red_reviewer", "--prune-extra", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("repair prune dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var dryRun map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &dryRun); err != nil {
+		t.Fatal(err)
+	}
+	if dryRun["command"] != "repair" || dryRun["suite_role"] != "red_reviewer" || dryRun["prune_extra"] != true {
+		t.Fatalf("unexpected repair dry-run payload: %+v", dryRun)
+	}
+	summary := dryRun["summary"].(map[string]any)
+	counts := summary["counts_by_action"].(map[string]any)
+	if counts["remove"] != float64(1) || counts["skip"] != float64(2) {
+		t.Fatalf("unexpected repair prune counts: %+v", summary)
+	}
+	noSpillover := dryRun["no_spillover"].(map[string]any)
+	if len(noSpillover["unknown_personal_skills_preserved"].([]any)) != 1 {
+		t.Fatalf("missing no-spillover evidence: %+v", noSpillover)
+	}
+	assertNoWriteEvidence(t, dryRun)
+	repairEvidence := dryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
+	nextAction := dryRun["next_action"].(string)
+	for _, want := range []string{"repair --profile kwanwoo --project doksuri-server --suite-role red_reviewer --prune-extra --apply " + repairEvidence, "--backup-vault-root <approved-abs-vault-root>"} {
+		if !strings.Contains(nextAction, want) {
+			t.Fatalf("public repair next_action missing %q: %s", want, nextAction)
+		}
+	}
+	if strings.Contains(nextAction, "repair-project-kas") || strings.Contains(nextAction, "--approve") {
+		t.Fatalf("public repair next_action must prefer public --apply flow, got: %s", nextAction)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "red_reviewer", "--prune-extra", "--apply", repairEvidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected repair apply without backup vault root to fail, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "backup_vault_root_rejected")
+
+	vault := filepath.Join(dir, "vault")
+	if err := os.MkdirAll(vault, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "red_reviewer", "--prune-extra", "--apply", repairEvidence, "--backup-vault-root", vault, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("repair prune apply failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var applied map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &applied); err != nil {
+		t.Fatal(err)
+	}
+	if applied["ok"] != true || applied["mode"] != "project_repair_approved" || applied["repair_id"] == "" {
+		t.Fatalf("unexpected repair apply payload: %+v", applied)
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-implement", "SKILL.md")); !os.IsNotExist(err) {
+		t.Fatalf("repair apply did not prune implement skill or unexpected stat error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-local-note", "SKILL.md")); err != nil {
+		t.Fatalf("repair apply touched unknown personal skill: %v", err)
+	}
+}
+
+func TestRepairProjectKASRoleAwareCompatibility(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-review"), "kkachi-review")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-verify"), "kkachi-verify")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-implement"), "kkachi-implement")
+	writeCLITestSkillPackYAML(t, repo, "kkachi-review", "kkachi-verify", "kkachi-implement")
+	profileRoot := filepath.Join(dir, "profile")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("install-project-kas dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var installDryRun map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &installDryRun); err != nil {
+		t.Fatal(err)
+	}
+	evidence := installDryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "blue_commander", "--approve", evidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("install-project-kas approve failed: code=%d stderr=%s", code, stderr.String())
+	}
+	setCLIManifestSuiteRole(t, profileRoot, "doksuri-server", "red_reviewer")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "red_reviewer", "--prune-extra", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("repair-project-kas prune dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var dryRun map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &dryRun); err != nil {
+		t.Fatal(err)
+	}
+	if dryRun["command"] != "repair-project-kas" || dryRun["suite_role"] != "red_reviewer" || dryRun["prune_extra"] != true {
+		t.Fatalf("compat dry-run missing role/prune fields: %+v", dryRun)
+	}
+	repairEvidence := dryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
+	vault := filepath.Join(dir, "vault")
+	if err := os.MkdirAll(vault, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"repair-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "red_reviewer", "--prune-extra", "--approve", repairEvidence, "--backup-vault-root", vault, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("repair-project-kas approve failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var applied map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &applied); err != nil {
+		t.Fatal(err)
+	}
+	if applied["ok"] != true || applied["mode"] != "project_repair_approved" {
+		t.Fatalf("unexpected compat approved payload: %+v", applied)
+	}
+}
+
+func setCLIManifestSuiteRole(t *testing.T, profileRoot string, project string, suiteRole string) {
+	t.Helper()
+	manifestPath := filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest map[string]any
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for _, rawSuite := range manifest["project_suites"].([]any) {
+		suite := rawSuite.(map[string]any)
+		if suite["project"] == project {
+			suite["suite_role"] = suiteRole
+			suite["suite_mode"] = "role_subset"
+		}
+	}
+	encoded, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, append(encoded, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSyncProjectKASJSONAndFailClosedGuards(t *testing.T) {
 	repo, projectRoot, statePath := setupCLISyncFixture(t)
 
@@ -1599,7 +1791,11 @@ func TestProjectSuiteDoctorRepairAndMigrateCLIForms(t *testing.T) {
 	evidence := payload["approval_request"].(map[string]any)["evidence_ref"].(string)
 	stdout.Reset()
 	stderr.Reset()
-	code = Main([]string{"repair-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--approve", evidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	vault := filepath.Join(t.TempDir(), "vault")
+	if err := os.MkdirAll(vault, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	code = Main([]string{"repair-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--approve", evidence, "--backup-vault-root", vault, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
 	if code != 0 {
 		t.Fatalf("approved repair failed: code=%d stderr=%s", code, stderr.String())
 	}

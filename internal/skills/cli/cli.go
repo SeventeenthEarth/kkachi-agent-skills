@@ -413,6 +413,8 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	profile := fs.String("profile", "", "Hermes target profile name")
 	project := fs.String("project", "", "project-specific KAS id")
 	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id")
+	suiteRole := fs.String("suite-role", "", "explicit role-aware project suite role")
+	pruneExtra := fs.Bool("prune-extra", false, "prune manifest-tracked KAS-managed skills outside --suite-role")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
 	workflowGraph := fs.Bool("workflow-graph", false, "orchestrate workflow graph proposal/apply through KAH")
 	propose := fs.Bool("propose", false, "create a KAH workflow graph proposal without applying it")
@@ -422,6 +424,7 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	dryRun := fs.Bool("dry-run", false, "report planned repairs without writing")
 	approve := fs.String("approve", "", "compatibility alias for --apply dry-run:sha256:<hash>")
 	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash> for approved lifecycle writes")
+	backupVaultRoot := fs.String("backup-vault-root", "", "required absolute backup vault root for repair --apply")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
 	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
 	if hasHelpArg(argv) {
@@ -457,7 +460,7 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	if *project == "" {
 		return emitError(stderr, "project_required", "repair requires --project <project>.", "repair", *jsonOutput, "")
 	}
-	opts := projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot}
+	opts := projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SuiteRole: *suiteRole, PruneExtra: *pruneExtra, BackupVaultRoot: *backupVaultRoot, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot}
 	var result projectinstall.ProjectActionResult
 	var err error
 	if approval != "" {
@@ -469,9 +472,25 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 		return emitError(stderr, "project_repair_failed", err.Error(), "repair", *jsonOutput, "")
 	}
 	result.Command = "repair"
+	result.NextAction = publicRepairNextAction(result, approval != "")
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return projectinstall.RenderHumanProjectAction(result)
 	})
+}
+
+func publicRepairNextAction(result projectinstall.ProjectActionResult, approved bool) string {
+	if approved || !result.ApprovalRequest.Required || result.ApprovalRequest.EvidenceRef == "" {
+		return result.NextAction
+	}
+	rolePart := ""
+	if strings.TrimSpace(result.SuiteRole) != "" {
+		rolePart = " --suite-role " + result.SuiteRole
+	}
+	prunePart := ""
+	if result.PruneExtra {
+		prunePart = " --prune-extra"
+	}
+	return fmt.Sprintf("Review dry-run evidence and apply with repair --profile %s --project %s%s%s --apply %s --backup-vault-root <approved-abs-vault-root>; rerun doctor --project-suite after approved changes.", result.TargetProfile.Name, result.Project.ID, rolePart, prunePart, result.ApprovalRequest.EvidenceRef)
 }
 
 func runWorkflowGraphRepair(repo string, project string, propose bool, reason string, applyProposal string, approval string, dryRun bool, approve string, apply string, profile string, sourcePack string, profileRoot string, sourcePackExplicit bool, profileRootExplicit bool, jsonOutput bool, stdout io.Writer, stderr io.Writer) int {
@@ -684,9 +703,13 @@ func runRepairProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env 
 	profile := fs.String("profile", "", "Hermes target profile name")
 	project := fs.String("project", "", "project-specific KAS id")
 	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id; defaults to kas-default-project-suite")
+	suiteRole := fs.String("suite-role", "", "explicit role-aware project suite role")
+	pruneExtra := fs.Bool("prune-extra", false, "prune manifest-tracked KAS-managed skills outside --suite-role")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
 	dryRun := fs.Bool("dry-run", false, "report planned repairs without writing")
 	approve := fs.String("approve", "", "approval evidence ref dry-run:<plan_hash>")
+	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash> for approved lifecycle writes")
+	backupVaultRoot := fs.String("backup-vault-root", "", "required absolute backup vault root for approved repair")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
 	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
 	if hasHelpArg(argv) {
@@ -703,10 +726,17 @@ func runRepairProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env 
 	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "repair-project-kas", *jsonOutput, "")
 	}
-	if *dryRun && *approve != "" {
-		return emitError(stderr, "project_repair_mode_ambiguous", "repair-project-kas accepts either --dry-run or --approve, not both.", "repair-project-kas", *jsonOutput, "Run dry-run first, then rerun with only --approve dry-run:<hash>.")
+	if *apply != "" && *approve != "" {
+		return emitError(stderr, "project_repair_mode_ambiguous", "repair-project-kas accepts only one approval flag.", "repair-project-kas", *jsonOutput, "Run dry-run first, then rerun with --approve or --apply dry-run:sha256:<hash>.")
 	}
-	if !*dryRun && *approve == "" {
+	approval := *apply
+	if approval == "" {
+		approval = *approve
+	}
+	if *dryRun && approval != "" {
+		return emitError(stderr, "project_repair_mode_ambiguous", "repair-project-kas accepts either --dry-run or approval, not both.", "repair-project-kas", *jsonOutput, "Run dry-run first, then rerun with only --approve dry-run:<hash>.")
+	}
+	if !*dryRun && approval == "" {
 		return emitError(stderr, "project_repair_requires_dry_run_or_approve", "repair-project-kas requires --dry-run or --approve dry-run:<hash>.", "repair-project-kas", *jsonOutput, "Rerun with repair-project-kas --profile <profile> --project <project> --dry-run.")
 	}
 	if *profile == "" {
@@ -715,11 +745,11 @@ func runRepairProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env 
 	if *project == "" {
 		return emitError(stderr, "project_required", "repair-project-kas requires --project <project>.", "repair-project-kas", *jsonOutput, "")
 	}
-	opts := projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot}
+	opts := projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SuiteRole: *suiteRole, PruneExtra: *pruneExtra, BackupVaultRoot: *backupVaultRoot, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot}
 	var result projectinstall.ProjectActionResult
 	var err error
-	if *approve != "" {
-		result, err = projectinstall.ApplyApprovedRepair(*repo, opts, *approve)
+	if approval != "" {
+		result, err = projectinstall.ApplyApprovedRepair(*repo, opts, approval)
 	} else {
 		result, err = projectinstall.BuildProjectRepairDryRun(*repo, opts)
 	}
