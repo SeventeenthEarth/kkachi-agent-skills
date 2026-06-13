@@ -136,6 +136,7 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 	profile := fs.String("profile", "", "Hermes target profile name")
 	project := fs.String("project", "", "project-specific KAS id")
 	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id")
+	suiteRole := fs.String("suite-role", "", "explicit role-aware project suite role")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
 	fromGeneric := fs.Bool("from-generic", false, "plan explicit generic-to-project migration")
 	dryRun := fs.Bool("dry-run", false, "report planned changes without writing")
@@ -154,7 +155,7 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 		return 2
 	}
 	if *project != "" || *fromGeneric {
-		return runPublicProjectInstall(*repo, *profile, *project, *sourcePack, *profileRoot, *dryRun, *fromGeneric, *approve, *apply, *jsonOutput, stdout, stderr, env, argv)
+		return runPublicProjectInstall(*repo, *profile, *project, *sourcePack, *suiteRole, *profileRoot, *dryRun, *fromGeneric, *approve, *apply, *jsonOutput, stdout, stderr, env, argv)
 	}
 	if *apply != "" {
 		if *approve != "" || *dryRun {
@@ -207,7 +208,7 @@ func runInstall(argv []string, stdout io.Writer, stderr io.Writer, env map[strin
 	return code
 }
 
-func runPublicProjectInstall(repo string, profile string, project string, sourcePack string, profileRoot string, dryRun bool, fromGeneric bool, approve string, apply string, jsonOutput bool, stdout io.Writer, stderr io.Writer, env map[string]string, argv []string) int {
+func runPublicProjectInstall(repo string, profile string, project string, sourcePack string, suiteRole string, profileRoot string, dryRun bool, fromGeneric bool, approve string, apply string, jsonOutput bool, stdout io.Writer, stderr io.Writer, env map[string]string, argv []string) int {
 	if profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "install", jsonOutput, "")
 	}
@@ -222,7 +223,7 @@ func runPublicProjectInstall(repo string, profile string, project string, source
 		return emitError(stderr, "project_install_mode_ambiguous", "install --project accepts either --dry-run or --apply, not both.", "install", jsonOutput, "Run dry-run first, then rerun with only --apply dry-run:sha256:<hash>.")
 	}
 	if !dryRun && approval == "" {
-		return emitError(stderr, "project_install_requires_dry_run_or_apply", "install --project requires --dry-run or --apply dry-run:sha256:<hash>.", "install", jsonOutput, "Rerun with install --profile <profile> --project <project> --dry-run.")
+		return emitError(stderr, "project_install_requires_dry_run_or_apply", "install --project requires --dry-run or --apply dry-run:sha256:<hash>.", "install", jsonOutput, "Rerun with install --profile <profile> --project <project> --suite-role <role> --dry-run.")
 	}
 	if profile == "" {
 		return emitError(stderr, "profile_required", "install --project requires --profile <profile>.", "install", jsonOutput, "")
@@ -253,16 +254,16 @@ func runPublicProjectInstall(repo string, profile string, project string, source
 	var result projectinstall.Result
 	var err error
 	if approval != "" {
-		result, err = projectinstall.ApplyApprovedInstall(repo, projectinstall.Options{Profile: profile, Project: project, SourcePack: sourcePack, ProfileRoot: profileRoot, DryRun: true}, approval)
+		result, err = projectinstall.ApplyApprovedInstall(repo, projectinstall.Options{Profile: profile, Project: project, SuiteRole: suiteRole, SourcePack: sourcePack, ProfileRoot: profileRoot, DryRun: true}, approval)
 	} else {
-		result, err = projectinstall.BuildDryRun(repo, projectinstall.Options{Profile: profile, Project: project, SourcePack: sourcePack, ProfileRoot: profileRoot, DryRun: true})
+		result, err = projectinstall.BuildDryRun(repo, projectinstall.Options{Profile: profile, Project: project, SuiteRole: suiteRole, SourcePack: sourcePack, ProfileRoot: profileRoot, DryRun: true})
 	}
 	if err != nil {
 		return emitError(stderr, "project_install_planner_failed", err.Error(), "install", jsonOutput, "")
 	}
 	result.Command = "install"
 	if result.DryRun {
-		result.NextAction = "Review install --project dry-run evidence; no files were written. Use doctor --project-suite after approved writes."
+		result.NextAction = "Review install --project dry-run evidence; no files were written. Apply with install --profile " + profile + " --project " + project + " --suite-role " + suiteRole + " --apply " + result.ApprovalRequest.EvidenceRef + "; use doctor --project-suite after approved writes."
 	}
 	return emitResult(stdout, stderr, result.OK, jsonOutput, result, func() string {
 		if result.DryRun {
@@ -611,6 +612,7 @@ func runInstallProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env
 	profile := fs.String("profile", "", "Hermes target profile name")
 	project := fs.String("project", "", "project-specific KAS id")
 	sourcePack := fs.String("source-pack", "", "project source suite id")
+	suiteRole := fs.String("suite-role", "", "explicit role-aware project suite role")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
 	dryRun := fs.Bool("dry-run", false, "render project-specific install plan without writing")
 	approve := fs.String("approve", "", "approval evidence ref dry-run:<plan_hash>")
@@ -622,7 +624,7 @@ func runInstallProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env
 		return 0
 	}
 	if writeFlag := unsupportedProjectInstallWriteFlag(argv); writeFlag != "" {
-		return emitError(stderr, "project_install_write_form_unsupported", "install-project-kas supports only --dry-run or --approve dry-run:<hash>; unsupported flag: "+writeFlag, "install-project-kas", wantsJSON(argv), "Rerun with install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run.")
+		return emitError(stderr, "project_install_write_form_unsupported", "install-project-kas supports only --dry-run or --approve dry-run:<hash>; unsupported flag: "+writeFlag, "install-project-kas", wantsJSON(argv), "Rerun with install-project-kas --profile <profile> --project <project> --suite-role <role> --source-pack kas-default-project-suite --dry-run.")
 	}
 	if projectInstallApproveMissingValue(argv) {
 		return emitError(stderr, "approval_evidence_malformed", "approval evidence must be exactly dry-run:sha256:<64 lowercase hex>.", "install-project-kas", wantsJSON(argv), "Rerun with the dry-run JSON approval_request.evidence_ref value.")
@@ -637,7 +639,7 @@ func runInstallProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env
 		return emitError(stderr, "project_install_mode_ambiguous", "install-project-kas accepts either --dry-run or --approve, not both.", "install-project-kas", *jsonOutput, "Run dry-run first, then rerun with only --approve dry-run:<hash>.")
 	}
 	if !*dryRun && *approve == "" {
-		return emitError(stderr, "project_install_requires_dry_run_or_approve", "install-project-kas requires --dry-run or --approve dry-run:<hash>.", "install-project-kas", *jsonOutput, "Rerun with install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run.")
+		return emitError(stderr, "project_install_requires_dry_run_or_approve", "install-project-kas requires --dry-run or --approve dry-run:<hash>.", "install-project-kas", *jsonOutput, "Rerun with install-project-kas --profile <profile> --project <project> --suite-role <role> --source-pack kas-default-project-suite --dry-run.")
 	}
 	if *profile == "" {
 		return emitError(stderr, "profile_required", "install-project-kas requires --profile <profile>.", "install-project-kas", *jsonOutput, "")
@@ -650,7 +652,7 @@ func runInstallProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env
 	}
 	var result projectinstall.Result
 	var err error
-	opts := projectinstall.Options{Profile: *profile, Project: *project, SourcePack: *sourcePack, ProfileRoot: *profileRoot, DryRun: true}
+	opts := projectinstall.Options{Profile: *profile, Project: *project, SuiteRole: *suiteRole, SourcePack: *sourcePack, ProfileRoot: *profileRoot, DryRun: true}
 	if *approve != "" {
 		result, err = projectinstall.ApplyApprovedInstall(*repo, opts, *approve)
 	} else {
@@ -811,7 +813,7 @@ func normalizeInstallArgs(argv []string) []string {
 	for i := 0; i < len(argv); i++ {
 		arg := argv[i]
 		switch arg {
-		case "--repo", "--profile", "--project", "--source-pack", "--profile-root", "--approve", "--apply", "--kab-stage", "--kab-adoption-stage":
+		case "--repo", "--profile", "--project", "--source-pack", "--suite-role", "--profile-root", "--approve", "--apply", "--kab-stage", "--kab-adoption-stage":
 			rewritten = append(rewritten, arg)
 			if i+1 < len(argv) {
 				i++
@@ -831,7 +833,7 @@ func normalizeInstallArgs(argv []string) []string {
 }
 
 func hasInstallFlagValue(arg string) bool {
-	for _, name := range []string{"--repo=", "--profile=", "--project=", "--source-pack=", "--profile-root=", "--approve=", "--apply=", "--kab-stage=", "--kab-adoption-stage=", "--from-generic=", "--dry-run=", "--json=", "--no-color="} {
+	for _, name := range []string{"--repo=", "--profile=", "--project=", "--source-pack=", "--suite-role=", "--profile-root=", "--approve=", "--apply=", "--kab-stage=", "--kab-adoption-stage=", "--from-generic=", "--dry-run=", "--json=", "--no-color="} {
 		if strings.HasPrefix(arg, name) {
 			return true
 		}

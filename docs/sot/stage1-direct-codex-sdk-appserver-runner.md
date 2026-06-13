@@ -63,6 +63,8 @@ Required runner behavior:
 6. Preserve `thread_id` and runner metadata in KAH artifacts so later phases can resume the correct Codex thread when appropriate.
 7. Write detailed backend output to the configured run artifact such as `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md` instead of dumping full detail into chat.
 8. Exit non-zero and fail closed on missing Codex CLI, missing `openai_codex`, missing prompt artifact, unsupported sandbox, stale approval evidence, missing writable artifact path, or Codex/app-server startup failure.
+9. For long-running implementation, feedback-fix, cleanup, and verification-support phases, invoke the runner through a supervised background process with completion notification and bounded polling/watch evidence. Do not run those phases as a single foreground Hermes terminal call whose tool timeout can kill the parent before metadata/output artifacts are flushed.
+10. Foreground runner invocation is acceptable only for short preflight and bounded plan-only/review turns. If an implementation turn exceeds the current foreground budget, restart or continue it through the supervised background pattern rather than increasing a foreground timeout as a substitute for process supervision.
 
 ## 4. Non-goals
 
@@ -91,6 +93,19 @@ Default lifecycle:
 6. The runner exits and lets the SDK clean up the app-server child process.
 
 Thread continuity comes from `thread_id` and KAH artifacts, not from assuming a long-lived app-server remains running across phases. A persistent daemon may be explored only as a separate KAB/wrapper or explicit infrastructure task.
+
+### 5.1 Invocation supervision and timeout policy
+
+Codex app-server itself may run longer than an ordinary shell command, but KAS must not treat an unbounded foreground shell call as durable execution. The operator-facing invocation policy is:
+
+- short preflight checks may run in foreground with a bounded timeout;
+- plan-only turns may run in foreground only when the expected duration is short enough to preserve complete metadata/output evidence;
+- implementation, feedback-fix, cleanup, and verification-support turns should run as a Hermes-tracked background process with `notify_on_complete` or equivalent completion signaling;
+- the supervisor should poll or wait in bounded intervals and record partial progress, final exit status, output path, metadata path, and any timeout/error excerpt in the KAH run artifacts;
+- if the foreground wrapper times out, the result is partial evidence, not implementation completion; inspect/stop any remaining Codex process, preserve the diff, and resume through the background-supervised runner before making completion claims;
+- do not silently switch to `codex exec`, generic `openai` SDK calls, raw app-server transport, or KAB `native_codex` evidence to avoid a timeout.
+
+This policy distinguishes a Codex turn taking a long time from a Hermes tool-call timeout. The former can be valid when supervised; the latter is an evidence gap unless output and metadata artifacts were flushed and verified.
 
 ## 6. Evidence contract
 

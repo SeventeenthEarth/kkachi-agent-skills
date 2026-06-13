@@ -120,7 +120,12 @@ KASPROJ-003 extends the existing KAS profile manifest at `.kas/skill-pack-manife
 | Field | Meaning |
 |---|---|
 | `project` | Concrete project suite id, for example `doksuri-server`. It determines the `skills/<project>/` directory and the required prefix for installed skill names. |
+| `suite_mode` | Role projection mode for the installed project suite. `full` means the explicit Blue commander role selected the complete source suite; `role_subset` means only registry-declared role skills were selected. |
+| `suite_role` | Explicit role registry id used for the project suite install, for example `blue_commander`, `red_reviewer`, `orange_pm_reviewer`, or `gray_scribe`. KAS must not infer this from the profile name. |
+| `role_registry` | Hash-bound registry evidence including path `registries/project-suite-roles.yaml`, version `role-aware-project-suite/v1`, and `sha256:<hex>` checksum. |
 | `source_pack` | Upstream KAS pack/template input used to generate or update the project-specific suite, including source repo, source path, commit/checksum, language assumptions, and phase list. |
+| `selected_skills` | Source/rendered skill evidence selected by the role projection, including source skill id, installed skill id, source pack id, and target path. |
+| `excluded_skills` | Source/rendered skill evidence excluded by the role projection, including reason `outside_suite_role` for ordinary role-subset exclusion. |
 | `installed_skill` | Project-prefixed skill id installed under the project suite, for example `doksuri-server-plan`; generic ids are invalid for project suites. |
 | `target_path` | Profile-relative canonical path for the installed skill file or directory, for example `skills/doksuri-server/doksuri-server-plan/SKILL.md`. |
 | `drift_policy` | Per-suite or per-skill policy for source/profile drift, for example `fail_closed`, `manual_review_required`, `semantic_port_required`, or `repair_after_approval`. |
@@ -141,6 +146,13 @@ Minimum compatible manifest shape:
       "dry_run_plan_hash": "sha256:<hex>",
       "approved_plan_hash": "sha256:<hex>",
       "project": "doksuri-server",
+      "suite_mode": "role_subset",
+      "suite_role": "red_reviewer",
+      "role_registry": {
+        "path": "registries/project-suite-roles.yaml",
+        "version": "role-aware-project-suite/v1",
+        "checksum": "sha256:<hex>"
+      },
       "source_pack": {
         "id": "kas-default-project-suite",
         "repo": "kkachi-agent-skills",
@@ -149,7 +161,24 @@ Minimum compatible manifest shape:
         "language_profile": "project-specific-prefix-render-only",
         "formal_registry": "skill-pack.yaml"
       },
-      "drift_policy": "manual_review_required",
+      "selected_skills": [
+        {
+          "source_skill": "kkachi-review",
+          "installed_skill": "doksuri-server-review",
+          "source_pack_id": "kkachi-review",
+          "target_path": "skills/doksuri-server/doksuri-server-review/SKILL.md"
+        }
+      ],
+      "excluded_skills": [
+        {
+          "source_skill": "kkachi-implement",
+          "installed_skill": "doksuri-server-implement",
+          "source_pack_id": "kkachi-implement",
+          "target_path": "skills/doksuri-server/doksuri-server-implement/SKILL.md",
+          "reason": "outside_suite_role"
+        }
+      ],
+      "drift_policy": "role_subset_expected",
       "semantic_adaptation_claimed": false,
       "installed_skills": [
         {
@@ -193,11 +222,30 @@ Diagnostic records must include `project`, `installed_skill` when applicable,
 
 ## 7. Dry-run, approval, repair, and migration contract
 
-KASPROJ-002 implements the read-only dry-run planner surface, preserved exactly by KASPROJ-003:
+KASPROJ-002 originally introduced the read-only dry-run planner surface, but
+KASROLE-002 deliberately breaks the copyable no-role path. Operators must now
+select an explicit suite role even when using the compatibility alias:
 
 ```bash
-kkachi-agent-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --dry-run [--json]
+kkachi-agent-skills install-project-kas --profile <profile> --project <project> --suite-role blue_commander --source-pack kas-default-project-suite --dry-run [--json]
 ```
+
+KASROLE-002 extends the public lifecycle surface with explicit role-aware project install:
+
+```bash
+kkachi-agent-skills install --profile <profile> --project <project> --suite-role <role> --dry-run [--json]
+kkachi-agent-skills install --profile <profile> --project <project> --suite-role <role> --apply dry-run:sha256:<hash> [--json]
+```
+
+The compatibility alias `install-project-kas` accepts the same required
+`--suite-role`. Missing or unknown roles fail closed with `ok:false` / exit 2
+before writes, and role inference from profile names is forbidden. The
+role-aware plan hash binds
+`suite_role`, `suite_mode`, role display label, `role_registry`,
+`selected_skills`, `excluded_skills`, source suite checksum, changed paths,
+conflicts/diagnostics, backup plan, manifest state, and no-write evidence.
+Human output must include the role label plus selected/excluded counts and a
+copy/paste apply command that preserves `--suite-role`.
 
 The planner resolves the formal source suite `kas-default-project-suite` from repository `skill-pack.yaml` plus current source skills under repo `skills/`, renders project-prefixed installed names and target paths, reports all `target_path` changes, computes checksum and `plan_hash` evidence, and performs no profile writes. Source skill `kkachi-plan` renders to installed skill `<project>-plan` and target path `skills/<project>/<project>-plan/SKILL.md`; other source skills strip a leading `kkachi-` when present before applying the project prefix.
 
@@ -228,10 +276,10 @@ Generic installed skill names, missing project prefix, unsafe/escaping target pa
 KASPROJ-003 approved install surface:
 
 ```bash
-kkachi-agent-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --approve dry-run:<plan_hash> [--json]
+kkachi-agent-skills install-project-kas --profile <profile> --project <project> --suite-role blue_commander --source-pack kas-default-project-suite --approve dry-run:<plan_hash> [--json]
 ```
 
-Approved install recomputes the current dry-run, compares approval evidence to the recomputed `plan_hash`, and fails closed before any write unless `--approve dry-run:<plan_hash>` exactly matches the recomputed plan hash and the plan is `ok:true`. Missing both `--dry-run`/`--approve`, using both together, malformed approval evidence, unsupported write/force/repair/migrate/from-generic flags, unguarded `--profile-root`, unknown profiles, unsafe/path-traversing targets, symlink escapes, ambiguous duplicate manifest entries, duplicate installed skills/target paths, unmanifested existing targets, local modifications, and checksum mismatches must return exit 2 with `ok:false` JSON.
+Approved install recomputes the current dry-run, compares approval evidence to the recomputed `plan_hash`, and fails closed before any write unless `--suite-role` is present, `--approve dry-run:<plan_hash>` exactly matches the recomputed plan hash, and the plan is `ok:true`. Missing both `--dry-run`/`--approve`, using both together, malformed approval evidence, unsupported write/force/repair/migrate/from-generic flags, unguarded `--profile-root`, unknown profiles, missing/unknown suite roles, unsafe/path-traversing targets, symlink escapes, ambiguous duplicate manifest entries, duplicate installed skills/target paths, unmanifested existing targets, local modifications, and checksum mismatches must return exit 2 with `ok:false` JSON.
 
 Safe write ordering is: preflight all source/target checksums and paths, create backups for trusted replacements, atomically write project skill files, verify post-write checksums, and write/update the compatible profile manifest last. Existing top-level `installs` and unrelated `project_suites` are preserved; only the matching `(project, source_pack.id)` suite is replaced. Human and JSON approved output must include approval evidence, `install_id`, `manifest_path`, backup/recovery evidence, changed-path counts/actions, and `next_action` stating that project-suite doctor should be rerun.
 

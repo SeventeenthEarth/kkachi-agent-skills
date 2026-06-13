@@ -13,6 +13,9 @@ func TestStage1DirectCodexRunnerSOTDefinesSDKAppServerContract(t *testing.T) {
 		"templates/runners/direct-codex-sdk-appserver-runner.py.tmpl",
 		"Sandbox.read_only",
 		"Sandbox.workspace_write",
+		"Hermes-tracked background process",
+		"completion notification and bounded polling/watch evidence",
+		"a single foreground Hermes terminal call whose tool timeout can kill the parent before metadata/output artifacts are flushed",
 		"thread_id",
 		"no-KAB-Codex rationale",
 		"Stage 2 KAB Codex-first",
@@ -61,6 +64,10 @@ func TestStage1DirectCodexRunnerGuidanceWiredIntoSkillsAndTemplates(t *testing.T
 			"codex app-server --listen stdio://",
 		})
 	}
+	requireContainsAll(t, "skills/kkachi-implement/SKILL.md", []string{
+		"Hermes-tracked background runner with completion notification and bounded polling/watch evidence",
+		"Foreground calls are acceptable for short preflight and bounded plan-only/review turns only",
+	})
 }
 
 func TestStage1DirectCodexRunnerRegisteredInDocsAndRoadmap(t *testing.T) {

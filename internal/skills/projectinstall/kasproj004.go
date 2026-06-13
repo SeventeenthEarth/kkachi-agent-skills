@@ -1082,7 +1082,7 @@ func finalizeProjectAction(result *ProjectActionResult) {
 }
 
 func projectActionPlannedManifest(result ProjectActionResult) map[string]any {
-	return plannedManifest(Options{Profile: result.TargetProfile.Name, Project: result.Project.ID, SourcePack: result.SourcePack.ID}, result.SourcePack.SuiteChecksum, result.PlannedSkills)
+	return plannedManifest(Options{Profile: result.TargetProfile.Name, Project: result.Project.ID, SourcePack: result.SourcePack.ID}, result.SourcePack.SuiteChecksum, result.PlannedSkills, Result{})
 }
 
 func hasWritableProjectAction(actions []PlannedAction) bool {

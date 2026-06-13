@@ -744,10 +744,13 @@ Minimum JSON shape:
 ### 6.7 Project-specific dry-run and approved install
 
 `docs/sot/project-specific-kas-install-contract.md` is the detailed SOT for the
-KASPROJ project-specific install layout. KASPROJ-002 implements the dry-run planner and KASPROJ-003 implements approval-hash-bound install:
+KASPROJ project-specific install layout. KASROLE-002 requires explicit
+`--suite-role` for both the public lifecycle form and the compatibility alias.
+KASPROJ-002 implements the dry-run planner and KASPROJ-003 implements
+approval-hash-bound install:
 
 ```bash
-kkachi-agent-skills install-project-kas --profile <profile> --project <project> --source-pack <source_pack> --dry-run [--json]
+kkachi-agent-skills install-project-kas --profile <profile> --project <project> --suite-role <role> --source-pack <source_pack> --dry-run [--json]
 ```
 
 The implemented source pack is `kas-default-project-suite`, resolved from repository `skill-pack.yaml` plus current discovered source skills under repo `skills/`. The command also accepts `--repo` and harness-only `--profile-root` when `KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1`. Missing both `--dry-run`/`--approve`, using both together, malformed `--approve`, missing required flags, unsupported write/force/repair/migrate/from-generic flags, and unguarded profile-root overrides fail closed with exit 2 and `ok:false` JSON when `--json` is requested.
@@ -778,10 +781,10 @@ KASPROJ-002 conflict example:
 Approved install form:
 
 ```bash
-kkachi-agent-skills install-project-kas --profile <profile> --project <project> --source-pack kas-default-project-suite --approve dry-run:<hash> [--json]
+kkachi-agent-skills install-project-kas --profile <profile> --project <project> --suite-role <role> --source-pack kas-default-project-suite --approve dry-run:<hash> [--json]
 ```
 
-Approved install recomputes the current dry-run, compares the approval evidence to the recomputed `plan_hash`, and writes nothing unless the hash matches and the plan has no conflicts/errors. It preflights all targets and source checksums, rejects unsafe/path-traversing/symlink-escaping/ambiguous/duplicate/local-modified targets, backs up trusted replacements under `.kas/backups/<install_id>/`, atomically writes project skill files, verifies checksums, and writes `.kas/skill-pack-manifest.json` last. Output includes approval evidence, `install_id`, `manifest_path`, backup/recovery evidence, changed path counts/actions, and a next action to run project-suite doctor.
+Approved install recomputes the current dry-run, compares the approval evidence to the recomputed `plan_hash`, and writes nothing unless the required `--suite-role` is present, the hash matches, and the plan has no conflicts/errors. It preflights all targets and source checksums, rejects missing/unknown roles, unsafe/path-traversing/symlink-escaping/ambiguous/duplicate/local-modified targets, backs up trusted replacements under `.kas/backups/<install_id>/`, atomically writes project skill files, verifies checksums, and writes `.kas/skill-pack-manifest.json` last. Output includes approval evidence, `install_id`, `manifest_path`, backup/recovery evidence, changed path counts/actions, and a next action to run project-suite doctor.
 
 KASPROJ-004 implemented project-suite doctor/repair/migrate forms:
 
@@ -831,6 +834,25 @@ snapshot, skipped local-only files, checksums, approval evidence, and uninstall
 evidence are written under the explicit vault root before any removal, and the
 profile manifest is updated last while preserving unrelated `installs` and
 `project_suites`.
+
+KASROLE-002 makes role-aware project install explicit on the public lifecycle
+surface:
+
+```bash
+kkachi-agent-skills install --profile <profile> --project <project> --suite-role <role> --dry-run [--json]
+kkachi-agent-skills install --profile <profile> --project <project> --suite-role <role> --apply dry-run:sha256:<hash> [--json]
+```
+
+The compatibility alias `install-project-kas` accepts the same
+`--suite-role`. Missing, unknown, or unregistered roles fail closed with
+`ok:false` and exit 2 before writes; KAS must not infer a role from the profile
+name. Dry-run JSON includes `suite_role`, `suite_mode`, `role_registry`,
+`selected_skills`, `excluded_skills`, selected/excluded counts, and
+`approval_request.hash_includes_role_fields:true`. Human output includes the
+role display label and preserves `--suite-role` in the copy/paste apply command.
+Apply recomputes the same role-aware dry-run and refuses stale role registry
+checksums, source-suite changes, selected/excluded skill changes, or approval
+hash mismatches before writing profile files.
 
 When `doctor --project-suite` is absent, `doctor --project <path>` keeps its existing KAH project-path meaning. When `--project-suite` is present, `--project` is interpreted as the project suite id. Repair and migration default `source_pack` to `kas-default-project-suite`; optional explicit `--source-pack` values fail closed when unknown, and the resolved source pack is included in JSON, diagnostics, and plan-hash evidence.
 

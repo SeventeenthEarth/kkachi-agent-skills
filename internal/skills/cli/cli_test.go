@@ -51,6 +51,55 @@ func writeCLITestSkillPackYAML(t *testing.T, repo string, skills ...string) {
 	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	writeCLITestRoleRegistry(t, repo)
+}
+
+func writeCLITestRoleRegistry(t *testing.T, repo string) {
+	t.Helper()
+	content := `version: role-aware-project-suite/v1
+roles:
+  blue_commander:
+    display_label: "Blue commander / full project suite"
+    selection_mode: full_source_suite
+    required_source_skills: "*"
+    optional_source_skills: []
+    forbidden_source_skills: []
+  red_reviewer:
+    display_label: "Red safety/fail-closed reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-review
+      - kkachi-verify
+    optional_source_skills: []
+    forbidden_source_skills:
+      - kkachi-implement
+  orange_pm_reviewer:
+    display_label: "Orange operator-value reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-review
+    optional_source_skills:
+      - kkachi-final-verify
+    optional_selection_default: unselected
+    forbidden_source_skills:
+      - kkachi-implement
+  gray_scribe:
+    display_label: "Gray evidence/scribe reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-review
+      - kkachi-final-verify
+    optional_source_skills: []
+    forbidden_source_skills:
+      - kkachi-implement
+      - kkachi-docs-update
+`
+	if err := os.MkdirAll(filepath.Join(repo, "registries"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, filepath.FromSlash(projectinstall.RoleRegistryPath)), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func assertCLIErrorCode(t *testing.T, data []byte, code string) {
@@ -447,7 +496,7 @@ func TestPublicLifecycleWrappersJSONDryRunOnly(t *testing.T) {
 	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
 
 	var stdout, stderr bytes.Buffer
-	code := Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	code := Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
 	if code != 0 {
 		t.Fatalf("public install dry-run failed: code=%d stderr=%s", code, stderr.String())
 	}
@@ -465,7 +514,7 @@ func TestPublicLifecycleWrappersJSONDryRunOnly(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	code = Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	code = Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "blue_commander", "--dry-run", "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
 	if code != 2 {
 		t.Fatalf("expected public install ambiguous-mode rejection, got %d", code)
 	}
@@ -525,10 +574,10 @@ func TestPublicLifecycleProjectHumanOutputIsEnglish(t *testing.T) {
 		labels     []string
 	}{
 		"install-project-dry-run": {
-			args:       []string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot},
+			args:       []string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot},
 			wantCode:   0,
 			wantStdout: true,
-			labels:     []string{"Status:", "Source pack:", "Plan:", "Writes:", "Approval evidence:", "Next:"},
+			labels:     []string{"Status:", "Source pack:", "Role:", "Plan:", "Writes:", "Approval evidence:", "Next:"},
 		},
 		"install-from-generic-dry-run": {
 			args:       []string{"install", "--from-generic", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--profile-root", profileRoot},
@@ -577,7 +626,7 @@ func TestInstallProjectKASJSONShapeAndNoWrite(t *testing.T) {
 	profileRoot := filepath.Join(dir, "profiles", "kwanwoo")
 
 	var stdout, stderr bytes.Buffer
-	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
 	if code != 0 {
 		t.Fatalf("code=%d stderr=%s", code, stderr.String())
 	}
@@ -608,13 +657,69 @@ func TestInstallProjectKASJSONShapeAndNoWrite(t *testing.T) {
 	}
 }
 
+func TestInstallProjectPublicSuiteRoleSurfaceAndMissingRegistry(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan")
+	writeCLITestSkillPackYAML(t, repo, "kkachi-plan")
+	profileRoot := filepath.Join(dir, "profiles", "kwanwoo")
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "blue_commander", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected missing mode exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "project_install_requires_dry_run_or_apply")
+	var errPayload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &errPayload); err != nil {
+		t.Fatal(err)
+	}
+	if next, _ := errPayload["next_action"].(string); !strings.Contains(next, "--suite-role <role>") {
+		t.Fatalf("missing mode guidance should preserve suite-role placeholder: %q", next)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("public project install dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["command"] != "install" || payload["suite_role"] != "blue_commander" {
+		t.Fatalf("unexpected public install payload: %+v", payload)
+	}
+	next, _ := payload["next_action"].(string)
+	if !strings.Contains(next, "--suite-role blue_commander") || !strings.Contains(next, "--apply dry-run:sha256:") {
+		t.Fatalf("next action must preserve --suite-role and approval evidence: %q", next)
+	}
+	approval := payload["approval_request"].(map[string]any)
+	if approval["hash_includes_role_fields"] != true {
+		t.Fatalf("approval hash must advertise role-field composition: %+v", approval)
+	}
+
+	if err := os.Remove(filepath.Join(repo, filepath.FromSlash(projectinstall.RoleRegistryPath))); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected missing registry exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "role_registry_unreadable")
+}
+
 func TestInstallProjectKASApprovedInstallAndFailClosedGuards(t *testing.T) {
 	dir := t.TempDir()
 	repo := filepath.Join(dir, "repo")
 	writeCLITestSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan")
 	writeCLITestSkillPackYAML(t, repo, "kkachi-plan")
 	profileRoot := filepath.Join(dir, "profile")
-	base := []string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--profile-root", profileRoot, "--json"}
+	base := []string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "blue_commander", "--profile-root", profileRoot, "--json"}
 
 	var stdout, stderr bytes.Buffer
 	code := Main(base, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
@@ -622,10 +727,13 @@ func TestInstallProjectKASApprovedInstallAndFailClosedGuards(t *testing.T) {
 		t.Fatalf("expected missing dry-run exit 2, got %d", code)
 	}
 	assertCLIErrorCode(t, stderr.Bytes(), "project_install_requires_dry_run_or_approve")
+	if !strings.Contains(stderr.String(), "--suite-role") {
+		t.Fatalf("missing mode next action should preserve suite-role guidance: %s", stderr.String())
+	}
 
 	for name, args := range map[string][]string{
-		"profile":     {"install-project-kas", "--repo", repo, "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--json"},
-		"project":     {"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--json"},
+		"profile":     {"install-project-kas", "--repo", repo, "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "blue_commander", "--dry-run", "--json"},
+		"project":     {"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "blue_commander", "--dry-run", "--json"},
 		"source-pack": {"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--dry-run", "--json"},
 	} {
 		t.Run("missing-"+name, func(t *testing.T) {
@@ -644,6 +752,14 @@ func TestInstallProjectKASApprovedInstallAndFailClosedGuards(t *testing.T) {
 			}
 		})
 	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 2 {
+		t.Fatalf("expected missing suite-role rejection, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "suite_role_required")
 
 	stdout.Reset()
 	stderr.Reset()
@@ -692,6 +808,9 @@ func TestInstallProjectKASApprovedInstallAndFailClosedGuards(t *testing.T) {
 		t.Fatalf("expected write form rejection, got %d", code)
 	}
 	assertCLIErrorCode(t, stderr.Bytes(), "project_install_write_form_unsupported")
+	if !strings.Contains(stderr.String(), "--suite-role") {
+		t.Fatalf("unsupported write next action should preserve suite-role guidance: %s", stderr.String())
+	}
 
 	stdout.Reset()
 	stderr.Reset()
@@ -729,7 +848,7 @@ func TestInstallProjectKASConflictJSONExitsTwo(t *testing.T) {
 	writeCLITestSkillPackYAML(t, repo, "kkachi-kas")
 	profileRoot := filepath.Join(dir, "profile")
 	var stdout, stderr bytes.Buffer
-	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
 	if code != 2 {
 		t.Fatalf("expected umbrella-only exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
 	}
@@ -874,7 +993,7 @@ func TestUninstallDryRunPlansManifestTrackedOnly(t *testing.T) {
 	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
 
 	var stdout, stderr bytes.Buffer
-	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	code := Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
 	if code != 0 {
 		t.Fatalf("install dry-run failed: code=%d stderr=%s", code, stderr.String())
 	}
@@ -885,7 +1004,7 @@ func TestUninstallDryRunPlansManifestTrackedOnly(t *testing.T) {
 	evidence := dryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
 	stdout.Reset()
 	stderr.Reset()
-	code = Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--approve", evidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	code = Main([]string{"install-project-kas", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--source-pack", projectinstall.VirtualSourcePackID, "--suite-role", "blue_commander", "--approve", evidence, "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
 	if code != 0 {
 		t.Fatalf("approved install failed: code=%d stderr=%s", code, stderr.String())
 	}
@@ -1344,6 +1463,23 @@ func TestInstallApprovedCopyJSON(t *testing.T) {
 	}
 	if counts["manifest_update"].(float64) != 1 || payload["manifest_path"] == "" || payload["recovery"] == nil {
 		t.Fatalf("missing manifest/recovery payload: %+v", payload)
+	}
+}
+
+func TestNormalizeInstallArgsTreatsSuiteRoleAsValueFlag(t *testing.T) {
+	args := []string{"alpha", "--suite-role", "blue_commander", "--dry-run", "--profile=kwanwoo", "--suite-role=red_reviewer"}
+	got := normalizeInstallArgs(args)
+	want := []string{"--suite-role", "blue_commander", "--dry-run", "--profile=kwanwoo", "--suite-role=red_reviewer", "alpha"}
+	if len(got) != len(want) {
+		t.Fatalf("normalizeInstallArgs() length = %d, want %d; got %v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("normalizeInstallArgs()[%d] = %q, want %q; got %v", i, got[i], want[i], got)
+		}
+	}
+	if !hasInstallFlagValue("--suite-role=gray_scribe") {
+		t.Fatal("hasInstallFlagValue should recognize --suite-role=<value>")
 	}
 }
 

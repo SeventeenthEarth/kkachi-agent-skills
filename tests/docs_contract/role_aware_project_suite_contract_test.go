@@ -58,7 +58,7 @@ func TestRoleAwareProjectSuiteDocsRegistrationAndRoadmap(t *testing.T) {
 		"named approval owner",
 	})
 	requireRoadmapTaskStatus(t, "KASROLE-001", "Completed")
-	requireRoadmapTaskStatus(t, "KASROLE-002", "Planned")
+	requireRoadmapTaskStatus(t, "KASROLE-002", "Completed")
 	requireRoadmapTaskStatus(t, "KASROLE-003", "Planned")
 	requireRoadmapTaskStatus(t, "KASROLE-004", "Planned")
 }

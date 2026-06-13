@@ -1,0 +1,60 @@
+version: role-aware-project-suite/v1
+roles:
+  blue_commander:
+    source: skill-pack.yaml
+    display_label: "Blue commander / full project suite"
+    selection_mode: full_source_suite
+    required_source_skills: "*"
+    least_privilege_default: full_project_suite_for_commander_only
+    optional_source_skills: []
+    forbidden_source_skills: []
+  red_reviewer:
+    source: skill-pack.yaml
+    display_label: "Red safety/fail-closed reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-review
+      - kkachi-verify
+    least_privilege_default: review_and_verification_only
+    optional_source_skills: []
+    forbidden_source_skills:
+      - kkachi-implement
+      - kkachi-backend-select
+      - kkachi-prompt-compose
+      - kkachi-optimize
+      - kkachi-orchestrate
+  orange_pm_reviewer:
+    source: skill-pack.yaml
+    display_label: "Orange operator-value reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-review
+    least_privilege_default: operator_value_review_only
+    optional_source_skills:
+      - kkachi-final-verify
+    optional_selection_default: unselected
+    forbidden_source_skills:
+      - kkachi-implement
+      - kkachi-backend-select
+      - kkachi-prompt-compose
+      - kkachi-optimize
+      - kkachi-orchestrate
+  gray_scribe:
+    source: skill-pack.yaml
+    display_label: "Gray evidence/scribe reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-review
+      - kkachi-final-verify
+    least_privilege_default: evidence_and_final_gate_support_only
+    optional_source_skills: []
+    forbidden_source_skills:
+      - kkachi-implement
+      - kkachi-backend-select
+      - kkachi-prompt-compose
+      - kkachi-optimize
+      - kkachi-orchestrate
+      - kkachi-docs-update
+    future_preferred_skills:
+      - kkachi-evidence-review
+      - kkachi-scribe-review

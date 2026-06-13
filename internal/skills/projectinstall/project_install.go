@@ -28,6 +28,7 @@ var validProjectID = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`)
 type Options struct {
 	Profile     string
 	Project     string
+	SuiteRole   string
 	SourcePack  string
 	ProfileRoot string
 	DryRun      bool
@@ -70,6 +71,8 @@ type ProjectTailoring struct {
 type Summary struct {
 	TotalSkills     int            `json:"total_skills"`
 	TotalFiles      int            `json:"total_files"`
+	SelectedSkills  int            `json:"selected_skills"`
+	ExcludedSkills  int            `json:"excluded_skills"`
 	CountsByAction  map[string]int `json:"counts_by_action"`
 	ConflictCount   int            `json:"conflict_count"`
 	DiagnosticCount int            `json:"diagnostic_count"`
@@ -114,6 +117,7 @@ type ApprovalRequest struct {
 	HashIncludesProfile           bool   `json:"hash_includes_profile"`
 	HashIncludesManifestState     bool   `json:"hash_includes_manifest_state"`
 	HashIncludesSourceSuite       bool   `json:"hash_includes_source_suite"`
+	HashIncludesRoleFields        bool   `json:"hash_includes_role_fields"`
 	HashIncludesNoWriteEvidence   bool   `json:"hash_includes_no_write_evidence"`
 	HashIncludesBackupPlan        bool   `json:"hash_includes_backup_plan"`
 	HashIncludesConflictsAndDiags bool   `json:"hash_includes_conflicts_and_diagnostics"`
@@ -161,6 +165,12 @@ type Result struct {
 	TargetProfile    discovery.TargetProfile `json:"target_profile"`
 	Project          Project                 `json:"project"`
 	SourcePack       SourcePack              `json:"source_pack"`
+	SuiteRole        string                  `json:"suite_role"`
+	SuiteMode        string                  `json:"suite_mode"`
+	RoleLabel        string                  `json:"role_label"`
+	RoleRegistry     RoleRegistryEvidence    `json:"role_registry"`
+	SelectedSkills   []RoleSkillEvidence     `json:"selected_skills"`
+	ExcludedSkills   []RoleSkillEvidence     `json:"excluded_skills"`
 	ProjectTailoring ProjectTailoring        `json:"project_tailoring"`
 	Summary          Summary                 `json:"summary"`
 	PlannedManifest  map[string]any          `json:"planned_manifest"`
@@ -226,12 +236,28 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 		finalize(&result)
 		return result, nil
 	}
+	roleRegistry, role, selectedPacks, selected, excluded, roleConflicts, roleDiagnostics := resolveProjectSuiteRole(sourceRepo, opts.SuiteRole, packs, opts.Project)
+	result.RoleRegistry = roleRegistry
+	result.RoleLabel = role.DisplayLabel
+	if role.SelectionMode == "full_source_suite" {
+		result.SuiteMode = SuiteModeFull
+	} else if role.ID != "" {
+		result.SuiteMode = SuiteModeRoleSubset
+	}
+	result.SelectedSkills = selected
+	result.ExcludedSkills = excluded
+	result.Conflicts = append(result.Conflicts, roleConflicts...)
+	result.Diagnostics = append(result.Diagnostics, roleDiagnostics...)
+	if len(roleConflicts) > 0 || len(roleDiagnostics) > 0 {
+		finalize(&result)
+		return result, nil
+	}
 	trust, manifestConflicts, manifestChecksum := trustedProjectSuite(profileRoot, opts.Project, opts.SourcePack)
 	for _, c := range manifestConflicts {
 		result.Conflicts = append(result.Conflicts, c)
 		result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: c.Condition, Message: c.Message})
 	}
-	planned, changed, conflicts, backups := planVirtualSuite(sourceRepo, profileRoot, opts.Project, packs, trust)
+	planned, changed, conflicts, backups := planVirtualSuite(sourceRepo, profileRoot, opts.Project, selectedPacks, trust)
 	result.PlannedSkills = planned
 	result.ChangedPaths = changed
 	result.BackupPlan = backups
@@ -259,7 +285,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 	if manifestChecksum != nil {
 		result.TargetProfile.PreviousManifestSHA256 = manifestChecksum
 	}
-	result.PlannedManifest = plannedManifest(opts, result.SourcePack.SuiteChecksum, result.PlannedSkills)
+	result.PlannedManifest = plannedManifest(opts, result.SourcePack.SuiteChecksum, result.PlannedSkills, result)
 	finalize(&result)
 	return result, nil
 }
@@ -272,6 +298,7 @@ func RenderHumanDryRun(result Result) string {
 	lines := []string{
 		fmt.Sprintf("Status: project KAS dry-run %s - %s", status, result.Project.ID),
 		fmt.Sprintf("Source pack: %s", result.SourcePack.ID),
+		fmt.Sprintf("Role: %s (%s); selected %d, excluded %d.", result.RoleLabel, result.SuiteRole, len(result.SelectedSkills), len(result.ExcludedSkills)),
 		fmt.Sprintf("Plan: skills %d, conflicts %d, plan_hash %s", result.Summary.TotalSkills, result.Summary.ConflictCount, result.PlanHash),
 		"Writes: dry-run only; profile/manifest/KAH/KAB writes 0.",
 		"Approval evidence: " + result.ApprovalRequest.EvidenceRef,
@@ -296,13 +323,17 @@ func baseResult(sourceRepo string, profileRoot string, opts Options) Result {
 		TargetProfile:    discovery.TargetProfile{Name: opts.Profile, Root: profileRoot, ManifestPath: manifestPath, ManifestState: manifestState(manifestPath)},
 		Project:          Project{ID: opts.Project, TargetSuitePath: "skills/" + opts.Project},
 		SourcePack:       SourcePack{ID: opts.SourcePack, ResolvedFrom: "skill-pack.yaml", SourceRepo: discovery.SourceRepoInfo(sourceRepo), PackChecksums: map[string]string{}, FormalRegistry: "skill-pack.yaml"},
+		SuiteRole:        opts.SuiteRole,
+		RoleRegistry:     RoleRegistryEvidence{Path: RoleRegistryPath},
+		SelectedSkills:   []RoleSkillEvidence{},
+		ExcludedSkills:   []RoleSkillEvidence{},
 		ProjectTailoring: ProjectTailoring{Mode: "prefix_render_only", Preserves: []string{"project_language", "project_runtime", "project_test_commands", "project_authority_ladder"}, Source: "skill-pack.yaml_and_project_id", SemanticPortRequiredBeforeApprovedInstall: false, SemanticAdaptationClaimed: false},
 		PlannedSkills:    []PlannedSkill{},
 		ChangedPaths:     []ChangedPath{},
 		BackupPlan:       []BackupEntry{},
 		Conflicts:        []Conflict{},
 		Diagnostics:      []discovery.Diagnostic{},
-		NextAction:       "Review changed_paths and approve with install-project-kas --approve dry-run:<plan_hash>; verify with doctor --project-suite after approved install.",
+		NextAction:       "Review changed_paths and approve with install --profile " + opts.Profile + " --project " + opts.Project + " --suite-role " + opts.SuiteRole + " --apply dry-run:<plan_hash>; verify with doctor --project-suite after approved install.",
 	}
 }
 
@@ -437,25 +468,40 @@ func scanProfileConflicts(result *Result, profileRoot string, project string) {
 	}
 }
 
-func plannedManifest(opts Options, sourceChecksum string, skills []PlannedSkill) map[string]any {
+func plannedManifest(opts Options, sourceChecksum string, skills []PlannedSkill, result Result) map[string]any {
 	installed := make([]map[string]any, 0, len(skills))
 	for _, skill := range skills {
 		installed = append(installed, map[string]any{"installed_skill": skill.InstalledSkill, "source_pack_id": skill.SourcePackID, "target_path": skill.TargetPath, "checksum": skill.Checksum, "drift_policy": skill.DriftPolicy, "tailoring_mode": skill.TailoringMode})
 	}
-	return map[string]any{
-		"version": ManifestVersion,
-		"kind":    ProfileManifestKind,
-		"profile": map[string]any{"name": opts.Profile},
-		"project_suites": []map[string]any{{
-			"kind":                        ManifestKind,
-			"project":                     opts.Project,
-			"source_pack":                 map[string]any{"id": opts.SourcePack, "repo": "kkachi-agent-skills", "checksum": sourceChecksum, "language_profile": "project-specific-prefix-render-only", "formal_registry": "skill-pack.yaml"},
-			"drift_policy":                "manual_review_required",
-			"semantic_adaptation_claimed": false,
-			"installed_skills":            installed,
-		}},
-		"installs": []any{},
+	suite := map[string]any{
+		"kind":                        ManifestKind,
+		"project":                     opts.Project,
+		"source_pack":                 map[string]any{"id": opts.SourcePack, "repo": "kkachi-agent-skills", "checksum": sourceChecksum, "language_profile": "project-specific-prefix-render-only", "formal_registry": "skill-pack.yaml"},
+		"drift_policy":                suiteDriftPolicy(result.SuiteMode),
+		"semantic_adaptation_claimed": false,
+		"installed_skills":            installed,
 	}
+	if result.SuiteRole != "" {
+		suite["suite_mode"] = result.SuiteMode
+		suite["suite_role"] = result.SuiteRole
+		suite["role_registry"] = result.RoleRegistry
+		suite["selected_skills"] = result.SelectedSkills
+		suite["excluded_skills"] = result.ExcludedSkills
+	}
+	return map[string]any{
+		"version":        ManifestVersion,
+		"kind":           ProfileManifestKind,
+		"profile":        map[string]any{"name": opts.Profile},
+		"project_suites": []map[string]any{suite},
+		"installs":       []any{},
+	}
+}
+
+func suiteDriftPolicy(suiteMode string) string {
+	if suiteMode == SuiteModeRoleSubset {
+		return "role_subset_expected"
+	}
+	return "manual_review_required"
 }
 
 func finalize(result *Result) {
@@ -463,11 +509,11 @@ func finalize(result *Result) {
 	for _, changed := range result.ChangedPaths {
 		counts[changed.Action]++
 	}
-	result.Summary = Summary{TotalSkills: len(result.PlannedSkills), TotalFiles: len(result.ChangedPaths), CountsByAction: counts, ConflictCount: len(result.Conflicts), DiagnosticCount: len(result.Diagnostics)}
+	result.Summary = Summary{TotalSkills: len(result.PlannedSkills), TotalFiles: len(result.ChangedPaths), SelectedSkills: len(result.SelectedSkills), ExcludedSkills: len(result.ExcludedSkills), CountsByAction: counts, ConflictCount: len(result.Conflicts), DiagnosticCount: len(result.Diagnostics)}
 	result.Checksums = Checksums{SourcePack: result.SourcePack.SuiteChecksum, PlannedManifest: checksumAny(result.PlannedManifest), PlannedSkills: checksumAny(result.PlannedSkills), ChangedPaths: checksumAny(result.ChangedPaths)}
-	canonical := map[string]any{"command": result.Command, "mode": result.Mode, "cli_version": result.CLIVersion, "dry_run": result.DryRun, "no_write": result.NoWrite, "source_repo": result.SourceRepo, "target_profile": result.TargetProfile, "manifest_path": result.TargetProfile.ManifestPath, "manifest_state": result.TargetProfile.ManifestState, "previous_manifest_sha256": result.TargetProfile.PreviousManifestSHA256, "project": result.Project, "source_pack": result.SourcePack, "project_tailoring": result.ProjectTailoring, "summary": result.Summary, "planned_manifest": result.PlannedManifest, "planned_skills": result.PlannedSkills, "changed_paths": result.ChangedPaths, "backup_plan": result.BackupPlan, "checksums": result.Checksums, "conflicts": result.Conflicts, "diagnostics": result.Diagnostics}
+	canonical := map[string]any{"command": result.Command, "mode": result.Mode, "cli_version": result.CLIVersion, "dry_run": result.DryRun, "no_write": result.NoWrite, "source_repo": result.SourceRepo, "target_profile": result.TargetProfile, "manifest_path": result.TargetProfile.ManifestPath, "manifest_state": result.TargetProfile.ManifestState, "previous_manifest_sha256": result.TargetProfile.PreviousManifestSHA256, "project": result.Project, "source_pack": result.SourcePack, "suite_role": result.SuiteRole, "suite_mode": result.SuiteMode, "role_label": result.RoleLabel, "role_registry": result.RoleRegistry, "selected_skills": result.SelectedSkills, "excluded_skills": result.ExcludedSkills, "project_tailoring": result.ProjectTailoring, "summary": result.Summary, "planned_manifest": result.PlannedManifest, "planned_skills": result.PlannedSkills, "changed_paths": result.ChangedPaths, "backup_plan": result.BackupPlan, "checksums": result.Checksums, "conflicts": result.Conflicts, "diagnostics": result.Diagnostics}
 	result.PlanHash = checksumAny(canonical)
-	result.ApprovalRequest = ApprovalRequest{Required: result.OK, EvidenceRef: "dry-run:" + result.PlanHash, DryRunPlanHash: result.PlanHash, HashIncludesProfile: true, HashIncludesManifestState: true, HashIncludesSourceSuite: true, HashIncludesNoWriteEvidence: true, HashIncludesBackupPlan: true, HashIncludesConflictsAndDiags: true}
+	result.ApprovalRequest = ApprovalRequest{Required: result.OK, EvidenceRef: "dry-run:" + result.PlanHash, DryRunPlanHash: result.PlanHash, HashIncludesProfile: true, HashIncludesManifestState: true, HashIncludesSourceSuite: true, HashIncludesRoleFields: true, HashIncludesNoWriteEvidence: true, HashIncludesBackupPlan: true, HashIncludesConflictsAndDiags: true}
 	result.OK = len(result.Conflicts) == 0 && noErrorDiagnostics(result.Diagnostics)
 	if !result.OK {
 		result.ApprovalRequest.Required = false

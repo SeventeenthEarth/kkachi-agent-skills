@@ -143,6 +143,7 @@ func RenderHumanApproved(result Result) string {
 	}
 	lines := []string{
 		fmt.Sprintf("Status: project KAS approved install %s - profile %s / project %s.", state, result.TargetProfile.Name, result.Project.ID),
+		fmt.Sprintf("Role: %s (%s); selected %d, excluded %d.", result.RoleLabel, result.SuiteRole, len(result.SelectedSkills), len(result.ExcludedSkills)),
 		"Approval evidence: " + result.Approval.EvidenceRef,
 		"install_id: " + result.InstallID,
 		"manifest: " + result.ManifestPath,
@@ -155,7 +156,7 @@ func RenderHumanApproved(result Result) string {
 			result.Summary.CountsByAction["error"],
 		),
 		"Recovery: " + result.BackupPath,
-		"semantic_adaptation_claimed:false; drift_policy: manual_review_required.",
+		fmt.Sprintf("semantic_adaptation_claimed:false; drift_policy: %s.", suiteDriftPolicy(result.SuiteMode)),
 	}
 	for _, diagnostic := range result.Diagnostics {
 		lines = append(lines, "Diagnostic: "+diagnostic.Message)
@@ -165,6 +166,18 @@ func RenderHumanApproved(result Result) string {
 }
 
 func preflightApprovedInstall(dryRun Result, relativeBackupRoot string) error {
+	if strings.TrimSpace(dryRun.SuiteRole) == "" {
+		return fmt.Errorf("missing suite_role evidence")
+	}
+	if dryRun.SuiteMode != SuiteModeFull && dryRun.SuiteMode != SuiteModeRoleSubset {
+		return fmt.Errorf("missing or unsupported suite_mode evidence: %s", dryRun.SuiteMode)
+	}
+	if dryRun.RoleRegistry.Path != RoleRegistryPath || dryRun.RoleRegistry.Version != RoleRegistryVersion || !strings.HasPrefix(dryRun.RoleRegistry.Checksum, "sha256:") {
+		return fmt.Errorf("malformed role_registry evidence")
+	}
+	if len(dryRun.SelectedSkills) != len(dryRun.PlannedSkills) {
+		return fmt.Errorf("selected skill evidence does not match planned skills")
+	}
 	seenSkills := map[string]bool{}
 	seenPaths := map[string]bool{}
 	for _, skill := range dryRun.PlannedSkills {
@@ -314,8 +327,14 @@ func buildApprovedResult(dryRun Result, evidenceRef string, approvedHash string,
 		TargetProfile:    dryRun.TargetProfile,
 		Project:          dryRun.Project,
 		SourcePack:       dryRun.SourcePack,
+		SuiteRole:        dryRun.SuiteRole,
+		SuiteMode:        dryRun.SuiteMode,
+		RoleLabel:        dryRun.RoleLabel,
+		RoleRegistry:     dryRun.RoleRegistry,
+		SelectedSkills:   dryRun.SelectedSkills,
+		ExcludedSkills:   dryRun.ExcludedSkills,
 		ProjectTailoring: dryRun.ProjectTailoring,
-		Summary:          Summary{TotalSkills: dryRun.Summary.TotalSkills, TotalFiles: counts["create"] + counts["update"] + counts["manifest_update"], CountsByAction: counts, ConflictCount: counts["conflict"], DiagnosticCount: len(diagnostics)},
+		Summary:          Summary{TotalSkills: dryRun.Summary.TotalSkills, TotalFiles: counts["create"] + counts["update"] + counts["manifest_update"], SelectedSkills: len(dryRun.SelectedSkills), ExcludedSkills: len(dryRun.ExcludedSkills), CountsByAction: counts, ConflictCount: counts["conflict"], DiagnosticCount: len(diagnostics)},
 		PlannedManifest:  dryRun.PlannedManifest,
 		PlannedSkills:    dryRun.PlannedSkills,
 		ChangedPaths:     changed,

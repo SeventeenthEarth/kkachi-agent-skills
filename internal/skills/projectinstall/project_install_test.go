@@ -24,7 +24,7 @@ func TestBuildDryRunRendersProjectPrefixedSuiteAndWritesNothing(t *testing.T) {
 	})
 	profileRoot := filepath.Join(t.TempDir(), "profiles", "kwanwoo")
 
-	result, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	result, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,6 +48,12 @@ func TestBuildDryRunRendersProjectPrefixedSuiteAndWritesNothing(t *testing.T) {
 	if result.SourcePack.FormalRegistry != "skill-pack.yaml" {
 		t.Fatalf("source suite was not formalized through skill-pack.yaml: %+v", result.SourcePack)
 	}
+	if result.SuiteRole != "blue_commander" || result.SuiteMode != SuiteModeFull || result.RoleLabel != "Blue commander / full project suite" {
+		t.Fatalf("missing role evidence: %+v", result)
+	}
+	if len(result.SelectedSkills) != 2 || len(result.ExcludedSkills) != 0 || !result.ApprovalRequest.HashIncludesRoleFields {
+		t.Fatalf("role fields were not hash-bound: selected=%+v excluded=%+v approval=%+v", result.SelectedSkills, result.ExcludedSkills, result.ApprovalRequest)
+	}
 	human := RenderHumanDryRun(result)
 	assertNoHangul(t, human)
 	for _, want := range []string{"Status:", "Source pack:", "Plan:", "Writes:", "Approval evidence:", "Next:"} {
@@ -62,7 +68,7 @@ func TestBuildDryRunRendersProjectPrefixedSuiteAndWritesNothing(t *testing.T) {
 		t.Fatalf("approval request is not hash-bound enough: %+v", result.ApprovalRequest)
 	}
 
-	repeated, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	repeated, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,13 +77,85 @@ func TestBuildDryRunRendersProjectPrefixedSuiteAndWritesNothing(t *testing.T) {
 	}
 }
 
+func TestBuildDryRunProjectsOnlySelectedRoleSkills(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{
+		"kkachi-review":       "---\nname: kkachi-review\n---\n# kkachi-review\n",
+		"kkachi-verify":       "---\nname: kkachi-verify\n---\n# kkachi-verify\n",
+		"kkachi-implement":    "---\nname: kkachi-implement\n---\n# kkachi-implement\n",
+		"kkachi-final-verify": "---\nname: kkachi-final-verify\n---\n# kkachi-final-verify\n",
+	})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+
+	result, err := BuildDryRun(repo, Options{Profile: "hahuyeon", Project: "doksuri-server", SuiteRole: "red_reviewer", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK {
+		t.Fatalf("expected ok red reviewer dry-run, got diagnostics=%+v conflicts=%+v", result.Diagnostics, result.Conflicts)
+	}
+	if result.SuiteMode != SuiteModeRoleSubset || result.RoleLabel != "Red safety/fail-closed reviewer subset" {
+		t.Fatalf("unexpected role evidence: %+v", result)
+	}
+	if len(result.PlannedSkills) != 2 || len(result.SelectedSkills) != 2 || len(result.ExcludedSkills) != 2 {
+		t.Fatalf("unexpected role projection counts: planned=%+v selected=%+v excluded=%+v", result.PlannedSkills, result.SelectedSkills, result.ExcludedSkills)
+	}
+	assertPlannedSkill(t, result, "kkachi-review", "doksuri-server-review", "skills/doksuri-server/doksuri-server-review/SKILL.md")
+	assertPlannedSkill(t, result, "kkachi-verify", "doksuri-server-verify", "skills/doksuri-server/doksuri-server-verify/SKILL.md")
+	for _, excluded := range result.ExcludedSkills {
+		if excluded.Reason != "outside_suite_role" || excluded.InstalledSkill == "" || excluded.SourceSkill == "" {
+			t.Fatalf("excluded skill missing reason/rendered identity: %+v", excluded)
+		}
+		if excluded.SourceSkill == "kkachi-implement" && excluded.InstalledSkill != "doksuri-server-implement" {
+			t.Fatalf("forbidden/out-of-role rendered name not recorded: %+v", excluded)
+		}
+	}
+	manifestSuite := result.PlannedManifest["project_suites"].([]map[string]any)[0]
+	if manifestSuite["suite_role"] != "red_reviewer" || manifestSuite["suite_mode"] != SuiteModeRoleSubset || manifestSuite["drift_policy"] != "role_subset_expected" {
+		t.Fatalf("planned manifest missing role vocabulary: %+v", manifestSuite)
+	}
+	approvedPreview := buildApprovedResult(result, result.ApprovalRequest.EvidenceRef, result.PlanHash, "preview-install", ".kas/backups/preview", nil, true, nil)
+	humanApproved := RenderHumanApproved(approvedPreview)
+	if !strings.Contains(humanApproved, "drift_policy: role_subset_expected") {
+		t.Fatalf("approved human output should render role-subset drift policy, got:\n%s", humanApproved)
+	}
+}
+
+func TestBuildDryRunRoleRegistryFailClosedCases(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{
+		"kkachi-review": "---\nname: kkachi-review\n---\n# kkachi-review\n",
+		"kkachi-verify": "---\nname: kkachi-verify\n---\n# kkachi-verify\n",
+	})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+
+	missingRole, err := BuildDryRun(repo, Options{Profile: "hahuyeon", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertConflict(t, missingRole, "suite_role_required")
+
+	unknownRole, err := BuildDryRun(repo, Options{Profile: "hahuyeon", Project: "doksuri-server", SuiteRole: "purple_reviewer", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertConflict(t, unknownRole, "unknown_suite_role")
+
+	if err := os.Remove(filepath.Join(repo, filepath.FromSlash(RoleRegistryPath))); err != nil {
+		t.Fatal(err)
+	}
+	missingRegistry, err := BuildDryRun(repo, Options{Profile: "hahuyeon", Project: "doksuri-server", SuiteRole: "red_reviewer", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertConflict(t, missingRegistry, "role_registry_unreadable")
+}
+
 func TestApplyApprovedInstallNoWriteOnMismatchAndSuccessfulCreate(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{
 		"kkachi-plan":         "---\nname: kkachi-plan\n---\n# kkachi-plan\n",
 		"kkachi-final-verify": "---\nname: kkachi-final-verify\n---\n# kkachi-final-verify\n",
 	})
 	profileRoot := filepath.Join(t.TempDir(), "profiles", "kwanwoo")
-	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
 	dryRun, err := BuildDryRun(repo, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -127,7 +205,7 @@ func TestApplyApprovedInstallRejectsKASSymlinkBeforeSkillWrites(t *testing.T) {
 	if err := os.Symlink(t.TempDir(), filepath.Join(profileRoot, ".kas")); err != nil {
 		t.Fatal(err)
 	}
-	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
 	dryRun, err := BuildDryRun(repo, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +232,7 @@ func TestApplyApprovedInstallRejectsKASSymlinkBeforeSkillWrites(t *testing.T) {
 func TestApplyApprovedInstallTrustedUpdateBacksUpAndLocalModificationConflicts(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\nold\n"})
 	profileRoot := filepath.Join(t.TempDir(), "profile")
-	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
 	dryRun, err := BuildDryRun(repo, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -203,7 +281,7 @@ func TestManifestCompatibilityPreservesInstallsAndRejectsDuplicateProjectSuites(
 			"pack_id": "kkachi-review", "target_path": "skills/kkachi-review", "pack_checksum": "legacy", "files": []any{},
 		}},
 	})
-	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
 	dryRun, err := BuildDryRun(repo, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -233,14 +311,14 @@ func TestBuildDryRunRejectsDuplicateUnsafeSymlinkUnknownProfileAndHashStateChang
 		"plan":        "---\nname: plan\n---\n# plan\n",
 	})
 	profileRoot := filepath.Join(t.TempDir(), "profile")
-	result, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	result, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	assertConflict(t, result, "duplicate_installed_skill")
 	assertConflict(t, result, "duplicate_target_path")
 
-	unknown, err := BuildDryRun(repo, Options{Profile: "missing", Project: "doksuri-server", SourcePack: VirtualSourcePackID, DryRun: true})
+	unknown, err := BuildDryRun(repo, Options{Profile: "missing", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,11 +327,11 @@ func TestBuildDryRunRejectsDuplicateUnsafeSymlinkUnknownProfileAndHashStateChang
 	repo2 := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
 	rootA := filepath.Join(t.TempDir(), "profile-a")
 	rootB := filepath.Join(t.TempDir(), "profile-b")
-	a, err := BuildDryRun(repo2, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: rootA, DryRun: true})
+	a, err := BuildDryRun(repo2, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: rootA, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := BuildDryRun(repo2, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: rootB, DryRun: true})
+	b, err := BuildDryRun(repo2, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: rootB, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +340,7 @@ func TestBuildDryRunRejectsDuplicateUnsafeSymlinkUnknownProfileAndHashStateChang
 	}
 	writeProjectInstallFile(t, filepath.Join(repo2, "skills", "kkachi-plan", "SKILL.md"), "---\nname: kkachi-plan\n---\n# kkachi-plan\nchanged\n")
 	writeSkillPackYAML(t, repo2, []string{"kkachi-plan"})
-	c, err := BuildDryRun(repo2, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: rootA, DryRun: true})
+	c, err := BuildDryRun(repo2, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: rootA, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,14 +355,14 @@ func TestBuildDryRunRejectsDuplicateUnsafeSymlinkUnknownProfileAndHashStateChang
 	if err := os.Symlink(t.TempDir(), filepath.Join(symlinkRoot, "skills", "doksuri-server")); err != nil {
 		t.Fatal(err)
 	}
-	symlink, err := BuildDryRun(repo2, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: symlinkRoot, DryRun: true})
+	symlink, err := BuildDryRun(repo2, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: symlinkRoot, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !symlink.OK {
 		t.Fatalf("dry-run may plan create before write preflight: %+v", symlink)
 	}
-	approved, err := ApplyApprovedInstall(repo2, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: symlinkRoot, DryRun: true}, symlink.ApprovalRequest.EvidenceRef)
+	approved, err := ApplyApprovedInstall(repo2, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: symlinkRoot, DryRun: true}, symlink.ApprovalRequest.EvidenceRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,13 +375,13 @@ func TestBuildDryRunRejectsInvalidProjectAndUnknownSourcePack(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
 	profileRoot := filepath.Join(t.TempDir(), "profile")
 
-	invalidProject, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "../escape", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	invalidProject, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "../escape", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	assertConflict(t, invalidProject, "invalid_project_id")
 
-	unknownPack, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: "missing-suite", ProfileRoot: profileRoot, DryRun: true})
+	unknownPack, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: "missing-suite", ProfileRoot: profileRoot, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +394,7 @@ func TestBuildDryRunFailClosesGenericUmbrellaOnlyAndExistingTargets(t *testing.T
 	writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", "doksuri-server", "kkachi-plan", "SKILL.md"), "generic")
 	writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md"), "local edit")
 
-	result, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	result, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +413,7 @@ func TestBuildDryRunFailClosesUmbrellaOnlyProfile(t *testing.T) {
 	profileRoot := filepath.Join(t.TempDir(), "profile")
 	writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-kas", "SKILL.md"), "umbrella")
 
-	result, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	result, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,7 +422,7 @@ func TestBuildDryRunFailClosesUmbrellaOnlyProfile(t *testing.T) {
 
 func TestBuildDryRunRejectsUmbrellaOnlySourceSuite(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-kas": "---\nname: kkachi-kas\n---\n# kkachi-kas\n"})
-	result, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: filepath.Join(t.TempDir(), "profile"), DryRun: true})
+	result, err := BuildDryRun(repo, Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: filepath.Join(t.TempDir(), "profile"), DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,7 +475,56 @@ func makeProjectInstallRepo(t *testing.T, skills map[string]string) string {
 		names = append(names, name)
 	}
 	writeSkillPackYAML(t, repo, names)
+	writeProjectSuiteRoleRegistry(t, repo)
 	return repo
+}
+
+func writeProjectSuiteRoleRegistry(t *testing.T, repo string) {
+	t.Helper()
+	content := `version: role-aware-project-suite/v1
+roles:
+  blue_commander:
+    display_label: "Blue commander / full project suite"
+    selection_mode: full_source_suite
+    required_source_skills: "*"
+    optional_source_skills: []
+    forbidden_source_skills: []
+  red_reviewer:
+    display_label: "Red safety/fail-closed reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-review
+      - kkachi-verify
+    optional_source_skills: []
+    forbidden_source_skills:
+      - kkachi-implement
+  orange_pm_reviewer:
+    display_label: "Orange operator-value reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-review
+    optional_source_skills:
+      - kkachi-final-verify
+    optional_selection_default: unselected
+    forbidden_source_skills:
+      - kkachi-implement
+  gray_scribe:
+    display_label: "Gray evidence/scribe reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-review
+      - kkachi-final-verify
+    optional_source_skills: []
+    forbidden_source_skills:
+      - kkachi-implement
+      - kkachi-docs-update
+`
+	if err := os.MkdirAll(filepath.Join(repo, "registries"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, filepath.FromSlash(RoleRegistryPath)), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func writeSkillPackYAML(t *testing.T, repo string, skills []string) {
@@ -484,7 +611,7 @@ func TestProjectSuiteDoctorDetectsHealthyMissingUmbrellaChecksumAndUnknownDirs(t
 		"kkachi-final-verify": "---\nname: kkachi-final-verify\n---\n# kkachi-final-verify\n",
 	})
 	profileRoot := filepath.Join(t.TempDir(), "profile")
-	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
 	dryRun, err := BuildDryRun(repo, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -566,7 +693,7 @@ func TestProjectSuiteDoctorDetectsHealthyMissingUmbrellaChecksumAndUnknownDirs(t
 func TestApplyProjectUninstallFailsClosedOnDriftSymlinkAndBacksUp(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
 	profileRoot := filepath.Join(t.TempDir(), "profile")
-	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
 	dryRun, err := BuildDryRun(repo, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -714,7 +841,7 @@ func TestProjectRepairHumanOutputShowsSuiteDiagnosticsAndActions(t *testing.T) {
 func TestProjectRepairBlocksErrorUnknownProfileSkillDirButAllowsWarning(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
 	profileRoot := filepath.Join(t.TempDir(), "profile")
-	installOpts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	installOpts := Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
 	dryRun, err := BuildDryRun(repo, installOpts)
 	if err != nil {
 		t.Fatal(err)
@@ -746,7 +873,7 @@ func TestProjectRepairBlocksErrorUnknownProfileSkillDirButAllowsWarning(t *testi
 func TestProjectRepairDefaultsSourcePackDryRunApprovalAndUnknownExplicit(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
 	profileRoot := filepath.Join(t.TempDir(), "profile")
-	installOpts := Options{Profile: "kwanwoo", Project: "doksuri-server", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	installOpts := Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
 	dryRun, err := BuildDryRun(repo, installOpts)
 	if err != nil {
 		t.Fatal(err)

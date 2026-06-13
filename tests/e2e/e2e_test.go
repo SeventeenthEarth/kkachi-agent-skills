@@ -385,7 +385,7 @@ func TestRootInstalledBinaryUsesEmbeddedSkillPackForProjectDryRunOutsideRepo(t *
 	workdir := t.TempDir()
 	profileRoot := filepath.Join(t.TempDir(), "profiles", "e2e")
 
-	cmd := exec.Command(binary, "install-project-kas", "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--dry-run", "--profile-root", profileRoot, "--json")
+	cmd := exec.Command(binary, "install-project-kas", "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json")
 	cmd.Dir = workdir
 	cmd.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
 	out, err := cmd.CombinedOutput()
@@ -454,7 +454,7 @@ func TestRealRepoInstallProjectKASDryRunWritesNothing(t *testing.T) {
 	binary := buildBinary(t)
 	profileRoot := filepath.Join(t.TempDir(), "profiles", "e2e")
 
-	cmd := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--dry-run", "--profile-root", profileRoot, "--json")
+	cmd := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json")
 	cmd.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -495,7 +495,7 @@ func TestRealRepoApprovedProjectKASInstallAndWrongHashNoWrite(t *testing.T) {
 	binary := buildBinary(t)
 	profileRoot := filepath.Join(t.TempDir(), "profiles", "e2e")
 
-	wrong := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--approve", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json")
+	wrong := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--suite-role", "blue_commander", "--approve", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--profile-root", profileRoot, "--json")
 	wrong.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
 	wrongOut, err := wrong.CombinedOutput()
 	if err == nil {
@@ -512,7 +512,7 @@ func TestRealRepoApprovedProjectKASInstallAndWrongHashNoWrite(t *testing.T) {
 		t.Fatalf("wrong hash created profile root: %v", err)
 	}
 
-	dryRun := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--dry-run", "--profile-root", profileRoot, "--json")
+	dryRun := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--suite-role", "blue_commander", "--dry-run", "--profile-root", profileRoot, "--json")
 	dryRun.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
 	dryRunOut, err := dryRun.CombinedOutput()
 	if err != nil {
@@ -523,7 +523,7 @@ func TestRealRepoApprovedProjectKASInstallAndWrongHashNoWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	evidence := dryRunPayload["approval_request"].(map[string]any)["evidence_ref"].(string)
-	approve := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--approve", evidence, "--profile-root", profileRoot, "--json")
+	approve := exec.Command(binary, "install-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--source-pack", "kas-default-project-suite", "--suite-role", "blue_commander", "--approve", evidence, "--profile-root", profileRoot, "--json")
 	approve.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
 	approveOut, err := approve.CombinedOutput()
 	if err != nil {
