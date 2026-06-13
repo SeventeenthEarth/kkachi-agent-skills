@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 )
 
 func assertNoHangul(t *testing.T, out string) {
@@ -690,6 +692,200 @@ func TestProjectSuiteDoctorDetectsHealthyMissingUmbrellaChecksumAndUnknownDirs(t
 	}
 }
 
+func TestProjectSuiteDoctorRoleAwareSemantics(t *testing.T) {
+	skills := map[string]string{
+		"kkachi-review":       "---\nname: kkachi-review\n---\n# kkachi-review\n",
+		"kkachi-verify":       "---\nname: kkachi-verify\n---\n# kkachi-verify\n",
+		"kkachi-implement":    "---\nname: kkachi-implement\n---\n# kkachi-implement\n",
+		"kkachi-final-verify": "---\nname: kkachi-final-verify\n---\n# kkachi-final-verify\n",
+		"kkachi-docs-update":  "---\nname: kkachi-docs-update\n---\n# kkachi-docs-update\n",
+	}
+	repo := makeProjectInstallRepo(t, skills)
+	project := "doksuri-server"
+
+	t.Run("blue full suite healthy", func(t *testing.T) {
+		doctor := installProjectSuiteAndDoctor(t, repo, project, "blue_commander")
+		if !doctor.OK || doctor.ProjectSuite.InstalledSkillCount != len(skills) {
+			t.Fatalf("expected blue full suite healthy, got ok=%t state=%+v diagnostics=%+v", doctor.OK, doctor.ProjectSuite, doctor.ProjectSuiteDiagnostics)
+		}
+	})
+
+	for _, tc := range []struct {
+		role  string
+		count int
+	}{
+		{role: "red_reviewer", count: 2},
+		{role: "orange_pm_reviewer", count: 1},
+		{role: "gray_scribe", count: 2},
+	} {
+		t.Run(tc.role+" subset healthy", func(t *testing.T) {
+			doctor := installProjectSuiteAndDoctor(t, repo, project, tc.role)
+			if !doctor.OK || doctor.ProjectSuite.InstalledSkillCount != tc.count {
+				t.Fatalf("expected role subset healthy with only selected skills installed, got ok=%t state=%+v diagnostics=%+v", doctor.OK, doctor.ProjectSuite, doctor.ProjectSuiteDiagnostics)
+			}
+			if hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "missing_file", "error") || hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "missing_selected_role_skill", "error") {
+				t.Fatalf("unselected full-suite skills must not be missing errors: %+v", doctor.ProjectSuiteDiagnostics)
+			}
+		})
+	}
+
+	t.Run("missing selected role skill is an error", func(t *testing.T) {
+		profileRoot := installProjectSuite(t, repo, project, "red_reviewer")
+		removeManifestInstalledSkill(t, profileRoot, project, "doksuri-server-verify")
+		doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
+		if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "missing_selected_role_skill", "error") {
+			t.Fatalf("expected missing selected role skill error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+		}
+	})
+
+	t.Run("selected checksum mismatch is an error", func(t *testing.T) {
+		profileRoot := installProjectSuite(t, repo, project, "orange_pm_reviewer")
+		if err := os.WriteFile(filepath.Join(profileRoot, "skills", project, "doksuri-server-review", "SKILL.md"), []byte("local drift\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
+		if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "checksum_mismatch", "error") {
+			t.Fatalf("expected selected checksum mismatch error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+		}
+	})
+
+	t.Run("out of role KAS-managed physical extra is an error", func(t *testing.T) {
+		profileRoot := installProjectSuite(t, repo, project, "gray_scribe")
+		writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", project, "doksuri-server-implement", "SKILL.md"), skills["kkachi-implement"])
+		doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
+		if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "out_of_role_kas_managed_skill", "error") {
+			t.Fatalf("expected out-of-role KAS-managed skill error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+		}
+	})
+
+	t.Run("benign unknown personal skill is warning only", func(t *testing.T) {
+		profileRoot := installProjectSuite(t, repo, project, "red_reviewer")
+		writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", project, "doksuri-server-local-note", "SKILL.md"), "personal\n")
+		doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
+		if !doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "unknown_profile_skill_dir", "warning") {
+			t.Fatalf("expected benign unknown personal skill warning, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+		}
+	})
+
+	t.Run("shadowing unknown personal skill is an error", func(t *testing.T) {
+		profileRoot := installProjectSuite(t, repo, project, "red_reviewer")
+		writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", project, "doksuri-server-review-local", "SKILL.md"), "shadow\n")
+		doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
+		if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "ambiguous_profile_skill_dir", "error") {
+			t.Fatalf("expected shadowing unknown personal skill error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+		}
+	})
+
+	t.Run("missing suite_role fails closed", func(t *testing.T) {
+		profileRoot := installProjectSuite(t, repo, project, "blue_commander")
+		setManifestSuiteRole(t, profileRoot, project, nil)
+		doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
+		if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "missing_suite_role", "error") {
+			t.Fatalf("expected missing suite_role fail-closed error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+		}
+	})
+
+	t.Run("unknown suite_role fails closed", func(t *testing.T) {
+		profileRoot := installProjectSuite(t, repo, project, "blue_commander")
+		role := "purple_reviewer"
+		setManifestSuiteRole(t, profileRoot, project, &role)
+		doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
+		if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "unknown_suite_role", "error") {
+			t.Fatalf("expected unknown suite_role fail-closed error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+		}
+	})
+
+	for _, role := range []string{"red_reviewer", "orange_pm_reviewer", "gray_scribe"} {
+		t.Run("legacy full suite unhealthy for "+role, func(t *testing.T) {
+			profileRoot := installProjectSuite(t, repo, project, "blue_commander")
+			setManifestSuiteRole(t, profileRoot, project, &role)
+			doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
+			if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "out_of_role_kas_managed_skill", "error") {
+				t.Fatalf("expected legacy full suite to be unhealthy for %s, got ok=%t diagnostics=%+v", role, doctor.OK, doctor.ProjectSuiteDiagnostics)
+			}
+		})
+	}
+}
+
+func installProjectSuiteAndDoctor(t *testing.T, repo string, project string, suiteRole string) ProjectSuiteDoctorResult {
+	t.Helper()
+	profileRoot := installProjectSuite(t, repo, project, suiteRole)
+	return buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
+}
+
+func installProjectSuite(t *testing.T, repo string, project string, suiteRole string) string {
+	t.Helper()
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	opts := Options{Profile: "kwanwoo", Project: project, SuiteRole: suiteRole, SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	dryRun, err := BuildDryRun(repo, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !dryRun.OK {
+		t.Fatalf("dry-run failed: diagnostics=%+v conflicts=%+v", dryRun.Diagnostics, dryRun.Conflicts)
+	}
+	approved, err := ApplyApprovedInstall(repo, opts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil || !approved.OK {
+		t.Fatalf("approved install failed: result=%+v err=%v", approved, err)
+	}
+	return profileRoot
+}
+
+func buildProjectSuiteDoctorForTest(t *testing.T, repo string, profileRoot string, project string) ProjectSuiteDoctorResult {
+	t.Helper()
+	doctor, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: project, ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return doctor
+}
+
+func setManifestSuiteRole(t *testing.T, profileRoot string, project string, suiteRole *string) {
+	t.Helper()
+	manifestPath := filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")
+	manifest := readProjectInstallManifest(t, manifestPath)
+	for _, rawSuite := range manifest["project_suites"].([]any) {
+		suite := rawSuite.(map[string]any)
+		if suite["project"] != project {
+			continue
+		}
+		if suiteRole == nil {
+			delete(suite, "suite_role")
+			delete(suite, "suite_mode")
+			delete(suite, "selected_skills")
+			delete(suite, "excluded_skills")
+			delete(suite, "role_registry")
+		} else {
+			suite["suite_role"] = *suiteRole
+			suite["suite_mode"] = SuiteModeRoleSubset
+		}
+	}
+	writeJSON(t, manifestPath, manifest)
+}
+
+func removeManifestInstalledSkill(t *testing.T, profileRoot string, project string, installedSkill string) {
+	t.Helper()
+	manifestPath := filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")
+	manifest := readProjectInstallManifest(t, manifestPath)
+	for _, rawSuite := range manifest["project_suites"].([]any) {
+		suite := rawSuite.(map[string]any)
+		if suite["project"] != project {
+			continue
+		}
+		rawSkills := suite["installed_skills"].([]any)
+		filtered := make([]any, 0, len(rawSkills))
+		for _, rawSkill := range rawSkills {
+			skill := rawSkill.(map[string]any)
+			if skill["installed_skill"] == installedSkill {
+				continue
+			}
+			filtered = append(filtered, skill)
+		}
+		suite["installed_skills"] = filtered
+	}
+	writeJSON(t, manifestPath, manifest)
+}
+
 func TestApplyProjectUninstallFailsClosedOnDriftSymlinkAndBacksUp(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
 	profileRoot := filepath.Join(t.TempDir(), "profile")
@@ -834,6 +1030,89 @@ func TestProjectRepairHumanOutputShowsSuiteDiagnosticsAndActions(t *testing.T) {
 	} {
 		if !strings.Contains(human, want) {
 			t.Fatalf("human repair output missing %q:\n%s", want, human)
+		}
+	}
+}
+
+func TestProjectSuiteDoctorHumanOutputShowsDiagnosticDetailsAndBoundedNext(t *testing.T) {
+	result := ProjectSuiteDoctorResult{
+		OK:            false,
+		Command:       "doctor",
+		Mode:          modeProjectSuiteDoctor,
+		TargetProfile: discovery.TargetProfile{Name: "kwanwoo"},
+		Project:       Project{ID: "doksuri-server", TargetSuitePath: "skills/doksuri-server"},
+		SourcePack:    SourcePack{ID: VirtualSourcePackID},
+		ManifestPath:  ".kas/skill-pack-manifest.json",
+		ProjectSuite:  ProjectSuiteState{ManifestState: "present", PhysicalState: "drifted", FilesChecked: 1},
+		ProjectSuiteDiagnostics: []ProjectSuiteDiagnostic{
+			suiteDiag("doksuri-server", "doksuri-server-review", "skills/doksuri-server/doksuri-server-review/SKILL.md", "error", "checksum_mismatch", "installed file checksum differs from manifest/source evidence", "Review diagnostics and use only an approved KASROLE-004 repair/prune plan when applicable."),
+		},
+	}
+	finalizeProjectSuiteDoctor(&result)
+
+	human := RenderHumanProjectSuiteDoctor(result)
+	assertNoHangul(t, human)
+	for _, want := range []string{
+		"project-suite diagnostic: error/checksum_mismatch - installed file checksum differs from manifest/source evidence",
+		"skill doksuri-server-review",
+		"path skills/doksuri-server/doksuri-server-review/SKILL.md",
+		"next_action: Review diagnostics and use only an approved KASROLE-004 repair/prune plan when applicable.",
+		"Next: Review project-suite diagnostics; use approved dry-run planning only, and reserve repair/prune/profile cleanup for approved KASROLE-004 workflows when applicable.",
+	} {
+		if !strings.Contains(human, want) {
+			t.Fatalf("human project-suite doctor output missing %q:\n%s", want, human)
+		}
+	}
+	if strings.Contains(human, "Run repair-project-kas --dry-run for deterministic repairs, or migrate-project-kas --from-generic --dry-run") {
+		t.Fatalf("human project-suite doctor output contains misleading generic repair/migration next action:\n%s", human)
+	}
+}
+
+func TestProjectSuiteDoctorRealPathBoundsInspectNextAction(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{
+		"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n",
+	})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	dryRun, err := BuildDryRun(repo, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approved, err := ApplyApprovedInstall(repo, opts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil || !approved.OK {
+		t.Fatalf("approved install failed: result=%+v err=%v", approved, err)
+	}
+
+	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")
+	if err := os.WriteFile(target, []byte("local edit\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	doctor, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "checksum_mismatch", "error") {
+		t.Fatalf("expected checksum mismatch error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+	}
+
+	human := RenderHumanProjectSuiteDoctor(doctor)
+	assertNoHangul(t, human)
+	for _, want := range []string{
+		"project-suite diagnostic: error/checksum_mismatch - installed file checksum differs from manifest/source evidence",
+		"skill doksuri-server-plan",
+		"path skills/doksuri-server/doksuri-server-plan/SKILL.md",
+		"next_action: Review diagnostics and use only an approved KASROLE-004 repair/prune plan when applicable.",
+	} {
+		if !strings.Contains(human, want) {
+			t.Fatalf("real-path human project-suite doctor output missing %q:\n%s", want, human)
+		}
+	}
+	for _, forbidden := range []string{
+		"Run repair-project-kas --dry-run",
+		"migrate-project-kas --from-generic",
+	} {
+		if strings.Contains(human, forbidden) {
+			t.Fatalf("real-path human project-suite doctor output contains unbounded next action %q:\n%s", forbidden, human)
 		}
 	}
 }

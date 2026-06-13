@@ -164,6 +164,8 @@ func BuildProjectSuiteDoctor(repo string, opts ProjectSuiteOptions) (ProjectSuit
 	}
 	populateSourcePackEvidence(&result.SourcePack, packs, registrySHA)
 	info := inspectProjectSuite(profileRoot, opts.Project, sourcePackID, packs, true)
+	info.Diagnostics = boundProjectSuiteDoctorInspectDiagnostics(info.Diagnostics)
+	info.Diagnostics = append(info.Diagnostics, roleAwareProjectSuiteDoctorDiagnostics(sourceRepo, profileRoot, opts.Project, packs, info)...)
 	result.TargetProfile.PreviousManifestSHA256 = info.ManifestSHA
 	result.TargetProfile.ManifestState = info.State
 	result.ManifestPath = info.ManifestPath
@@ -171,6 +173,26 @@ func BuildProjectSuiteDoctor(repo string, opts ProjectSuiteOptions) (ProjectSuit
 	result.ProjectSuite = suiteState(profileRoot, opts.Project, info)
 	finalizeProjectSuiteDoctor(&result)
 	return result, nil
+}
+
+func boundProjectSuiteDoctorInspectDiagnostics(diags []ProjectSuiteDiagnostic) []ProjectSuiteDiagnostic {
+	bounded := make([]ProjectSuiteDiagnostic, len(diags))
+	for i, diag := range diags {
+		bounded[i] = diag
+		bounded[i].NextAction = boundProjectSuiteDoctorInspectNextAction(diag)
+	}
+	return bounded
+}
+
+func boundProjectSuiteDoctorInspectNextAction(diag ProjectSuiteDiagnostic) string {
+	switch diag.Condition {
+	case "missing_file", "checksum_mismatch", "missing_project_suite", "umbrella_only":
+		return "Review diagnostics and use only an approved KASROLE-004 repair/prune plan when applicable."
+	}
+	if strings.Contains(diag.NextAction, "repair-project-kas") || strings.Contains(diag.NextAction, "migrate-project-kas") {
+		return "Review diagnostics and use only an approved KASROLE-004 repair/prune plan when applicable."
+	}
+	return diag.NextAction
 }
 
 func RenderHumanProjectSuiteDoctor(result ProjectSuiteDoctorResult) string {
@@ -187,7 +209,7 @@ func RenderHumanProjectSuiteDoctor(result ProjectSuiteDoctorResult) string {
 		"source_pack: " + result.SourcePack.ID,
 	}
 	for _, diagnostic := range result.ProjectSuiteDiagnostics {
-		lines = append(lines, fmt.Sprintf("%s: %s - %s", diagnostic.Severity, diagnostic.Condition, diagnostic.Message))
+		lines = append(lines, humanProjectSuiteDiagnosticLine(diagnostic))
 	}
 	lines = append(lines, "Next: "+result.NextAction)
 	return strings.Join(lines, "\n")
@@ -502,6 +524,99 @@ func inspectProjectSuite(profileRoot string, project string, sourcePackID string
 		}
 	}
 	return info
+}
+
+func roleAwareProjectSuiteDoctorDiagnostics(sourceRepo string, profileRoot string, project string, packs []discovery.SourcePack, info projectSuiteManifestInfo) []ProjectSuiteDiagnostic {
+	if info.Suite == nil {
+		return nil
+	}
+	suiteRole, _ := info.Suite["suite_role"].(string)
+	if strings.TrimSpace(suiteRole) == "" {
+		return []ProjectSuiteDiagnostic{suiteDiag(project, "", ".kas/skill-pack-manifest.json", "error", "missing_suite_role", "project suite manifest is missing suite_role; doctor cannot infer role from profile name or installed skills", "Reinstall with an explicit registered suite_role, or use only an approved KASROLE-004 workflow when applicable.")}
+	}
+	_, role, _, selected, _, conflicts, diagnostics := resolveProjectSuiteRole(sourceRepo, suiteRole, packs, project)
+	roleDiags := []ProjectSuiteDiagnostic{}
+	if len(conflicts) > 0 || len(diagnostics) > 0 {
+		for _, diag := range diagnostics {
+			roleDiags = append(roleDiags, suiteDiag(project, "", RoleRegistryPath, diag.Level, diag.Code, diag.Message, "Use a registered suite_role from registries/project-suite-roles.yaml; do not infer a fallback role."))
+		}
+		return roleDiags
+	}
+
+	selectedTargets := map[string]RoleSkillEvidence{}
+	selectedInstalled := map[string]bool{}
+	for _, skill := range selected {
+		selectedTargets[skill.TargetPath] = skill
+		selectedInstalled[skill.InstalledSkill] = true
+		if info.Records[skill.TargetPath].TargetPath == "" {
+			roleDiags = append(roleDiags, suiteDiag(project, skill.InstalledSkill, skill.TargetPath, "error", "missing_selected_role_skill", fmt.Sprintf("suite_role %s requires selected skill %s but it is not recorded in the project suite manifest", suiteRole, skill.InstalledSkill), "Reinstall with the same explicit registered suite_role, or use only an approved KASROLE-004 workflow when applicable."))
+		}
+	}
+
+	managedInstalled := map[string]RoleSkillEvidence{}
+	for _, pack := range packs {
+		sourceSkill := sourceSkillID(pack.PackID)
+		installed := renderInstalledSkill(project, sourceSkill)
+		target := filepath.ToSlash(filepath.Join("skills", project, installed, "SKILL.md"))
+		managedInstalled[installed] = RoleSkillEvidence{SourceSkill: sourceSkill, InstalledSkill: installed, SourcePackID: pack.PackID, TargetPath: target}
+	}
+	seenOutOfRole := map[string]bool{}
+	outOfRoleSeverity := "error"
+	if role.ID == "blue_commander" {
+		outOfRoleSeverity = "warning"
+	}
+	for target, record := range info.Records {
+		if selectedTargets[target].TargetPath != "" {
+			continue
+		}
+		if managed, ok := managedInstalled[record.InstalledSkill]; ok {
+			roleDiags = append(roleDiags, suiteDiag(project, record.InstalledSkill, target, outOfRoleSeverity, "out_of_role_kas_managed_skill", fmt.Sprintf("suite_role %s does not select KAS-managed skill %s", suiteRole, record.InstalledSkill), "Prune only through a later approved repair/prune workflow; doctor does not mutate profiles."))
+			seenOutOfRole[managed.InstalledSkill] = true
+		}
+	}
+
+	suiteRoot := filepath.Join(profileRoot, "skills", project)
+	entries, err := os.ReadDir(suiteRoot)
+	if err != nil {
+		return roleDiags
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		target := filepath.ToSlash(filepath.Join("skills", project, name, "SKILL.md"))
+		if _, err := os.Stat(filepath.Join(profileRoot, filepath.FromSlash(target))); err != nil {
+			continue
+		}
+		if info.Records[target].TargetPath != "" {
+			continue
+		}
+		if managed, ok := managedInstalled[name]; ok && !selectedInstalled[name] && !seenOutOfRole[name] {
+			roleDiags = append(roleDiags, suiteDiag(project, managed.InstalledSkill, target, outOfRoleSeverity, "out_of_role_kas_managed_skill", fmt.Sprintf("suite_role %s does not select KAS-managed physical skill %s", suiteRole, managed.InstalledSkill), "Prune only through a later approved repair/prune workflow; doctor does not mutate profiles."))
+			seenOutOfRole[name] = true
+			continue
+		}
+		if _, managed := managedInstalled[name]; managed {
+			continue
+		}
+		if shadowsManagedSkill(name, managedInstalled) {
+			roleDiags = append(roleDiags, suiteDiag(project, name, target, "error", "ambiguous_profile_skill_dir", "unknown project skill shadows or ambiguously overlaps a KAS-managed skill identity", "Rename or manually review the personal skill before relying on project-suite doctor health."))
+		}
+	}
+	return roleDiags
+}
+
+func shadowsManagedSkill(name string, managed map[string]RoleSkillEvidence) bool {
+	for managedName := range managed {
+		if name == managedName {
+			return true
+		}
+		if strings.HasPrefix(name, managedName+"-") || strings.HasPrefix(managedName, name+"-") {
+			return true
+		}
+	}
+	return false
 }
 
 func sourceLanguageProfile(suite map[string]any) string {
@@ -1116,7 +1231,7 @@ func finalizeProjectSuiteDoctor(result *ProjectSuiteDoctorResult) {
 	}
 	result.OK = !hasSuiteSeverity(result.ProjectSuiteDiagnostics, "error")
 	if !result.OK {
-		result.NextAction = "Run repair-project-kas --dry-run for deterministic repairs, or migrate-project-kas --from-generic --dry-run for explicit generic migration; never use generic KAS fallback."
+		result.NextAction = "Review project-suite diagnostics; use approved dry-run planning only, and reserve repair/prune/profile cleanup for approved KASROLE-004 workflows when applicable."
 	} else if hasSuiteSeverity(result.ProjectSuiteDiagnostics, "warning") {
 		result.NextAction = "Review warnings; rerun project-suite doctor after any approved repair or migration."
 	}

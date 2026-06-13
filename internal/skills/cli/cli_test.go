@@ -594,7 +594,7 @@ func TestPublicLifecycleProjectHumanOutputIsEnglish(t *testing.T) {
 		"doctor-project-suite": {
 			args:     []string{"doctor", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--project-suite", "--profile-root", profileRoot},
 			wantCode: 2,
-			labels:   []string{"Status:", "manifest:", "suite:", "source_pack:", "error:", "Next:"},
+			labels:   []string{"Status:", "manifest:", "suite:", "source_pack:", "project-suite diagnostic:", "Next:"},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
