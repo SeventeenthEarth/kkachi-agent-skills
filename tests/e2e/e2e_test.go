@@ -66,7 +66,7 @@ func TestRootInstalledBinaryVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("root binary --version failed: %v\n%s", err, out)
 	}
-	if strings.TrimSpace(string(out)) != "kkachi-agent-skills 0.1.2" {
+	if strings.TrimSpace(string(out)) != "kkachi-agent-skills 0.1.3" {
 		t.Fatalf("unexpected --version output: %q", out)
 	}
 }
@@ -609,7 +609,7 @@ func TestRealRepoApprovedProjectKASInstallAndWrongHashNoWrite(t *testing.T) {
 		t.Fatalf("wrong repair hash wrote target: %v", err)
 	}
 	evidence = repairPayload["approval_request"].(map[string]any)["evidence_ref"].(string)
-	repairApprove := exec.Command(binary, "repair-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--approve", evidence, "--profile-root", profileRoot, "--json")
+	repairApprove := exec.Command(binary, "repair-project-kas", "--repo", root, "--profile", "e2e", "--project", "doksuri-server", "--approve", evidence, "--backup-vault-root", t.TempDir(), "--profile-root", profileRoot, "--json")
 	repairApprove.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
 	repairApproveOut, err := repairApprove.CombinedOutput()
 	if err != nil {

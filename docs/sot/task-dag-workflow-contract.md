@@ -3,13 +3,14 @@
 Date: 2026-06-12
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record pending
-Status: planning SOT for KAS `WFLOW` task-DAG workflow workstream; not implementation behavior until roadmap tasks pass evidence and review gates
+Status: planning SOT for KAS `WFLOW` task-DAG workflow workstream; KASROLE v0.1.3 is the prerequisite release baseline and WFLOW completion targets KAS v0.1.4; not implementation behavior until roadmap tasks pass evidence and review gates
 Authority level: KAS-side planning authority for task-DAG workflow policy, selector rules, node/agent contracts, generic trigger skills, and custom workflow skill scaffolding
 Scope: `kkachi-agent-skills` docs, registries, templates, skills, and CLI planning; no KAH deterministic implementation claim, no KAB runtime change, no Hermes profile/provider/gateway/auth/token/model mutation, and no automatic workflow execution without explicit evidence/approval gates
 Related docs: `docs/sot/workflow-graph-integration.md`, `docs/sot/graph-workflow-sync-compatibility.md`, `docs/sot/graph-template-registry.md`, `docs/sot/phase-orchestration-policy.md`, `docs/roadmap.md`, KAH `docs/sot/task-dag-state-machine.md`
 Evidence/source paths:
 - Master direction in 17번째 지구 Discord `#kas` thread `1514986770456903781` on 2026-06-12: support project-local multiple task DAGs, KAH order enforcement, KAS node-level agent/role contracts, generic and thin trigger skills, and a KAS custom workflow creator for user-specific scenarios.
 - `WFLOW-001` is the logical cross-repo planning acceptance gate: the KAS SOT/roadmap/docs registration and the paired KAH `DAGSM` planning SOT/docs registration may be committed as `WFLOW-001` evidence. This does not complete or implement KAH `DAGSM-001`; `DAGSM-001` remains the subsequent KAH schema-validation/explain implementation task.
+- Release-transition direction in 17번째 지구 Discord `#kah` thread `1515219219002818610` on 2026-06-14: KASROLE is complete at KAS v0.1.3, and WFLOW epic completion should target KAS v0.1.4.
 
 ## Decision summary
 
@@ -120,7 +121,7 @@ Mode output expectations:
 
 ## Required roadmap sequence
 
-The seven-PR workstream is intentionally linear until the substrate is proven:
+The post-KASROLE workstream is intentionally linear until the substrate is proven. KASROLE v0.1.3 is the prerequisite release baseline, and completing this WFLOW epic should produce the KAS v0.1.4 target release:
 
 1. `WFLOW-001` — accept this KAS SOT plus the paired KAH `DAGSM` planning SOT/docs registration as the cross-repo planning contract.
 2. `DAGSM-001` — KAH task-DAG schema and validation/explain substrate, dependent on `WFLOW-001` policy acceptance.

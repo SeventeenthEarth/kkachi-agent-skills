@@ -196,6 +196,42 @@ func TestApplyApprovedInstallNoWriteOnMismatchAndSuccessfulCreate(t *testing.T) 
 	}
 }
 
+func TestApplyApprovedInstallUsesMaterializedSourceWhenPublicSourceRepoIsEmbedded(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{
+		"kkachi-review": "---\nname: kkachi-review\n---\n# kkachi-review\n",
+	})
+	if err := os.WriteFile(filepath.Join(repo, ".kas-embedded-source-sha256"), []byte("abc123\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	opts := Options{Profile: "hahuyeon", Project: "doksuri-server", SuiteRole: "orange_pm_reviewer", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	dryRun, err := BuildDryRun(repo, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !dryRun.OK {
+		t.Fatalf("dry-run should be ok with materialized source repo: %+v", dryRun)
+	}
+	if !strings.HasPrefix(dryRun.SourceRepo.Path, "embedded://") {
+		t.Fatalf("test must exercise public embedded source identity, got %q", dryRun.SourceRepo.Path)
+	}
+
+	approved, err := ApplyApprovedInstall(repo, opts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !approved.OK {
+		t.Fatalf("approved install should render from the internal materialized source path, got diagnostics=%+v", approved.Diagnostics)
+	}
+	written, err := os.ReadFile(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-review", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("approved install did not write projected skill: %v", err)
+	}
+	if !strings.Contains(string(written), "doksuri-server-review") {
+		t.Fatalf("project-prefixed skill content was not rendered: %s", string(written))
+	}
+}
+
 func TestApplyApprovedInstallRejectsKASSymlinkBeforeSkillWrites(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{
 		"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n",

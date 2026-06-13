@@ -19,6 +19,10 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 	if err != nil {
 		return Result{}, err
 	}
+	sourceRepo, err := discovery.FindSourceRepo(repo)
+	if err != nil {
+		return Result{}, err
+	}
 	approvedHash, evidenceOK := approvedHashFromEvidence(evidenceRef)
 	if !evidenceOK {
 		result := dryRun
@@ -53,7 +57,7 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 	installID := makeInstallID(dryRun.PlanHash, time.Now().UTC())
 	backupRoot := filepath.Join(dryRun.TargetProfile.Root, ".kas", "backups", installID)
 	relativeBackupRoot := filepath.ToSlash(filepath.Join(".kas", "backups", installID))
-	if err := preflightApprovedInstall(dryRun, relativeBackupRoot); err != nil {
+	if err := preflightApprovedInstall(dryRun, relativeBackupRoot, sourceRepo); err != nil {
 		return approvedFailure(dryRun, evidenceRef, approvedHash, installID, backupRoot, nil, "project_install_preflight_failed", err.Error()), nil
 	}
 	actualChanged := []ChangedPath{}
@@ -79,7 +83,7 @@ func ApplyApprovedInstall(repo string, opts Options, evidenceRef string) (Result
 		if entry.Action != "create" && entry.Action != "update" {
 			continue
 		}
-		content, err := renderedContentForEntry(dryRun, entry)
+		content, err := renderedContentForEntry(dryRun, entry, sourceRepo)
 		if err != nil {
 			return approvedFailure(dryRun, evidenceRef, approvedHash, installID, backupRoot, actualChanged, "source_render_failed", err.Error()), nil
 		}
@@ -165,7 +169,7 @@ func RenderHumanApproved(result Result) string {
 	return strings.Join(lines, "\n")
 }
 
-func preflightApprovedInstall(dryRun Result, relativeBackupRoot string) error {
+func preflightApprovedInstall(dryRun Result, relativeBackupRoot string, sourceRepo string) error {
 	if strings.TrimSpace(dryRun.SuiteRole) == "" {
 		return fmt.Errorf("missing suite_role evidence")
 	}
@@ -248,7 +252,7 @@ func preflightApprovedInstall(dryRun Result, relativeBackupRoot string) error {
 				return fmt.Errorf("target checksum changed after dry-run: %s", entry.Path)
 			}
 		}
-		content, err := renderedContentForEntry(dryRun, entry)
+		content, err := renderedContentForEntry(dryRun, entry, sourceRepo)
 		if err != nil {
 			return err
 		}
@@ -259,16 +263,16 @@ func preflightApprovedInstall(dryRun Result, relativeBackupRoot string) error {
 	return nil
 }
 
-func renderedContentForEntry(result Result, entry ChangedPath) ([]byte, error) {
+func renderedContentForEntry(result Result, entry ChangedPath, sourceRepo string) ([]byte, error) {
 	for _, skill := range result.PlannedSkills {
 		if skill.TargetPath != entry.Path {
 			continue
 		}
-		pack, ok := sourcePackForPlannedSkill(result.SourceRepo.Path, skill.SourcePackID)
+		pack, ok := sourcePackForPlannedSkill(sourceRepo, skill.SourcePackID)
 		if !ok {
 			return nil, fmt.Errorf("missing source pack for %s", skill.SourcePackID)
 		}
-		sourcePath := filepath.Join(result.SourceRepo.Path, filepath.FromSlash(pack.SourcePath), "SKILL.md")
+		sourcePath := filepath.Join(sourceRepo, filepath.FromSlash(pack.SourcePath), "SKILL.md")
 		info, err := os.Lstat(sourcePath)
 		if err != nil {
 			return nil, err
@@ -276,7 +280,7 @@ func renderedContentForEntry(result Result, entry ChangedPath) ([]byte, error) {
 		if info.Mode()&os.ModeSymlink != 0 {
 			return nil, fmt.Errorf("source SKILL.md symlink rejected: %s", sourcePath)
 		}
-		return plannedSkillContent(result.SourceRepo.Path, pack, skill.SourceSkill, skill.InstalledSkill)
+		return plannedSkillContent(sourceRepo, pack, skill.SourceSkill, skill.InstalledSkill)
 	}
 	return nil, fmt.Errorf("no planned skill maps target path %s", entry.Path)
 }

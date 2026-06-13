@@ -55,11 +55,12 @@ func TestRoleAwareProjectSuiteDocsRegistrationAndRoadmap(t *testing.T) {
 		"Initial color evidence: Red `t_bfad026c`, Orange `t_21f593c9`, Gray `t_acc68322`, Blue synthesis `t_a971aa92`",
 		"unknown-role fail-closed fixtures",
 		"missing/unknown `suite_role`",
-		"named approval owner",
-		"source behavior is implemented and committed through `7324d9c`",
+		"KASROLE is the KAS v0.1.3 release baseline",
+		"WFLOW epic completion target is KAS v0.1.4",
+		"WFLOW startup must still run effective installed-binary/profile doctor evidence",
 	})
 	requireRoadmapTaskStatus(t, "KASROLE-001", "Completed")
 	requireRoadmapTaskStatus(t, "KASROLE-002", "Completed")
 	requireRoadmapTaskStatus(t, "KASROLE-003", "Completed")
-	requireRoadmapTaskStatus(t, "KASROLE-004", "Blocked")
+	requireRoadmapTaskStatus(t, "KASROLE-004", "Completed")
 }
