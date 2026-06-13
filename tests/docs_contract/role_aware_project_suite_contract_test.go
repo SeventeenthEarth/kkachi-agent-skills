@@ -6,7 +6,7 @@ const roleAwareProjectSuiteSOT = "docs/sot/role-aware-project-suite-contract.md"
 
 func TestRoleAwareProjectSuiteSOTDefinesRolesAndRegistry(t *testing.T) {
 	requireContainsAll(t, roleAwareProjectSuiteSOT, []string{
-		"Status: KASROLE-001 Completed after color discussion",
+		"Status: KASROLE-001..004 source behavior completed through commits",
 		"Red `t_bfad026c`, Orange `t_21f593c9`, Gray `t_acc68322`, Blue synthesis `t_a971aa92`",
 		"`blue_commander`",
 		"`red_reviewer`",
@@ -44,7 +44,7 @@ func TestRoleAwareProjectSuiteDocsRegistrationAndRoadmap(t *testing.T) {
 		"sot/role-aware-project-suite-contract.md",
 		"canonical role registry path `registries/project-suite-roles.yaml`",
 		"unknown-role fail-closed behavior",
-		"KASROLE-001 is completed with color evidence recorded",
+		"KASROLE-001..004 source work is implemented and committed through `7324d9c`",
 	})
 	requireContainsAll(t, "docs/kkachi-docs-map.yaml", []string{
 		"docs/sot/role-aware-project-suite-contract.md",
@@ -56,9 +56,10 @@ func TestRoleAwareProjectSuiteDocsRegistrationAndRoadmap(t *testing.T) {
 		"unknown-role fail-closed fixtures",
 		"missing/unknown `suite_role`",
 		"named approval owner",
+		"source behavior is implemented and committed through `7324d9c`",
 	})
 	requireRoadmapTaskStatus(t, "KASROLE-001", "Completed")
 	requireRoadmapTaskStatus(t, "KASROLE-002", "Completed")
 	requireRoadmapTaskStatus(t, "KASROLE-003", "Completed")
-	requireRoadmapTaskStatus(t, "KASROLE-004", "In Review")
+	requireRoadmapTaskStatus(t, "KASROLE-004", "Blocked")
 }

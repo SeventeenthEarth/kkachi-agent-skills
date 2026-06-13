@@ -2,8 +2,8 @@
 
 Date: 2026-06-13
 Owner: KAS workflow/policy layer
-Confirming role: Responsible approver / KASROLE-001 color review evidence recorded in Kanban cards Red `t_bfad026c`, Orange `t_21f593c9`, Gray `t_acc68322`, Blue synthesis `t_a971aa92`; completion remains roadmap-gated
-Status: KASROLE-001 Completed after color discussion, post-review doc correction, docs-contract coverage, aggregate test evidence, and amended commit evidence; implementation behavior still begins only when later roadmap tasks pass their evidence and review gates
+Confirming role: Responsible approver / KASROLE-001 color review evidence recorded in Kanban cards Red `t_bfad026c`, Orange `t_21f593c9`, Gray `t_acc68322`, Blue synthesis `t_a971aa92`; source implementation completion is recorded in roadmap evidence and operational cleanup remains approval-gated
+Status: KASROLE-001..004 source behavior completed through commits `cda451c`, `5082663`, `0ba3f82`, and `7324d9c`; real Red/Orange/Gray profile cleanup/apply remains blocked until explicit 주군 operational approval and must not be implied by this SOT
 Authority level: KAS-side source of truth for role-aware project suite selection, subset manifests, doctor/repair semantics, and pre-WFLOW operational cleanup
 Scope: `kkachi-agent-skills` docs, registries, templates, CLI planning, profile-suite manifest semantics, and KAS-owned repair guidance. No Hermes profile mutation, installed skill deletion, KAH deterministic state mutation, KAB runtime activation, auth/token/gateway/provider/model change, or automatic rollout is authorized by this document alone.
 Related docs: `docs/sot/project-specific-kas-install-contract.md`, `docs/sot/project-kas-sync-state.md`, `docs/sot/task-dag-workflow-contract.md`, `docs/sot/token-economy-and-agent-instruction-contract.md`, `docs/sot/kas-cli-contract.md`, `docs/roadmap.md`, KAH `docs/sot/task-dag-state-machine.md`
@@ -11,6 +11,7 @@ Evidence/source paths:
 - 주군 direction in 17번째 지구 Discord `#kah` thread `1515219219002818610` on 2026-06-13: before local DAGSM/WFLOW development, do not proceed with Red/Orange/Gray profiles that received full 18-skill `kkachi-agent-helper` project suites; create a KAS SOT and fix role-aware install/doctor/repair first.
 - Observed current KAS behavior: `kas-default-project-suite` is derived from `skill-pack.yaml` and installs all 18 project-prefixed skills for every target profile. This matches Blue commander needs but over-provisions reviewer/scribe profiles.
 - KASROLE-001 color discussion on 2026-06-13: Red `t_bfad026c` accepted the safety/fail-closed direction, Orange `t_21f593c9` conditionally accepted with UX/role-label refinements, Gray `t_acc68322` conditionally accepted with SOT/evidence trace refinements, and Blue synthesis `t_a971aa92` directed minor doc/design fixes before KASROLE-002 planning.
+- KASROLE source implementation closure on 2026-06-13: commits `5082663`, `0ba3f82`, and `7324d9c` implemented role-aware install/manifest, doctor diagnostics, and approval-gated repair/prune source behavior. Read-only doctor evidence still reports `hahuyeon`, `yeomong`, and `jingung` KAH development profile suites as fail-closed legacy/full-suite states with missing `suite_role`; no real profile cleanup/apply is authorized by source closure.
 
 ## 1. Decision summary
 
