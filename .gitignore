@@ -13,3 +13,6 @@ __pycache__/
 .claude/
 .claude-octopus/
 feedback.md
+
+bin/
+
