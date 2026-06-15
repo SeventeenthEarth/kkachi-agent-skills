@@ -199,6 +199,178 @@ func TestTriggerFailsClosedForReadyNodeWithoutMatchingContract(t *testing.T) {
 	}
 }
 
+func TestTriggerSelectorConflictFailsBeforeKAHCalls(t *testing.T) {
+	project := t.TempDir()
+	registry := writeRegistry(t, project, validRegistry("demo", "setup"))
+	runner := newWorkflowFakeRunner("demo", "run-20260615T010203Z-abcdef123456", []string{"setup"})
+
+	result, err := Trigger(Options{
+		Project:          project,
+		WorkflowID:       "demo",
+		SelectorRegistry: registry,
+		TaskClass:        "development",
+		RunID:            "run-20260615T010203Z-abcdef123456",
+		Runner:           runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "selector_explicit_mode_conflict" {
+		t.Fatalf("expected selector conflict, got %+v", result)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("conflict must not call KAH: %#v", runner.calls)
+	}
+}
+
+func TestTriggerSelectorNoMatchAndAmbiguousDoNotCallKAH(t *testing.T) {
+	project := t.TempDir()
+	registry := writeRegistry(t, project, validRegistry("demo", "setup")+strings.ReplaceAll(validRegistry("other", "setup"), "version: kas-task-dag-workflow-registry/v1\n", ""))
+	runner := newWorkflowFakeRunner("demo", "run-20260615T010203Z-abcdef123456", []string{"setup"})
+
+	result, err := Trigger(Options{
+		Project:          project,
+		SelectorRegistry: registry,
+		TaskClass:        "security",
+		RunID:            "run-20260615T010203Z-abcdef123456",
+		Runner:           runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "selector_no_match" {
+		t.Fatalf("expected no match, got %+v", result)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("no-match must not call KAH: %#v", runner.calls)
+	}
+
+	result, err = Trigger(Options{
+		Project:              project,
+		SelectorRegistry:     registry,
+		TaskClass:            "development",
+		Labels:               []string{"stage1", "backend"},
+		ChangedSurfaces:      []string{"code"},
+		RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"},
+		RunID:                "run-20260615T010203Z-abcdef123456",
+		Runner:               runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "selector_ambiguous" || len(result.SelectorMatch.CandidateIDs) != 2 {
+		t.Fatalf("expected ambiguity, got %+v", result)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("ambiguity must not call KAH: %#v", runner.calls)
+	}
+}
+
+func TestTriggerSelectorMatchRendersRegistryReadbackPacket(t *testing.T) {
+	project := t.TempDir()
+	registry := writeRegistry(t, project, validRegistry("demo", "setup"))
+	runner := newWorkflowFakeRunner("demo", "run-20260615T010203Z-abcdef123456", []string{"setup"})
+	runner.responses["workflow explain --file .kkachi/workflows/demo.yaml --json"] = CommandResult{Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"demo","schema_version":"task-dag/v1","nodes":[{"id":"setup"}]}`)}
+
+	result, err := Trigger(Options{
+		Project:              project,
+		SelectorRegistry:     registry,
+		TaskClass:            "development",
+		Labels:               []string{"stage1", "backend"},
+		ChangedSurfaces:      []string{"code"},
+		RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"},
+		RunID:                "run-20260615T010203Z-abcdef123456",
+		Runner:               runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.WorkflowID != "demo" || result.SelectorMatch.WorkflowID != "demo" {
+		t.Fatalf("unexpected selector success: %+v", result)
+	}
+	if len(result.DispatchPackets) != 1 {
+		t.Fatalf("dispatch packets = %+v", result.DispatchPackets)
+	}
+	packet := result.DispatchPackets[0]
+	if packet.SelectorRegistrySource == "" || packet.SelectorRegistryChecksum == "" || packet.CompletionAuthority != "kah_only" || packet.Stage1DirectCodexIsKABNativeCodex {
+		t.Fatalf("missing selector/readback authority fields: %+v", packet)
+	}
+	if packet.TaskClass != "development" || packet.SelectorMatch != "selector_matched" {
+		t.Fatalf("missing selector packet metadata: %+v", packet)
+	}
+	if !reflect.DeepEqual(packet.Labels, []string{"backend", "stage1"}) {
+		t.Fatalf("missing selector labels readback: %+v", packet)
+	}
+	if !reflect.DeepEqual(packet.ChangedSurfaces, []string{"code"}) {
+		t.Fatalf("missing changed surfaces readback: %+v", packet)
+	}
+	if !reflect.DeepEqual(packet.RequiredCapabilities, []string{"task_dag_schema_validation", "workflow_instance_state"}) {
+		t.Fatalf("missing required capabilities readback: %+v", packet)
+	}
+	if result.DirectKAHStateWrite {
+		t.Fatalf("selector trigger must never report direct KAH state writes: %+v", result)
+	}
+}
+
+func TestTriggerSelectorExplainNodeIDMismatchFailsClosed(t *testing.T) {
+	project := t.TempDir()
+	registry := writeRegistry(t, project, validRegistry("demo", "setup"))
+	runner := newWorkflowFakeRunner("demo", "run-20260615T010203Z-abcdef123456", []string{"setup"})
+	runner.responses["workflow explain --file .kkachi/workflows/demo.yaml --json"] = CommandResult{Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"demo","schema_version":"task-dag/v1","nodes":[{"id":"different"}]}`)}
+
+	result, err := Trigger(Options{
+		Project:              project,
+		SelectorRegistry:     registry,
+		TaskClass:            "development",
+		ChangedSurfaces:      []string{"code"},
+		RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"},
+		RunID:                "run-20260615T010203Z-abcdef123456",
+		Runner:               runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "blocked_registry_node_contract_mismatch" {
+		t.Fatalf("expected node-id mismatch blocker, got %+v", result)
+	}
+	if containsCall(runner.calls, "workflow create --run run-20260615T010203Z-abcdef123456 --file .kkachi/workflows/demo.yaml --json") {
+		t.Fatalf("node-id mismatch must not create workflow instance: %#v", runner.calls)
+	}
+}
+
+func TestTriggerSelectorExplainNodeIDUnavailableIsInformational(t *testing.T) {
+	project := t.TempDir()
+	registry := writeRegistry(t, project, validRegistry("demo", "setup"))
+	runner := newWorkflowFakeRunner("demo", "run-20260615T010203Z-abcdef123456", []string{"setup"})
+	runner.responses["workflow explain --file .kkachi/workflows/demo.yaml --json"] = CommandResult{Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"demo","schema_version":"task-dag/v1","nodes":[{"name":"setup"}]}`)}
+
+	result, err := Trigger(Options{
+		Project:              project,
+		SelectorRegistry:     registry,
+		TaskClass:            "development",
+		Labels:               []string{"stage1", "backend"},
+		ChangedSurfaces:      []string{"code"},
+		RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"},
+		RunID:                "run-20260615T010203Z-abcdef123456",
+		Runner:               runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.Status != "dispatch_packets_rendered" {
+		t.Fatalf("unavailable explain node ids should not block ready-node contract enforcement: %+v", result)
+	}
+	found := false
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.Level == "info" && diagnostic.Code == "kah_explain_node_id_readback_unavailable" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("missing informational explain-node-id diagnostic: %+v", result.Diagnostics)
+	}
+}
+
 func writeNodeContractBundle(t *testing.T, dir string, content string) string {
 	t.Helper()
 	path := filepath.Join(dir, "node-contracts.json")
@@ -226,6 +398,44 @@ func validNodeContractBundle(workflowID string, nodeID string) string {
     }
   ]
 }`
+}
+
+func writeRegistry(t *testing.T, dir string, content string) string {
+	t.Helper()
+	path := filepath.Join(dir, "workflow-registry.yaml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func validRegistry(workflowID string, nodeID string) string {
+	return `version: kas-task-dag-workflow-registry/v1
+workflows:
+  - workflow_id: ` + workflowID + `
+    workflow_path: .kkachi/workflows/` + workflowID + `.yaml
+    selector:
+      task_classes: [development]
+      labels_any: []
+      labels_all: []
+      changed_surfaces_any: [code, tests]
+      risk_levels: []
+      required_agents_all: []
+      required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]
+    fallback_policy: none_fail_closed
+node_contracts:
+  - workflow_id: ` + workflowID + `
+    node_id: ` + nodeID + `
+    task_class: development
+    owner_role: implementer_backend
+    execution_lane: direct_kas_skill
+    required_inputs: [task-contract.yaml]
+    expected_artifacts: [artifacts/` + nodeID + `.md]
+    prompt_ref: skills/kkachi-implement/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: make test
+`
 }
 
 func newWorkflowFakeRunner(workflowID string, runID string, readyNodes []string) *fakeKAHRunner {

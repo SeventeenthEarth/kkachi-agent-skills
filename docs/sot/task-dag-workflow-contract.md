@@ -67,6 +67,28 @@ Selector result handling is fail-closed:
 
 LLM judgment may explain options, but it must not override selector ambiguity, KAH validation failure, missing capability evidence, approval requirements, or node evidence checks.
 
+WFLOW-003 implements the selector registry as KAS-owned metadata at
+`registries/task-dag-workflow-registry.yaml` with schema version
+`kas-task-dag-workflow-registry/v1`. Selector mode is requested by
+`--selector-registry` or selector fields, requires an explicit registry path,
+and accepts task class, labels, changed surfaces, risk, required agents, and
+required capabilities. Explicit
+`--workflow-id` / `--node-contract-source` inputs and selector inputs are
+mutually exclusive; mixed mode fails closed with
+`selector_explicit_mode_conflict`.
+
+Selector diagnostics are deterministic and non-ranking:
+
+| Diagnostic | Meaning |
+|---|---|
+| `selector_registry_required` | Selector fields were supplied without a registry path |
+| `selector_registry_unreadable` | Registry path could not be read |
+| `selector_registry_schema_unsupported` | Registry version or YAML shape is unsupported |
+| `selector_required_input_missing` | Required selector input such as task class is missing |
+| `selector_no_match` | Zero workflows matched; KAS must not call KAH workflow instance commands |
+| `selector_ambiguous` | Multiple workflows matched; KAS must not choose first or rank candidates |
+| `selector_explicit_mode_conflict` | Explicit and selector inputs were combined |
+
 ## Node contract requirements
 
 Each KAS node contract must declare at least:
@@ -83,9 +105,23 @@ Each KAS node contract must declare at least:
 
 KAS must not mark a node complete. Node completion is a KAH state transition backed by the required artifacts/evidence.
 
+WFLOW-003 registry node contracts require the WFLOW-002 core fields plus
+`task_class`. JSON node-contract bundles used by explicit WFLOW-002 mode and
+YAML registry node contracts share the same core validation path; the registry
+adds the selector-specific `task_class` invariant. If KAH `workflow explain`
+returns reliable node ids, selector-mode registry contracts must exactly cover
+those ids before KAS creates or resumes an instance. If KAH does not expose
+reliable node ids, KAS records an informational diagnostic and still fails
+closed later for any KAH-ready node without a matching contract.
+
+Dispatch packets must preserve `direct_kah_state_write:false` and include
+`completion_authority: kah_only`. Stage 1 direct Codex SDK/app-server evidence
+must be reported separately from KAB `native_codex` evidence with
+`stage1_direct_codex_is_kab_native_codex:false`.
+
 ## Trigger skill posture
 
-The generic trigger skill should be implemented before thin or custom trigger generation. `WFLOW-002` is explicitly scoped to `workflow_id` execution only: it may accept an explicit workflow id plus an explicit node-contract source/ref and must not implement selector search or a full registry. Selector-driven workflow choice and formal node-contract registry behavior are deferred to `WFLOW-003`. Its MVP responsibilities are:
+The generic trigger skill should be implemented before thin or custom trigger generation. `WFLOW-002` is explicitly scoped to `workflow_id` execution only: it may accept an explicit workflow id plus an explicit node-contract source/ref and must not implement selector search or a full registry. `WFLOW-003` adds deterministic selector-driven workflow choice and a formal node-contract registry without adding custom workflow creation, thin trigger scaffolding, scoring, LLM tie-breaks, backend fallback, or direct KAH state writes. Its MVP responsibilities are:
 
 1. read the project workflow catalog or explicit workflow id;
 2. check effective KAH capabilities and workflow validation;

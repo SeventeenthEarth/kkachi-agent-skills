@@ -1,15 +1,15 @@
 package workflowtrigger
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowregistry"
 )
 
 const (
@@ -26,38 +26,63 @@ type CommandResult struct {
 }
 
 type Options struct {
-	Project            string
-	WorkflowID         string
-	NodeContractSource string
-	NodeContractRef    string
-	RunID              string
-	InstanceID         string
-	Runner             Runner
+	Project              string
+	WorkflowID           string
+	NodeContractSource   string
+	NodeContractRef      string
+	SelectorRegistry     string
+	TaskClass            string
+	Labels               []string
+	ChangedSurfaces      []string
+	Risk                 string
+	RequiredAgents       []string
+	RequiredCapabilities []string
+	RunID                string
+	InstanceID           string
+	Runner               Runner
 }
 
 type Result struct {
-	OK                  bool             `json:"ok"`
-	Command             string           `json:"command"`
-	Mode                string           `json:"mode"`
-	Status              string           `json:"status"`
-	Project             string           `json:"project"`
-	WorkflowID          string           `json:"workflow_id"`
-	Workflow            WorkflowEvidence `json:"workflow"`
-	NodeContractSource  string           `json:"node_contract_source"`
-	NodeContractRef     string           `json:"node_contract_ref,omitempty"`
-	KAHCapability       KAHCapability    `json:"kah_capability"`
-	Instance            InstanceEvidence `json:"instance"`
-	ReadyNodes          []ReadyNode      `json:"ready_nodes"`
-	DispatchPackets     []DispatchPacket `json:"dispatch_packets"`
-	Diagnostics         []Diagnostic     `json:"diagnostics"`
-	ReasonCodes         []string         `json:"reason_codes"`
-	NextAction          string           `json:"next_action"`
-	DirectKAHStateWrite bool             `json:"direct_kah_state_write"`
+	OK                   bool             `json:"ok"`
+	Command              string           `json:"command"`
+	Mode                 string           `json:"mode"`
+	Status               string           `json:"status"`
+	Project              string           `json:"project"`
+	WorkflowID           string           `json:"workflow_id"`
+	Workflow             WorkflowEvidence `json:"workflow"`
+	NodeContractSource   string           `json:"node_contract_source"`
+	NodeContractRef      string           `json:"node_contract_ref,omitempty"`
+	SelectorRegistry     RegistryEvidence `json:"selector_registry,omitempty"`
+	SelectorMatch        SelectorEvidence `json:"selector_match,omitempty"`
+	TaskClass            string           `json:"task_class,omitempty"`
+	Labels               []string         `json:"labels,omitempty"`
+	ChangedSurfaces      []string         `json:"changed_surfaces,omitempty"`
+	RequiredCapabilities []string         `json:"required_capabilities,omitempty"`
+	KAHCapability        KAHCapability    `json:"kah_capability"`
+	Instance             InstanceEvidence `json:"instance"`
+	ReadyNodes           []ReadyNode      `json:"ready_nodes"`
+	DispatchPackets      []DispatchPacket `json:"dispatch_packets"`
+	Diagnostics          []Diagnostic     `json:"diagnostics"`
+	ReasonCodes          []string         `json:"reason_codes"`
+	NextAction           string           `json:"next_action"`
+	DirectKAHStateWrite  bool             `json:"direct_kah_state_write"`
 }
 
 type WorkflowEvidence struct {
 	ID   string `json:"id"`
 	Path string `json:"path"`
+}
+
+type RegistryEvidence struct {
+	Path     string `json:"path,omitempty"`
+	Version  string `json:"version,omitempty"`
+	Checksum string `json:"checksum,omitempty"`
+}
+
+type SelectorEvidence struct {
+	Status       string   `json:"status,omitempty"`
+	WorkflowID   string   `json:"workflow_id,omitempty"`
+	CandidateIDs []string `json:"candidate_ids,omitempty"`
 }
 
 type KAHCapability struct {
@@ -79,21 +104,30 @@ type ReadyNode struct {
 }
 
 type DispatchPacket struct {
-	WorkflowID         string   `json:"workflow_id"`
-	InstanceID         string   `json:"instance_id"`
-	NodeID             string   `json:"node_id"`
-	OwnerRole          string   `json:"owner_role"`
-	ExecutionLane      string   `json:"execution_lane"`
-	RequiredInputs     []string `json:"required_inputs"`
-	ExpectedArtifacts  []string `json:"expected_artifacts"`
-	PromptRef          string   `json:"prompt_ref"`
-	ApprovalRequired   bool     `json:"approval_required"`
-	FallbackPolicy     string   `json:"fallback_policy"`
-	VerificationGate   string   `json:"verification_gate"`
-	NodeContractSource string   `json:"node_contract_source"`
-	NodeContractRef    string   `json:"node_contract_ref,omitempty"`
-	SourceChecksum     string   `json:"source_checksum"`
-	Status             string   `json:"status"`
+	WorkflowID                        string   `json:"workflow_id"`
+	InstanceID                        string   `json:"instance_id"`
+	NodeID                            string   `json:"node_id"`
+	OwnerRole                         string   `json:"owner_role"`
+	ExecutionLane                     string   `json:"execution_lane"`
+	RequiredInputs                    []string `json:"required_inputs"`
+	ExpectedArtifacts                 []string `json:"expected_artifacts"`
+	PromptRef                         string   `json:"prompt_ref"`
+	ApprovalRequired                  bool     `json:"approval_required"`
+	FallbackPolicy                    string   `json:"fallback_policy"`
+	VerificationGate                  string   `json:"verification_gate"`
+	NodeContractSource                string   `json:"node_contract_source"`
+	NodeContractRef                   string   `json:"node_contract_ref,omitempty"`
+	SelectorRegistrySource            string   `json:"selector_registry_source,omitempty"`
+	SelectorRegistryChecksum          string   `json:"selector_registry_checksum,omitempty"`
+	SelectorMatch                     string   `json:"selector_match,omitempty"`
+	TaskClass                         string   `json:"task_class,omitempty"`
+	Labels                            []string `json:"labels,omitempty"`
+	ChangedSurfaces                   []string `json:"changed_surfaces,omitempty"`
+	RequiredCapabilities              []string `json:"required_capabilities,omitempty"`
+	CompletionAuthority               string   `json:"completion_authority"`
+	Stage1DirectCodexIsKABNativeCodex bool     `json:"stage1_direct_codex_is_kab_native_codex"`
+	SourceChecksum                    string   `json:"source_checksum"`
+	Status                            string   `json:"status"`
 }
 
 type Diagnostic struct {
@@ -106,24 +140,7 @@ type Diagnostic struct {
 	Actual   string `json:"actual,omitempty"`
 }
 
-type nodeContractBundle struct {
-	SchemaVersion string         `json:"schema_version"`
-	Ref           string         `json:"ref"`
-	Contracts     []NodeContract `json:"contracts"`
-}
-
-type NodeContract struct {
-	WorkflowID        string   `json:"workflow_id"`
-	NodeID            string   `json:"node_id"`
-	OwnerRole         string   `json:"owner_role"`
-	ExecutionLane     string   `json:"execution_lane"`
-	RequiredInputs    []string `json:"required_inputs"`
-	ExpectedArtifacts []string `json:"expected_artifacts"`
-	PromptRef         string   `json:"prompt_ref"`
-	ApprovalRequired  bool     `json:"approval_required"`
-	FallbackPolicy    string   `json:"fallback_policy"`
-	VerificationGate  string   `json:"verification_gate"`
-}
+type NodeContract = workflowregistry.NodeContract
 
 type commandRunner struct{}
 
@@ -148,27 +165,49 @@ func Trigger(opts Options) (Result, error) {
 	if opts.Project == "" {
 		return fail(result, "project_required", "workflow-trigger requires --project <path>."), nil
 	}
-	if strings.TrimSpace(opts.WorkflowID) == "" {
-		return fail(result, "workflow_id_required", "workflow-trigger requires --workflow-id <id>."), nil
+	selectorMode := hasSelectorInput(opts)
+	explicitMode := strings.TrimSpace(opts.WorkflowID) != "" || strings.TrimSpace(opts.NodeContractSource) != ""
+	var contracts []NodeContract
+	checksum := ""
+	if selectorMode && explicitMode {
+		return fail(result, "selector_explicit_mode_conflict", "workflow-trigger accepts either explicit workflow/node-contract inputs or selector registry inputs, not both."), nil
 	}
-	if !safeWorkflowID(opts.WorkflowID) {
-		return fail(result, "workflow_id_invalid", "workflow id must be a simple file-safe id."), nil
-	}
-	result.WorkflowID = opts.WorkflowID
-	result.Workflow = WorkflowEvidence{ID: opts.WorkflowID, Path: workflowPath(opts.WorkflowID)}
-	if strings.TrimSpace(opts.NodeContractSource) == "" {
-		return fail(result, "node_contract_source_required", "workflow-trigger requires --node-contract-source <path>."), nil
+	if selectorMode {
+		selectedContracts, registryChecksum, ok := resolveSelectorMode(&result, opts)
+		if !ok {
+			return result, nil
+		}
+		contracts = selectedContracts
+		checksum = registryChecksum
+		opts.WorkflowID = result.WorkflowID
+		opts.NodeContractSource = result.NodeContractSource
+	} else {
+		if strings.TrimSpace(opts.WorkflowID) == "" {
+			return fail(result, "workflow_id_required", "workflow-trigger requires --workflow-id <id>."), nil
+		}
+		if !safeWorkflowID(opts.WorkflowID) {
+			return fail(result, "workflow_id_invalid", "workflow id must be a simple file-safe id."), nil
+		}
+		result.WorkflowID = opts.WorkflowID
+		result.Workflow = WorkflowEvidence{ID: opts.WorkflowID, Path: workflowPath(opts.WorkflowID)}
+		if strings.TrimSpace(opts.NodeContractSource) == "" {
+			return fail(result, "node_contract_source_required", "workflow-trigger requires --node-contract-source <path>."), nil
+		}
+		if strings.TrimSpace(opts.RunID) == "" && strings.TrimSpace(opts.InstanceID) == "" {
+			return fail(result, "run_or_instance_required", "workflow-trigger requires --run <run-id> for create or --instance-id <id> for resume."), nil
+		}
+		loadedContracts, loadedChecksum, loadErr := loadNodeContracts(opts.NodeContractSource, opts.NodeContractRef)
+		if loadErr != nil {
+			return fail(result, loadErr.Code, loadErr.Message), nil
+		}
+		contracts = loadedContracts
+		checksum = loadedChecksum
+		result.NodeContractSource = opts.NodeContractSource
+		result.NodeContractRef = opts.NodeContractRef
 	}
 	if strings.TrimSpace(opts.RunID) == "" && strings.TrimSpace(opts.InstanceID) == "" {
 		return fail(result, "run_or_instance_required", "workflow-trigger requires --run <run-id> for create or --instance-id <id> for resume."), nil
 	}
-
-	contracts, checksum, loadErr := loadNodeContracts(opts.NodeContractSource, opts.NodeContractRef)
-	if loadErr != nil {
-		return fail(result, loadErr.Code, loadErr.Message), nil
-	}
-	result.NodeContractSource = opts.NodeContractSource
-	result.NodeContractRef = opts.NodeContractRef
 
 	preflight := preflightKAH(opts)
 	result.KAHCapability = preflight.capability
@@ -176,8 +215,18 @@ func Trigger(opts Options) (Result, error) {
 		return fail(result, "blocked_missing_kah_workflow_capability", preflight.err.Error()), nil
 	}
 
-	if !runWorkflowValidateExplain(&result, opts) {
+	explainNodeIDs, explainHadNodeIDs, ok := runWorkflowValidateExplain(&result, opts)
+	if !ok {
 		return result, nil
+	}
+	if selectorMode {
+		if explainHadNodeIDs {
+			if err := workflowregistry.ValidateContractsCoverNodeIDs(contracts, result.WorkflowID, explainNodeIDs); err != nil {
+				return fail(result, "blocked_registry_node_contract_mismatch", err.Error()), nil
+			}
+		} else {
+			result.Diagnostics = append(result.Diagnostics, Diagnostic{Level: "info", Code: "kah_explain_node_id_readback_unavailable", Message: "KAH workflow explain did not expose reliable node ids; ready-node contract checks remain enforced."})
+		}
 	}
 
 	runID := strings.TrimSpace(opts.InstanceID)
@@ -214,7 +263,7 @@ func Trigger(opts Options) (Result, error) {
 			result.Diagnostics[len(result.Diagnostics)-1].NodeID = node.ID
 			return result, nil
 		}
-		packets = append(packets, packetFromContract(contract, runID, opts.NodeContractSource, opts.NodeContractRef, checksum))
+		packets = append(packets, packetFromContract(contract, runID, opts.NodeContractSource, opts.NodeContractRef, checksum, result))
 	}
 	result.DispatchPackets = packets
 	result.OK = true
@@ -239,23 +288,34 @@ func normalizeOptions(opts Options) Options {
 			opts.Project = abs
 		}
 	}
+	opts.Labels = workflowregistry.NormalizeSelectorValues(opts.Labels)
+	opts.ChangedSurfaces = workflowregistry.NormalizeSelectorValues(opts.ChangedSurfaces)
+	opts.RequiredAgents = workflowregistry.NormalizeSelectorValues(opts.RequiredAgents)
+	opts.RequiredCapabilities = workflowregistry.NormalizeSelectorValues(opts.RequiredCapabilities)
+	opts.TaskClass = strings.TrimSpace(opts.TaskClass)
+	opts.Risk = strings.TrimSpace(opts.Risk)
+	opts.SelectorRegistry = strings.TrimSpace(opts.SelectorRegistry)
 	return opts
 }
 
 func newResult(opts Options) Result {
 	return Result{
-		Command:             Command,
-		Mode:                Mode,
-		Status:              "blocked",
-		Project:             opts.Project,
-		WorkflowID:          opts.WorkflowID,
-		NodeContractSource:  opts.NodeContractSource,
-		NodeContractRef:     opts.NodeContractRef,
-		ReadyNodes:          []ReadyNode{},
-		DispatchPackets:     []DispatchPacket{},
-		Diagnostics:         []Diagnostic{},
-		ReasonCodes:         []string{},
-		DirectKAHStateWrite: false,
+		Command:              Command,
+		Mode:                 Mode,
+		Status:               "blocked",
+		Project:              opts.Project,
+		WorkflowID:           opts.WorkflowID,
+		NodeContractSource:   opts.NodeContractSource,
+		NodeContractRef:      opts.NodeContractRef,
+		TaskClass:            opts.TaskClass,
+		Labels:               opts.Labels,
+		ChangedSurfaces:      opts.ChangedSurfaces,
+		RequiredCapabilities: opts.RequiredCapabilities,
+		ReadyNodes:           []ReadyNode{},
+		DispatchPackets:      []DispatchPacket{},
+		Diagnostics:          []Diagnostic{},
+		ReasonCodes:          []string{},
+		DirectKAHStateWrite:  false,
 	}
 }
 
@@ -281,30 +341,94 @@ func (e codedError) Error() string {
 }
 
 func loadNodeContracts(path string, expectedRef string) ([]NodeContract, string, *codedError) {
-	data, err := os.ReadFile(path)
+	contracts, checksum, err := workflowregistry.LoadJSONContracts(path, expectedRef)
 	if err != nil {
-		return nil, "", &codedError{Code: "node_contract_source_unreadable", Message: "node-contract source is unreadable: " + err.Error()}
+		return nil, "", mapNodeContractError(err)
 	}
-	var bundle nodeContractBundle
-	if err := json.Unmarshal(data, &bundle); err != nil {
-		return nil, "", &codedError{Code: "node_contract_source_invalid_json", Message: "node-contract source must be JSON for WFLOW-002 MVP."}
+	return contracts, checksum, nil
+}
+
+func mapNodeContractError(err error) *codedError {
+	message := err.Error()
+	switch {
+	case strings.Contains(message, "unreadable"):
+		return &codedError{Code: "node_contract_source_unreadable", Message: message}
+	case strings.Contains(message, "must be JSON"):
+		return &codedError{Code: "node_contract_source_invalid_json", Message: message}
+	case strings.Contains(message, "schema_version"):
+		return &codedError{Code: "node_contract_schema_unsupported", Message: message}
+	case strings.Contains(message, "ref does not match"):
+		return &codedError{Code: "node_contract_ref_mismatch", Message: message}
+	case strings.Contains(message, "at least one contract"):
+		return &codedError{Code: "node_contracts_empty", Message: message}
+	default:
+		return &codedError{Code: "node_contract_required_field_missing", Message: message}
 	}
-	if bundle.SchemaVersion != "kas-node-contracts/v1" {
-		return nil, "", &codedError{Code: "node_contract_schema_unsupported", Message: "node-contract source must use schema_version kas-node-contracts/v1."}
+}
+
+func hasSelectorInput(opts Options) bool {
+	return opts.SelectorRegistry != "" || opts.TaskClass != "" || opts.Risk != "" || len(opts.Labels) > 0 || len(opts.ChangedSurfaces) > 0 || len(opts.RequiredAgents) > 0 || len(opts.RequiredCapabilities) > 0
+}
+
+func resolveSelectorMode(result *Result, opts Options) ([]NodeContract, string, bool) {
+	if opts.SelectorRegistry == "" {
+		*result = fail(*result, "selector_registry_required", "selector mode requires --selector-registry <path>.")
+		return nil, "", false
 	}
-	if expectedRef != "" && bundle.Ref != expectedRef {
-		return nil, "", &codedError{Code: "node_contract_ref_mismatch", Message: "node-contract source ref does not match --node-contract-ref."}
-	}
-	if len(bundle.Contracts) == 0 {
-		return nil, "", &codedError{Code: "node_contracts_empty", Message: "node-contract source must include at least one contract."}
-	}
-	for _, contract := range bundle.Contracts {
-		if contract.WorkflowID == "" || contract.NodeID == "" || contract.OwnerRole == "" || contract.ExecutionLane == "" || contract.PromptRef == "" || contract.FallbackPolicy == "" || contract.VerificationGate == "" {
-			return nil, "", &codedError{Code: "node_contract_required_field_missing", Message: "node contracts require workflow_id, node_id, owner_role, execution_lane, prompt_ref, fallback_policy, and verification_gate."}
+	registry, err := workflowregistry.Load(opts.SelectorRegistry)
+	if err != nil {
+		*result = fail(*result, "selector_registry_schema_unsupported", err.Error())
+		if strings.Contains(err.Error(), "unreadable") {
+			result.Status = "selector_registry_unreadable"
+			result.ReasonCodes = []string{"selector_registry_unreadable"}
+			result.Diagnostics = []Diagnostic{{Level: "error", Code: "selector_registry_unreadable", Message: err.Error()}}
 		}
+		return nil, "", false
 	}
-	sum := sha256.Sum256(data)
-	return bundle.Contracts, "sha256:" + hex.EncodeToString(sum[:]), nil
+	result.SelectorRegistry = RegistryEvidence{Path: registry.Path, Version: registry.Version, Checksum: registry.Checksum}
+	query := workflowregistry.Query{TaskClass: opts.TaskClass, Labels: opts.Labels, ChangedSurfaces: opts.ChangedSurfaces, Risk: opts.Risk, RequiredAgents: opts.RequiredAgents, RequiredCapabilities: opts.RequiredCapabilities}
+	match, err := workflowregistry.Select(registry, query)
+	result.TaskClass = match.Query.TaskClass
+	result.Labels = match.Query.Labels
+	result.ChangedSurfaces = match.Query.ChangedSurfaces
+	result.RequiredCapabilities = match.Query.RequiredCapabilities
+	result.SelectorMatch = SelectorEvidence{Status: match.Status, CandidateIDs: workflowCandidateIDs(match.Candidates)}
+	if err != nil {
+		*result = fail(*result, match.Status, err.Error())
+		return nil, "", false
+	}
+	switch match.Status {
+	case "selector_no_match":
+		*result = fail(*result, "selector_no_match", "selector registry did not match any workflow.")
+		return nil, "", false
+	case "selector_ambiguous":
+		*result = fail(*result, "selector_ambiguous", "selector registry matched multiple workflows; narrow selector metadata or provide explicit workflow inputs.")
+		return nil, "", false
+	case "selector_matched":
+		result.WorkflowID = match.Selected.WorkflowID
+		result.Workflow = WorkflowEvidence{ID: match.Selected.WorkflowID, Path: match.Selected.WorkflowPath}
+		result.SelectorMatch.WorkflowID = match.Selected.WorkflowID
+	default:
+		*result = fail(*result, "selector_registry_schema_unsupported", "selector returned unsupported status.")
+		return nil, "", false
+	}
+	contracts := workflowregistry.ContractsForWorkflow(registry.NodeContracts, match.Selected.WorkflowID)
+	if len(contracts) == 0 {
+		*result = fail(*result, "blocked_missing_ready_node_contract", "selected workflow has no node contracts in selector registry.")
+		return nil, "", false
+	}
+	result.NodeContractSource = registry.Path
+	opts.NodeContractSource = registry.Path
+	return contracts, registry.Checksum, true
+}
+
+func workflowCandidateIDs(candidates []workflowregistry.Workflow) []string {
+	ids := []string{}
+	for _, candidate := range candidates {
+		ids = append(ids, candidate.WorkflowID)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 type preflightResult struct {
@@ -375,23 +499,65 @@ func parseWorkflowCapabilities(data []byte) ([]string, bool) {
 	return appendUnique(commands...), flagsOK
 }
 
-func runWorkflowValidateExplain(result *Result, opts Options) bool {
+func runWorkflowValidateExplain(result *Result, opts Options) ([]string, bool, bool) {
+	explainNodeIDs := []string{}
+	explainHadNodeIDs := false
 	for _, subcommand := range []string{"validate", "explain"} {
 		command := opts.Runner(opts.Project, "workflow", subcommand, "--file", result.Workflow.Path, "--json")
 		payload, ok := parseKAHJSON(result, command, "blocked_kah_workflow_"+subcommand+"_failed", "KAH workflow "+subcommand+" failed.")
 		if !ok {
-			return false
+			return nil, false, false
 		}
 		if !truthy(payload["ok"]) {
 			*result = fail(*result, "blocked_kah_workflow_"+subcommand+"_failed", "KAH workflow "+subcommand+" returned ok:false.")
-			return false
+			return nil, false, false
 		}
 		if id, _ := payload["workflow_id"].(string); id != "" && id != opts.WorkflowID {
 			*result = fail(*result, "workflow_id_mismatch", "KAH workflow "+subcommand+" returned a different workflow_id.")
-			return false
+			return nil, false, false
+		}
+		if subcommand == "explain" {
+			explainNodeIDs, explainHadNodeIDs = extractExplainNodeIDs(payload)
 		}
 	}
-	return true
+	return explainNodeIDs, explainHadNodeIDs, true
+}
+
+func extractExplainNodeIDs(payload map[string]any) ([]string, bool) {
+	for _, source := range []any{payload["nodes"], nestedMapValue(payload, "workflow", "nodes")} {
+		items := list(source)
+		if len(items) == 0 {
+			continue
+		}
+		ids := []string{}
+		reliable := true
+		for _, raw := range items {
+			item, ok := raw.(map[string]any)
+			if !ok {
+				reliable = false
+				break
+			}
+			id, _ := item["id"].(string)
+			if id == "" {
+				reliable = false
+				break
+			}
+			ids = append(ids, id)
+		}
+		if reliable {
+			sort.Strings(ids)
+			return ids, true
+		}
+	}
+	return nil, false
+}
+
+func nestedMapValue(payload map[string]any, parent string, child string) any {
+	item, _ := payload[parent].(map[string]any)
+	if item == nil {
+		return nil
+	}
+	return item[child]
 }
 
 func runWorkflowCreate(result *Result, opts Options, runID string) bool {
@@ -480,23 +646,32 @@ func findContract(contracts []NodeContract, workflowID string, nodeID string) (N
 	return NodeContract{}, false
 }
 
-func packetFromContract(contract NodeContract, instanceID string, source string, ref string, checksum string) DispatchPacket {
+func packetFromContract(contract NodeContract, instanceID string, source string, ref string, checksum string, result Result) DispatchPacket {
 	return DispatchPacket{
-		WorkflowID:         contract.WorkflowID,
-		InstanceID:         instanceID,
-		NodeID:             contract.NodeID,
-		OwnerRole:          contract.OwnerRole,
-		ExecutionLane:      contract.ExecutionLane,
-		RequiredInputs:     contract.RequiredInputs,
-		ExpectedArtifacts:  contract.ExpectedArtifacts,
-		PromptRef:          contract.PromptRef,
-		ApprovalRequired:   contract.ApprovalRequired,
-		FallbackPolicy:     contract.FallbackPolicy,
-		VerificationGate:   contract.VerificationGate,
-		NodeContractSource: source,
-		NodeContractRef:    ref,
-		SourceChecksum:     checksum,
-		Status:             "ready_for_declared_lane",
+		WorkflowID:                        contract.WorkflowID,
+		InstanceID:                        instanceID,
+		NodeID:                            contract.NodeID,
+		OwnerRole:                         contract.OwnerRole,
+		ExecutionLane:                     contract.ExecutionLane,
+		RequiredInputs:                    contract.RequiredInputs,
+		ExpectedArtifacts:                 contract.ExpectedArtifacts,
+		PromptRef:                         contract.PromptRef,
+		ApprovalRequired:                  contract.ApprovalRequired,
+		FallbackPolicy:                    contract.FallbackPolicy,
+		VerificationGate:                  contract.VerificationGate,
+		NodeContractSource:                source,
+		NodeContractRef:                   ref,
+		SelectorRegistrySource:            result.SelectorRegistry.Path,
+		SelectorRegistryChecksum:          result.SelectorRegistry.Checksum,
+		SelectorMatch:                     result.SelectorMatch.Status,
+		TaskClass:                         contract.TaskClass,
+		Labels:                            result.Labels,
+		ChangedSurfaces:                   result.ChangedSurfaces,
+		RequiredCapabilities:              result.RequiredCapabilities,
+		CompletionAuthority:               "kah_only",
+		Stage1DirectCodexIsKABNativeCodex: false,
+		SourceChecksum:                    checksum,
+		Status:                            "ready_for_declared_lane",
 	}
 }
 

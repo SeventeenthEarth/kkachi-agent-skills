@@ -543,6 +543,13 @@ func runWorkflowTrigger(argv []string, stdout io.Writer, stderr io.Writer, env m
 	workflowID := fs.String("workflow-id", "", "explicit workflow id")
 	nodeContractSource := fs.String("node-contract-source", "", "explicit JSON node-contract source path")
 	nodeContractRef := fs.String("node-contract-ref", "", "optional node-contract source ref")
+	selectorRegistry := fs.String("selector-registry", "", "selector/node-contract registry path")
+	taskClass := fs.String("task-class", "", "selector task class")
+	labels := fs.String("labels", "", "selector labels, comma-separated")
+	changedSurfaces := fs.String("changed-surfaces", "", "selector changed surfaces, comma-separated")
+	risk := fs.String("risk", "", "selector risk level")
+	requiredAgent := fs.String("required-agent", "", "selector required agents, comma-separated")
+	requiredCapability := fs.String("required-capability", "", "selector required capabilities, comma-separated")
 	runID := fs.String("run", "", "KAH run id for workflow create")
 	instanceID := fs.String("instance-id", "", "existing KAH workflow instance id to resume")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
@@ -558,7 +565,21 @@ func runWorkflowTrigger(argv []string, stdout io.Writer, stderr io.Writer, env m
 	if fs.NArg() != 0 {
 		return emitError(stderr, "unexpected_argument", "workflow-trigger does not accept positional arguments", "workflow-trigger", *jsonOutput, "Rerun with workflow-trigger --project <path> --workflow-id <id> --node-contract-source <path> --run <run-id> --json.")
 	}
-	result, err := workflowtrigger.Trigger(workflowtrigger.Options{Project: *project, WorkflowID: *workflowID, NodeContractSource: *nodeContractSource, NodeContractRef: *nodeContractRef, RunID: *runID, InstanceID: *instanceID})
+	result, err := workflowtrigger.Trigger(workflowtrigger.Options{
+		Project:              *project,
+		WorkflowID:           *workflowID,
+		NodeContractSource:   *nodeContractSource,
+		NodeContractRef:      *nodeContractRef,
+		SelectorRegistry:     *selectorRegistry,
+		TaskClass:            *taskClass,
+		Labels:               splitFlagList(*labels),
+		ChangedSurfaces:      splitFlagList(*changedSurfaces),
+		Risk:                 *risk,
+		RequiredAgents:       splitFlagList(*requiredAgent),
+		RequiredCapabilities: splitFlagList(*requiredCapability),
+		RunID:                *runID,
+		InstanceID:           *instanceID,
+	})
 	if err != nil {
 		return emitError(stderr, "workflow_trigger_failed", err.Error(), "workflow-trigger", *jsonOutput, "")
 	}
@@ -963,7 +984,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  update   Classify project KAS updates without writing")
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
 	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
-	fmt.Fprintln(w, "  workflow-trigger  Render dispatch packets for an explicit KAH workflow")
+	fmt.Fprintln(w, "  workflow-trigger  Render dispatch packets for an explicit or selector-matched KAH workflow")
 	fmt.Fprintln(w, "  uninstall  Plan project-suite removal without writing")
 	fmt.Fprintln(w, "  version  Print CLI version information")
 	fmt.Fprintln(w)
@@ -1022,6 +1043,20 @@ func envValue(env map[string]string, key string) string {
 		return env[key]
 	}
 	return os.Getenv(key)
+}
+
+func splitFlagList(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	items := []string{}
+	for _, part := range strings.Split(value, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			items = append(items, part)
+		}
+	}
+	return items
 }
 
 func unsupportedProjectInstallWriteFlag(argv []string) string {

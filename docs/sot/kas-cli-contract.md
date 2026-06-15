@@ -66,6 +66,29 @@ WFLOW-002 node-contract input is JSON-only:
 
 Every ready node must match one contract by `workflow_id` and `node_id`; missing or invalid source/ref, missing KAH workflow capability, KAH validation failure, and missing ready-node contracts fail closed with JSON and no partial packets. `ok:true/status:no_ready_nodes` is the successful no-packet state. Selector search and the full node-contract registry are WFLOW-003 deferrals. Custom workflow creation, dynamic node generation, thin trigger scaffolding, retry/rollback automation, arbitrary webhook runtime, automatic backend/agent fallback, direct KAH state writes, KAB graph authority, and Hermes profile/provider/gateway/auth/token/model mutation are outside WFLOW-002 and remain deferred.
 
+WFLOW-003 extends `workflow-trigger` with deterministic selector mode:
+
+```text
+kkachi-agent-skills workflow-trigger --project <path> --selector-registry <path> --task-class <class> [--labels <csv>] [--changed-surfaces <csv>] [--risk <level>] [--required-agent <csv>] [--required-capability <csv>] [--run <run-id>] [--instance-id <id>] --json
+```
+
+Selector mode reads `kas-task-dag-workflow-registry/v1` YAML from the explicit
+`--selector-registry` path. The shipped registry lives at
+`registries/task-dag-workflow-registry.yaml`. It
+evaluates only deterministic predicates and returns `selector_no_match` for
+zero candidates, `selector_ambiguous` for multiple candidates, and
+`selector_matched` only for exactly one candidate. Zero and multiple candidate
+states must not call KAH workflow instance commands. Combining selector inputs
+with explicit `--workflow-id` or `--node-contract-source` fails closed with
+`selector_explicit_mode_conflict`; there is no choose-first, scoring, ranking,
+LLM tie-break, backend fallback, or agent fallback behavior.
+
+Selector dispatch packets include selector registry path/checksum, selector
+match readback, task class, labels, changed surfaces, required capabilities,
+`completion_authority:kah_only`, `stage1_direct_codex_is_kab_native_codex:false`,
+and `direct_kah_state_write:false`. KAS may render dispatch packets only; KAH
+remains the authority for node state transitions and completion.
+
 KAH remains the deterministic project-local state/evidence layer and currently advertises `install_command=false`. Therefore KAS owns this profile-scoped list/install/doctor surface; KAH must not be described as the skill installer.
 
 ## 2. SOT basis

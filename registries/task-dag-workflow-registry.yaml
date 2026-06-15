@@ -1,0 +1,36 @@
+version: kas-task-dag-workflow-registry/v1
+workflows:
+  - workflow_id: development-default
+    workflow_path: .kkachi/workflows/development-default.yaml
+    selector:
+      task_classes: [development]
+      labels_any: []
+      labels_all: []
+      changed_surfaces_any: [code, tests, docs]
+      risk_levels: []
+      required_agents_all: []
+      required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]
+    fallback_policy: none_fail_closed
+node_contracts:
+  - workflow_id: development-default
+    node_id: plan
+    task_class: development
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-contract.yaml]
+    expected_artifacts: [plan.md, test-spec.md]
+    prompt_ref: skills/kkachi-plan/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+  - workflow_id: development-default
+    node_id: implement
+    task_class: development
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-contract.yaml, plan.md]
+    expected_artifacts: [source-diff, test-output]
+    prompt_ref: skills/kkachi-implement/SKILL.md
+    approval_required: true
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence

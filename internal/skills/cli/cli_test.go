@@ -591,6 +591,60 @@ func TestWorkflowTriggerCLIJSONSuccessAndBlockerRouting(t *testing.T) {
 	}
 }
 
+func TestWorkflowTriggerCLISelectorRegistrySuccess(t *testing.T) {
+	project := t.TempDir()
+	registry := filepath.Join(project, "workflow-registry.yaml")
+	if err := os.WriteFile(registry, []byte(`version: kas-task-dag-workflow-registry/v1
+workflows:
+  - workflow_id: demo
+    workflow_path: .kkachi/workflows/demo.yaml
+    selector:
+      task_classes: [development]
+      labels_any: []
+      labels_all: []
+      changed_surfaces_any: [code]
+      risk_levels: []
+      required_agents_all: []
+      required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]
+    fallback_policy: none_fail_closed
+node_contracts:
+  - workflow_id: demo
+    node_id: setup
+    task_class: development
+    owner_role: implementer_backend
+    execution_lane: direct_kas_skill
+    required_inputs: [task-contract.yaml]
+    expected_artifacts: [artifacts/setup.md]
+    prompt_ref: skills/kkachi-implement/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: make test
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	installCLIWorkflowTriggerFakeKAH(t, true)
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"workflow-trigger", "--project", project, "--selector-registry", registry, "--task-class", "development", "--changed-surfaces", "code", "--required-capability", "task_dag_schema_validation,workflow_instance_state", "--run", "run-20260615T010203Z-abcdef123456", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("selector workflow trigger failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["workflow_id"] != "demo" || payload["direct_kah_state_write"] != false {
+		t.Fatalf("unexpected selector payload: %+v", payload)
+	}
+	selectorMatch := payload["selector_match"].(map[string]any)
+	if selectorMatch["status"] != "selector_matched" || selectorMatch["workflow_id"] != "demo" {
+		t.Fatalf("missing selector match readback: %+v", payload)
+	}
+	packet := payload["dispatch_packets"].([]any)[0].(map[string]any)
+	if packet["selector_registry_checksum"] == "" || packet["completion_authority"] != "kah_only" || packet["stage1_direct_codex_is_kab_native_codex"] != false {
+		t.Fatalf("missing packet registry/authority readback: %+v", packet)
+	}
+}
+
 func TestDoctorWorkflowGraphJSONAndFlagValidation(t *testing.T) {
 	installCLITestFakeKAH(t)
 	project := t.TempDir()
