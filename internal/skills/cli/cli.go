@@ -16,6 +16,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kasstate"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowtrigger"
 )
 
 var installPromptInput io.Reader = os.Stdin
@@ -36,7 +37,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, uninstall, or version command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, workflow-trigger, uninstall, or version command", "", false, "")
 	}
 	if isVersionArg(argv[0]) {
 		return runVersion(argv[1:], stdout, stderr)
@@ -56,6 +57,8 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runDoctor(argv[1:], stdout, stderr, env)
 	case "repair":
 		return runRepair(argv[1:], stdout, stderr, env)
+	case "workflow-trigger":
+		return runWorkflowTrigger(argv[1:], stdout, stderr, env)
 	case "uninstall":
 		return runUninstall(argv[1:], stdout, stderr, env)
 	case "version":
@@ -69,7 +72,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 	case "migrate-project-kas":
 		return runMigrateProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
 	}
 }
 
@@ -533,6 +536,37 @@ func runWorkflowGraphRepair(repo string, project string, propose bool, reason st
 	})
 }
 
+func runWorkflowTrigger(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("workflow-trigger", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	project := fs.String("project", "", "project path")
+	workflowID := fs.String("workflow-id", "", "explicit workflow id")
+	nodeContractSource := fs.String("node-contract-source", "", "explicit JSON node-contract source path")
+	nodeContractRef := fs.String("node-contract-ref", "", "optional node-contract source ref")
+	runID := fs.String("run", "", "KAH run id for workflow create")
+	instanceID := fs.String("instance-id", "", "existing KAH workflow instance id to resume")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "workflow-trigger does not accept positional arguments", "workflow-trigger", *jsonOutput, "Rerun with workflow-trigger --project <path> --workflow-id <id> --node-contract-source <path> --run <run-id> --json.")
+	}
+	result, err := workflowtrigger.Trigger(workflowtrigger.Options{Project: *project, WorkflowID: *workflowID, NodeContractSource: *nodeContractSource, NodeContractRef: *nodeContractRef, RunID: *runID, InstanceID: *instanceID})
+	if err != nil {
+		return emitError(stderr, "workflow_trigger_failed", err.Error(), "workflow-trigger", *jsonOutput, "")
+	}
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return workflowtrigger.RenderHuman(result)
+	})
+}
+
 func runUninstall(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
 	fs := flag.NewFlagSet("uninstall", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -929,6 +963,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  update   Classify project KAS updates without writing")
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
 	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
+	fmt.Fprintln(w, "  workflow-trigger  Render dispatch packets for an explicit KAH workflow")
 	fmt.Fprintln(w, "  uninstall  Plan project-suite removal without writing")
 	fmt.Fprintln(w, "  version  Print CLI version information")
 	fmt.Fprintln(w)

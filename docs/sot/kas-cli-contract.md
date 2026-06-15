@@ -33,6 +33,39 @@ GRSYNC-003 extends `repair` with a separate workflow graph mode. `repair --proje
 
 `repair --project <path> --workflow-graph --apply-proposal <proposal-id> --approval <approval-ref> --json` is the safer approved equivalent for graph apply. It does not use project-suite lifecycle `--apply dry-run:sha256:<hash>` and cannot be combined with project-suite repair flags such as `--profile`, `--dry-run`, `--approve`, `--apply`, `--source-pack`, or `--profile-root`. Apply mode reruns doctor and full KAH graph capability preflight, calls only KAH `graph apply --proposal <proposal-id> --approval <approval-ref> --json`, then reruns KAH validate/explain. JSON reports `mode: workflow_graph_repair_apply`, proposal id, approval ref, audit/backup/recovery fields returned by KAH, post-apply checksum/version, validation/explain states, diagnostics, and next action.
 
+WFLOW-002 extends the CLI with a generic explicit task-DAG trigger:
+
+```text
+kkachi-agent-skills workflow-trigger --project <path> --workflow-id <id> --node-contract-source <path> [--node-contract-ref <ref>] [--run <run-id>] [--instance-id <id>] --json
+```
+
+This command supports only explicit `workflow_id` plus explicit JSON node-contract source/ref. KAS resolves the workflow id to `.kkachi/workflows/<workflow-id>.yaml`, preflights KAH with `--version`, `capabilities --json`, and `workflow --help`, requires KAH workflow subcommands `validate`, `explain`, `create`, `show`, `ready`, and `node`, validates/explains the workflow through KAH, creates with `workflow create --run <run-id> --file <workflow.yaml>` or resumes with `workflow show --run <instance-id>`, reads ready nodes with `workflow ready --run <id>`, and renders dispatch packets only. The result always includes `direct_kah_state_write:false`; KAS must not directly edit KAH workflow instance files or complete/block/start nodes.
+
+WFLOW-002 node-contract input is JSON-only:
+
+```json
+{
+  "schema_version": "kas-node-contracts/v1",
+  "ref": "optional-source-ref",
+  "contracts": [
+    {
+      "workflow_id": "demo",
+      "node_id": "setup",
+      "owner_role": "implementer_backend",
+      "execution_lane": "direct_kas_skill",
+      "required_inputs": ["task-contract.yaml"],
+      "expected_artifacts": ["artifacts/setup.md"],
+      "prompt_ref": "skills/kkachi-implement/SKILL.md",
+      "approval_required": true,
+      "fallback_policy": "none_fail_closed",
+      "verification_gate": "make test"
+    }
+  ]
+}
+```
+
+Every ready node must match one contract by `workflow_id` and `node_id`; missing or invalid source/ref, missing KAH workflow capability, KAH validation failure, and missing ready-node contracts fail closed with JSON and no partial packets. `ok:true/status:no_ready_nodes` is the successful no-packet state. Selector search and the full node-contract registry are WFLOW-003 deferrals. Custom workflow creation, dynamic node generation, thin trigger scaffolding, retry/rollback automation, arbitrary webhook runtime, automatic backend/agent fallback, direct KAH state writes, KAB graph authority, and Hermes profile/provider/gateway/auth/token/model mutation are outside WFLOW-002 and remain deferred.
+
 KAH remains the deterministic project-local state/evidence layer and currently advertises `install_command=false`. Therefore KAS owns this profile-scoped list/install/doctor surface; KAH must not be described as the skill installer.
 
 ## 2. SOT basis

@@ -261,6 +261,67 @@ esac
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
+func installCLIWorkflowTriggerFakeKAH(t *testing.T, workflowSupported bool) {
+	t.Helper()
+	binDir := t.TempDir()
+	helper := filepath.Join(binDir, "kkachi-agent-helper")
+	script := `#!/bin/sh
+case "$*" in
+  "--version")
+    echo "kkachi-agent-helper 0.1.10"
+    ;;
+  "capabilities --json")
+    if [ "` + boolShellValue(workflowSupported) + `" = "1" ]; then
+      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true}}'
+    else
+      echo '{"command_groups":[{"name":"graph","status":"supported","subcommands":["validate"]}],"compatibility_flags":{"workflow_instance_state":false}}'
+    fi
+    ;;
+  "workflow --help")
+    if [ "` + boolShellValue(workflowSupported) + `" = "1" ]; then
+      echo "Subcommands:"
+      echo "  validate"
+      echo "  explain"
+      echo "  create"
+      echo "  show"
+      echo "  ready"
+      echo "  node"
+    else
+      echo "unknown help topic" >&2
+      exit 2
+    fi
+    ;;
+  "workflow validate --file .kkachi/workflows/demo.yaml --json")
+    echo '{"ok":true,"status":"valid","workflow_id":"demo","schema_version":"task-dag/v1"}'
+    ;;
+  "workflow explain --file .kkachi/workflows/demo.yaml --json")
+    echo '{"ok":true,"status":"valid","workflow_id":"demo","schema_version":"task-dag/v1"}'
+    ;;
+  "workflow create --run run-20260615T010203Z-abcdef123456 --file .kkachi/workflows/demo.yaml --json")
+    echo '{"ok":true,"status":"pass","reason":"workflow_instance_created","run_id":"run-20260615T010203Z-abcdef123456","instance":{"version":"workflow-instance/v1","run_id":"run-20260615T010203Z-abcdef123456","workflow_id":"demo","schema_version":"task-dag/v1","source_path":".kkachi/workflows/demo.yaml","revision":1,"nodes":[{"id":"setup","depends_on":[],"join":"all_of","required_outputs":["artifacts/setup.md"],"state":"pending"}]},"ready":[{"id":"setup","reasons":["dependencies_satisfied","state_pending"]}]}'
+    ;;
+  "workflow ready --run run-20260615T010203Z-abcdef123456 --json")
+    echo '{"ok":true,"status":"pass","reason":"workflow_ready_nodes_computed","run_id":"run-20260615T010203Z-abcdef123456","instance":{"version":"workflow-instance/v1","run_id":"run-20260615T010203Z-abcdef123456","workflow_id":"demo","schema_version":"task-dag/v1","source_path":".kkachi/workflows/demo.yaml","revision":1,"nodes":[{"id":"setup","depends_on":[],"join":"all_of","required_outputs":["artifacts/setup.md"],"state":"pending"}]},"ready":[{"id":"setup","reasons":["dependencies_satisfied","state_pending"]}]}'
+    ;;
+  *)
+    echo "unexpected kkachi-agent-helper call: $*" >&2
+    exit 9
+    ;;
+esac
+`
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func boolShellValue(value bool) string {
+	if value {
+		return "1"
+	}
+	return "0"
+}
+
 func TestPublicLifecycleFailClosedHumanErrorsAreEnglish(t *testing.T) {
 	for name, args := range map[string][]string{
 		"update-missing-dry-run": {
@@ -434,6 +495,100 @@ func TestRepairWorkflowGraphRejectsProjectSuiteFlags(t *testing.T) {
 		t.Fatalf("expected mixed workflow/project repair flags to fail, got %d", code)
 	}
 	assertCLIErrorCode(t, stderr.Bytes(), "workflow_graph_repair_mode_ambiguous")
+}
+
+func TestWorkflowTriggerCLIRequiresExplicitInputs(t *testing.T) {
+	for name, tc := range map[string]struct {
+		args     []string
+		wantCode string
+	}{
+		"workflow-id": {
+			args:     []string{"workflow-trigger", "--project", t.TempDir(), "--node-contract-source", "contracts.json", "--run", "run-20260615T010203Z-abcdef123456", "--json"},
+			wantCode: "workflow_id_required",
+		},
+		"node-contract-source": {
+			args:     []string{"workflow-trigger", "--project", t.TempDir(), "--workflow-id", "demo", "--run", "run-20260615T010203Z-abcdef123456", "--json"},
+			wantCode: "node_contract_source_required",
+		},
+		"run-or-instance": {
+			args:     []string{"workflow-trigger", "--project", t.TempDir(), "--workflow-id", "demo", "--node-contract-source", "contracts.json", "--json"},
+			wantCode: "run_or_instance_required",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := Main(tc.args, &stdout, &stderr, nil)
+			if code != 2 {
+				t.Fatalf("expected exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+			}
+			assertCLIErrorCode(t, stderr.Bytes(), tc.wantCode)
+		})
+	}
+}
+
+func TestWorkflowTriggerCLIJSONSuccessAndBlockerRouting(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(project, "node-contracts.json")
+	if err := os.WriteFile(source, []byte(`{
+  "schema_version": "kas-node-contracts/v1",
+  "contracts": [
+    {
+      "workflow_id": "demo",
+      "node_id": "setup",
+      "owner_role": "implementer_backend",
+      "execution_lane": "direct_kas_skill",
+      "required_inputs": ["task-contract.yaml"],
+      "expected_artifacts": ["artifacts/setup.md"],
+      "prompt_ref": "skills/kkachi-implement/SKILL.md",
+      "approval_required": false,
+      "fallback_policy": "none_fail_closed",
+      "verification_gate": "make test"
+    }
+  ]
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	installCLIWorkflowTriggerFakeKAH(t, true)
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"workflow-trigger", "--project", project, "--workflow-id", "demo", "--node-contract-source", source, "--run", "run-20260615T010203Z-abcdef123456", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("workflow trigger failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected success JSON on stdout only, got stderr=%q", stderr.String())
+	}
+	var success map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &success); err != nil {
+		t.Fatal(err)
+	}
+	if success["ok"] != true || success["command"] != "workflow-trigger" || success["status"] != "dispatch_packets_rendered" || success["direct_kah_state_write"] != false {
+		t.Fatalf("unexpected success payload: %+v", success)
+	}
+	if packets := success["dispatch_packets"].([]any); len(packets) != 1 || packets[0].(map[string]any)["node_id"] != "setup" {
+		t.Fatalf("missing dispatch packet: %+v", success)
+	}
+
+	installCLIWorkflowTriggerFakeKAH(t, false)
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"workflow-trigger", "--project", project, "--workflow-id", "demo", "--node-contract-source", source, "--run", "run-20260615T010203Z-abcdef123456", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected capability blocker exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected blocker JSON on stderr only, got stdout=%q", stdout.String())
+	}
+	var blocked map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &blocked); err != nil {
+		t.Fatal(err)
+	}
+	if blocked["ok"] != false || blocked["status"] != "blocked_missing_kah_workflow_capability" || blocked["direct_kah_state_write"] != false {
+		t.Fatalf("unexpected blocker payload: %+v", blocked)
+	}
+	if packets, ok := blocked["dispatch_packets"].([]any); !ok || len(packets) != 0 {
+		t.Fatalf("blocker must not include dispatch packets: %+v", blocked)
+	}
 }
 
 func TestDoctorWorkflowGraphJSONAndFlagValidation(t *testing.T) {

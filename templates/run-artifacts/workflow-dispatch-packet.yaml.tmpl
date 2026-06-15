@@ -1,0 +1,18 @@
+schema_version: kas-workflow-dispatch-packet/v1
+workflow_id: "{{workflow_id}}"
+instance_id: "{{instance_id}}"
+node_id: "{{node_id}}"
+owner_role: "{{owner_role}}"
+execution_lane: "{{execution_lane}}"
+required_inputs:
+  - "{{required_input}}"
+expected_artifacts:
+  - "{{expected_artifact}}"
+prompt_ref: "{{prompt_ref}}"
+approval_required: {{approval_required}}
+fallback_policy: "none_fail_closed"
+verification_gate: "{{verification_gate}}"
+node_contract_source: "{{node_contract_source}}"
+node_contract_ref: "{{node_contract_ref}}"
+source_checksum: "{{source_checksum}}"
+direct_kah_state_write: false
