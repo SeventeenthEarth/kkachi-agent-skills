@@ -90,9 +90,8 @@ gate integration, and node-contract registry evidence.
 
 Current source-built KAH DAGSM-003 evidence advertises `workflow catalog
 validate/explain` and node-contract registry diagnostics. It does not advertise
-a reviewed workflow catalog proposal/apply command mapping. Installed KAH
-`0.1.9` lacks the workflow command group entirely. Therefore runtime apply
-stays fail-closed until the effective helper advertises a reviewed catalog
+a reviewed workflow catalog proposal/apply command mapping. KAH v0.1.10 is the first release line for reviewed workflow catalog proposal/apply. Therefore runtime apply
+stays fail-closed until the effective helper advertises `workflow_catalog_proposal_apply=true` and the catalog
 proposal/apply surface. KAS must not use direct KAH state writes as a fallback.
 
 ## Fail-Closed Codes

@@ -58,9 +58,9 @@ The dry-run emits a stable `kas-workflow-promote-packet/v1` machine packet with:
   generated content, trigger plan, capability evidence, base checksums,
   diagnostics/conflicts, and no-write evidence.
 
-Apply recomputes the approval hash before any apply decision. While reviewed
-DAGSM-006 workflow catalog proposal/apply support is absent, correct-hash apply
-must fail closed with no writes. KAS must not direct-write
+Apply recomputes the approval hash before any apply decision. Persistent apply requires effective KAH DAGSM-006 / v0.1.10 workflow catalog
+proposal/apply support and `workflow_catalog_proposal_apply=true` evidence; otherwise
+correct-hash apply must fail closed with no writes. KAS must not direct-write
 `.kkachi/workflows/*`, `.kkachi/workflow-catalog.yaml`,
 `.kkachi-workflow.yaml`, profile files, KAH state, KAB state, auth/token,
 provider/gateway/model config, or fallback backend selection.

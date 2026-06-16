@@ -85,7 +85,7 @@ func TestWFLOW008RunLocalMaterializationContractIsDocumentedAndBounded(t *testin
 			"WFLOW-004 approval hashes",
 			"official KAB GLM Octo accepted",
 			"No `.kkachi-workflow.yaml`, `.kkachi/workflow-catalog.yaml`, or `.kkachi/workflows/*` auto-write",
-			"WFLOW-009 promotion/apply remains deferred",
+			"WFLOW-009 promotion/apply remains explicit, approval-gated",
 		},
 	}
 	for rel, needles := range cases {

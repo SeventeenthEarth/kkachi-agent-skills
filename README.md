@@ -11,9 +11,9 @@ backend execution, automated review-by-different-tool transport, KAB plan
 lifecycle, or bridge evidence, KHS must select a KAB backend lane, render the
 backend-specific prompt, call KAB, and preserve KAB runtime evidence.
 
-Maturity note: KAS is now in the post-KAH 0.1.4 enablement lane. It is still an
-early skill/process pack rather than a final polished product, but KAH graph and
-configurable-feedback substrates are capability-evidenced. Real Hermes/Kkachi
+Maturity note: KAS v0.1.4 completes the WFLOW task-DAG workflow release lane. It remains an
+early skill/process pack rather than a final polished product, but KAH graph,
+configurable-feedback, and workflow catalog promotion substrates are capability-evidenced. Real Hermes/Kkachi
 runs should mature KAS through captured evidence, project overlays, prompt/phase
 skill references, reusable scripts, and the existing `kkachi-improve` /
 improvement-promotion rules.
@@ -172,8 +172,8 @@ evidence, emits `kas-workflow-promote-packet/v1`, and binds the approval hash to
 source provenance/checksums, target paths, generated content, trigger plan,
 KAS/KAH capability evidence, base checksums, changed paths,
 diagnostics/conflicts, and no-write evidence. `workflow-promote --apply`
-recomputes the hash but remains fail-closed while reviewed DAGSM-006 catalog
-proposal/apply support is absent; KAS does not direct-write `.kkachi/workflows/*`,
+recomputes the hash and requires effective KAH DAGSM-006 / v0.1.10 catalog
+proposal/apply support before persistent writes; KAS does not direct-write `.kkachi/workflows/*`,
 `.kkachi/workflow-catalog.yaml`, `.kkachi-workflow.yaml`, profile files, KAH
 state, KAB state, auth/token/provider/gateway/model config, or fallback backend
 selection; no fallback backend selection is introduced.

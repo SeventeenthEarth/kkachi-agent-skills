@@ -56,7 +56,7 @@ func TestRoleAwareProjectSuiteDocsRegistrationAndRoadmap(t *testing.T) {
 		"unknown-role fail-closed fixtures",
 		"missing/unknown `suite_role`",
 		"KASROLE is the KAS v0.1.3 release baseline",
-		"WFLOW epic completion target is KAS v0.1.4",
+		"WFLOW epic completion is the KAS v0.1.4 release baseline",
 		"WFLOW startup must still run effective installed-binary/profile doctor evidence",
 	})
 	requireRoadmapTaskStatus(t, "KASROLE-001", "Completed")

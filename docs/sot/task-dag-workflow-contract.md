@@ -3,7 +3,7 @@
 Date: 2026-06-12
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record pending
-Status: current planning SOT for KAS `WFLOW` task-DAG workflow workstream; WFLOW-001..004 define the initial task-DAG workflow substrate, and WFLOW-005+ extends that substrate toward bundle workflow selection and run-local ephemeral workflow materialization; not implementation behavior until roadmap tasks pass evidence and review gates
+Status: current SOT for KAS `WFLOW` task-DAG workflow workstream; WFLOW-001..009 are implemented and make up the KAS v0.1.4 workflow release baseline, with persistent promotion dependent on effective KAH DAGSM-006 / v0.1.10 capability evidence
 Authority level: KAS-side planning authority for task-DAG workflow policy, selector rules, node/agent contracts, generic trigger skills, and custom workflow skill scaffolding
 Scope: `kkachi-agent-skills` docs, registries, templates, skills, and CLI planning; no KAH deterministic implementation claim, no KAB runtime change, no Hermes profile/provider/gateway/auth/token/model mutation, and no automatic workflow execution without explicit evidence/approval gates
 Related docs: `docs/sot/workflow-graph-integration.md`, `docs/sot/graph-workflow-sync-compatibility.md`, `docs/sot/graph-template-registry.md`, `docs/sot/phase-orchestration-policy.md`, `docs/roadmap.md`, KAH `docs/sot/task-dag-state-machine.md`
@@ -211,9 +211,10 @@ evidence, and a deterministic approval hash.
 The WFLOW-009 approval hash binds source materialization provenance, source
 checksums, target paths, generated content, trigger plan, capability evidence,
 base checksums, changed paths, diagnostics/conflicts, and no-write evidence.
-Apply recomputes the hash before any apply decision. Until DAGSM-006 reviewed
-workflow catalog proposal/apply support exists, correct-hash apply remains
-non-authoritative and fail-closed; it must not direct-write
+Apply recomputes the hash before any apply decision. Persistent project-local
+apply requires effective KAH DAGSM-006 / v0.1.10 `workflow catalog propose/apply`
+and `workflow_catalog_proposal_apply=true` evidence; without that evidence, apply remains
+non-authoritative and fail-closed, and it must not direct-write
 `.kkachi/workflows/*`, `.kkachi/workflow-catalog.yaml`, `.kkachi-workflow.yaml`,
 profile files, KAH state, KAB state, auth/token/provider/gateway/model config,
 or fallback backend selection. Generated evidence preserves
