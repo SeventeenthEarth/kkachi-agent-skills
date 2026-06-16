@@ -3,7 +3,7 @@
 Date: 2026-06-12
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record pending
-Status: planning SOT for KAS `WFLOW` task-DAG workflow workstream; KASROLE v0.1.3 is the prerequisite release baseline and WFLOW completion targets KAS v0.1.4; not implementation behavior until roadmap tasks pass evidence and review gates
+Status: current planning SOT for KAS `WFLOW` task-DAG workflow workstream; WFLOW-001..004 define the initial task-DAG workflow substrate, and WFLOW-005+ extends that substrate toward bundle workflow selection and run-local ephemeral workflow materialization; not implementation behavior until roadmap tasks pass evidence and review gates
 Authority level: KAS-side planning authority for task-DAG workflow policy, selector rules, node/agent contracts, generic trigger skills, and custom workflow skill scaffolding
 Scope: `kkachi-agent-skills` docs, registries, templates, skills, and CLI planning; no KAH deterministic implementation claim, no KAB runtime change, no Hermes profile/provider/gateway/auth/token/model mutation, and no automatic workflow execution without explicit evidence/approval gates
 Related docs: `docs/sot/workflow-graph-integration.md`, `docs/sot/graph-workflow-sync-compatibility.md`, `docs/sot/graph-template-registry.md`, `docs/sot/phase-orchestration-policy.md`, `docs/roadmap.md`, KAH `docs/sot/task-dag-state-machine.md`
@@ -11,12 +11,15 @@ Evidence/source paths:
 - Master direction in 17번째 지구 Discord `#kas` thread `1514986770456903781` on 2026-06-12: support project-local multiple task DAGs, KAH order enforcement, KAS node-level agent/role contracts, generic and thin trigger skills, and a KAS custom workflow creator for user-specific scenarios.
 - `WFLOW-001` is the logical cross-repo planning acceptance gate: the KAS SOT/roadmap/docs registration and the paired KAH `DAGSM` planning SOT/docs registration may be committed as `WFLOW-001` evidence. This does not complete or implement KAH `DAGSM-001`; `DAGSM-001` remains the subsequent KAH schema-validation/explain implementation task.
 - Release-transition direction in 17번째 지구 Discord `#kah` thread `1515219219002818610` on 2026-06-14: KASROLE is complete at KAS v0.1.3, and WFLOW epic completion should target KAS v0.1.4.
+- Master direction in 17번째 지구 Discord `#kas` thread `1516002725689819209` on 2026-06-16: extend the existing WFLOW/DAGSM sequence instead of creating a separate BWFLOW axis; record WFLOW-005 and DAGSM-004 as paired SOT-alignment tasks before implementation; make run-local ephemeral workflows the default and promote to project-local custom workflows only by explicit approval.
 
 ## Decision summary
 
 KAS will define the policy and operator-facing contract for task-DAG workflows while KAH remains the deterministic DAG state/evidence/order enforcer. The task-DAG workstream extends existing project workflow graph concepts; it does not replace `.kkachi-workflow.yaml`, `.kkachi/runs/<run_id>/phase-plan.yaml`, KAH graph proposal/apply evidence, KAB backend/session evidence, or Kanban as the long-lived team-member work bus.
 
 A project may support multiple task DAGs. KAS must let an operator either select a workflow explicitly or use deterministic selector rules to choose a single eligible workflow. If zero or multiple workflows match, KAS must fail closed and ask for an explicit workflow choice rather than letting an LLM silently pick the "best" graph.
+
+WFLOW-005 extends the SOT from substrate completion into the adoption layer: task classification should resolve to a standard bundle workflow when possible, and the default runtime shape for task-specific or custom workflows is run-local ephemeral materialization under `.kkachi/runs/<run_id>/...`. Project-local persistent workflow registration is a later explicit promotion path, not an install-time side effect and not a silent `.kkachi-workflow.yaml` or catalog write.
 
 ## Ownership boundary
 
@@ -34,21 +37,41 @@ Initial MVP planning uses these conceptual files. Exact paths may be refined by 
 
 | Artifact | Purpose | Owner |
 |---|---|---|
-| `.kkachi-workflow.yaml` or `.kkachi/workflow-catalog.yaml` | Project workflow catalog / active graph registry when KAH validates or applies it | KAS policy proposed through KAH validation/apply |
+| `.kkachi-workflow.yaml` or `.kkachi/workflow-catalog.yaml` | Project-local persistent workflow catalog / active graph registry when explicitly promoted or KAH validates/applies it; not the default path for bundle execution | KAS policy proposed through KAH validation/apply |
 | `.kkachi/workflows/<workflow-id>.yaml` | Task-DAG definition for one workflow | KAS template/policy, KAH validation |
-| `.kkachi/runs/<run_id>/workflow-instance.yaml` | Run-local task-DAG instance state | KAH |
-| `.kkachi/runs/<run_id>/node-state.yaml` | Node state, evidence refs, and gate status | KAH |
+| `.kkachi/runs/<run_id>/workflow.yaml` or equivalent run-local task-DAG file | Ephemeral per-run workflow materialized from a bundle or task-specific classification | KAS proposes content; KAH validates/creates the instance |
+| `.kkachi/runs/<run_id>/workflow-instance.json` | Run-local task-DAG instance state | KAH |
+| `.kkachi/runs/<run_id>/node-state.yaml` or equivalent node projection | Node state, evidence refs, and gate status | KAH |
 | `registries/task-dag-workflow-*.yaml` | KAS selector/node-contract metadata | KAS |
 | trigger skill `SKILL.md` | Operator entrypoint for generic or thin workflow starts | KAS / Hermes skill layer |
 
 KAS must not directly hand-edit KAH authoritative graph state as a fallback. KAS may generate complete candidate workflow/catalog files and ask KAH to validate, diff, propose, or apply them through the supported KAH command surface.
 
+## Bundle workflow and run-local ephemeral policy
+
+WFLOW-005 records the adoption-layer target before implementation. Standard bundle workflows are KAS-owned policy templates for common task classes; they are not KAH-selected behavior. The initial bundle vocabulary is:
+
+| Bundle workflow | Primary task class | Default posture |
+|---|---|---|
+| `development_full` | `development` | Full KAS/KAH development spine with plan, implementation, verification, docs, review, feedback handling, and final verification. |
+| `docs_only_light` | `docs_only` | Durable docs/SOT/roadmap shaping with docs validation and explicit skipped-phase reasons. |
+| `research_evidence_light` | `research_evidence` | Read-only evidence collection, source citation, and final report without implementation/test/optimize phases. |
+| `review_light` | `collaboration_review` | Read-only review or risk triage with preserved feedback evidence and no direct mutation. |
+| `bootstrap_config` | `bootstrap_config` | Repository/helper/profile/tooling setup with approval gates for unsafe or external mutations. |
+| `direct_report` | `simple_command_report` | Bounded command/status evidence and final report; normally outside KHS unless the master explicitly keeps it inside a run. |
+
+Classification-to-bundle routing must be deterministic and fail closed. If task classification is missing, ambiguous, or maps to more than one eligible bundle, KAS must ask for a narrowed task contract or explicit workflow choice. KAH must not classify the task, rank bundles, or choose the workflow.
+
+Run-local ephemeral workflow materialization is the default for bundle execution and one-off custom task flows. The generated DAG and node contracts live under `.kkachi/runs/<run_id>/...`, are validated by the effective KAH workflow command surface, and become authoritative for that run only after KAH creates the workflow instance. Promotion from a run-local workflow to a project-local persistent workflow requires a separate dry-run, hash-bound approval, KAH capability evidence, and later WFLOW/DAGSM promotion tasks.
+
 ## Workflow selection policy
 
-KAS supports two trigger modes:
+Through WFLOW-004, KAS supports two workflow selection modes:
 
 1. **Explicit workflow selection**: the operator or thin trigger skill names `workflow_id`.
 2. **Selector-based workflow selection**: KAS evaluates deterministic metadata such as task class, labels, changed surfaces, risk level, required agents, required capabilities, and project policy.
+
+WFLOW-005+ adds the planned adoption-layer route: deterministic task-classification-to-bundle routing. That route must resolve to exactly one standard bundle before run-local materialization; missing, no-match, or ambiguous classification fails closed, and KAH must not classify, rank, or choose bundles.
 
 Operator examples:
 
@@ -177,7 +200,7 @@ Mode output expectations:
 
 | Mode | Typical dry-run generated paths | Apply posture |
 |---|---|---|
-| `dag_only` | `.kkachi/workflows/<workflow-id>.yaml`, catalog/proposal packet, node-contract packet | KAH validate/propose/apply when authoritative graph state changes |
+| `dag_only` | For WFLOW-004 project-local proposal mode: `.kkachi/workflows/<workflow-id>.yaml`, catalog/proposal packet, node-contract packet. For WFLOW-005+ bundle or one-off defaults: run-local `.kkachi/runs/<run_id>/...` materialization until explicit WFLOW-009 promotion is approved. | KAH validate/propose/apply only when authoritative graph/catalog state changes and reviewed capability exists; otherwise proposal-only/fail-closed |
 | `thin_trigger` | `dag_only` outputs plus one `<project>-<workflow-id>-trigger/SKILL.md` wrapper plan | Requires skill-scope approval and regenerated hash |
 | `full_trigger` | `thin_trigger` outputs plus custom input/dispatch sections | Exceptional; requires explicit reason and color review |
 
@@ -192,13 +215,20 @@ The post-KASROLE workstream is intentionally linear until the substrate is prove
 5. `WFLOW-003` — KAS selector and node contract registry, dependent on `WFLOW-002` and `DAGSM-002`.
 6. `DAGSM-003` — KAH multi-DAG catalog, diagnostics, and gate integration, dependent on `DAGSM-002` and `WFLOW-003` metadata shape.
 7. `WFLOW-004` — KAS custom workflow creator and optional thin trigger generator, dependent on `WFLOW-003` and `DAGSM-003`.
+8. `WFLOW-005` plus KAH `DAGSM-004` — paired SOT/roadmap alignment for bundle workflows, deterministic classification routing, run-local ephemeral defaults, effective KAH capability evidence, and explicit promotion boundaries.
+9. `WFLOW-006` — implement standard bundle workflow registry/templates and KAH-compatible DAG rendering.
+10. `DAGSM-005` — harden effective workflow capability, installed-binary alignment, and KAS-generated DAG compatibility evidence where KAH support is required.
+11. `WFLOW-007` — implement task classification to bundle routing with no-match and ambiguity fail-closed behavior.
+12. `WFLOW-008` — implement run-local ephemeral workflow materialization and trigger support for run-local workflow files.
+13. `WFLOW-009` plus optional KAH `DAGSM-006` — implement explicit promotion from run-local workflows to project-local persistent workflows when proposal/apply support is approved.
 
-Implementation must not skip ahead from KAS trigger work to custom workflow generation before KAH node-state enforcement exists. `WFLOW-002` must stay explicit-workflow-only until `WFLOW-003` provides selector and registry contracts.
+Implementation must not skip ahead from KAS trigger work to custom workflow generation before KAH node-state enforcement exists. WFLOW-005 and DAGSM-004 are documentation/SOT alignment tasks only; they do not claim installed-runtime support, binary update, bundle implementation, classification automation, or project-local persistence.
 
 ## Non-goals and deferrals
 
 - No automatic KAH/KAS binary update.
-- No automatic graph apply from cron/CI.
+- No install-time bundle persistence or silent `.kkachi-workflow.yaml` / `.kkachi/workflow-catalog.yaml` write.
+- No automatic graph/catalog apply from cron/CI.
 - No arbitrary webhook runtime in the MVP.
 - No hidden fallback from one agent/backend to another.
 - No dynamic node generation during execution until a later approved design.
@@ -212,6 +242,7 @@ Implementation must not skip ahead from KAS trigger work to custom workflow gene
 Before KAS claims task-DAG workflow support:
 
 - KAH advertises the required DAG/FSM/catalog capabilities through current effective-binary evidence.
+- For bundle-routed/run-local task-DAG workflow support, KAS records the selected bundle, task class, classification reason, skipped-phase reasons, and run-local/persistent posture before workflow execution; for explicit workflow mode, KAS records the explicit workflow id/source and no-bundle reason instead.
 - KAS trigger and selector behavior has deterministic tests for explicit, unique, zero-match, and ambiguous workflow selection.
 - KAS node contracts preserve agent/role/backend boundaries and never complete nodes without KAH evidence.
 - Custom workflow creator defaults to dry-run, emits approval-hash-bound plans, and refuses direct `.kkachi-workflow.yaml` edit fallback.
