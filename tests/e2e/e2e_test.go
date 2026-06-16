@@ -164,6 +164,60 @@ esac
 	return binDir
 }
 
+func writeFakeKAHWorkflowCreate(t *testing.T, workflowCatalogSupported bool) string {
+	t.Helper()
+	binDir := t.TempDir()
+	helper := filepath.Join(binDir, "kkachi-agent-helper")
+	script := `#!/bin/sh
+case "$*" in
+  "--version")
+    if [ "` + boolShellValueE2E(workflowCatalogSupported) + `" = "1" ]; then
+      echo "kkachi-agent-helper 0.1.10-source"
+    else
+      echo "kkachi-agent-helper 0.1.9"
+    fi
+    ;;
+  "capabilities --json")
+    if [ "` + boolShellValueE2E(workflowCatalogSupported) + `" = "1" ]; then
+      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","catalog","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_catalog_diagnostics":true,"workflow_final_gate_integration":true,"workflow_node_contract_registry_evidence":true}}'
+    else
+      echo '{"command_groups":[{"name":"graph","status":"supported","subcommands":["validate"]}],"compatibility_flags":{"workflow_instance_state":false}}'
+    fi
+    ;;
+  "workflow --help")
+    if [ "` + boolShellValueE2E(workflowCatalogSupported) + `" = "1" ]; then
+      echo "workflow validate"
+      echo "workflow explain"
+      echo "workflow catalog validate"
+      echo "workflow catalog explain"
+      echo "workflow create"
+      echo "workflow show"
+      echo "workflow ready"
+      echo "workflow node"
+    else
+      echo "unknown help topic" >&2
+      exit 2
+    fi
+    ;;
+  *)
+    echo "unexpected kkachi-agent-helper call: $*" >&2
+    exit 9
+    ;;
+esac
+`
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return binDir
+}
+
+func boolShellValueE2E(value bool) string {
+	if value {
+		return "1"
+	}
+	return "0"
+}
+
 func fileHash(t *testing.T, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -305,6 +359,100 @@ func TestWorkflowGraphRepairProposalAndApplyE2E(t *testing.T) {
 	if applied["status"] != "applied" || applied["post_apply"].(map[string]any)["graph_checksum"] != "sha256:e2e-new" {
 		t.Fatalf("unexpected apply payload: %+v", applied)
 	}
+}
+
+func TestWorkflowCreateDryRunAndWrongHashE2ENoWrite(t *testing.T) {
+	binary := buildRootBinary(t)
+	fakeKAHBin := writeFakeKAHWorkflowCreate(t, true)
+	project := t.TempDir()
+	request := writeE2EWorkflowCreateRequest(t, project)
+	before := treeHash(t, project)
+
+	dryRun := exec.Command(binary, "workflow-create", "--project", project, "--workflow-id", "release-flow", "--mode", "thin_trigger", "--request", request, "--dry-run", "--json")
+	dryRun.Env = append(os.Environ(), "PATH="+fakeKAHBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, err := dryRun.CombinedOutput()
+	if err != nil {
+		t.Fatalf("workflow-create dry-run failed: %v\n%s", err, out)
+	}
+	if after := treeHash(t, project); after != before {
+		t.Fatalf("workflow-create dry-run mutated project tree: before=%s after=%s", before, after)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["status"] != "dry_run_ready" || payload["machine_packet"].(map[string]any)["approval_hash"] == "" {
+		t.Fatalf("unexpected workflow-create payload: %+v", payload)
+	}
+	wrong := exec.Command(binary, "workflow-create", "--project", project, "--workflow-id", "release-flow", "--mode", "thin_trigger", "--request", request, "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--json")
+	wrong.Env = append(os.Environ(), "PATH="+fakeKAHBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	wrongOut, err := wrong.CombinedOutput()
+	if err == nil {
+		t.Fatalf("wrong hash workflow-create unexpectedly succeeded: %s", wrongOut)
+	}
+	if after := treeHash(t, project); after != before {
+		t.Fatalf("wrong hash workflow-create mutated project tree: before=%s after=%s", before, after)
+	}
+	var wrongPayload map[string]any
+	if err := json.Unmarshal(wrongOut, &wrongPayload); err != nil {
+		t.Fatal(err)
+	}
+	if wrongPayload["status"] != "approval_plan_hash_mismatch" {
+		t.Fatalf("unexpected wrong-hash payload: %+v", wrongPayload)
+	}
+
+	missingKAH := writeFakeKAHWorkflowCreate(t, false)
+	blocked := exec.Command(binary, "workflow-create", "--project", project, "--workflow-id", "release-flow", "--mode", "dag_only", "--request", request, "--dry-run", "--json")
+	blocked.Env = append(os.Environ(), "PATH="+missingKAH+string(os.PathListSeparator)+os.Getenv("PATH"))
+	blockedOut, err := blocked.CombinedOutput()
+	if err == nil {
+		t.Fatalf("installed-KAH caveat dry-run unexpectedly succeeded: %s", blockedOut)
+	}
+	var blockedPayload map[string]any
+	if err := json.Unmarshal(blockedOut, &blockedPayload); err != nil {
+		t.Fatal(err)
+	}
+	if blockedPayload["status"] != "blocked_missing_kah_workflow_capability" || blockedPayload["approval_request"].(map[string]any)["required"] != false {
+		t.Fatalf("unexpected installed-KAH caveat payload: %+v", blockedPayload)
+	}
+}
+
+func writeE2EWorkflowCreateRequest(t *testing.T, dir string) string {
+	t.Helper()
+	path := filepath.Join(dir, "workflow-create-request.json")
+	content := `{
+  "schema_version": "kas-workflow-create-request/v1",
+  "selector_metadata": {
+    "task_class": "development",
+    "labels": ["release"],
+    "changed_surfaces": ["code"],
+    "required_capabilities": ["task_dag_schema_validation", "workflow_instance_state"]
+  },
+  "nodes": [
+    {
+      "node_id": "plan",
+      "task_class": "development",
+      "depends_on": [],
+      "required_outputs": ["artifacts/plan.md"],
+      "owner_role": "planner_backend",
+      "execution_lane": "stage1_direct_codex_app_server",
+      "required_inputs": ["task-contract.yaml"],
+      "expected_artifacts": ["plan.md"],
+      "prompt_ref": "skills/kkachi-plan/SKILL.md",
+      "approval_required": false,
+      "fallback_policy": "none_fail_closed",
+      "verification_gate": "kah_workflow_node_evidence"
+    }
+  ],
+  "trigger": {
+    "name": "release-flow-trigger",
+    "description": "Release flow trigger"
+  }
+}`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func TestRootInstalledBinaryUsesEmbeddedSourceOutsideRepo(t *testing.T) {

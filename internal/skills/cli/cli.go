@@ -16,6 +16,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kasstate"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowcreator"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowtrigger"
 )
 
@@ -37,7 +38,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, workflow-trigger, uninstall, or version command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, workflow-create, workflow-trigger, uninstall, or version command", "", false, "")
 	}
 	if isVersionArg(argv[0]) {
 		return runVersion(argv[1:], stdout, stderr)
@@ -57,6 +58,8 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runDoctor(argv[1:], stdout, stderr, env)
 	case "repair":
 		return runRepair(argv[1:], stdout, stderr, env)
+	case "workflow-create":
+		return runWorkflowCreate(argv[1:], stdout, stderr, env)
 	case "workflow-trigger":
 		return runWorkflowTrigger(argv[1:], stdout, stderr, env)
 	case "uninstall":
@@ -72,7 +75,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 	case "migrate-project-kas":
 		return runMigrateProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, workflow-create, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
 	}
 }
 
@@ -588,6 +591,51 @@ func runWorkflowTrigger(argv []string, stdout io.Writer, stderr io.Writer, env m
 	})
 }
 
+func runWorkflowCreate(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("workflow-create", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	project := fs.String("project", "", "project path")
+	workflowID := fs.String("workflow-id", "", "workflow id")
+	mode := fs.String("mode", "", "creator mode: dag_only, thin_trigger, or full_trigger")
+	request := fs.String("request", "", "workflow-create request JSON path")
+	fullTriggerReason := fs.String("full-trigger-reason", "", "required reason for full_trigger mode")
+	dryRun := fs.Bool("dry-run", false, "emit workflow-create packet without writing")
+	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash>")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "workflow-create does not accept positional arguments", "workflow-create", *jsonOutput, "Rerun with workflow-create --project <path> --workflow-id <id> --mode dag_only --request <json-path> --dry-run --json.")
+	}
+	if *dryRun && *apply != "" {
+		return emitError(stderr, "workflow_create_mode_ambiguous", "workflow-create accepts either --dry-run or --apply, not both.", "workflow-create", *jsonOutput, "Run dry-run first, then rerun with only --apply dry-run:sha256:<hash>.")
+	}
+	if !*dryRun && *apply == "" {
+		return emitError(stderr, "workflow_create_requires_dry_run_or_apply", "workflow-create requires --dry-run or --apply dry-run:sha256:<hash>.", "workflow-create", *jsonOutput, "Rerun with workflow-create --project <path> --workflow-id <id> --mode dag_only --request <json-path> --dry-run.")
+	}
+	opts := workflowcreator.Options{Project: *project, WorkflowID: *workflowID, Mode: *mode, RequestPath: *request, FullTriggerReason: *fullTriggerReason, Approval: *apply}
+	var result workflowcreator.Result
+	var err error
+	if *apply != "" {
+		result, err = workflowcreator.Apply(opts)
+	} else {
+		result, err = workflowcreator.BuildDryRun(opts)
+	}
+	if err != nil {
+		return emitError(stderr, "workflow_create_failed", err.Error(), "workflow-create", *jsonOutput, "")
+	}
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return workflowcreator.RenderHuman(result)
+	})
+}
+
 func runUninstall(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
 	fs := flag.NewFlagSet("uninstall", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -984,6 +1032,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  update   Classify project KAS updates without writing")
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
 	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
+	fmt.Fprintln(w, "  workflow-create   Plan custom task-DAG workflow candidates without writing")
 	fmt.Fprintln(w, "  workflow-trigger  Render dispatch packets for an explicit or selector-matched KAH workflow")
 	fmt.Fprintln(w, "  uninstall  Plan project-suite removal without writing")
 	fmt.Fprintln(w, "  version  Print CLI version information")

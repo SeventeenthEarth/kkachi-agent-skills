@@ -147,6 +147,32 @@ KAS should provide a custom workflow creator because KAS understands KAH capabil
 
 The creator must emit a dry-run packet containing generated paths, graph/catalog candidate, node contracts, trigger skill plan, selector metadata, KAH validation expectations, approval requirements, and an apply hash. Apply must recompute and match a canonical dry-run hash before writing. The canonical apply hash is `sha256` over a deterministic UTF-8 JSON payload with sorted keys and normalized relative paths; implementation may add a versioned canonicalization field, but must not use ambiguous prose or timestamp-dependent content as the hash input. The hash must bind target paths, candidate DAG/catalog content, node contracts, trigger plan, selector metadata, approval scope, effective KAH/KAS capability-version evidence, base graph/catalog checksums when present, changed-path set, conflicts/diagnostics, and no-write evidence. Any mismatch fails closed. The dry-run output must include both a compact operator summary and the full machine packet so 주군 can approve from stable deltas without reading raw hash inputs. It must not mutate installed profile skills, project `.kkachi` state, source KAS files, or KAH state without explicit approval evidence.
 
+WFLOW-004 implements this posture through
+`kkachi-agent-skills workflow-create --mode dag_only|thin_trigger|full_trigger`.
+The machine packet uses `kas-workflow-create-packet/v1`; approval uses
+`kas-workflow-create-approval/v1`; the canonical `sha256` binds command, mode,
+target paths, generated content, selector metadata, KAH/KAS capability evidence,
+base checksums, changed paths, conflicts/diagnostics, and no-write evidence.
+Fail-closed diagnostics include `approval_plan_hash_mismatch`,
+`unsafe_target_path`, `selector_metadata_invalid`,
+`workflow_creator_mode_unsupported`,
+`blocked_missing_kah_workflow_capability`,
+`blocked_missing_kah_workflow_catalog_capability`,
+`base_catalog_unreadable`, `base_checksum_mismatch`, and
+`generated_skill_validation_failed`.
+
+Installed KAH `0.1.9` lacks the workflow command group, so installed-runtime
+WFLOW-004 apply is non-approvable/fail-closed. Source-built DAGSM-003 evidence
+currently advertises workflow catalog diagnostics (`workflow catalog
+validate/explain`) and node-contract registry evidence, but not a reviewed
+workflow catalog proposal/apply command mapping. KAS must document that actual
+capability/help discovery and must not invent a direct write or apply fallback.
+This preserves no automatic fallback for ambiguous selectors, unsupported
+modes, missing capability, unsafe paths, hash mismatch, unreadable or mismatched
+base catalog evidence, generated-skill validation failure, profile/provider
+mutation, KAB graph authority, arbitrary webhook runtime, retry/rollback
+automation, and dynamic node generation during execution.
+
 Mode output expectations:
 
 | Mode | Typical dry-run generated paths | Apply posture |

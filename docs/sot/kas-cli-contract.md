@@ -89,6 +89,42 @@ match readback, task class, labels, changed surfaces, required capabilities,
 and `direct_kah_state_write:false`. KAS may render dispatch packets only; KAH
 remains the authority for node state transitions and completion.
 
+WFLOW-004 extends the CLI with a dry-run-first custom workflow creator:
+
+```text
+kkachi-agent-skills workflow-create --project <path> --workflow-id <id> --mode dag_only|thin_trigger|full_trigger --request <json-path> --dry-run --json
+kkachi-agent-skills workflow-create --project <path> --workflow-id <id> --mode dag_only|thin_trigger|full_trigger --request <json-path> --apply dry-run:sha256:<hash> --json
+```
+
+The request is JSON-only with schema `kas-workflow-create-request/v1`.
+`dag_only` emits candidate DAG, catalog, and node-contract registry content.
+`thin_trigger` adds a bounded trigger `SKILL.md` wrapper that delegates to
+`workflow-trigger`. `full_trigger` is exceptional and requires an explicit
+reason. Dry-run emits compact operator output plus a full machine packet with
+candidate paths, `target_paths`, `generated_content`, `selector_metadata`,
+KAS/KAH `capability_evidence`, base checksums, `changed_paths`,
+conflicts/diagnostics, no-write evidence, and an approval hash.
+
+The approval hash is canonical `sha256` over deterministic UTF-8 JSON with
+sorted keys and normalized project-relative paths. The hash scope is represented
+directly by command, mode, `target_paths`, `changed_paths`,
+`generated_content`, selector metadata, capability evidence, base checksums,
+conflicts/diagnostics, and no-write evidence. Apply recomputes that packet and
+fails closed on malformed, stale, mismatched, blocked, or non-approvable
+evidence before any write or KAH delegation.
+Missing, null, or empty `selector_metadata` fails closed with
+`selector_metadata_invalid` because workflow creation must not proceed without a
+deterministic selector contract.
+
+KAS generates candidate content and approval packets only. KAH remains
+authoritative for workflow/catalog validation, proposal, apply, audit, final
+gate integration, and node-contract registry evidence. Installed KAH `0.1.9` lacks the workflow command group. Source-built DAGSM-003 KAH currently
+advertises `workflow catalog validate/explain` and node-contract registry
+diagnostics, but does not advertise a reviewed workflow catalog proposal/apply command mapping. Therefore `workflow-create --apply` remains fail-closed with
+`blocked_missing_kah_workflow_catalog_capability` until an effective KAH binary
+advertises a reviewed apply surface. KAS must not direct-write `.kkachi`
+workflow state as a fallback.
+
 KAH remains the deterministic project-local state/evidence layer and currently advertises `install_command=false`. Therefore KAS owns this profile-scoped list/install/doctor surface; KAH must not be described as the skill installer.
 
 ## 2. SOT basis

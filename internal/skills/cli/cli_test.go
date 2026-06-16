@@ -315,6 +315,53 @@ esac
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
+func installCLIWorkflowCreateFakeKAH(t *testing.T, workflowCatalogSupported bool) {
+	t.Helper()
+	binDir := t.TempDir()
+	helper := filepath.Join(binDir, "kkachi-agent-helper")
+	script := `#!/bin/sh
+case "$*" in
+  "--version")
+    if [ "` + boolShellValue(workflowCatalogSupported) + `" = "1" ]; then
+      echo "kkachi-agent-helper 0.1.10-source"
+    else
+      echo "kkachi-agent-helper 0.1.9"
+    fi
+    ;;
+  "capabilities --json")
+    if [ "` + boolShellValue(workflowCatalogSupported) + `" = "1" ]; then
+      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","catalog","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_catalog_diagnostics":true,"workflow_final_gate_integration":true,"workflow_node_contract_registry_evidence":true}}'
+    else
+      echo '{"command_groups":[{"name":"graph","status":"supported","subcommands":["validate"]}],"compatibility_flags":{"workflow_instance_state":false}}'
+    fi
+    ;;
+  "workflow --help")
+    if [ "` + boolShellValue(workflowCatalogSupported) + `" = "1" ]; then
+      echo "workflow validate"
+      echo "workflow explain"
+      echo "workflow catalog validate"
+      echo "workflow catalog explain"
+      echo "workflow create"
+      echo "workflow show"
+      echo "workflow ready"
+      echo "workflow node"
+    else
+      echo "unknown help topic" >&2
+      exit 2
+    fi
+    ;;
+  *)
+    echo "unexpected kkachi-agent-helper call: $*" >&2
+    exit 9
+    ;;
+esac
+`
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
 func boolShellValue(value bool) string {
 	if value {
 		return "1"
@@ -643,6 +690,124 @@ node_contracts:
 	if packet["selector_registry_checksum"] == "" || packet["completion_authority"] != "kah_only" || packet["stage1_direct_codex_is_kab_native_codex"] != false {
 		t.Fatalf("missing packet registry/authority readback: %+v", packet)
 	}
+}
+
+func TestWorkflowCreateCLIDryRunAndFailClosedApply(t *testing.T) {
+	project := t.TempDir()
+	request := writeCLIWorkflowCreateRequest(t, project)
+	installCLIWorkflowCreateFakeKAH(t, true)
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"workflow-create", "--project", project, "--workflow-id", "release-flow", "--mode", "thin_trigger", "--request", request, "--dry-run", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("workflow-create dry-run failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected dry-run success on stdout only, got stderr=%q", stderr.String())
+	}
+	var dryRun map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &dryRun); err != nil {
+		t.Fatal(err)
+	}
+	if dryRun["ok"] != true || dryRun["command"] != "workflow-create" || dryRun["status"] != "dry_run_ready" || dryRun["direct_kah_state_write"] != false {
+		t.Fatalf("unexpected workflow-create dry-run payload: %+v", dryRun)
+	}
+	packet := dryRun["machine_packet"].(map[string]any)
+	if packet["approval_hash"] == "" || packet["generated_content"] == nil || packet["candidate_paths"] == nil {
+		t.Fatalf("dry-run missing machine packet evidence: %+v", dryRun)
+	}
+	noWrite := packet["no_write"].(map[string]any)
+	if noWrite["guaranteed"] != true || noWrite["project_write_count"] != float64(0) || noWrite["kah_state_write_count"] != float64(0) || noWrite["profile_write_count"] != float64(0) {
+		t.Fatalf("unexpected no-write evidence: %+v", noWrite)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".kkachi")); !os.IsNotExist(err) {
+		t.Fatalf("workflow-create dry-run created project state: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"workflow-create", "--project", project, "--workflow-id", "release-flow", "--mode", "thin_trigger", "--request", request, "--dry-run", "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected ambiguous mode failure, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "workflow_create_mode_ambiguous")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"workflow-create", "--project", project, "--workflow-id", "release-flow", "--mode", "thin_trigger", "--request", request, "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected wrong hash failure, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var wrongHash map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &wrongHash); err != nil {
+		t.Fatal(err)
+	}
+	if wrongHash["status"] != "approval_plan_hash_mismatch" || wrongHash["approval"].(map[string]any)["matched_current_plan"] != false {
+		t.Fatalf("unexpected wrong-hash payload: %+v", wrongHash)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".kkachi")); !os.IsNotExist(err) {
+		t.Fatalf("wrong hash created project state: %v", err)
+	}
+}
+
+func TestWorkflowCreateCLIInstalledKAHCaveatIsNonApprovable(t *testing.T) {
+	project := t.TempDir()
+	request := writeCLIWorkflowCreateRequest(t, project)
+	installCLIWorkflowCreateFakeKAH(t, false)
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"workflow-create", "--project", project, "--workflow-id", "release-flow", "--mode", "dag_only", "--request", request, "--dry-run", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected missing installed KAH workflow capability blocker, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var blocked map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &blocked); err != nil {
+		t.Fatal(err)
+	}
+	if blocked["status"] != "blocked_missing_kah_workflow_capability" || blocked["approval_request"].(map[string]any)["required"] != false {
+		t.Fatalf("unexpected installed-KAH caveat payload: %+v", blocked)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".kkachi")); !os.IsNotExist(err) {
+		t.Fatalf("blocked dry-run created project state: %v", err)
+	}
+}
+
+func writeCLIWorkflowCreateRequest(t *testing.T, dir string) string {
+	t.Helper()
+	path := filepath.Join(dir, "workflow-create-request.json")
+	content := `{
+  "schema_version": "kas-workflow-create-request/v1",
+  "selector_metadata": {
+    "task_class": "development",
+    "labels": ["release"],
+    "changed_surfaces": ["code"],
+    "required_capabilities": ["task_dag_schema_validation", "workflow_instance_state"]
+  },
+  "nodes": [
+    {
+      "node_id": "plan",
+      "task_class": "development",
+      "depends_on": [],
+      "required_outputs": ["artifacts/plan.md"],
+      "owner_role": "planner_backend",
+      "execution_lane": "stage1_direct_codex_app_server",
+      "required_inputs": ["task-contract.yaml"],
+      "expected_artifacts": ["plan.md"],
+      "prompt_ref": "skills/kkachi-plan/SKILL.md",
+      "approval_required": false,
+      "fallback_policy": "none_fail_closed",
+      "verification_gate": "kah_workflow_node_evidence"
+    }
+  ],
+  "trigger": {
+    "name": "release-flow-trigger",
+    "description": "Release flow trigger"
+  }
+}`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func TestDoctorWorkflowGraphJSONAndFlagValidation(t *testing.T) {

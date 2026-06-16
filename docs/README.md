@@ -104,6 +104,11 @@ A discussion note becomes SOT only after the decision is reflected in the releva
 - `.kkachi-workflow.yaml` is a project-level workflow graph file when backed by KAH graph evidence.
 - Graph workflow sync compatibility is owned by `sot/graph-workflow-sync-compatibility.md` and `registries/graph-workflow-sync-compatibility.yaml`: KAS v0.1.2 requires/recommends/tests KAH v0.1.9 for graph workflow sync, `doctor --project <path> --workflow-graph --json` classifies supportability without writes, first recommends KAH update when KAH is old, GRSYNC-003 implemented KAH proposal/apply orchestration for stale or broken graph repair through explicit `repair --workflow-graph --propose` and approval-gated `--apply-proposal`, and user-custom graphs remain accepted when they stay inside the supported KAS/KAH envelope.
 - Task-DAG workflow policy is planned by `sot/task-dag-workflow-contract.md`: KAS owns selector rules, node agent/role/backend contracts, trigger skills, and custom workflow scaffolding; KAH owns deterministic DAG validation, node state/order enforcement, evidence, diagnostics, and gates under the paired KAH `DAGSM` SOT.
+- WFLOW-004 custom workflow creation is exposed through `workflow-create` as
+  dry-run-first candidate packet generation for `dag_only`, `thin_trigger`, and
+  exceptional `full_trigger` modes; apply recomputes the canonical hash and
+  remains fail-closed unless effective KAH capability/help evidence advertises a
+  reviewed workflow catalog proposal/apply surface.
 - `.kkachi/runs/<run_id>/phase-plan.yaml` remains run-local execution state/evidence for one KHS run.
 - KAS owns graph templates, policy selection, phase applicability, proposal content, and skill/CLI adoption work.
 - KAH owns deterministic validation/write/apply/diff/audit behavior for evidenced `kkachi-agent-helper graph` surfaces; KAH 0.1.4 also advertises configurable external-feedback intake capability, while KAS adoption remains integration-pending.

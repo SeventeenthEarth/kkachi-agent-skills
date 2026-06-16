@@ -1,0 +1,23 @@
+---
+name: "{{workflow_id}}-trigger"
+description: Thin trigger wrapper for workflow {{workflow_id}}.
+version: 0.1.0
+---
+
+# {{workflow_id}} Trigger
+
+Workflow id: `{{workflow_id}}`.
+
+This generated trigger delegates to `kkachi-agent-skills workflow-trigger`.
+It must not select fallback workflows, fallback agents, fallback backends,
+direct-write KAH state, complete nodes, run arbitrary webhooks, or mutate
+profiles, providers, auth, tokens, gateways, models, or KAB runtime state.
+
+```bash
+kkachi-agent-skills workflow-trigger \
+  --project <path> \
+  --workflow-id {{workflow_id}} \
+  --node-contract-source <path> \
+  --run <run-id> \
+  --json
+```

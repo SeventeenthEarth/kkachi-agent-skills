@@ -1,0 +1,53 @@
+schema_version: kas-workflow-create-packet/v1
+approval_schema: kas-workflow-create-approval/v1
+canonicalization: utf8-json-sorted-keys-normalized-relative-paths/v1
+workflow_id: "{{workflow_id}}"
+mode: "{{mode}}"
+candidate_paths:
+  workflow_dag: "{{workflow_dag_path}}"
+  catalog: "{{workflow_catalog_path}}"
+  node_contract_registry: "{{node_contract_registry_path}}"
+  trigger_skill: "{{trigger_skill_path}}"
+target_paths:
+  - "{{target_path}}"
+generated_content:
+  - path: "{{generated_path}}"
+    kind: "{{generated_kind}}"
+    sha256: "{{generated_sha256}}"
+selector_metadata:
+  task_class: "{{task_class}}"
+  labels:
+    - "{{label}}"
+node_contracts:
+  - workflow_id: "{{workflow_id}}"
+    node_id: "{{node_id}}"
+    task_class: "{{task_class}}"
+    completion_authority: kah_only
+    direct_kah_state_write: false
+trigger_plan:
+  generated: {{trigger_generated}}
+  delegates_to: kkachi-agent-skills workflow-trigger
+capability_evidence:
+  kas_cli_version: "{{kas_cli_version}}"
+  kah_version: "{{kah_version}}"
+  kah_workflow_catalog_diagnostics: {{kah_workflow_catalog_diagnostics}}
+base_checksums:
+  "{{base_path}}": "{{base_checksum}}"
+changed_paths:
+  - path: "{{changed_path}}"
+    action: "{{changed_action}}"
+    kind: "{{changed_kind}}"
+conflicts: []
+diagnostics:
+  - code: "{{diagnostic_code}}"
+    level: "{{diagnostic_level}}"
+no_write:
+  guaranteed: true
+  project_write_count: 0
+  candidate_file_write_count: 0
+  kah_state_write_count: 0
+  kab_runtime_mutation_count: 0
+  hermes_runtime_mutation_count: 0
+  profile_write_count: 0
+  auth_provider_config_write_count: 0
+approval_hash: "{{approval_hash}}"

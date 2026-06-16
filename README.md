@@ -88,6 +88,8 @@ kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <projec
 kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
 kkachi-agent-skills repair [--repo <path>] --project <path> --workflow-graph --propose --reason <reason> [--json]
 kkachi-agent-skills repair [--repo <path>] --project <path> --workflow-graph --apply-proposal <proposal-id> --approval <approval-ref> [--json]
+kkachi-agent-skills workflow-create --project <path> --workflow-id <id> --mode dag_only|thin_trigger|full_trigger --request <json-path> --dry-run [--json]
+kkachi-agent-skills workflow-create --project <path> --workflow-id <id> --mode dag_only|thin_trigger|full_trigger --request <json-path> --apply dry-run:sha256:<hash> [--json]
 kkachi-agent-skills uninstall --profile <profile> --project <project> --dry-run [--json]
 kkachi-agent-skills uninstall --profile <profile> --project <project> --apply dry-run:sha256:<hash> --backup-vault-root <abs-path> [--json]
 ```
@@ -148,6 +150,17 @@ diff/propose, and reports proposal evidence without applying the graph.
 preflight, calls KAH graph apply, then reruns KAH validate/explain. Periodic
 checks must default to doctor/report only; proposal is opt-in and apply is never
 automatic from cron or CI.
+`workflow-create --dry-run` plans WFLOW-004 custom task-DAG workflow candidates
+for `dag_only`, `thin_trigger`, and exceptional `full_trigger` modes. It emits
+compact operator output plus a full machine packet with candidate DAG, catalog,
+node-contract, trigger paths, generated content, selector metadata, KAH/KAS
+capability evidence, base checksums, changed paths, diagnostics, no-write
+evidence, and a canonical `sha256` approval hash. `workflow-create --apply`
+recomputes the packet hash and fails closed before any write or KAH delegation
+on mismatches or missing KAH workflow/catalog capability. KAS does not
+direct-write `.kkachi` workflow state or install generated trigger skills into a
+Hermes profile; KAH remains authoritative for workflow/catalog validation,
+proposal, apply, audit, and final gate evidence.
 KAB is not required for this profile-scoped minimum CLI lane. KAB remains
 required for backend execution, automated review-by-different-tool transport,
 KAB plan lifecycle, and bridge evidence when those surfaces are in scope.
