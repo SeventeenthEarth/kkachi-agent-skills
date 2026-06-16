@@ -89,6 +89,32 @@ match readback, task class, labels, changed surfaces, required capabilities,
 and `direct_kah_state_write:false`. KAS may render dispatch packets only; KAH
 remains the authority for node state transitions and completion.
 
+WFLOW-007 adds a separate route-only classification-to-bundle surface:
+
+```text
+kkachi-agent-skills workflow-route --taxonomy <path> --selector-registry <path> --task-class <class> --classification-reason <reason> [--selected-spine <bundle>] [--labels <csv>] [--changed-surfaces <csv>] [--risk <level>] [--required-agent <csv>] [--required-capability <csv>] --json
+```
+
+`workflow-route` accepts already-classified metadata only; it does not infer a
+class from raw task prose. KAS reads `registries/task-taxonomy.yaml`, resolves
+only declared aliases, reads the standard bundle registry, and returns
+`bundle_route_matched` only when exactly one bundle matches and any explicit
+`--selected-spine` agrees with that deterministic match. The JSON result
+preserves task class, classification reason, selected bundle/workflow id,
+workflow path, work path/mode, execution mode, skipped-phase reasons, capability
+posture, taxonomy checksum, registry checksum, diagnostics, and
+`direct_kah_state_write:false`.
+
+Fail-closed statuses include `classification_required_input_missing`,
+`classification_reason_missing`, `classification_class_unsupported`,
+`taxonomy_required`, `taxonomy_unreadable`, `taxonomy_schema_unsupported`,
+`bundle_registry_required`, `bundle_registry_unreadable`,
+`bundle_registry_schema_unsupported`, `bundle_default_spine_missing`,
+`bundle_no_match`, `bundle_ambiguous`, and `bundle_selected_mismatch`.
+`workflow-route` must not call KAH workflow create/show/ready/node APIs, render
+dispatch packets, materialize run-local workflows, promote project workflow
+catalogs, choose first, score, rank, or use an LLM tie-break.
+
 WFLOW-004 extends the CLI with a dry-run-first custom workflow creator:
 
 ```text

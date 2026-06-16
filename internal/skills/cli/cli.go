@@ -17,6 +17,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowcreator"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowrouting"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowtrigger"
 )
 
@@ -38,7 +39,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, workflow-create, workflow-trigger, uninstall, or version command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, workflow-create, workflow-route, workflow-trigger, uninstall, or version command", "", false, "")
 	}
 	if isVersionArg(argv[0]) {
 		return runVersion(argv[1:], stdout, stderr)
@@ -60,6 +61,8 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runRepair(argv[1:], stdout, stderr, env)
 	case "workflow-create":
 		return runWorkflowCreate(argv[1:], stdout, stderr, env)
+	case "workflow-route":
+		return runWorkflowRoute(argv[1:], stdout, stderr, env)
 	case "workflow-trigger":
 		return runWorkflowTrigger(argv[1:], stdout, stderr, env)
 	case "uninstall":
@@ -75,7 +78,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 	case "migrate-project-kas":
 		return runMigrateProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, workflow-create, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, workflow-create, workflow-route, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
 	}
 }
 
@@ -591,6 +594,52 @@ func runWorkflowTrigger(argv []string, stdout io.Writer, stderr io.Writer, env m
 	})
 }
 
+func runWorkflowRoute(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("workflow-route", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	taxonomy := fs.String("taxonomy", "", "task taxonomy path")
+	selectorRegistry := fs.String("selector-registry", "", "standard bundle selector registry path")
+	taskClass := fs.String("task-class", "", "already-classified task class")
+	classificationReason := fs.String("classification-reason", "", "classification reason from the task contract or classifier artifact")
+	selectedSpine := fs.String("selected-spine", "", "optional expected selected bundle/spine")
+	labels := fs.String("labels", "", "selector labels, comma-separated")
+	changedSurfaces := fs.String("changed-surfaces", "", "selector changed surfaces, comma-separated")
+	risk := fs.String("risk", "", "selector risk level")
+	requiredAgent := fs.String("required-agent", "", "selector required agents, comma-separated")
+	requiredCapability := fs.String("required-capability", "", "selector required capabilities, comma-separated")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "workflow-route does not accept positional arguments", "workflow-route", *jsonOutput, "Rerun with workflow-route --taxonomy <path> --selector-registry <path> --task-class <class> --classification-reason <reason> --json.")
+	}
+	result, err := workflowrouting.Route(workflowrouting.Options{
+		TaxonomyPath:         *taxonomy,
+		SelectorRegistryPath: *selectorRegistry,
+		TaskClass:            *taskClass,
+		ClassificationReason: *classificationReason,
+		SelectedSpine:        *selectedSpine,
+		Labels:               splitFlagList(*labels),
+		ChangedSurfaces:      splitFlagList(*changedSurfaces),
+		Risk:                 *risk,
+		RequiredAgents:       splitFlagList(*requiredAgent),
+		RequiredCapabilities: splitFlagList(*requiredCapability),
+	})
+	if err != nil {
+		return emitError(stderr, "workflow_route_failed", err.Error(), "workflow-route", *jsonOutput, "")
+	}
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return workflowrouting.RenderHuman(result)
+	})
+}
+
 func runWorkflowCreate(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
 	fs := flag.NewFlagSet("workflow-create", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -1033,6 +1082,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
 	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
 	fmt.Fprintln(w, "  workflow-create   Plan custom task-DAG workflow candidates without writing")
+	fmt.Fprintln(w, "  workflow-route    Route classified tasks to one standard bundle without KAH calls")
 	fmt.Fprintln(w, "  workflow-trigger  Render dispatch packets for an explicit or selector-matched KAH workflow")
 	fmt.Fprintln(w, "  uninstall  Plan project-suite removal without writing")
 	fmt.Fprintln(w, "  version  Print CLI version information")

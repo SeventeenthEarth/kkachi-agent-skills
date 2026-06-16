@@ -112,6 +112,36 @@ Selector diagnostics are deterministic and non-ranking:
 | `selector_ambiguous` | Multiple workflows matched; KAS must not choose first or rank candidates |
 | `selector_explicit_mode_conflict` | Explicit and selector inputs were combined |
 
+WFLOW-007 implements classification-to-standard-bundle routing through the
+separate route-only `workflow-route` CLI. The input is already-classified
+metadata, not raw natural-language task inference. KAS validates the task class
+or declared taxonomy alias from `registries/task-taxonomy.yaml`, preserves the
+classification reason, then uses the standard bundle registry to resolve
+exactly one bundle. Route output records the selected bundle/workflow id,
+workflow path, work path/mode, execution mode, skipped-phase reasons, required
+capabilities, taxonomy checksum, registry checksum, diagnostics, and
+`direct_kah_state_write:false`.
+
+Route diagnostics are deterministic and non-ranking:
+
+| Diagnostic | Meaning |
+|---|---|
+| `classification_required_input_missing` | No task class was supplied |
+| `classification_reason_missing` | Classification reason was not supplied |
+| `classification_class_unsupported` | Task class or alias is not declared by the taxonomy |
+| `taxonomy_required` / `taxonomy_unreadable` / `taxonomy_schema_unsupported` | Taxonomy path, read, or schema validation failed |
+| `bundle_registry_required` / `bundle_registry_unreadable` / `bundle_registry_schema_unsupported` | Bundle registry path, read, or schema validation failed |
+| `bundle_default_spine_missing` | Taxonomy class does not declare a default bundle spine |
+| `bundle_no_match` | Classification matched zero standard bundles |
+| `bundle_ambiguous` | Classification matched multiple standard bundles |
+| `bundle_selected_mismatch` | Explicit selected spine conflicts with the deterministic registry match |
+
+`workflow-route` must not call KAH workflow create/show/ready/node APIs, render
+dispatch packets, materialize `.kkachi/runs/<run_id>/workflow.yaml`, promote or
+apply project workflow catalogs, choose first, score, rank, or use an LLM
+tie-break. WFLOW-008 owns run-local workflow materialization, and WFLOW-009 plus
+optional DAGSM-006 own promotion/apply.
+
 ## Node contract requirements
 
 Each KAS node contract must declare at least:

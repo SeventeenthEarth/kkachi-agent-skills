@@ -694,6 +694,56 @@ node_contracts:
 	}
 }
 
+func TestWorkflowRouteCLIRoutesClassifiedTaskWithoutKAH(t *testing.T) {
+	root := cliRepoRoot(t)
+	taxonomy := filepath.Join(root, "registries", "task-taxonomy.yaml")
+	registry := filepath.Join(root, "registries", "task-dag-workflow-registry.yaml")
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"workflow-route", "--taxonomy", taxonomy, "--selector-registry", registry, "--task-class", "development", "--classification-reason", "KAH classified WFLOW-007 as development.", "--selected-spine", "development_full", "--required-capability", "task_dag_schema_validation,workflow_instance_state", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("workflow-route failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected route success on stdout only, got stderr=%q", stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["command"] != "workflow-route" || payload["status"] != "bundle_route_matched" || payload["selected_bundle"] != "development_full" || payload["direct_kah_state_write"] != false {
+		t.Fatalf("unexpected workflow-route payload: %+v", payload)
+	}
+	if _, ok := payload["dispatch_packets"]; ok {
+		t.Fatalf("workflow-route must not render dispatch packets: %+v", payload)
+	}
+}
+
+func TestWorkflowRouteCLIFailsClosed(t *testing.T) {
+	root := cliRepoRoot(t)
+	taxonomy := filepath.Join(root, "registries", "task-taxonomy.yaml")
+	registry := filepath.Join(root, "registries", "task-dag-workflow-registry.yaml")
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"workflow-route", "--taxonomy", taxonomy, "--selector-registry", registry, "--task-class", "development", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected fail-closed exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected failure JSON on stderr only, got stdout=%q", stdout.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != false || payload["status"] != "classification_reason_missing" || payload["direct_kah_state_write"] != false {
+		t.Fatalf("unexpected workflow-route failure payload: %+v", payload)
+	}
+	if _, ok := payload["dispatch_packets"]; ok {
+		t.Fatalf("workflow-route failure must not include dispatch packets: %+v", payload)
+	}
+}
+
 func TestWorkflowCreateCLIDryRunAndFailClosedApply(t *testing.T) {
 	project := t.TempDir()
 	request := writeCLIWorkflowCreateRequest(t, project)

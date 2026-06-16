@@ -17,6 +17,7 @@ skills:
   - kkachi-review
   - kkachi-verify
   - kkachi-workflow-create
+  - kkachi-workflow-route
   - kkachi-workflow-trigger
   - kkachi-docs-update
   - kkachi-request-feedback
