@@ -1,6 +1,8 @@
 package workflowtrigger
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -8,6 +10,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowcreator"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowregistry"
 )
 
 type fakeKAHRunner struct {
@@ -371,10 +376,334 @@ func TestTriggerSelectorExplainNodeIDUnavailableIsInformational(t *testing.T) {
 	}
 }
 
+func TestTriggerExplicitWorkflowFileUsesProvidedPath(t *testing.T) {
+	project := t.TempDir()
+	source := writeNodeContractBundle(t, project, validNodeContractBundle("demo", "setup"))
+	workflowFile := ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/workflow.yaml"
+	runner := newWorkflowFakeRunnerForFile("demo", "run-20260616T105614Z-4b0ebe11b67d", workflowFile, []string{"setup"})
+
+	result, err := Trigger(Options{
+		Project:            project,
+		WorkflowID:         "demo",
+		WorkflowFile:       workflowFile,
+		NodeContractSource: source,
+		RunID:              "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:             runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.Workflow.Path != workflowFile {
+		t.Fatalf("unexpected explicit workflow-file result: %+v", result)
+	}
+	if !containsCall(runner.calls, "workflow validate --file "+workflowFile+" --json") ||
+		!containsCall(runner.calls, "workflow create --run run-20260616T105614Z-4b0ebe11b67d --file "+workflowFile+" --json") {
+		t.Fatalf("KAH calls did not use explicit workflow file: %#v", runner.calls)
+	}
+	packet := result.DispatchPackets[0]
+	if packet.WorkflowFile != workflowFile || packet.DirectKAHStateWrite {
+		t.Fatalf("dispatch packet missing workflow file or no-write evidence: %+v", packet)
+	}
+}
+
+func TestTriggerRunLocalMaterializationPreflightsBeforeWrite(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeRegistry(t, project, validRegistry("demo", "setup"))
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routeResult := writeTriggerRouteResult(t, project, registry, "demo")
+	runner := &fakeKAHRunner{responses: map[string]CommandResult{
+		"--version":           {Stdout: []byte("kkachi-agent-helper 0.1.9\n")},
+		"capabilities --json": {Stdout: []byte(`{"command_groups":[{"name":"graph","status":"supported","subcommands":["validate"]}],"compatibility_flags":{"workflow_instance_state":false}}`)},
+		"workflow --help":     {Stderr: []byte("unknown help topic\n"), Err: errors.New("exit 2")},
+	}}
+
+	result, err := Trigger(Options{
+		Project:             project,
+		RouteResult:         routeResult,
+		MaterializeRunLocal: true,
+		RunID:               "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:              runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "blocked_missing_kah_workflow_capability" {
+		t.Fatalf("expected capability blocker, got %+v", result)
+	}
+	if result.Materialization != nil {
+		t.Fatalf("preflight blocker exposed materialization evidence: %+v", result.Materialization)
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := payload["materialization"]; ok {
+		t.Fatalf("preflight blocker JSON must omit materialization: %s", encoded)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".kkachi")); !os.IsNotExist(err) {
+		t.Fatalf("materialization wrote before KAH preflight passed: %v", err)
+	}
+	if len(runner.calls) != 3 {
+		t.Fatalf("expected preflight-only calls, got %#v", runner.calls)
+	}
+}
+
+func TestTriggerRunLocalMaterializationRendersDispatchPackets(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeRegistry(t, project, validRegistry("demo", "setup"))
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routeResult := writeTriggerRouteResult(t, project, registry, "demo")
+	workflowFile := ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/workflow.yaml"
+	runner := newWorkflowFakeRunnerForFile("demo", "run-20260616T105614Z-4b0ebe11b67d", workflowFile, []string{"setup"})
+
+	result, err := Trigger(Options{
+		Project:             project,
+		RouteResult:         routeResult,
+		MaterializeRunLocal: true,
+		RunID:               "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:              runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.Mode != "run_local_materialized_trigger" || result.Materialization == nil || result.Materialization.WorkflowFile != workflowFile {
+		t.Fatalf("unexpected materialized trigger result: %+v", result)
+	}
+	if !result.Materialization.NoPromotion || result.Materialization.PersistentPromotion {
+		t.Fatalf("materialization promotion posture drifted: %+v", result.Materialization)
+	}
+	if result.Workflow.Path != workflowFile || result.NodeContractSource != ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/node-contracts.json" {
+		t.Fatalf("trigger did not consume run-local files: %+v", result)
+	}
+	if len(result.DispatchPackets) != 1 {
+		t.Fatalf("dispatch packets = %+v", result.DispatchPackets)
+	}
+	packet := result.DispatchPackets[0]
+	if packet.WorkflowFile != workflowFile || packet.CompletionAuthority != "kah_only" || packet.FallbackPolicy != "none_fail_closed" || packet.DirectKAHStateWrite {
+		t.Fatalf("packet authority fields drifted: %+v", packet)
+	}
+	for _, rel := range []string{"workflow.yaml", "node-contracts.json", "route-result.json", "materialization.json", "checksums.json"} {
+		if _, err := os.Stat(filepath.Join(project, ".kkachi", "runs", "run-20260616T105614Z-4b0ebe11b67d", "workflow", rel)); err != nil {
+			t.Fatalf("missing materialized %s: %v", rel, err)
+		}
+	}
+	for _, want := range []string{
+		"workflow validate --file " + workflowFile + " --json",
+		"workflow explain --file " + workflowFile + " --json",
+		"workflow create --run run-20260616T105614Z-4b0ebe11b67d --file " + workflowFile + " --json",
+	} {
+		if !containsCall(runner.calls, want) {
+			t.Fatalf("run-local trigger did not call KAH with explicit workflow file %q: %#v", want, runner.calls)
+		}
+	}
+	for _, call := range runner.calls {
+		if strings.Contains(call, ".kkachi/workflows/") {
+			t.Fatalf("run-local trigger fell back to persistent workflow path: %#v", runner.calls)
+		}
+	}
+}
+
+func TestTriggerCustomMaterializationPreflightsBeforeWrite(t *testing.T) {
+	project := t.TempDir()
+	packetPath, approval := writeTriggerCustomWorkflowPacket(t, project, "demo")
+	runner := &fakeKAHRunner{responses: map[string]CommandResult{
+		"--version":           {Stdout: []byte("kkachi-agent-helper 0.1.9\n")},
+		"capabilities --json": {Stdout: []byte(`{"command_groups":[{"name":"graph","status":"supported","subcommands":["validate"]}],"compatibility_flags":{"workflow_instance_state":false}}`)},
+		"workflow --help":     {Stderr: []byte("unknown help topic\n"), Err: errors.New("exit 2")},
+	}}
+
+	result, err := Trigger(Options{
+		Project:              project,
+		CustomWorkflowPacket: packetPath,
+		Approval:             approval,
+		MaterializeRunLocal:  true,
+		RunID:                "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:               runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "blocked_missing_kah_workflow_capability" {
+		t.Fatalf("expected capability blocker, got %+v", result)
+	}
+	if result.Materialization != nil {
+		t.Fatalf("preflight blocker exposed custom materialization evidence: %+v", result.Materialization)
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := payload["materialization"]; ok {
+		t.Fatalf("custom preflight blocker JSON must omit materialization: %s", encoded)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".kkachi")); !os.IsNotExist(err) {
+		t.Fatalf("custom materialization wrote before KAH preflight passed: %v", err)
+	}
+	if len(runner.calls) != 3 {
+		t.Fatalf("expected preflight-only calls, got %#v", runner.calls)
+	}
+}
+
+func TestTriggerCustomMaterializationRendersDispatchPackets(t *testing.T) {
+	project := t.TempDir()
+	packetPath, approval := writeTriggerCustomWorkflowPacket(t, project, "demo")
+	workflowFile := ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/workflow.yaml"
+	runner := newWorkflowFakeRunnerForFile("demo", "run-20260616T105614Z-4b0ebe11b67d", workflowFile, []string{"plan"})
+
+	result, err := Trigger(Options{
+		Project:              project,
+		CustomWorkflowPacket: packetPath,
+		Approval:             approval,
+		MaterializeRunLocal:  true,
+		RunID:                "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:               runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.Mode != "run_local_materialized_trigger" || result.Materialization == nil || result.Materialization.CustomWorkflowPacketCopy == "" || result.Materialization.ApprovalEvidence != approval {
+		t.Fatalf("unexpected custom materialized trigger result: %+v", result)
+	}
+	if !result.Materialization.NoPromotion || result.Materialization.PersistentPromotion {
+		t.Fatalf("custom materialization promotion posture drifted: %+v", result.Materialization)
+	}
+	packet := result.DispatchPackets[0]
+	if packet.WorkflowFile != workflowFile || packet.NodeID != "plan" || packet.CompletionAuthority != "kah_only" || packet.FallbackPolicy != "none_fail_closed" || packet.DirectKAHStateWrite {
+		t.Fatalf("custom packet authority fields drifted: %+v", packet)
+	}
+	for _, rel := range []string{"workflow.yaml", "node-contracts.json", "custom-workflow-packet.json", "materialization.json", "checksums.json"} {
+		if _, err := os.Stat(filepath.Join(project, ".kkachi", "runs", "run-20260616T105614Z-4b0ebe11b67d", "workflow", rel)); err != nil {
+			t.Fatalf("missing custom materialized %s: %v", rel, err)
+		}
+	}
+	for _, want := range []string{
+		"workflow validate --file " + workflowFile + " --json",
+		"workflow explain --file " + workflowFile + " --json",
+		"workflow create --run run-20260616T105614Z-4b0ebe11b67d --file " + workflowFile + " --json",
+	} {
+		if !containsCall(runner.calls, want) {
+			t.Fatalf("custom run-local trigger did not call KAH with explicit workflow file %q: %#v", want, runner.calls)
+		}
+	}
+	for _, call := range runner.calls {
+		if strings.Contains(call, ".kkachi/workflows/") {
+			t.Fatalf("custom run-local trigger fell back to persistent workflow path: %#v", runner.calls)
+		}
+	}
+}
+
 func writeNodeContractBundle(t *testing.T, dir string, content string) string {
 	t.Helper()
 	path := filepath.Join(dir, "node-contracts.json")
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeTriggerCustomWorkflowPacket(t *testing.T, dir string, workflowID string) (string, string) {
+	t.Helper()
+	dag := "workflow_id: " + workflowID + "\nschema_version: task-dag/v1\nnodes:\n  - id: plan\n    depends_on: []\n    join: all_of\n    required_outputs:\n      - artifacts/plan.md\n"
+	result := workflowcreator.Result{
+		OK:                  true,
+		Command:             workflowcreator.Command,
+		Mode:                workflowcreator.ModeDAGOnly,
+		Status:              "dry_run_ready",
+		Project:             workflowcreator.ProjectEvidence{Path: dir},
+		Workflow:            workflowcreator.WorkflowEvidence{ID: workflowID, SchemaVersion: "task-dag/v1"},
+		DirectKAHStateWrite: false,
+		MachinePacket: workflowcreator.MachinePacket{
+			SchemaVersion:    workflowcreator.PacketSchemaVersion,
+			ApprovalSchema:   workflowcreator.ApprovalSchema,
+			Canonicalization: workflowcreator.Canonicalization,
+			TargetPaths:      []string{".kkachi/workflows/" + workflowID + ".yaml"},
+			CandidatePaths:   workflowcreator.CandidatePaths{WorkflowDAG: ".kkachi/workflows/" + workflowID + ".yaml"},
+			GeneratedContent: []workflowcreator.GeneratedContent{{Path: ".kkachi/workflows/" + workflowID + ".yaml", Kind: "workflow_dag", Content: dag, SHA256: triggerChecksum([]byte(dag))}},
+			SelectorMetadata: map[string]any{"task_class": "development"},
+			NodeContracts: []workflowcreator.NodeContract{{
+				WorkflowID:          workflowID,
+				NodeID:              "plan",
+				TaskClass:           "development",
+				OwnerRole:           "planner_backend",
+				ExecutionLane:       "stage1_direct_codex_app_server",
+				RequiredInputs:      []string{"task-contract.yaml"},
+				ExpectedArtifacts:   []string{"artifacts/plan.md"},
+				PromptRef:           "skills/kkachi-plan/SKILL.md",
+				ApprovalRequired:    false,
+				FallbackPolicy:      workflowregistry.NoFallbackPolicy,
+				VerificationGate:    "kah_workflow_node_evidence",
+				CompletionAuthority: workflowregistry.KAHOnlyAuthority,
+				DirectKAHStateWrite: false,
+			}},
+			TriggerPlan:   workflowcreator.TriggerPlan{Mode: workflowcreator.ModeDAGOnly, Generated: false, DelegatesTo: "kkachi-agent-skills workflow-trigger", CustomLogic: false},
+			BaseChecksums: map[string]string{".kkachi/workflows/" + workflowID + ".yaml": "missing"},
+			ChangedPaths:  []workflowcreator.ChangedPath{{Path: ".kkachi/workflows/" + workflowID + ".yaml", Action: "create", Kind: "workflow_dag"}},
+			Conflicts:     []workflowcreator.Conflict{},
+			Diagnostics:   []workflowcreator.Diagnostic{},
+			NoWrite:       workflowcreator.NoWriteEvidence{Guaranteed: true},
+		},
+	}
+	result.MachinePacket.ApprovalHash = workflowcreator.RecomputeApprovalHash(result)
+	result.ApprovalRequest = workflowcreator.ApprovalRequest{Required: true, EvidenceRef: "dry-run:" + result.MachinePacket.ApprovalHash, DryRunPlanHash: result.MachinePacket.ApprovalHash}
+	path := filepath.Join(dir, "workflow-create-dry-run.json")
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path, result.ApprovalRequest.EvidenceRef
+}
+
+func triggerChecksum(data []byte) string {
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func writeTriggerRouteResult(t *testing.T, dir string, registry workflowregistry.Registry, workflowID string) string {
+	t.Helper()
+	path := filepath.Join(dir, "route-result.json")
+	payload := map[string]any{
+		"ok":                    true,
+		"command":               "workflow-route",
+		"status":                "bundle_route_matched",
+		"task_class":            "development",
+		"classification_reason": "test route",
+		"selected_bundle":       workflowID,
+		"workflow_id":           workflowID,
+		"workflow_path":         ".kkachi/workflows/" + workflowID + ".yaml",
+		"selected_spine":        workflowID,
+		"taxonomy": map[string]any{
+			"path":     "registries/task-taxonomy.yaml",
+			"checksum": "sha256:taxonomy",
+		},
+		"selector_registry": map[string]any{
+			"path":     registry.Path,
+			"version":  registry.Version,
+			"checksum": registry.Checksum,
+		},
+		"direct_kah_state_write": false,
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return path
@@ -441,6 +770,10 @@ node_contracts:
 }
 
 func newWorkflowFakeRunner(workflowID string, runID string, readyNodes []string) *fakeKAHRunner {
+	return newWorkflowFakeRunnerForFile(workflowID, runID, ".kkachi/workflows/"+workflowID+".yaml", readyNodes)
+}
+
+func newWorkflowFakeRunnerForFile(workflowID string, runID string, workflowFile string, readyNodes []string) *fakeKAHRunner {
 	ready := make([]map[string]any, 0, len(readyNodes))
 	nodes := make([]map[string]any, 0, len(readyNodes))
 	for _, id := range readyNodes {
@@ -452,7 +785,7 @@ func newWorkflowFakeRunner(workflowID string, runID string, readyNodes []string)
 		"run_id":         runID,
 		"workflow_id":    workflowID,
 		"schema_version": "task-dag/v1",
-		"source_path":    ".kkachi/workflows/" + workflowID + ".yaml",
+		"source_path":    workflowFile,
 		"revision":       1,
 		"nodes":          nodes,
 	}
@@ -465,9 +798,9 @@ func newWorkflowFakeRunner(workflowID string, runID string, readyNodes []string)
 		"--version":           {Stdout: []byte("kkachi-agent-helper 0.1.10\n")},
 		"capabilities --json": {Stdout: []byte(`{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true}}`)},
 		"workflow --help":     {Stdout: []byte("Subcommands:\n  validate\n  explain\n  create\n  show\n  ready\n  node\n")},
-		"workflow validate --file .kkachi/workflows/" + workflowID + ".yaml --json": {Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"` + workflowID + `","schema_version":"task-dag/v1"}`)},
-		"workflow explain --file .kkachi/workflows/" + workflowID + ".yaml --json":  {Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"` + workflowID + `","schema_version":"task-dag/v1"}`)},
-		"workflow create --run " + runID + " --file .kkachi/workflows/" + workflowID + ".yaml --json": {
+		"workflow validate --file " + workflowFile + " --json": {Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"` + workflowID + `","schema_version":"task-dag/v1"}`)},
+		"workflow explain --file " + workflowFile + " --json":  {Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"` + workflowID + `","schema_version":"task-dag/v1"}`)},
+		"workflow create --run " + runID + " --file " + workflowFile + " --json": {
 			Stdout: instanceJSON,
 		},
 		"workflow show --run " + runID + " --json": {

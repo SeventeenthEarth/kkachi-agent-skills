@@ -142,6 +142,53 @@ apply project workflow catalogs, choose first, score, rank, or use an LLM
 tie-break. WFLOW-008 owns run-local workflow materialization, and WFLOW-009 plus
 optional DAGSM-006 own promotion/apply.
 
+WFLOW-008 implements run-local materialization through either
+`workflow-trigger --route-result <workflow-route-json> --materialize-run-local
+--run <run-id>` for selected standard bundles, or `workflow-trigger
+--custom-workflow-packet <workflow-create-dry-run.json> --approval
+dry-run:sha256:<hash> --materialize-run-local --run <run-id>` for approved
+one-off custom DAGs. The route-result path consumes the existing WFLOW-007
+route result from a file; it does not reroute raw task metadata, infer a class,
+rank bundles, or choose a workflow inside the trigger. The custom packet path
+consumes the existing WFLOW-004 workflow-create dry-run machine packet shape,
+requires approval-hash-bound evidence, and recomputes the hash with
+WFLOW-004 canonical approval semantics before any write; this is not a second
+hash algorithm. KAS preflights effective KAH workflow capability before non-dry-run materialization.
+If the installed helper
+lacks the `workflow` command group, KAS fails closed with
+`blocked_missing_kah_workflow_capability` before writing run-local artifacts.
+
+The WFLOW-008 run-local layout is:
+
+```text
+.kkachi/runs/<run_id>/workflow/materialization.json
+.kkachi/runs/<run_id>/workflow/workflow.yaml
+.kkachi/runs/<run_id>/workflow/node-contracts.json
+.kkachi/runs/<run_id>/workflow/route-result.json              # route-result source only
+.kkachi/runs/<run_id>/workflow/custom-workflow-packet.json    # approved one-off source only
+.kkachi/runs/<run_id>/workflow/checksums.json
+```
+
+`materialization.json` records source registry/taxonomy checksums, selected
+bundle, task class, classification reason, run-local posture, and
+`no_promotion:true` for route-result sources. For approved custom packet
+sources it records the packet path/checksum, approval evidence, dry-run plan
+hash, approved plan hash, run-local posture, `persistent_promotion:false`, and
+`no_promotion:true`. `workflow.yaml` is the run-local task-DAG file passed
+explicitly to KAH. `node-contracts.json` is a `kas-node-contracts/v1` bundle
+rendered from KAS node contracts or copied from the approved generated node
+contracts in the WFLOW-004 packet. KAS must pass the explicit run-local
+`--workflow-file` to KAH `workflow validate`, `workflow explain`, and `workflow
+create`; it must not assume `.kkachi/workflows/<workflow-id>.yaml` for
+run-local execution.
+
+WFLOW-008 rejects unsafe paths, symlink/path escapes, project-local
+`.kkachi/workflows`, `.kkachi/workflow-catalog.yaml`, `.kkachi-workflow.yaml`,
+profile/provider/gateway/auth/token/model paths, KAB runtime paths, direct KAH
+workflow-instance writes, fallback agent/backend selection, retry/rollback
+automation, dynamic node generation, arbitrary webhook runtime, and WFLOW-009
+promotion/apply.
+
 ## Node contract requirements
 
 Each KAS node contract must declare at least:

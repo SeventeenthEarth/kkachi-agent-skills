@@ -36,10 +36,23 @@ GRSYNC-003 extends `repair` with a separate workflow graph mode. `repair --proje
 WFLOW-002 extends the CLI with a generic explicit task-DAG trigger:
 
 ```text
-kkachi-agent-skills workflow-trigger --project <path> --workflow-id <id> --node-contract-source <path> [--node-contract-ref <ref>] [--run <run-id>] [--instance-id <id>] --json
+kkachi-agent-skills workflow-trigger --project <path> --workflow-id <id> [--workflow-file <repo-relative-yaml>] --node-contract-source <path> [--node-contract-ref <ref>] [--run <run-id>] [--instance-id <id>] --json
 ```
 
-This command supports only explicit `workflow_id` plus explicit JSON node-contract source/ref. KAS resolves the workflow id to `.kkachi/workflows/<workflow-id>.yaml`, preflights KAH with `--version`, `capabilities --json`, and `workflow --help`, requires KAH workflow subcommands `validate`, `explain`, `create`, `show`, `ready`, and `node`, validates/explains the workflow through KAH, creates with `workflow create --run <run-id> --file <workflow.yaml>` or resumes with `workflow show --run <instance-id>`, reads ready nodes with `workflow ready --run <id>`, and renders dispatch packets only. The result always includes `direct_kah_state_write:false`; KAS must not directly edit KAH workflow instance files or complete/block/start nodes.
+This command supports explicit `workflow_id` plus explicit JSON node-contract
+source/ref. Without `--workflow-file`, KAS preserves the WFLOW-002 legacy
+resolution to `.kkachi/workflows/<workflow-id>.yaml`. With `--workflow-file`,
+KAS passes the explicit repository-relative YAML file to KAH `workflow
+validate`, `workflow explain`, and `workflow create`; it must not derive or
+substitute `.kkachi/workflows/<workflow-id>.yaml`. KAS preflights KAH with
+`--version`, `capabilities --json`, and `workflow --help`, requires KAH
+workflow subcommands `validate`, `explain`, `create`, `show`, `ready`, and
+`node`, validates/explains the workflow through KAH, creates with `workflow
+create --run <run-id> --file <workflow.yaml>` or resumes with `workflow show
+--run <instance-id>`, reads ready nodes with `workflow ready --run <id>`, and
+renders dispatch packets only. The result always includes
+`direct_kah_state_write:false`; KAS must not directly edit KAH workflow
+instance files or complete/block/start nodes.
 
 WFLOW-002 node-contract input is JSON-only:
 
@@ -114,6 +127,63 @@ Fail-closed statuses include `classification_required_input_missing`,
 `workflow-route` must not call KAH workflow create/show/ready/node APIs, render
 dispatch packets, materialize run-local workflows, promote project workflow
 catalogs, choose first, score, rank, or use an LLM tie-break.
+
+WFLOW-008 extends `workflow-trigger` with run-local materialization from a
+previously matched route result or an approved one-off custom workflow packet:
+
+```text
+kkachi-agent-skills workflow-trigger --project <path> --route-result <workflow-route-json> --materialize-run-local --run <run-id> --json
+kkachi-agent-skills workflow-trigger --project <path> --run <run-id> --custom-workflow-packet <workflow-create-dry-run.json> --approval dry-run:sha256:<hash> --materialize-run-local --json
+```
+
+The route-result path consumes a `workflow-route` JSON file only. It does not
+reroute raw task metadata inside `workflow-trigger`, infer a task class, rank
+bundles, or call KAH before deterministic route evidence exists. The route
+result must be `ok:true`, `status: bundle_route_matched`, and
+`direct_kah_state_write:false`. The custom packet path consumes the existing
+WFLOW-004 `workflow-create` dry-run machine packet shape only. It requires
+`--approval dry-run:sha256:<hash>`, recomputes the packet hash with the
+WFLOW-004 canonical approval semantics, and fails closed with no writes for
+missing, malformed, mismatched, stale, or non-approvable packet evidence.
+`--route-result` and `--custom-workflow-packet` are mutually exclusive.
+
+Before writing materialized files, KAS runs the same KAH workflow capability
+preflight required by trigger execution. If the effective installed helper lacks
+the `workflow` command group, for example installed
+`kkachi-agent-helper 0.1.9`, the command returns
+`blocked_missing_kah_workflow_capability` and writes no
+`.kkachi/runs/<run_id>/workflow/` files. KAS must not install or update KAH.
+
+Successful run-local materialization writes only:
+
+```text
+.kkachi/runs/<run_id>/workflow/materialization.json
+.kkachi/runs/<run_id>/workflow/workflow.yaml
+.kkachi/runs/<run_id>/workflow/node-contracts.json
+.kkachi/runs/<run_id>/workflow/route-result.json              # route-result source only
+.kkachi/runs/<run_id>/workflow/custom-workflow-packet.json    # custom packet source only
+.kkachi/runs/<run_id>/workflow/checksums.json
+```
+
+The materialization record includes source registry/taxonomy paths and
+checksums for route results, approval hash and source packet checksum for
+approved custom packets, selected bundle or one-off workflow id, task class,
+classification reason, run-local posture, `persistent_promotion:false`,
+`no_promotion:true`, and `direct_kah_state_write:false`. The generated
+`node-contracts.json` uses `kas-node-contracts/v1`; custom packet contracts are
+copied from approved generated node contracts, and dispatch packets include
+`workflow_file`, `completion_authority:kah_only`,
+`fallback_policy:none_fail_closed`, and `direct_kah_state_write:false`.
+Missing KAH-ready node contracts fail the whole command with no partial
+packets.
+
+WFLOW-008 materialization must reject unsafe paths, symlink/path escapes,
+project-local `.kkachi/workflows`, `.kkachi/workflow-catalog.yaml`,
+`.kkachi-workflow.yaml`, Hermes profile/provider/gateway/auth/token/model
+paths, and KAB runtime paths. It must not implement WFLOW-009 promotion/apply,
+automatic project-local workflow/catalog persistence, fallback agent/backend
+selection, retry/rollback automation, dynamic node generation, arbitrary
+webhook runtime, or KAH workflow-instance direct writes.
 
 WFLOW-004 extends the CLI with a dry-run-first custom workflow creator:
 

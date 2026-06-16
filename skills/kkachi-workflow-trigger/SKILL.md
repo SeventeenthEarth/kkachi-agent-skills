@@ -6,10 +6,13 @@ version: 0.1.0
 
 # Kkachi Workflow Trigger
 
-Use this skill when an operator provides either:
+Use this skill when an operator provides any of:
 
 - WFLOW-002 explicit mode: a `workflow_id` and explicit JSON node-contract source/ref; or
-- WFLOW-003 selector mode: an explicit selector registry plus deterministic selector inputs.
+- WFLOW-003 selector mode: an explicit selector registry plus deterministic selector inputs; or
+- WFLOW-008 run-local mode: a `workflow-route` JSON result or approved
+  `workflow-create` dry-run packet to materialize under
+  `.kkachi/runs/<run_id>/workflow/`.
 
 The trigger renders dispatch packets only. It is not a custom workflow creator,
 thin trigger generator, KAH state editor, KAB graph authority, dynamic node
@@ -23,6 +26,7 @@ Explicit WFLOW-002 mode:
 kkachi-agent-skills workflow-trigger \
   --project <path> \
   --workflow-id <id> \
+  [--workflow-file <repo-relative-yaml>] \
   --node-contract-source <path> \
   [--node-contract-ref <ref>] \
   [--run <run-id>] \
@@ -47,13 +51,54 @@ kkachi-agent-skills workflow-trigger \
   --json
 ```
 
+Run-local WFLOW-008 mode:
+
+```bash
+kkachi-agent-skills workflow-trigger \
+  --project <path> \
+  --route-result <workflow-route-json> \
+  --materialize-run-local \
+  --run <run-id> \
+  --json
+```
+
+Approved one-off WFLOW-008 custom packet mode:
+
+```bash
+kkachi-agent-skills workflow-trigger \
+  --project <path> \
+  --run <run-id> \
+  --custom-workflow-packet <workflow-create-dry-run.json> \
+  --approval dry-run:sha256:<hash> \
+  --materialize-run-local \
+  --json
+```
+
 Rules:
 
-- In explicit mode, `--workflow-id` is required and resolves deterministically to `.kkachi/workflows/<workflow-id>.yaml`.
+- In explicit mode, `--workflow-id` is required. Without `--workflow-file`, it
+  preserves the legacy `.kkachi/workflows/<workflow-id>.yaml` resolution.
+- When `--workflow-file` is supplied, the trigger passes that explicit
+  repository-relative YAML path to KAH `workflow validate`, `workflow explain`,
+  and `workflow create`; it does not derive `.kkachi/workflows/<workflow-id>.yaml`.
 - In explicit mode, `--node-contract-source` is required and must be JSON.
 - Explicit mode does not perform selector search or registry matching.
 - In selector mode, `--selector-registry` is required. The bundled registry is `registries/task-dag-workflow-registry.yaml`, but the CLI does not auto-load it; callers must pass the path explicitly.
 - Selector mode uses deterministic registry predicates. Exactly one workflow may proceed; zero matches return `selector_no_match`, multiple matches return `selector_ambiguous`, and mixed explicit/selector inputs return `selector_explicit_mode_conflict`.
+- In run-local mode, the route result must already be `ok:true` with
+  `status: bundle_route_matched`; `workflow-trigger` does not reroute raw task
+  metadata or infer a task class.
+- In approved one-off custom packet mode, the packet must be the existing
+  `workflow-create` dry-run machine packet shape, `--approval` must be exactly
+  `dry-run:sha256:<hash>`, and the hash is recomputed with WFLOW-004 canonical
+  approval semantics before any run-local write.
+- `--route-result` and `--custom-workflow-packet` are mutually exclusive.
+- Run-local materialization writes only `.kkachi/runs/<run_id>/workflow/`
+  artifacts: `materialization.json`, `workflow.yaml`, `node-contracts.json`,
+  either `route-result.json` or `custom-workflow-packet.json`, and
+  `checksums.json`.
+- Run-local materialization is preflighted: if the effective KAH binary lacks
+  workflow support, the command fails closed before writing run-local files.
 - Use `--run <run-id>` when KAH should create the workflow instance.
 - Use `--instance-id <id>` when KAH should resume by `workflow show`; the instance id is passed to KAH as the run id.
 - JSON output is the stable contract. Human output is compact status only.
@@ -68,7 +113,12 @@ The trigger fails closed unless the effective `kkachi-agent-helper` supports all
 - workflow subcommands: `validate`, `explain`, `create`, `show`, `ready`, and `node`
 - capability flags: `task_dag_schema_validation` and `workflow_instance_state`
 
-Missing workflow capability returns `ok:false`, `status: blocked_missing_kah_workflow_capability`, `direct_kah_state_write:false`, and no dispatch packets. The trigger must not call workflow instance commands after a failed capability preflight.
+Missing workflow capability returns `ok:false`,
+`status: blocked_missing_kah_workflow_capability`,
+`direct_kah_state_write:false`, and no dispatch packets. Run-local
+materialization also performs this preflight before writes, so installed KAH
+without the `workflow` command group must not create `.kkachi/runs/.../workflow`
+artifacts.
 
 ## Node-Contract JSON
 
@@ -114,20 +164,33 @@ ambiguous matches.
 
 The trigger:
 
-1. resolves exactly one workflow from explicit inputs or selector-registry inputs;
+1. resolves exactly one workflow from explicit inputs, selector-registry inputs,
+   a previously matched route-result file, or an approved custom workflow
+   packet;
 2. validates/explains the selected workflow through KAH;
 3. creates a KAH workflow instance with `workflow create --run <run-id> --file <path>` or resumes with `workflow show --run <instance-id>`;
 4. reads ready nodes with `workflow ready --run <id>`;
 5. renders one dispatch packet per ready node;
 6. returns `ok:true/status:no_ready_nodes` when KAH has no ready nodes;
-7. always reports `direct_kah_state_write:false`, `completion_authority:kah_only`, and `stage1_direct_codex_is_kab_native_codex:false`.
+7. always reports `direct_kah_state_write:false`, `completion_authority:kah_only`, `fallback_policy:none_fail_closed`, and `stage1_direct_codex_is_kab_native_codex:false`.
 
 Dispatch packets are instructions for the declared lane only. This skill does not start, complete, block, retry, or roll back KAH nodes.
 
+Run-local materialization records the selected bundle, task class,
+classification reason or approved one-off packet evidence, source
+registry/taxonomy checksums or approval hash/packet checksum, run-local
+posture, `persistent_promotion:false`, and `no_promotion:true`. It must not write `.kkachi-workflow.yaml`,
+`.kkachi/workflow-catalog.yaml`, `.kkachi/workflows/*`, profiles, providers,
+gateways, auth, tokens, models, or KAB runtime state.
+
 ## Deferrals
 
-WFLOW-004 owns custom workflow creation and thin trigger scaffolding. This skill
-must not implement custom creator/thin-trigger behavior, dynamic node
-generation, arbitrary webhooks, retry/rollback automation, hidden backend or
-agent fallback, KAB graph authority, direct KAH state mutation, KAH completion authority, registry auto-loading without `--selector-registry`, or Hermes
+WFLOW-004 owns custom workflow creation and thin trigger scaffolding. WFLOW-009
+owns persistent workflow promotion/apply. This skill may consume an approved
+WFLOW-004 dry-run machine packet only to materialize a one-off run-local
+workflow; it must not implement project-local custom creator/thin-trigger
+apply, dynamic node generation, arbitrary webhooks, retry/rollback automation,
+hidden backend or agent fallback, KAB graph authority, direct KAH state
+mutation, KAH completion authority, registry auto-loading without
+`--selector-registry`, project-local catalog promotion, or Hermes
 profile/provider/gateway/auth/token/model mutation.

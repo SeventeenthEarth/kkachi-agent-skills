@@ -491,6 +491,10 @@ func canonicalApproval(result Result) map[string]any {
 	}
 }
 
+func RecomputeApprovalHash(result Result) string {
+	return checksumAny(canonicalApproval(result))
+}
+
 func preflightKAH(opts Options) KAHCapability {
 	capability := KAHCapability{WorkflowCommands: []string{}, CompatibilityFlags: []string{}, HelpState: "unavailable"}
 	versionResult := opts.Runner(opts.Project, "--version")

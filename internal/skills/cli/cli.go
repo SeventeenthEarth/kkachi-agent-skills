@@ -547,9 +547,14 @@ func runWorkflowTrigger(argv []string, stdout io.Writer, stderr io.Writer, env m
 	fs.SetOutput(stderr)
 	project := fs.String("project", "", "project path")
 	workflowID := fs.String("workflow-id", "", "explicit workflow id")
+	workflowFile := fs.String("workflow-file", "", "explicit repo-relative workflow YAML file")
 	nodeContractSource := fs.String("node-contract-source", "", "explicit JSON node-contract source path")
 	nodeContractRef := fs.String("node-contract-ref", "", "optional node-contract source ref")
 	selectorRegistry := fs.String("selector-registry", "", "selector/node-contract registry path")
+	routeResult := fs.String("route-result", "", "workflow-route JSON result to materialize under the run")
+	customWorkflowPacket := fs.String("custom-workflow-packet", "", "approved workflow-create dry-run JSON packet to materialize under the run")
+	approval := fs.String("approval", "", "approval evidence dry-run:sha256:<hash> for custom workflow packet materialization")
+	materializeRunLocal := fs.Bool("materialize-run-local", false, "materialize selected route result or approved custom packet under .kkachi/runs/<run-id>/workflow")
 	taskClass := fs.String("task-class", "", "selector task class")
 	labels := fs.String("labels", "", "selector labels, comma-separated")
 	changedSurfaces := fs.String("changed-surfaces", "", "selector changed surfaces, comma-separated")
@@ -574,9 +579,14 @@ func runWorkflowTrigger(argv []string, stdout io.Writer, stderr io.Writer, env m
 	result, err := workflowtrigger.Trigger(workflowtrigger.Options{
 		Project:              *project,
 		WorkflowID:           *workflowID,
+		WorkflowFile:         *workflowFile,
 		NodeContractSource:   *nodeContractSource,
 		NodeContractRef:      *nodeContractRef,
 		SelectorRegistry:     *selectorRegistry,
+		RouteResult:          *routeResult,
+		CustomWorkflowPacket: *customWorkflowPacket,
+		Approval:             *approval,
+		MaterializeRunLocal:  *materializeRunLocal,
 		TaskClass:            *taskClass,
 		Labels:               splitFlagList(*labels),
 		ChangedSurfaces:      splitFlagList(*changedSurfaces),

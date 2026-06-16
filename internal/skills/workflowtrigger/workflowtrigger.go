@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowmaterializer"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowregistry"
 )
 
@@ -28,9 +29,14 @@ type CommandResult struct {
 type Options struct {
 	Project              string
 	WorkflowID           string
+	WorkflowFile         string
 	NodeContractSource   string
 	NodeContractRef      string
 	SelectorRegistry     string
+	RouteResult          string
+	CustomWorkflowPacket string
+	Approval             string
+	MaterializeRunLocal  bool
 	TaskClass            string
 	Labels               []string
 	ChangedSurfaces      []string
@@ -43,34 +49,58 @@ type Options struct {
 }
 
 type Result struct {
-	OK                   bool             `json:"ok"`
-	Command              string           `json:"command"`
-	Mode                 string           `json:"mode"`
-	Status               string           `json:"status"`
-	Project              string           `json:"project"`
-	WorkflowID           string           `json:"workflow_id"`
-	Workflow             WorkflowEvidence `json:"workflow"`
-	NodeContractSource   string           `json:"node_contract_source"`
-	NodeContractRef      string           `json:"node_contract_ref,omitempty"`
-	SelectorRegistry     RegistryEvidence `json:"selector_registry,omitempty"`
-	SelectorMatch        SelectorEvidence `json:"selector_match,omitempty"`
-	TaskClass            string           `json:"task_class,omitempty"`
-	Labels               []string         `json:"labels,omitempty"`
-	ChangedSurfaces      []string         `json:"changed_surfaces,omitempty"`
-	RequiredCapabilities []string         `json:"required_capabilities,omitempty"`
-	KAHCapability        KAHCapability    `json:"kah_capability"`
-	Instance             InstanceEvidence `json:"instance"`
-	ReadyNodes           []ReadyNode      `json:"ready_nodes"`
-	DispatchPackets      []DispatchPacket `json:"dispatch_packets"`
-	Diagnostics          []Diagnostic     `json:"diagnostics"`
-	ReasonCodes          []string         `json:"reason_codes"`
-	NextAction           string           `json:"next_action"`
-	DirectKAHStateWrite  bool             `json:"direct_kah_state_write"`
+	OK                   bool                     `json:"ok"`
+	Command              string                   `json:"command"`
+	Mode                 string                   `json:"mode"`
+	Status               string                   `json:"status"`
+	Project              string                   `json:"project"`
+	WorkflowID           string                   `json:"workflow_id"`
+	Workflow             WorkflowEvidence         `json:"workflow"`
+	Materialization      *MaterializationEvidence `json:"materialization,omitempty"`
+	NodeContractSource   string                   `json:"node_contract_source"`
+	NodeContractRef      string                   `json:"node_contract_ref,omitempty"`
+	SelectorRegistry     RegistryEvidence         `json:"selector_registry,omitempty"`
+	SelectorMatch        SelectorEvidence         `json:"selector_match,omitempty"`
+	TaskClass            string                   `json:"task_class,omitempty"`
+	Labels               []string                 `json:"labels,omitempty"`
+	ChangedSurfaces      []string                 `json:"changed_surfaces,omitempty"`
+	RequiredCapabilities []string                 `json:"required_capabilities,omitempty"`
+	KAHCapability        KAHCapability            `json:"kah_capability"`
+	Instance             InstanceEvidence         `json:"instance"`
+	ReadyNodes           []ReadyNode              `json:"ready_nodes"`
+	DispatchPackets      []DispatchPacket         `json:"dispatch_packets"`
+	Diagnostics          []Diagnostic             `json:"diagnostics"`
+	ReasonCodes          []string                 `json:"reason_codes"`
+	NextAction           string                   `json:"next_action"`
+	DirectKAHStateWrite  bool                     `json:"direct_kah_state_write"`
 }
 
 type WorkflowEvidence struct {
 	ID   string `json:"id"`
 	Path string `json:"path"`
+}
+
+type MaterializationEvidence struct {
+	SchemaVersion            string            `json:"schema_version,omitempty"`
+	Status                   string            `json:"status,omitempty"`
+	RunID                    string            `json:"run_id,omitempty"`
+	WorkflowFile             string            `json:"workflow_file,omitempty"`
+	NodeContractSource       string            `json:"node_contract_source,omitempty"`
+	RouteResultCopy          string            `json:"route_result_copy,omitempty"`
+	CustomWorkflowPacketCopy string            `json:"custom_workflow_packet_copy,omitempty"`
+	MaterializationFile      string            `json:"materialization_file,omitempty"`
+	ChecksumsFile            string            `json:"checksums_file,omitempty"`
+	SelectedBundle           string            `json:"selected_bundle,omitempty"`
+	TaskClass                string            `json:"task_class,omitempty"`
+	ClassificationReason     string            `json:"classification_reason,omitempty"`
+	RunLocalPosture          string            `json:"run_local_posture,omitempty"`
+	NoPromotion              bool              `json:"no_promotion"`
+	PersistentPromotion      bool              `json:"persistent_promotion"`
+	ApprovalEvidence         string            `json:"approval_evidence,omitempty"`
+	DryRunPlanHash           string            `json:"dry_run_plan_hash,omitempty"`
+	ApprovedPlanHash         string            `json:"approved_plan_hash,omitempty"`
+	Checksums                map[string]string `json:"checksums,omitempty"`
+	WrittenPaths             []string          `json:"written_paths,omitempty"`
 }
 
 type RegistryEvidence struct {
@@ -105,6 +135,7 @@ type ReadyNode struct {
 
 type DispatchPacket struct {
 	WorkflowID                        string   `json:"workflow_id"`
+	WorkflowFile                      string   `json:"workflow_file,omitempty"`
 	InstanceID                        string   `json:"instance_id"`
 	NodeID                            string   `json:"node_id"`
 	OwnerRole                         string   `json:"owner_role"`
@@ -125,6 +156,7 @@ type DispatchPacket struct {
 	ChangedSurfaces                   []string `json:"changed_surfaces,omitempty"`
 	RequiredCapabilities              []string `json:"required_capabilities,omitempty"`
 	CompletionAuthority               string   `json:"completion_authority"`
+	DirectKAHStateWrite               bool     `json:"direct_kah_state_write"`
 	Stage1DirectCodexIsKABNativeCodex bool     `json:"stage1_direct_codex_is_kab_native_codex"`
 	SourceChecksum                    string   `json:"source_checksum"`
 	Status                            string   `json:"status"`
@@ -165,8 +197,56 @@ func Trigger(opts Options) (Result, error) {
 	if opts.Project == "" {
 		return fail(result, "project_required", "workflow-trigger requires --project <path>."), nil
 	}
+	if opts.MaterializeRunLocal || strings.TrimSpace(opts.RouteResult) != "" || strings.TrimSpace(opts.CustomWorkflowPacket) != "" {
+		hasRouteResult := strings.TrimSpace(opts.RouteResult) != ""
+		hasCustomPacket := strings.TrimSpace(opts.CustomWorkflowPacket) != ""
+		if hasRouteResult == hasCustomPacket {
+			return fail(result, "run_local_materialization_source_required", "workflow-trigger --materialize-run-local requires exactly one of --route-result or --custom-workflow-packet."), nil
+		}
+		if !opts.MaterializeRunLocal {
+			return fail(result, "materialize_run_local_required", "workflow-trigger requires --materialize-run-local when a run-local source is supplied."), nil
+		}
+		if hasCustomPacket && strings.TrimSpace(opts.Approval) == "" {
+			return fail(result, "approval_evidence_required", "workflow-trigger custom workflow packet materialization requires --approval dry-run:sha256:<hash>."), nil
+		}
+		if hasRouteResult && strings.TrimSpace(opts.Approval) != "" {
+			return fail(result, "run_local_materialization_mode_conflict", "workflow-trigger route-result materialization does not accept --approval; approval is only for custom workflow packets."), nil
+		}
+		if strings.TrimSpace(opts.RunID) == "" {
+			return fail(result, "run_id_required", "workflow-trigger run-local materialization requires --run <run-id>."), nil
+		}
+		if hasSelectorInput(opts) || strings.TrimSpace(opts.WorkflowID) != "" || strings.TrimSpace(opts.WorkflowFile) != "" || strings.TrimSpace(opts.NodeContractSource) != "" || strings.TrimSpace(opts.InstanceID) != "" {
+			return fail(result, "run_local_materialization_mode_conflict", "workflow-trigger --materialize-run-local accepts exactly one run-local source plus --run only; do not mix explicit, selector, or resume inputs."), nil
+		}
+		preflight := preflightKAH(opts)
+		result.KAHCapability = preflight.capability
+		if preflight.err != nil {
+			return fail(result, "blocked_missing_kah_workflow_capability", preflight.err.Error()), nil
+		}
+		materialized, err := materializeRunLocal(opts, hasCustomPacket)
+		if err != nil {
+			return result, err
+		}
+		if !materialized.OK {
+			result = fail(result, materialized.Status, firstDiagnosticMessage(materialized.Diagnostics))
+			result.Diagnostics = append(result.Diagnostics, materializerDiagnostics(materialized.Diagnostics)...)
+			result.ReasonCodes = appendUnique(append(result.ReasonCodes, materialized.ReasonCodes...)...)
+			return result, nil
+		}
+		result.Mode = "run_local_materialized_trigger"
+		evidence := materializationEvidence(materialized)
+		result.Materialization = &evidence
+		opts.WorkflowID = materialized.WorkflowID
+		opts.WorkflowFile = materialized.WorkflowFile
+		opts.NodeContractSource = materialized.NodeContractSource
+		opts.NodeContractRef = "run-local:" + opts.RunID + ":" + materialized.WorkflowID
+		result.WorkflowID = opts.WorkflowID
+		result.NodeContractSource = opts.NodeContractSource
+		result.NodeContractRef = opts.NodeContractRef
+		result.TaskClass = materialized.TaskClass
+	}
 	selectorMode := hasSelectorInput(opts)
-	explicitMode := strings.TrimSpace(opts.WorkflowID) != "" || strings.TrimSpace(opts.NodeContractSource) != ""
+	explicitMode := strings.TrimSpace(opts.WorkflowID) != "" || strings.TrimSpace(opts.WorkflowFile) != "" || strings.TrimSpace(opts.NodeContractSource) != ""
 	var contracts []NodeContract
 	checksum := ""
 	if selectorMode && explicitMode {
@@ -189,14 +269,21 @@ func Trigger(opts Options) (Result, error) {
 			return fail(result, "workflow_id_invalid", "workflow id must be a simple file-safe id."), nil
 		}
 		result.WorkflowID = opts.WorkflowID
-		result.Workflow = WorkflowEvidence{ID: opts.WorkflowID, Path: workflowPath(opts.WorkflowID)}
+		workflowFile := workflowPath(opts.WorkflowID)
+		if strings.TrimSpace(opts.WorkflowFile) != "" {
+			if !safeExplicitWorkflowFile(opts.WorkflowFile) {
+				return fail(result, "unsafe_workflow_file", "workflow file must be a safe repository-relative YAML path."), nil
+			}
+			workflowFile = filepath.ToSlash(opts.WorkflowFile)
+		}
+		result.Workflow = WorkflowEvidence{ID: opts.WorkflowID, Path: workflowFile}
 		if strings.TrimSpace(opts.NodeContractSource) == "" {
 			return fail(result, "node_contract_source_required", "workflow-trigger requires --node-contract-source <path>."), nil
 		}
 		if strings.TrimSpace(opts.RunID) == "" && strings.TrimSpace(opts.InstanceID) == "" {
 			return fail(result, "run_or_instance_required", "workflow-trigger requires --run <run-id> for create or --instance-id <id> for resume."), nil
 		}
-		loadedContracts, loadedChecksum, loadErr := loadNodeContracts(opts.NodeContractSource, opts.NodeContractRef)
+		loadedContracts, loadedChecksum, loadErr := loadNodeContracts(opts.Project, opts.NodeContractSource, opts.NodeContractRef)
 		if loadErr != nil {
 			return fail(result, loadErr.Code, loadErr.Message), nil
 		}
@@ -209,10 +296,12 @@ func Trigger(opts Options) (Result, error) {
 		return fail(result, "run_or_instance_required", "workflow-trigger requires --run <run-id> for create or --instance-id <id> for resume."), nil
 	}
 
-	preflight := preflightKAH(opts)
-	result.KAHCapability = preflight.capability
-	if preflight.err != nil {
-		return fail(result, "blocked_missing_kah_workflow_capability", preflight.err.Error()), nil
+	if !result.KAHCapability.Available {
+		preflight := preflightKAH(opts)
+		result.KAHCapability = preflight.capability
+		if preflight.err != nil {
+			return fail(result, "blocked_missing_kah_workflow_capability", preflight.err.Error()), nil
+		}
 	}
 
 	explainNodeIDs, explainHadNodeIDs, ok := runWorkflowValidateExplain(&result, opts)
@@ -288,6 +377,10 @@ func normalizeOptions(opts Options) Options {
 			opts.Project = abs
 		}
 	}
+	opts.WorkflowFile = filepath.ToSlash(strings.TrimSpace(opts.WorkflowFile))
+	opts.RouteResult = strings.TrimSpace(opts.RouteResult)
+	opts.CustomWorkflowPacket = strings.TrimSpace(opts.CustomWorkflowPacket)
+	opts.Approval = strings.TrimSpace(opts.Approval)
 	opts.Labels = workflowregistry.NormalizeSelectorValues(opts.Labels)
 	opts.ChangedSurfaces = workflowregistry.NormalizeSelectorValues(opts.ChangedSurfaces)
 	opts.RequiredAgents = workflowregistry.NormalizeSelectorValues(opts.RequiredAgents)
@@ -298,6 +391,20 @@ func normalizeOptions(opts Options) Options {
 	return opts
 }
 
+func materializeRunLocal(opts Options, custom bool) (workflowmaterializer.Result, error) {
+	materializerOpts := workflowmaterializer.Options{
+		Project:              opts.Project,
+		RunID:                opts.RunID,
+		RouteResult:          opts.RouteResult,
+		CustomWorkflowPacket: opts.CustomWorkflowPacket,
+		Approval:             opts.Approval,
+	}
+	if custom {
+		return workflowmaterializer.MaterializeFromCustomPacket(materializerOpts)
+	}
+	return workflowmaterializer.MaterializeFromRoute(materializerOpts)
+}
+
 func newResult(opts Options) Result {
 	return Result{
 		Command:              Command,
@@ -305,6 +412,7 @@ func newResult(opts Options) Result {
 		Status:               "blocked",
 		Project:              opts.Project,
 		WorkflowID:           opts.WorkflowID,
+		Workflow:             WorkflowEvidence{ID: opts.WorkflowID, Path: opts.WorkflowFile},
 		NodeContractSource:   opts.NodeContractSource,
 		NodeContractRef:      opts.NodeContractRef,
 		TaskClass:            opts.TaskClass,
@@ -340,8 +448,12 @@ func (e codedError) Error() string {
 	return e.Message
 }
 
-func loadNodeContracts(path string, expectedRef string) ([]NodeContract, string, *codedError) {
-	contracts, checksum, err := workflowregistry.LoadJSONContracts(path, expectedRef)
+func loadNodeContracts(project string, path string, expectedRef string) ([]NodeContract, string, *codedError) {
+	readPath := path
+	if !filepath.IsAbs(readPath) && project != "" {
+		readPath = filepath.Join(project, filepath.FromSlash(readPath))
+	}
+	contracts, checksum, err := workflowregistry.LoadJSONContracts(readPath, expectedRef)
 	if err != nil {
 		return nil, "", mapNodeContractError(err)
 	}
@@ -649,6 +761,7 @@ func findContract(contracts []NodeContract, workflowID string, nodeID string) (N
 func packetFromContract(contract NodeContract, instanceID string, source string, ref string, checksum string, result Result) DispatchPacket {
 	return DispatchPacket{
 		WorkflowID:                        contract.WorkflowID,
+		WorkflowFile:                      result.Workflow.Path,
 		InstanceID:                        instanceID,
 		NodeID:                            contract.NodeID,
 		OwnerRole:                         contract.OwnerRole,
@@ -669,6 +782,7 @@ func packetFromContract(contract NodeContract, instanceID string, source string,
 		ChangedSurfaces:                   result.ChangedSurfaces,
 		RequiredCapabilities:              result.RequiredCapabilities,
 		CompletionAuthority:               "kah_only",
+		DirectKAHStateWrite:               false,
 		Stage1DirectCodexIsKABNativeCodex: false,
 		SourceChecksum:                    checksum,
 		Status:                            "ready_for_declared_lane",
@@ -677,6 +791,29 @@ func packetFromContract(contract NodeContract, instanceID string, source string,
 
 func workflowPath(workflowID string) string {
 	return filepath.ToSlash(filepath.Join(".kkachi", "workflows", workflowID+".yaml"))
+}
+
+func safeExplicitWorkflowFile(path string) bool {
+	path = filepath.ToSlash(strings.TrimSpace(path))
+	if path == "" || strings.HasPrefix(path, "/") || strings.Contains(path, "\\") {
+		return false
+	}
+	if !(strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
+		return false
+	}
+	parts := strings.Split(path, "/")
+	for _, part := range parts {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+	blocked := []string{".kkachi-workflow.yaml", ".kkachi/workflow-catalog.yaml", ".kkachi/config.yaml", ".kkachi/config/workflows/"}
+	for _, item := range blocked {
+		if path == strings.TrimSuffix(item, "/") || strings.HasPrefix(path, item) {
+			return false
+		}
+	}
+	return true
 }
 
 func safeWorkflowID(id string) bool {
@@ -690,6 +827,48 @@ func safeWorkflowID(id string) bool {
 		return false
 	}
 	return true
+}
+
+func materializationEvidence(result workflowmaterializer.Result) MaterializationEvidence {
+	return MaterializationEvidence{
+		SchemaVersion:            result.SchemaVersion,
+		Status:                   result.Status,
+		RunID:                    result.RunID,
+		WorkflowFile:             result.WorkflowFile,
+		NodeContractSource:       result.NodeContractSource,
+		RouteResultCopy:          result.RouteResultCopy,
+		CustomWorkflowPacketCopy: result.CustomWorkflowPacketCopy,
+		MaterializationFile:      result.MaterializationFile,
+		ChecksumsFile:            result.ChecksumsFile,
+		SelectedBundle:           result.SelectedBundle,
+		TaskClass:                result.TaskClass,
+		ClassificationReason:     result.ClassificationReason,
+		RunLocalPosture:          result.RunLocalPosture,
+		NoPromotion:              result.NoPromotion,
+		PersistentPromotion:      result.PersistentPromotion,
+		ApprovalEvidence:         result.SourceEvidence.ApprovalEvidence,
+		DryRunPlanHash:           result.SourceEvidence.DryRunPlanHash,
+		ApprovedPlanHash:         result.SourceEvidence.ApprovedPlanHash,
+		Checksums:                result.Checksums,
+		WrittenPaths:             result.WrittenPaths,
+	}
+}
+
+func materializerDiagnostics(diagnostics []workflowmaterializer.Diagnostic) []Diagnostic {
+	converted := []Diagnostic{}
+	for _, diagnostic := range diagnostics {
+		converted = append(converted, Diagnostic{Level: diagnostic.Level, Code: diagnostic.Code, Message: diagnostic.Message, Field: diagnostic.Field})
+	}
+	return converted
+}
+
+func firstDiagnosticMessage(diagnostics []workflowmaterializer.Diagnostic) string {
+	for _, diagnostic := range diagnostics {
+		if strings.TrimSpace(diagnostic.Message) != "" {
+			return diagnostic.Message
+		}
+	}
+	return "workflow materialization failed."
 }
 
 func requiredWorkflowCommands() []string {
