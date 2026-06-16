@@ -435,6 +435,8 @@ node_contracts:
     approval_required: false
     fallback_policy: none_fail_closed
     verification_gate: make test
+    completion_authority: kah_only
+    direct_kah_state_write: false
 `
 }
 

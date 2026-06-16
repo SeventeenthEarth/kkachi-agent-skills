@@ -1,9 +1,29 @@
 package workflowregistry
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+var standardBundleNodeIDs = map[string][]string{
+	"development_full":        {"codegraph_refresh", "plan", "ask", "implement", "enhance_test", "optimize", "update_docs", "request_feedback", "handle_feedback", "final_verify", "improve"},
+	"docs_only_light":         {"task_contract", "plan", "update_docs", "docs_validation", "final_verify"},
+	"research_evidence_light": {"task_contract", "evidence_collection", "source_citation", "final_verify"},
+	"review_light":            {"task_contract", "review_request", "feedback_evidence", "final_verify"},
+	"bootstrap_config":        {"task_contract", "preflight", "configure", "verification", "final_verify"},
+	"direct_report":           {"command_evidence", "final_report"},
+}
+
+var standardBundleTaskClasses = map[string]string{
+	"development_full":        "development",
+	"docs_only_light":         "docs_only",
+	"research_evidence_light": "research_evidence",
+	"review_light":            "collaboration_review",
+	"bootstrap_config":        "bootstrap_config",
+	"direct_report":           "simple_command_report",
+}
 
 func TestParseValidRegistryWithNestedSelectorAndContractLists(t *testing.T) {
 	registry, err := Parse(validRegistryYAML("demo"))
@@ -20,6 +40,66 @@ func TestParseValidRegistryWithNestedSelectorAndContractLists(t *testing.T) {
 	contract := registry.NodeContracts[0]
 	if contract.TaskClass != "development" || contract.RequiredInputs[0] != "task-contract.yaml" || contract.ExpectedArtifacts[0] != "artifacts/setup.md" {
 		t.Fatalf("contract block lists not parsed: %+v", contract)
+	}
+	if contract.CompletionAuthority != KAHOnlyAuthority || contract.DirectKAHStateWrite == nil || *contract.DirectKAHStateWrite {
+		t.Fatalf("contract authority fields not parsed: %+v", contract)
+	}
+}
+
+func TestShippedRegistryContainsCanonicalStandardBundles(t *testing.T) {
+	registry := loadShippedRegistry(t)
+	if len(registry.Workflows) != len(standardBundleTaskClasses) {
+		t.Fatalf("shipped registry workflow count = %d, want %d: %+v", len(registry.Workflows), len(standardBundleTaskClasses), registry.Workflows)
+	}
+	seen := map[string]bool{}
+	for _, workflow := range registry.Workflows {
+		seen[workflow.WorkflowID] = true
+		if workflow.WorkflowID == "development-default" {
+			t.Fatal("legacy development-default must not remain selectable in the shipped standard bundle registry")
+		}
+		if workflow.FallbackPolicy != NoFallbackPolicy {
+			t.Fatalf("workflow %s fallback drifted: %s", workflow.WorkflowID, workflow.FallbackPolicy)
+		}
+	}
+	for workflowID := range standardBundleTaskClasses {
+		if !seen[workflowID] {
+			t.Fatalf("shipped registry missing canonical bundle %s; seen=%v", workflowID, seen)
+		}
+	}
+}
+
+func TestShippedStandardBundlesSelectUniquelyAndCoverContracts(t *testing.T) {
+	registry := loadShippedRegistry(t)
+	for workflowID, taskClass := range standardBundleTaskClasses {
+		t.Run(workflowID, func(t *testing.T) {
+			match, err := Select(registry, Query{TaskClass: taskClass, RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if match.Status != "selector_matched" || match.Selected.WorkflowID != workflowID || len(match.Candidates) != 1 {
+				t.Fatalf("expected unique %s match for task_class %s, got %+v", workflowID, taskClass, match)
+			}
+			contracts := ContractsForWorkflow(registry.NodeContracts, workflowID)
+			if len(contracts) != len(standardBundleNodeIDs[workflowID]) {
+				t.Fatalf("contract count for %s = %d, want %d", workflowID, len(contracts), len(standardBundleNodeIDs[workflowID]))
+			}
+			if err := ValidateContractsCoverNodeIDs(registry.NodeContracts, workflowID, standardBundleNodeIDs[workflowID]); err != nil {
+				t.Fatalf("contracts do not cover expected nodes: %v", err)
+			}
+			for _, contract := range contracts {
+				if contract.CompletionAuthority != KAHOnlyAuthority || contract.DirectKAHStateWrite == nil || *contract.DirectKAHStateWrite || contract.FallbackPolicy != NoFallbackPolicy {
+					t.Fatalf("contract authority drift for %s/%s: %+v", workflowID, contract.NodeID, contract)
+				}
+			}
+		})
+	}
+	missing, err := Select(registry, Query{RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}})
+	if err == nil || missing.Status != "selector_required_input_missing" {
+		t.Fatalf("expected missing task_class to fail closed, got %+v err=%v", missing, err)
+	}
+	noMatch, err := Select(registry, Query{TaskClass: "unknown", RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}})
+	if err != nil || noMatch.Status != "selector_no_match" {
+		t.Fatalf("expected unknown task_class to no-match, got %+v err=%v", noMatch, err)
 	}
 }
 
@@ -117,6 +197,8 @@ func TestParseFailsClosedForDuplicateNodeContracts(t *testing.T) {
     approval_required: false
     fallback_policy: none_fail_closed
     verification_gate: make test
+    completion_authority: kah_only
+    direct_kah_state_write: false
 `
 	_, err := Parse(text)
 	if err == nil || !strings.Contains(err.Error(), "duplicate node contract") {
@@ -149,6 +231,27 @@ func TestJSONAndYAMLNodeContractsShareCoreValidation(t *testing.T) {
 	_, err = Parse(registryWithInvalidCore)
 	if err == nil || !strings.Contains(err.Error(), "unsupported fallback_policy") {
 		t.Fatalf("registry YAML must share core node-contract validation, got %v", err)
+	}
+}
+
+func TestRegistryNodeContractAuthorityFieldsFailClosed(t *testing.T) {
+	cases := map[string]string{
+		"missing completion authority": strings.Replace(validRegistryYAML("demo"), "    completion_authority: kah_only\n", "", 1),
+		"wrong completion authority":   strings.Replace(validRegistryYAML("demo"), "    completion_authority: kah_only\n", "    completion_authority: kas_local\n", 1),
+		"missing direct write":         strings.Replace(validRegistryYAML("demo"), "    direct_kah_state_write: false\n", "", 1),
+		"direct write true":            strings.Replace(validRegistryYAML("demo"), "    direct_kah_state_write: false\n", "    direct_kah_state_write: true\n", 1),
+		"node fallback drift":          strings.Replace(validRegistryYAML("demo"), "    fallback_policy: none_fail_closed\n    verification_gate: make test\n", "    fallback_policy: retry\n    verification_gate: make test\n", 1),
+	}
+	for name, input := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := Parse(input)
+			if err == nil {
+				t.Fatal("expected authority-field drift to fail closed")
+			}
+			if !strings.Contains(err.Error(), "completion_authority") && !strings.Contains(err.Error(), "direct_kah_state_write") && !strings.Contains(err.Error(), "fallback_policy") {
+				t.Fatalf("expected authority-field error, got %v", err)
+			}
+		})
 	}
 }
 
@@ -208,5 +311,21 @@ node_contracts:
     approval_required: false
     fallback_policy: none_fail_closed
     verification_gate: make test
+    completion_authority: kah_only
+    direct_kah_state_write: false
 `
+}
+
+func loadShippedRegistry(t *testing.T) Registry {
+	t.Helper()
+	path := filepath.Join("..", "..", "..", "registries", "task-dag-workflow-registry.yaml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := Parse(string(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return registry
 }

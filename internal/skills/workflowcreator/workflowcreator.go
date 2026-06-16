@@ -582,15 +582,14 @@ func candidatePaths(workflowID string, mode string) CandidatePaths {
 
 func renderDAG(workflowID string, nodes []RequestNode) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "schema_version: task-dag/v1\nworkflow_id: %s\nnodes:\n", workflowID)
+	fmt.Fprintf(&b, "workflow_id: %s\nschema_version: task-dag/v1\nnodes:\n", workflowID)
 	for _, node := range nodes {
 		fmt.Fprintf(&b, "  - id: %s\n", node.NodeID)
-		b.WriteString("    depends_on:\n")
-		for _, dep := range normalizeStrings(node.DependsOn) {
-			fmt.Fprintf(&b, "      - %s\n", dep)
-		}
-		if len(node.DependsOn) == 0 {
-			b.WriteString("      []\n")
+		deps := normalizeStrings(node.DependsOn)
+		if len(deps) == 0 {
+			b.WriteString("    depends_on: []\n")
+		} else {
+			fmt.Fprintf(&b, "    depends_on: [%s]\n", strings.Join(deps, ", "))
 		}
 		b.WriteString("    join: all_of\n")
 		b.WriteString("    required_outputs:\n")
@@ -629,11 +628,22 @@ func renderNodeContractRegistry(contracts []NodeContract) string {
 		fmt.Fprintf(&b, "  - workflow_id: %s\n", contract.WorkflowID)
 		fmt.Fprintf(&b, "    node_id: %s\n", contract.NodeID)
 		fmt.Fprintf(&b, "    task_class: %s\n", contract.TaskClass)
-		fmt.Fprintf(&b, "    completion_authority: kah_only\n")
-		fmt.Fprintf(&b, "    direct_kah_state_write: false\n")
 		fmt.Fprintf(&b, "    owner_role: %s\n", contract.OwnerRole)
 		fmt.Fprintf(&b, "    execution_lane: %s\n", contract.ExecutionLane)
-		fmt.Fprintf(&b, "    fallback_policy: none_fail_closed\n")
+		b.WriteString("    required_inputs:\n")
+		for _, input := range normalizeStrings(contract.RequiredInputs) {
+			fmt.Fprintf(&b, "      - %s\n", input)
+		}
+		b.WriteString("    expected_artifacts:\n")
+		for _, artifact := range normalizeStrings(contract.ExpectedArtifacts) {
+			fmt.Fprintf(&b, "      - %s\n", artifact)
+		}
+		fmt.Fprintf(&b, "    prompt_ref: %s\n", contract.PromptRef)
+		fmt.Fprintf(&b, "    approval_required: %t\n", contract.ApprovalRequired)
+		fmt.Fprintf(&b, "    fallback_policy: %s\n", contract.FallbackPolicy)
+		fmt.Fprintf(&b, "    verification_gate: %s\n", contract.VerificationGate)
+		fmt.Fprintf(&b, "    completion_authority: %s\n", contract.CompletionAuthority)
+		fmt.Fprintf(&b, "    direct_kah_state_write: %t\n", contract.DirectKAHStateWrite)
 	}
 	return b.String()
 }

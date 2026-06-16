@@ -95,6 +95,59 @@ func TestDryRunApprovalHashIsStableAndBindsSelectorMetadata(t *testing.T) {
 	}
 }
 
+func TestRenderDAGUsesKAHCompatibleDependencyShape(t *testing.T) {
+	dag := renderDAG("demo", []RequestNode{
+		{NodeID: "plan", DependsOn: []string{}, RequiredOutputs: []string{"artifacts/plan.md"}},
+		{NodeID: "implement", DependsOn: []string{"plan"}, RequiredOutputs: []string{"artifacts/implement.md"}},
+		{NodeID: "final_verify", DependsOn: []string{"implement", "docs_validation"}, RequiredOutputs: []string{"artifacts/final.md"}},
+	})
+	if !strings.HasPrefix(dag, "workflow_id: demo\nschema_version: task-dag/v1\nnodes:\n") {
+		t.Fatalf("DAG top-level order is not KAH-compatible:\n%s", dag)
+	}
+	if !strings.Contains(dag, "  - id: plan\n    depends_on: []\n    join: all_of\n    required_outputs:\n      - artifacts/plan.md\n") {
+		t.Fatalf("root node did not render inline empty depends_on with deterministic join:\n%s", dag)
+	}
+	if strings.Contains(dag, "depends_on:\n      []") {
+		t.Fatalf("DAG rendered block-style empty depends_on:\n%s", dag)
+	}
+	if !strings.Contains(dag, "  - id: implement\n    depends_on: [plan]\n    join: all_of\n") {
+		t.Fatalf("single dependency did not render inline with deterministic join:\n%s", dag)
+	}
+	if !strings.Contains(dag, "  - id: final_verify\n    depends_on: [docs_validation, implement]\n    join: all_of\n") {
+		t.Fatalf("fan-in dependencies did not render normalized inline list with deterministic join:\n%s", dag)
+	}
+}
+
+func TestDryRunGeneratedNodeContractRegistryCarriesCompleteContracts(t *testing.T) {
+	project := t.TempDir()
+	request := writeRequest(t, project, validRequest(ModeDAGOnly))
+	result, err := BuildDryRun(Options{Project: project, WorkflowID: "demo", Mode: ModeDAGOnly, RequestPath: request, Runner: workflowCapableRunner().Run})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := generatedContentByKind(t, result, "node_contract_registry")
+	for _, want := range []string{
+		"schema_version: kas-task-dag-workflow-registry/v1\nnode_contracts:\n",
+		"  - workflow_id: demo\n",
+		"    node_id: plan\n",
+		"    task_class: development\n",
+		"    owner_role: planner_backend\n",
+		"    execution_lane: stage1_direct_codex_app_server\n",
+		"    required_inputs:\n      - task-contract.yaml\n",
+		"    expected_artifacts:\n      - plan.md\n",
+		"    prompt_ref: skills/kkachi-plan/SKILL.md\n",
+		"    approval_required: false\n",
+		"    fallback_policy: none_fail_closed\n",
+		"    verification_gate: kah_workflow_node_evidence\n",
+		"    completion_authority: kah_only\n",
+		"    direct_kah_state_write: false\n",
+	} {
+		if !strings.Contains(registry, want) {
+			t.Fatalf("generated node contract registry missing %q:\n%s", want, registry)
+		}
+	}
+}
+
 func TestDryRunFailsClosedForMissingNilOrEmptySelectorMetadata(t *testing.T) {
 	project := t.TempDir()
 	for name, content := range map[string]string{
@@ -295,6 +348,17 @@ func firstCode(diags []Diagnostic) string {
 		return ""
 	}
 	return diags[0].Code
+}
+
+func generatedContentByKind(t *testing.T, result Result, kind string) string {
+	t.Helper()
+	for _, item := range result.MachinePacket.GeneratedContent {
+		if item.Kind == kind {
+			return item.Content
+		}
+	}
+	t.Fatalf("generated content kind %s not found: %+v", kind, result.MachinePacket.GeneratedContent)
+	return ""
 }
 
 func TestResultJSONCarriesMachinePacket(t *testing.T) {

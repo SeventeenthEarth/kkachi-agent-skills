@@ -15,6 +15,7 @@ const (
 	RegistryVersion      = "kas-task-dag-workflow-registry/v1"
 	NodeContractsVersion = "kas-node-contracts/v1"
 	NoFallbackPolicy     = "none_fail_closed"
+	KAHOnlyAuthority     = "kah_only"
 )
 
 type Registry struct {
@@ -59,17 +60,19 @@ type MatchResult struct {
 }
 
 type NodeContract struct {
-	WorkflowID        string   `json:"workflow_id"`
-	NodeID            string   `json:"node_id"`
-	TaskClass         string   `json:"task_class,omitempty"`
-	OwnerRole         string   `json:"owner_role"`
-	ExecutionLane     string   `json:"execution_lane"`
-	RequiredInputs    []string `json:"required_inputs"`
-	ExpectedArtifacts []string `json:"expected_artifacts"`
-	PromptRef         string   `json:"prompt_ref"`
-	ApprovalRequired  bool     `json:"approval_required"`
-	FallbackPolicy    string   `json:"fallback_policy"`
-	VerificationGate  string   `json:"verification_gate"`
+	WorkflowID          string   `json:"workflow_id"`
+	NodeID              string   `json:"node_id"`
+	TaskClass           string   `json:"task_class,omitempty"`
+	OwnerRole           string   `json:"owner_role"`
+	ExecutionLane       string   `json:"execution_lane"`
+	RequiredInputs      []string `json:"required_inputs"`
+	ExpectedArtifacts   []string `json:"expected_artifacts"`
+	PromptRef           string   `json:"prompt_ref"`
+	ApprovalRequired    bool     `json:"approval_required"`
+	FallbackPolicy      string   `json:"fallback_policy"`
+	VerificationGate    string   `json:"verification_gate"`
+	CompletionAuthority string   `json:"completion_authority,omitempty"`
+	DirectKAHStateWrite *bool    `json:"direct_kah_state_write,omitempty"`
 }
 
 type nodeContractBundle struct {
@@ -134,6 +137,12 @@ func Parse(text string) (Registry, error) {
 		if contract.TaskClass == "" {
 			return Registry{}, fmt.Errorf("registry node contracts require task_class")
 		}
+		if contract.CompletionAuthority != KAHOnlyAuthority {
+			return Registry{}, fmt.Errorf("registry node contract %s/%s requires completion_authority %s", contract.WorkflowID, contract.NodeID, KAHOnlyAuthority)
+		}
+		if contract.DirectKAHStateWrite == nil {
+			return Registry{}, fmt.Errorf("registry node contract %s/%s requires direct_kah_state_write", contract.WorkflowID, contract.NodeID)
+		}
 	}
 	seenWorkflows := map[string]bool{}
 	for _, workflow := range registry.Workflows {
@@ -168,6 +177,12 @@ func ValidateNodeContracts(contracts []NodeContract) error {
 		}
 		if contract.FallbackPolicy != NoFallbackPolicy {
 			return fmt.Errorf("node contract %s/%s uses unsupported fallback_policy %q", contract.WorkflowID, contract.NodeID, contract.FallbackPolicy)
+		}
+		if contract.CompletionAuthority != "" && contract.CompletionAuthority != KAHOnlyAuthority {
+			return fmt.Errorf("node contract %s/%s uses unsupported completion_authority %q", contract.WorkflowID, contract.NodeID, contract.CompletionAuthority)
+		}
+		if contract.DirectKAHStateWrite != nil && *contract.DirectKAHStateWrite {
+			return fmt.Errorf("node contract %s/%s must set direct_kah_state_write false", contract.WorkflowID, contract.NodeID)
 		}
 		key := contract.WorkflowID + "\x00" + contract.NodeID
 		if seen[key] {
@@ -487,6 +502,19 @@ func (p *registryParser) setContractScalar(lineNo int, key string, value string)
 		contract.FallbackPolicy = value
 	case "verification_gate":
 		contract.VerificationGate = value
+	case "completion_authority":
+		contract.CompletionAuthority = value
+	case "direct_kah_state_write":
+		switch value {
+		case "true":
+			v := true
+			contract.DirectKAHStateWrite = &v
+		case "false":
+			v := false
+			contract.DirectKAHStateWrite = &v
+		default:
+			return fmt.Errorf("line %d: direct_kah_state_write must be true or false", lineNo)
+		}
 	default:
 		return fmt.Errorf("line %d: unsupported node_contract field %q", lineNo, key)
 	}

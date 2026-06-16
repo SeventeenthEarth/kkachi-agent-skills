@@ -1,36 +1,472 @@
 version: kas-task-dag-workflow-registry/v1
 workflows:
-  - workflow_id: development-default
-    workflow_path: .kkachi/workflows/development-default.yaml
+  - workflow_id: development_full
+    workflow_path: .kkachi/workflows/development_full.yaml
     selector:
       task_classes: [development]
       labels_any: []
       labels_all: []
-      changed_surfaces_any: [code, tests, docs]
+      changed_surfaces_any: []
+      risk_levels: []
+      required_agents_all: []
+      required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]
+    fallback_policy: none_fail_closed
+  - workflow_id: docs_only_light
+    workflow_path: .kkachi/workflows/docs_only_light.yaml
+    selector:
+      task_classes: [docs_only]
+      labels_any: []
+      labels_all: []
+      changed_surfaces_any: []
+      risk_levels: []
+      required_agents_all: []
+      required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]
+    fallback_policy: none_fail_closed
+  - workflow_id: research_evidence_light
+    workflow_path: .kkachi/workflows/research_evidence_light.yaml
+    selector:
+      task_classes: [research_evidence]
+      labels_any: []
+      labels_all: []
+      changed_surfaces_any: []
+      risk_levels: []
+      required_agents_all: []
+      required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]
+    fallback_policy: none_fail_closed
+  - workflow_id: review_light
+    workflow_path: .kkachi/workflows/review_light.yaml
+    selector:
+      task_classes: [collaboration_review]
+      labels_any: []
+      labels_all: []
+      changed_surfaces_any: []
+      risk_levels: []
+      required_agents_all: []
+      required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]
+    fallback_policy: none_fail_closed
+  - workflow_id: bootstrap_config
+    workflow_path: .kkachi/workflows/bootstrap_config.yaml
+    selector:
+      task_classes: [bootstrap_config]
+      labels_any: []
+      labels_all: []
+      changed_surfaces_any: []
+      risk_levels: []
+      required_agents_all: []
+      required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]
+    fallback_policy: none_fail_closed
+  - workflow_id: direct_report
+    workflow_path: .kkachi/workflows/direct_report.yaml
+    selector:
+      task_classes: [simple_command_report]
+      labels_any: []
+      labels_all: []
+      changed_surfaces_any: []
       risk_levels: []
       required_agents_all: []
       required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]
     fallback_policy: none_fail_closed
 node_contracts:
-  - workflow_id: development-default
+  - workflow_id: development_full
+    node_id: codegraph_refresh
+    task_class: development
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [task-contract.yaml]
+    expected_artifacts: [codegraph-status.md]
+    prompt_ref: skills/kkachi-orchestrate/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
     node_id: plan
     task_class: development
     owner_role: planner_backend
     execution_lane: stage1_direct_codex_app_server
-    required_inputs: [task-contract.yaml]
-    expected_artifacts: [plan.md, test-spec.md]
+    required_inputs: [task-contract.yaml, codegraph-status.md]
+    expected_artifacts: [plan.md, checklist.md]
     prompt_ref: skills/kkachi-plan/SKILL.md
     approval_required: false
     fallback_policy: none_fail_closed
     verification_gate: kah_workflow_node_evidence
-  - workflow_id: development-default
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: ask
+    task_class: development
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [plan.md]
+    expected_artifacts: [ask.md, answered-decisions.md]
+    prompt_ref: skills/kkachi-ask/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
     node_id: implement
     task_class: development
     owner_role: implementer_backend
     execution_lane: stage1_direct_codex_app_server
-    required_inputs: [task-contract.yaml, plan.md]
-    expected_artifacts: [source-diff, test-output]
+    required_inputs: [task-contract.yaml, plan.md, ask.md]
+    expected_artifacts: [diff.patch, impl-log.md, cli-output.md]
     prompt_ref: skills/kkachi-implement/SKILL.md
     approval_required: true
     fallback_policy: none_fail_closed
     verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: enhance_test
+    task_class: development
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [diff.patch, impl-log.md]
+    expected_artifacts: [test-plan.md, test-log.md]
+    prompt_ref: skills/kkachi-enhance-test/SKILL.md
+    approval_required: true
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: optimize
+    task_class: development
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [diff.patch, test-log.md]
+    expected_artifacts: [slop-cleanup-log.md, optimize-log.md]
+    prompt_ref: skills/kkachi-optimize/SKILL.md
+    approval_required: true
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: update_docs
+    task_class: development
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [diff.patch, optimize-log.md]
+    expected_artifacts: [docs-update.md]
+    prompt_ref: skills/kkachi-docs-update/SKILL.md
+    approval_required: true
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: request_feedback
+    task_class: development
+    owner_role: feedback_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [diff.patch, docs-update.md]
+    expected_artifacts: [feedback-request.md, feedback-1.md]
+    prompt_ref: skills/kkachi-request-feedback/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: handle_feedback
+    task_class: development
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [feedback-1.md]
+    expected_artifacts: [feedback-triage-1.md, handle-feedback-1.md]
+    prompt_ref: skills/kkachi-handle-feedback/SKILL.md
+    approval_required: true
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: final_verify
+    task_class: development
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [checklist.md, diff.patch, test-log.md]
+    expected_artifacts: [verification.md, final-report.md]
+    prompt_ref: skills/kkachi-final-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: improve
+    task_class: development
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [final-report.md]
+    expected_artifacts: [improvement-note.md]
+    prompt_ref: skills/kkachi-improve/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: docs_only_light
+    node_id: task_contract
+    task_class: docs_only
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-intake.md]
+    expected_artifacts: [task-contract.yaml]
+    prompt_ref: skills/kkachi-task-contract/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: docs_only_light
+    node_id: plan
+    task_class: docs_only
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-contract.yaml]
+    expected_artifacts: [plan.md, checklist.md]
+    prompt_ref: skills/kkachi-plan/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: docs_only_light
+    node_id: update_docs
+    task_class: docs_only
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [plan.md]
+    expected_artifacts: [docs-update.md]
+    prompt_ref: skills/kkachi-docs-update/SKILL.md
+    approval_required: true
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: docs_only_light
+    node_id: docs_validation
+    task_class: docs_only
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [docs-update.md]
+    expected_artifacts: [docs-validation.md]
+    prompt_ref: skills/kkachi-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: docs_only_light
+    node_id: final_verify
+    task_class: docs_only
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [checklist.md, docs-validation.md]
+    expected_artifacts: [verification.md, final-report.md]
+    prompt_ref: skills/kkachi-final-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: research_evidence_light
+    node_id: task_contract
+    task_class: research_evidence
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-intake.md]
+    expected_artifacts: [task-contract.yaml]
+    prompt_ref: skills/kkachi-task-contract/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: research_evidence_light
+    node_id: evidence_collection
+    task_class: research_evidence
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-contract.yaml]
+    expected_artifacts: [evidence.md]
+    prompt_ref: skills/kkachi-orchestrate/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: research_evidence_light
+    node_id: source_citation
+    task_class: research_evidence
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [evidence.md]
+    expected_artifacts: [source-citations.md]
+    prompt_ref: skills/kkachi-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: research_evidence_light
+    node_id: final_verify
+    task_class: research_evidence
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [evidence.md, source-citations.md]
+    expected_artifacts: [verification.md, final-report.md]
+    prompt_ref: skills/kkachi-final-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: review_light
+    node_id: task_contract
+    task_class: collaboration_review
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-intake.md]
+    expected_artifacts: [task-contract.yaml]
+    prompt_ref: skills/kkachi-task-contract/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: review_light
+    node_id: review_request
+    task_class: collaboration_review
+    owner_role: feedback_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-contract.yaml]
+    expected_artifacts: [review.md]
+    prompt_ref: skills/kkachi-review/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: review_light
+    node_id: feedback_evidence
+    task_class: collaboration_review
+    owner_role: feedback_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [review.md]
+    expected_artifacts: [feedback-evidence.md]
+    prompt_ref: skills/kkachi-request-feedback/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: review_light
+    node_id: final_verify
+    task_class: collaboration_review
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [review.md, feedback-evidence.md]
+    expected_artifacts: [verification.md, final-report.md]
+    prompt_ref: skills/kkachi-final-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: bootstrap_config
+    node_id: task_contract
+    task_class: bootstrap_config
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-intake.md]
+    expected_artifacts: [task-contract.yaml]
+    prompt_ref: skills/kkachi-task-contract/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: bootstrap_config
+    node_id: preflight
+    task_class: bootstrap_config
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-contract.yaml]
+    expected_artifacts: [preflight.md]
+    prompt_ref: skills/kkachi-install-guide/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: bootstrap_config
+    node_id: configure
+    task_class: bootstrap_config
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [preflight.md]
+    expected_artifacts: [configure-log.md]
+    prompt_ref: skills/kkachi-install-guide/SKILL.md
+    approval_required: true
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: bootstrap_config
+    node_id: verification
+    task_class: bootstrap_config
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [configure-log.md]
+    expected_artifacts: [verification.md]
+    prompt_ref: skills/kkachi-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: bootstrap_config
+    node_id: final_verify
+    task_class: bootstrap_config
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [verification.md]
+    expected_artifacts: [final-report.md]
+    prompt_ref: skills/kkachi-final-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: direct_report
+    node_id: command_evidence
+    task_class: simple_command_report
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [task-intake.md]
+    expected_artifacts: [command-evidence.md]
+    prompt_ref: skills/kkachi-orchestrate/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: direct_report
+    node_id: final_report
+    task_class: simple_command_report
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [command-evidence.md]
+    expected_artifacts: [final-report.md]
+    prompt_ref: skills/kkachi-final-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false

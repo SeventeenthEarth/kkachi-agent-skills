@@ -63,8 +63,13 @@ func TestWFLOW003DispatchPacketTemplatePreservesSelectorReadback(t *testing.T) {
 func TestWFLOW003RegistryCarriesSharedNodeContractFields(t *testing.T) {
 	requireContainsAll(t, "registries/task-dag-workflow-registry.yaml", []string{
 		"version: kas-task-dag-workflow-registry/v1",
-		"workflow_id: development-default",
-		"workflow_path: .kkachi/workflows/development-default.yaml",
+		"workflow_id: development_full",
+		"workflow_id: docs_only_light",
+		"workflow_id: research_evidence_light",
+		"workflow_id: review_light",
+		"workflow_id: bootstrap_config",
+		"workflow_id: direct_report",
+		"workflow_path: .kkachi/workflows/development_full.yaml",
 		"required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]",
 		"node_contracts:",
 		"task_class: development",
@@ -76,5 +81,7 @@ func TestWFLOW003RegistryCarriesSharedNodeContractFields(t *testing.T) {
 		"approval_required:",
 		"fallback_policy: none_fail_closed",
 		"verification_gate: kah_workflow_node_evidence",
+		"completion_authority: kah_only",
+		"direct_kah_state_write: false",
 	})
 }
