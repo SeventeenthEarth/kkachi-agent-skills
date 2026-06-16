@@ -240,10 +240,10 @@ case "$*" in
       echo '{"ok":true,"graph":{"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.0.9","checksum":"sha256:old"}}'
     fi
     ;;
-  "graph diff --from .kkachi-workflow.yaml --to .kkachi/graph/candidates/kas-default-9e933dd77ff2c95c.yaml --semantic --json")
+  "graph diff --from .kkachi-workflow.yaml --to .kkachi/graph/candidates/kas-default-96af9b5b030fc4ca.yaml --semantic --json")
     echo '{"ok":true,"summary":"semantic diff ready","risk_flags":["phase_path_change"],"reason_codes":["graph_stale"]}'
     ;;
-  "graph propose --candidate-file .kkachi/graph/candidates/kas-default-9e933dd77ff2c95c.yaml --reason repair --json")
+  "graph propose --candidate-file .kkachi/graph/candidates/kas-default-96af9b5b030fc4ca.yaml --reason repair --json")
     echo '{"ok":true,"proposal_id":"prop-1","proposal_path":".kkachi/graph/proposals/prop-1.yaml","approval_required":true,"risk_flags":["phase_path_change"],"reason_codes":["proposal_recorded"]}'
     ;;
   "graph apply --proposal prop-1 --approval approved:1 --json")
@@ -1121,6 +1121,98 @@ func TestWorkflowCreateCLIInstalledKAHCaveatIsNonApprovable(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(project, ".kkachi")); !os.IsNotExist(err) {
 		t.Fatalf("blocked dry-run created project state: %v", err)
+	}
+}
+
+func TestWorkflowPromoteCLIDryRunAndFailClosedApply(t *testing.T) {
+	project := t.TempDir()
+	registryPath := filepath.Join(project, "workflow-registry.yaml")
+	if err := os.WriteFile(registryPath, []byte(cliWorkflowRegistry("demo")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routeResult := writeCLIWorkflowRouteResult(t, project, registry, "demo")
+	installCLIWorkflowTriggerRunLocalFakeKAH(t, true)
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"workflow-trigger", "--project", project, "--route-result", routeResult, "--materialize-run-local", "--run", "run-20260616T105614Z-4b0ebe11b67d", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("workflow-trigger materialization failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+
+	installCLIWorkflowCreateFakeKAH(t, true)
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"workflow-promote", "--project", project, "--run", "run-20260616T105614Z-4b0ebe11b67d", "--target-workflow-id", "promoted-demo", "--reuse-reason", "demo workflow proved reusable for repeat release tasks", "--thin-trigger", "--dry-run", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("workflow-promote dry-run failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var dryRun map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &dryRun); err != nil {
+		t.Fatal(err)
+	}
+	if dryRun["ok"] != true || dryRun["command"] != "workflow-promote" || dryRun["status"] != "dry_run_ready" || dryRun["direct_kah_state_write"] != false {
+		t.Fatalf("unexpected workflow-promote dry-run payload: %+v", dryRun)
+	}
+	packet := dryRun["machine_packet"].(map[string]any)
+	if packet["approval_hash"] == "" || packet["source_provenance"] == nil || packet["generated_content"] == nil || packet["target_paths"] == nil {
+		t.Fatalf("dry-run missing promotion machine packet evidence: %+v", packet)
+	}
+	source := packet["source_provenance"].(map[string]any)
+	if source["run_id"] != "run-20260616T105614Z-4b0ebe11b67d" || source["workflow_checksum"] == "" || source["node_contracts_checksum"] == "" || source["materialization_checksum"] == "" {
+		t.Fatalf("missing source provenance: %+v", source)
+	}
+	noWrite := packet["no_write"].(map[string]any)
+	if noWrite["guaranteed"] != true || noWrite["project_write_count"] != float64(0) || noWrite["kah_state_write_count"] != float64(0) || noWrite["kab_runtime_mutation_count"] != float64(0) {
+		t.Fatalf("unexpected no-write evidence: %+v", noWrite)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".kkachi", "workflows")); !os.IsNotExist(err) {
+		t.Fatalf("workflow-promote dry-run created project workflow state: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"workflow-promote", "--project", project, "--run", "run-20260616T105614Z-4b0ebe11b67d", "--target-workflow-id", "promoted-demo", "--reuse-reason", "demo workflow proved reusable for repeat release tasks", "--dry-run", "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected ambiguous mode failure, got code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "workflow_promote_mode_ambiguous")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"workflow-promote", "--project", project, "--run", "run-20260616T105614Z-4b0ebe11b67d", "--target-workflow-id", "promoted-demo", "--reuse-reason", "demo workflow proved reusable for repeat release tasks", "--apply", "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected wrong hash failure, got code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var wrongHash map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &wrongHash); err != nil {
+		t.Fatal(err)
+	}
+	if wrongHash["status"] != "approval_plan_hash_mismatch" || wrongHash["approval"].(map[string]any)["matched_current_plan"] != false {
+		t.Fatalf("unexpected wrong-hash payload: %+v", wrongHash)
+	}
+
+	approval := dryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"workflow-promote", "--project", project, "--run", "run-20260616T105614Z-4b0ebe11b67d", "--target-workflow-id", "promoted-demo", "--reuse-reason", "demo workflow proved reusable for repeat release tasks", "--thin-trigger", "--apply", approval, "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected correct-hash fail-closed apply, got code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var blocked map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &blocked); err != nil {
+		t.Fatal(err)
+	}
+	if blocked["status"] != "blocked_missing_kah_workflow_catalog_capability" || blocked["approval"].(map[string]any)["matched_current_plan"] != true {
+		t.Fatalf("unexpected correct-hash blocked payload: %+v", blocked)
+	}
+	for _, forbidden := range []string{".kkachi/workflows", ".kkachi/workflow-catalog.yaml", ".kkachi-workflow.yaml"} {
+		if _, err := os.Stat(filepath.Join(project, filepath.FromSlash(forbidden))); !os.IsNotExist(err) {
+			t.Fatalf("workflow-promote apply wrote forbidden path %s: %v", forbidden, err)
+		}
 	}
 }
 

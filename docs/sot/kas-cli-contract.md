@@ -185,6 +185,40 @@ automatic project-local workflow/catalog persistence, fallback agent/backend
 selection, retry/rollback automation, dynamic node generation, arbitrary
 webhook runtime, or KAH workflow-instance direct writes.
 
+WFLOW-009 adds an explicit `workflow-promote` surface for promotion proposals
+from an existing WFLOW-008 run-local materialization bundle:
+
+```text
+kkachi-agent-skills workflow-promote --project <path> --run <run-id> --target-workflow-id <id> --reuse-reason <reason> [--thin-trigger] --dry-run --json
+kkachi-agent-skills workflow-promote --project <path> --run <run-id> --target-workflow-id <id> --reuse-reason <reason> [--thin-trigger] --apply dry-run:sha256:<hash> --json
+```
+
+`workflow-promote` is explicit and must not overload `workflow-trigger`.
+`--target-workflow-id` and `--reuse-reason` are required. `--dry-run` and
+`--apply dry-run:sha256:<hash>` are mutually exclusive. The command consumes
+the existing `.kkachi/runs/<run_id>/workflow/materialization.json`,
+`workflow.yaml`, `node-contracts.json`, `checksums.json`, and WFLOW-008
+source/checksum evidence. Dry-run emits `kas-workflow-promote-packet/v1` with
+source run/materialization provenance, target project-local paths, generated
+workflow/catalog/node-contract registry content, optional thin trigger content,
+base checksums, changed paths, diagnostics/conflicts, no-write evidence,
+KAS/KAH capability evidence, and a deterministic approval hash.
+
+The WFLOW-009 approval hash is canonical `sha256` over deterministic UTF-8 JSON
+with sorted keys and normalized project-relative paths. It binds source
+materialization provenance, source checksums, target paths, generated content,
+trigger plan, capability evidence, base checksums, changed paths,
+diagnostics/conflicts, and no-write evidence. Apply recomputes and verifies the
+hash before any apply decision. While DAGSM-006 reviewed catalog proposal/apply
+support is absent, correct-hash apply remains fail-closed with
+`blocked_missing_kah_workflow_catalog_capability` or
+`workflow_promote_apply_refused`; KAS must not direct-write
+`.kkachi/workflows/*`, `.kkachi/workflow-catalog.yaml`, `.kkachi-workflow.yaml`,
+profile files, KAH state, KAB state, auth/token/provider/gateway/model config,
+or fallback backend selection. Generated node evidence preserves
+`direct_kah_state_write:false`, `completion_authority:kah_only`, and
+`fallback_policy:none_fail_closed`.
+
 WFLOW-004 extends the CLI with a dry-run-first custom workflow creator:
 
 ```text

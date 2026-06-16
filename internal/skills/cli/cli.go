@@ -17,6 +17,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowcreator"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowpromoter"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowrouting"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowtrigger"
 )
@@ -39,7 +40,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, workflow-create, workflow-route, workflow-trigger, uninstall, or version command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, or version command", "", false, "")
 	}
 	if isVersionArg(argv[0]) {
 		return runVersion(argv[1:], stdout, stderr)
@@ -61,6 +62,8 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runRepair(argv[1:], stdout, stderr, env)
 	case "workflow-create":
 		return runWorkflowCreate(argv[1:], stdout, stderr, env)
+	case "workflow-promote":
+		return runWorkflowPromote(argv[1:], stdout, stderr, env)
 	case "workflow-route":
 		return runWorkflowRoute(argv[1:], stdout, stderr, env)
 	case "workflow-trigger":
@@ -78,7 +81,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 	case "migrate-project-kas":
 		return runMigrateProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, workflow-create, workflow-route, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
 	}
 }
 
@@ -695,6 +698,52 @@ func runWorkflowCreate(argv []string, stdout io.Writer, stderr io.Writer, env ma
 	})
 }
 
+func runWorkflowPromote(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("workflow-promote", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	project := fs.String("project", "", "project path")
+	runID := fs.String("run", "", "source WFLOW-008 run id")
+	materialization := fs.String("materialization", "", "optional explicit materialization.json path")
+	targetWorkflowID := fs.String("target-workflow-id", "", "target project-local workflow id")
+	reuseReason := fs.String("reuse-reason", "", "required operator reason for promoting the run-local workflow")
+	thinTrigger := fs.Bool("thin-trigger", false, "include an optional thin trigger candidate")
+	dryRun := fs.Bool("dry-run", false, "emit workflow-promote proposal packet without writing")
+	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash>")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "workflow-promote does not accept positional arguments", "workflow-promote", *jsonOutput, "Rerun with workflow-promote --project <path> --run <run-id> --target-workflow-id <id> --reuse-reason <reason> --dry-run --json.")
+	}
+	if *dryRun && *apply != "" {
+		return emitError(stderr, "workflow_promote_mode_ambiguous", "workflow-promote accepts either --dry-run or --apply, not both.", "workflow-promote", *jsonOutput, "Run dry-run first, then rerun with only --apply dry-run:sha256:<hash>.")
+	}
+	if !*dryRun && *apply == "" {
+		return emitError(stderr, "workflow_promote_requires_dry_run_or_apply", "workflow-promote requires --dry-run or --apply dry-run:sha256:<hash>.", "workflow-promote", *jsonOutput, "Rerun with workflow-promote --project <path> --run <run-id> --target-workflow-id <id> --reuse-reason <reason> --dry-run.")
+	}
+	opts := workflowpromoter.Options{Project: *project, RunID: *runID, Materialization: *materialization, TargetWorkflowID: *targetWorkflowID, ReuseReason: *reuseReason, ThinTrigger: *thinTrigger, Approval: *apply}
+	var result workflowpromoter.Result
+	var err error
+	if *apply != "" {
+		result, err = workflowpromoter.Apply(opts)
+	} else {
+		result, err = workflowpromoter.BuildDryRun(opts)
+	}
+	if err != nil {
+		return emitError(stderr, "workflow_promote_failed", err.Error(), "workflow-promote", *jsonOutput, "")
+	}
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return workflowpromoter.RenderHuman(result)
+	})
+}
+
 func runUninstall(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
 	fs := flag.NewFlagSet("uninstall", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -1092,6 +1141,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
 	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
 	fmt.Fprintln(w, "  workflow-create   Plan custom task-DAG workflow candidates without writing")
+	fmt.Fprintln(w, "  workflow-promote  Propose run-local workflow promotion without writing")
 	fmt.Fprintln(w, "  workflow-route    Route classified tasks to one standard bundle without KAH calls")
 	fmt.Fprintln(w, "  workflow-trigger  Render dispatch packets for an explicit or selector-matched KAH workflow")
 	fmt.Fprintln(w, "  uninstall  Plan project-suite removal without writing")

@@ -189,6 +189,37 @@ workflow-instance writes, fallback agent/backend selection, retry/rollback
 automation, dynamic node generation, arbitrary webhook runtime, and WFLOW-009
 promotion/apply.
 
+WFLOW-009 implements explicit promotion proposal through a separate
+`workflow-promote` command, not by overloading `workflow-trigger`:
+
+```text
+workflow-promote --project <path> --run <run-id> --target-workflow-id <id> --reuse-reason <reason> [--thin-trigger] --dry-run --json
+workflow-promote --project <path> --run <run-id> --target-workflow-id <id> --reuse-reason <reason> [--thin-trigger] --apply dry-run:sha256:<hash> --json
+```
+
+The source is an existing WFLOW-008 run-local bundle containing
+`materialization.json`, `workflow.yaml`, `node-contracts.json`,
+`checksums.json`, and source/checksum evidence. `--target-workflow-id` and
+`--reuse-reason` are required. `--dry-run` and
+`--apply dry-run:sha256:<hash>` are mutually exclusive. Dry-run emits
+`kas-workflow-promote-packet/v1` with source run/materialization provenance,
+target project-local paths, generated workflow/catalog/node-contract registry
+content, optional thin trigger content, base checksums, source checksums,
+changed paths, diagnostics/conflicts, no-write evidence, KAS/KAH capability
+evidence, and a deterministic approval hash.
+
+The WFLOW-009 approval hash binds source materialization provenance, source
+checksums, target paths, generated content, trigger plan, capability evidence,
+base checksums, changed paths, diagnostics/conflicts, and no-write evidence.
+Apply recomputes the hash before any apply decision. Until DAGSM-006 reviewed
+workflow catalog proposal/apply support exists, correct-hash apply remains
+non-authoritative and fail-closed; it must not direct-write
+`.kkachi/workflows/*`, `.kkachi/workflow-catalog.yaml`, `.kkachi-workflow.yaml`,
+profile files, KAH state, KAB state, auth/token/provider/gateway/model config,
+or fallback backend selection. Generated evidence preserves
+`direct_kah_state_write:false`, `completion_authority:kah_only`, and
+`fallback_policy:none_fail_closed`.
+
 ## Node contract requirements
 
 Each KAS node contract must declare at least:

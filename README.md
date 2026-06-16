@@ -90,6 +90,8 @@ kkachi-agent-skills repair [--repo <path>] --project <path> --workflow-graph --p
 kkachi-agent-skills repair [--repo <path>] --project <path> --workflow-graph --apply-proposal <proposal-id> --approval <approval-ref> [--json]
 kkachi-agent-skills workflow-create --project <path> --workflow-id <id> --mode dag_only|thin_trigger|full_trigger --request <json-path> --dry-run [--json]
 kkachi-agent-skills workflow-create --project <path> --workflow-id <id> --mode dag_only|thin_trigger|full_trigger --request <json-path> --apply dry-run:sha256:<hash> [--json]
+kkachi-agent-skills workflow-promote --project <path> --run <run-id> --target-workflow-id <id> --reuse-reason <reason> [--thin-trigger] --dry-run [--json]
+kkachi-agent-skills workflow-promote --project <path> --run <run-id> --target-workflow-id <id> --reuse-reason <reason> [--thin-trigger] --apply dry-run:sha256:<hash> [--json]
 kkachi-agent-skills uninstall --profile <profile> --project <project> --dry-run [--json]
 kkachi-agent-skills uninstall --profile <profile> --project <project> --apply dry-run:sha256:<hash> --backup-vault-root <abs-path> [--json]
 ```
@@ -161,6 +163,20 @@ on mismatches or missing KAH workflow/catalog capability. KAS does not
 direct-write `.kkachi` workflow state or install generated trigger skills into a
 Hermes profile; KAH remains authoritative for workflow/catalog validation,
 proposal, apply, audit, and final gate evidence.
+`workflow-promote --dry-run` implements WFLOW-009 as an explicit promotion
+proposal from an existing WFLOW-008 run-local materialization bundle to
+project-local workflow/catalog/node-contract candidates and an optional thin
+trigger. It requires `--target-workflow-id` and `--reuse-reason`, verifies
+`materialization.json`, `workflow.yaml`, `node-contracts.json`, and checksum
+evidence, emits `kas-workflow-promote-packet/v1`, and binds the approval hash to
+source provenance/checksums, target paths, generated content, trigger plan,
+KAS/KAH capability evidence, base checksums, changed paths,
+diagnostics/conflicts, and no-write evidence. `workflow-promote --apply`
+recomputes the hash but remains fail-closed while reviewed DAGSM-006 catalog
+proposal/apply support is absent; KAS does not direct-write `.kkachi/workflows/*`,
+`.kkachi/workflow-catalog.yaml`, `.kkachi-workflow.yaml`, profile files, KAH
+state, KAB state, auth/token/provider/gateway/model config, or fallback backend
+selection; no fallback backend selection is introduced.
 KAB is not required for this profile-scoped minimum CLI lane. KAB remains
 required for backend execution, automated review-by-different-tool transport,
 KAB plan lifecycle, and bridge evidence when those surfaces are in scope.
