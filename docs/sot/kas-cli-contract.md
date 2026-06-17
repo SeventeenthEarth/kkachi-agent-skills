@@ -209,10 +209,11 @@ with sorted keys and normalized project-relative paths. It binds source
 materialization provenance, source checksums, target paths, generated content,
 trigger plan, capability evidence, base checksums, changed paths,
 diagnostics/conflicts, and no-write evidence. Apply recomputes and verifies the
-hash before any apply decision. While DAGSM-006 reviewed catalog proposal/apply
-support is absent, correct-hash apply remains fail-closed with
+hash before any apply decision. KAH `0.1.10` provides the DAGSM-006 workflow
+catalog proposal/apply capability, but apply remains fail-closed with
 `blocked_missing_kah_workflow_catalog_capability` or
-`workflow_promote_apply_refused`; KAS must not direct-write
+`workflow_promote_apply_refused` when effective binary capability evidence is
+missing, stale, or insufficient. KAS must not direct-write
 `.kkachi/workflows/*`, `.kkachi/workflow-catalog.yaml`, `.kkachi-workflow.yaml`,
 profile files, KAH state, KAB state, auth/token/provider/gateway/model config,
 or fallback backend selection. Generated node evidence preserves
@@ -248,11 +249,13 @@ deterministic selector contract.
 
 KAS generates candidate content and approval packets only. KAH remains
 authoritative for workflow/catalog validation, proposal, apply, audit, final
-gate integration, and node-contract registry evidence. Installed KAH `0.1.9` lacks the workflow command group. Source-built DAGSM-003 KAH currently
-advertises `workflow catalog validate/explain` and node-contract registry
-diagnostics, but does not advertise a reviewed workflow catalog proposal/apply command mapping. Therefore `workflow-create --apply` remains fail-closed with
-`blocked_missing_kah_workflow_catalog_capability` until an effective KAH binary
-advertises a reviewed apply surface. KAS must not direct-write `.kkachi`
+gate integration, and node-contract registry evidence. Older installed KAH
+`0.1.9` lacks the workflow command group, while effective KAH `0.1.10` advertises
+workflow catalog diagnostics, node-contract registry evidence, and
+`workflow_catalog_proposal_apply=true`. Therefore `workflow-create --apply`
+remains fail-closed with `blocked_missing_kah_workflow_catalog_capability` until
+the effective KAH binary for the current project provides current capability/help
+evidence for the reviewed apply surface. KAS must not direct-write `.kkachi`
 workflow state as a fallback.
 
 KAH remains the deterministic project-local state/evidence layer and currently advertises `install_command=false`. Therefore KAS owns this profile-scoped list/install/doctor surface; KAH must not be described as the skill installer.

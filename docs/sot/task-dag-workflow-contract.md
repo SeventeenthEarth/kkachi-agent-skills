@@ -293,17 +293,17 @@ Fail-closed diagnostics include `approval_plan_hash_mismatch`,
 `base_catalog_unreadable`, `base_checksum_mismatch`, and
 `generated_skill_validation_failed`.
 
-Installed KAH `0.1.9` lacks the workflow command group, so installed-runtime
-WFLOW-004 apply is non-approvable/fail-closed. Source-built DAGSM-003 evidence
-currently advertises workflow catalog diagnostics (`workflow catalog
-validate/explain`) and node-contract registry evidence, but not a reviewed
-workflow catalog proposal/apply command mapping. KAS must document that actual
-capability/help discovery and must not invent a direct write or apply fallback.
-This preserves no automatic fallback for ambiguous selectors, unsupported
-modes, missing capability, unsafe paths, hash mismatch, unreadable or mismatched
-base catalog evidence, generated-skill validation failure, profile/provider
-mutation, KAB graph authority, arbitrary webhook runtime, retry/rollback
-automation, and dynamic node generation during execution.
+Older installed KAH `0.1.9` lacks the workflow command group, so WFLOW-004 apply
+remains non-approvable/fail-closed under that effective runtime. KAH `0.1.10`
+adds the workflow command group and DAGSM-006 workflow catalog proposal/apply
+capability, but KAS must still capture effective binary capability/help evidence
+before any run relies on it. Missing, stale, or insufficient capability evidence
+keeps apply fail-closed; KAS must not invent a direct write or apply fallback.
+This preserves no automatic fallback for ambiguous selectors, unsupported modes,
+missing capability, unsafe paths, hash mismatch, unreadable or mismatched base
+catalog evidence, generated-skill validation failure, profile/provider mutation,
+KAB graph authority, arbitrary webhook runtime, retry/rollback automation, and
+dynamic node generation during execution.
 
 Mode output expectations:
 
