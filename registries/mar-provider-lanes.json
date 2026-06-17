@@ -1,0 +1,59 @@
+{
+  "schema_version": "mar.provider_lanes.v1",
+  "default_reviewers": [
+    "zcode_glm_5_2",
+    "kimi_k2_7",
+    "antigravity_gemini"
+  ],
+  "reviewers": {
+    "zcode_glm_5_2": {
+      "command_lane": "zcode",
+      "executable": "zcode",
+      "selected_model": "glm-5.2",
+      "prompt_template": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+      "command_args": [
+        "--model",
+        "{model}",
+        "--prompt-file",
+        "{prompt_path}"
+      ],
+      "timeout_seconds": 120,
+      "validated": false,
+      "validation_required_before_success_coverage": true
+    },
+    "kimi_k2_7": {
+      "command_lane": "kimi",
+      "executable": "kimi",
+      "selected_model": "k2.7",
+      "prompt_template": "templates/prompts/mar/kimi-k2-7-reviewer-request.md.tmpl",
+      "command_args": [
+        "--model",
+        "{model}",
+        "--prompt-file",
+        "{prompt_path}"
+      ],
+      "timeout_seconds": 120,
+      "validated": false,
+      "validation_required_before_success_coverage": true
+    },
+    "antigravity_gemini": {
+      "command_lane": "agy",
+      "executable": "agy",
+      "selected_model": null,
+      "prompt_template": "templates/prompts/mar/antigravity-gemini-reviewer-request.md.tmpl",
+      "command_args": [
+        "--print",
+        "--model",
+        "{model}",
+        "--prompt",
+        "{prompt_text}",
+        "--print-timeout",
+        "{timeout_seconds}s",
+        "--sandbox"
+      ],
+      "timeout_seconds": 120,
+      "validated": false,
+      "validation_required_before_success_coverage": true
+    }
+  }
+}

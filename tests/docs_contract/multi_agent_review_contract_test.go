@@ -6,7 +6,7 @@ import (
 
 var marPromptTemplates = []string{
 	"templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
-	"templates/prompts/mar/kimi-k2-6-reviewer-request.md.tmpl",
+	"templates/prompts/mar/kimi-k2-7-reviewer-request.md.tmpl",
 	"templates/prompts/mar/antigravity-gemini-reviewer-request.md.tmpl",
 	"templates/prompts/mar/premium-reviewer-request.md.tmpl",
 }
@@ -27,7 +27,7 @@ func TestMultiAgentReviewSkillScaffoldDefinesReadOnlyReviewContract(t *testing.T
 func TestMultiAgentReviewReferencesDefineReviewerPolicy(t *testing.T) {
 	requireContainsAll(t, "skills/kkachi-multi-agent-review/references/reviewer-role-matrix.md", []string{
 		"zcode_glm_5_2",
-		"kimi_k2_6",
+		"kimi_k2_7",
 		"antigravity_gemini",
 		"premium_approval_required",
 	})
@@ -65,6 +65,10 @@ func TestMultiAgentReviewRunArtifactsCaptureBlueAndRedDisposition(t *testing.T) 
 		"coverage_state",
 		"red_adjudication_trigger",
 		"no_provider_execution_claim",
+		"provider_attempt_paths",
+		"unresolved_default_reviewers",
+		"retry_alternate_waiver_refs",
+		"ProviderAttemptCoverage",
 	})
 
 	requireContainsAll(t, "templates/run-artifacts/mar-red-adjudication-handoff.md.tmpl", []string{
@@ -80,5 +84,31 @@ func TestMultiAgentReviewRunArtifactsCaptureBlueAndRedDisposition(t *testing.T) 
 func TestMultiAgentReviewSkillPackRegistrationExists(t *testing.T) {
 	requireContainsAll(t, "skill-pack.yaml", []string{
 		"kkachi-multi-agent-review",
+	})
+}
+
+func TestMultiAgentReviewSOTDefinesProviderFailureDecisionPolicy(t *testing.T) {
+	requireContainsAll(t, "docs/sot/multi-agent-review-policy.md", []string{
+		"kimi_k2_7",
+		"registries/mar-provider-lanes.json",
+		"scripts/mar.py provider-lanes",
+		"attempt-all-first",
+		"same-provider retry",
+		"approved alternate provider",
+		"explicit 주군 waiver",
+		"auth_failed",
+		"token_exhausted",
+		"mutation_detected",
+		"automatic alternate-provider substitution",
+	})
+}
+
+func TestMultiAgentReviewProviderLaneRegistryIsRegistered(t *testing.T) {
+	requireContainsAll(t, "docs/README.md", []string{
+		"registries/mar-provider-lanes.json",
+		"provider lane readback",
+	})
+	requireContainsAll(t, "docs/kkachi-docs-map.yaml", []string{
+		"registries/mar-provider-lanes.json",
 	})
 }

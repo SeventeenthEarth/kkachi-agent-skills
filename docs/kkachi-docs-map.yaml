@@ -15,6 +15,7 @@ sot_docs:
   - "docs/sot/multi-agent-review-policy.md"
 compatibility_registries:
   - "registries/graph-workflow-sync-compatibility.yaml"
+  - "registries/mar-provider-lanes.json"
 adr_dir: "docs/adr"
 todo_dir: "docs/todo"
 spec_dir: "docs/sot"

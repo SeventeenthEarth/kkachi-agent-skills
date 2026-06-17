@@ -1,4 +1,4 @@
-# Kimi K2.6 MAR Reviewer Request
+# Kimi K2.7 MAR Reviewer Request
 
 Run ID: `{{ .RunID }}`
 Task: `{{ .TaskID }}`
@@ -30,6 +30,8 @@ Diff summary:
 - Do not mutate auth, tokens, provider settings, gateway config, model config,
   profile config, or runtime state.
 - provider execution is not completion evidence.
+- Failed Kimi coverage requires same-provider retry, 주군-approved alternate,
+  explicit 주군 waiver, or non-clean disposition; do not assume fallback.
 - Report missing or inconsistent evidence as fail-closed findings.
 
 ## Output

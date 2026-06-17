@@ -7,10 +7,17 @@ coverage_state: `{{ .CoverageState }}`
 status: `{{ .Status }}`
 red_adjudication_trigger: `{{ .RedAdjudicationTrigger }}`
 no_provider_execution_claim: `{{ .NoProviderExecutionClaim }}`
+provider_attempt_paths: `{{ .ProviderAttemptPaths }}`
+unresolved_default_reviewers: `{{ .UnresolvedDefaultReviewers }}`
+retry_alternate_waiver_refs: `{{ .RetryAlternateWaiverRefs }}`
 
 ## Reviewer Coverage
 
 {{ .ReviewerCoverage }}
+
+## Provider Attempt Coverage
+
+{{ .ProviderAttemptCoverage }}
 
 ## Finding Disposition
 
@@ -24,4 +31,7 @@ no_provider_execution_claim: `{{ .NoProviderExecutionClaim }}`
 
 - Provider dispatch success, provider availability, or prompt rendering is not
   completion evidence.
+- Failed default reviewer coverage cannot become clean `PASS` without
+  same-provider retry success, approved named alternate success, or explicit
+  주군 waiver evidence.
 - This disposition does not claim KAB-backed execution or KAH MAR gate support.
