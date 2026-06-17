@@ -1,0 +1,39 @@
+# Antigravity Gemini MAR Reviewer Request
+
+Run ID: `{{ .RunID }}`
+Task: `{{ .TaskID }}`
+
+Perform a read-only review of architecture, integration, security, and
+operational risk.
+
+## Inputs
+
+Task contract:
+
+{{ .TaskContract }}
+
+Diff summary:
+
+{{ .DiffSummary }}
+
+## Rules
+
+- Do not edit files.
+- Do not run tests.
+- Do not run linters.
+- Do not run builds.
+- Do not run installs.
+- Do not run package managers.
+- Do not start services.
+- Do not run network probes.
+- Do not run runtime verification commands.
+- Do not mutate auth, tokens, provider settings, gateway config, model config,
+  profile config, or runtime state.
+- provider execution is not completion evidence.
+- Escalate boundary, security, auth, runtime, KAS/KAH/KAB ownership, and
+  approval findings explicitly.
+
+## Output
+
+Return concise findings with severity, evidence, and recommendation. Use
+`PASS`, `REQUEST_CHANGES`, `DEGRADED`, `FAILED`, or `BLOCKED`.

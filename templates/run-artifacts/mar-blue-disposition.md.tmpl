@@ -1,0 +1,27 @@
+# Blue disposition
+
+run_id: `{{ .RunID }}`
+task_id: `{{ .TaskID }}`
+
+coverage_state: `{{ .CoverageState }}`
+status: `{{ .Status }}`
+red_adjudication_trigger: `{{ .RedAdjudicationTrigger }}`
+no_provider_execution_claim: `{{ .NoProviderExecutionClaim }}`
+
+## Reviewer Coverage
+
+{{ .ReviewerCoverage }}
+
+## Finding Disposition
+
+{{ .FindingDisposition }}
+
+## Evidence Pointers
+
+{{ .EvidencePointers }}
+
+## Boundary Notes
+
+- Provider dispatch success, provider availability, or prompt rendering is not
+  completion evidence.
+- This disposition does not claim KAB-backed execution or KAH MAR gate support.

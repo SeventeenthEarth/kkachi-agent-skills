@@ -1,0 +1,28 @@
+# Red adjudication handoff
+
+run_id: `{{ .RunID }}`
+task_id: `{{ .TaskID }}`
+
+blocker: `{{ .Blocker }}`
+high_risk: `{{ .HighRisk }}`
+disagreement: `{{ .Disagreement }}`
+degraded: `{{ .Degraded }}`
+premium_escalation: `{{ .PremiumEscalation }}`
+
+## Trigger Summary
+
+{{ .TriggerSummary }}
+
+## Evidence Pointers
+
+{{ .EvidencePointers }}
+
+## Requested Red Decision
+
+{{ .RequestedRedDecision }}
+
+## Boundary Notes
+
+- Red adjudication resolves risk and disposition; reviewer consensus is not
+  authority.
+- Premium escalation requires explicit approval before Codex or Claude review.
