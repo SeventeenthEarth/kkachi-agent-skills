@@ -1,4 +1,4 @@
-.PHONY: test test-prepare test-unit test-int test-e2e build install push-tag
+.PHONY: test test-prepare test-unit test-int test-e2e build install install-toolchain push-tag
 
 GOCACHE ?= /tmp/kkachi-agent-skills-go-build
 GOPATH ?= /tmp/kkachi-agent-skills-go-path
@@ -7,6 +7,8 @@ export GOPATH
 
 BIN_DIR := bin
 BINARY  := kkachi-agent-skills
+TOOLCHAIN_ROOT ?= $(HOME)/.local/kkachi/toolchains
+TOOLCHAIN_COMPONENT := kas
 
 test-prepare:
 	@test -z "$$(gofmt -l main.go cmd internal tests)" || (gofmt -l main.go cmd internal tests && exit 1)
@@ -32,6 +34,25 @@ build:
 
 install:
 	env -u GOPATH go install .
+
+install-toolchain: build
+	@set -e; \
+	VERSION="$$(./$(BIN_DIR)/$(BINARY) --version | awk '{print $$2}')"; \
+	if [ -z "$$VERSION" ]; then \
+		echo "ERROR: could not determine $(BINARY) version" >&2; \
+		exit 1; \
+	fi; \
+	VERSION_TAG="v$${VERSION#v}"; \
+	case "$$VERSION_TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "ERROR: unsupported $(BINARY) version for toolchain install: $$VERSION" >&2; exit 1 ;; esac; \
+	INSTALL_DIR="$(TOOLCHAIN_ROOT)/$(TOOLCHAIN_COMPONENT)/$$VERSION_TAG/bin"; \
+	mkdir -p "$$INSTALL_DIR"; \
+	install -m 0755 "$(BIN_DIR)/$(BINARY)" "$$INSTALL_DIR/$(BINARY)"; \
+	INSTALLED_VERSION="$$("$$INSTALL_DIR/$(BINARY)" --version | awk '{print $$2}')"; \
+	if [ "$${INSTALLED_VERSION#v}" != "$${VERSION#v}" ]; then \
+		echo "ERROR: installed version mismatch: expected $$VERSION, got $$INSTALLED_VERSION" >&2; \
+		exit 1; \
+	fi; \
+	echo "installed $(BINARY) $$VERSION_TAG to $$INSTALL_DIR/$(BINARY)"
 
 push-tag: build
 	@set -e; \
