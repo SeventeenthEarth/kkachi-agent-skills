@@ -12,6 +12,7 @@ sot_docs:
   - "docs/sot/graph-workflow-sync-compatibility.md"
   - "docs/sot/task-dag-workflow-contract.md"
   - "docs/sot/token-economy-and-agent-instruction-contract.md"
+  - "docs/sot/multi-agent-review-policy.md"
 compatibility_registries:
   - "registries/graph-workflow-sync-compatibility.yaml"
 adr_dir: "docs/adr"

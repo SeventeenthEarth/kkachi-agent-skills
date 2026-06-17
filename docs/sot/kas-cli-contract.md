@@ -249,13 +249,12 @@ deterministic selector contract.
 
 KAS generates candidate content and approval packets only. KAH remains
 authoritative for workflow/catalog validation, proposal, apply, audit, final
-gate integration, and node-contract registry evidence. Older installed KAH
-`0.1.9` lacks the workflow command group, while effective KAH `0.1.10` advertises
+gate integration, and node-contract registry evidence. Installed KAH `0.1.9` lacks the workflow command group, while effective KAH `0.1.10` advertises
 workflow catalog diagnostics, node-contract registry evidence, and
 `workflow_catalog_proposal_apply=true`. Therefore `workflow-create --apply`
 remains fail-closed with `blocked_missing_kah_workflow_catalog_capability` until
 the effective KAH binary for the current project provides current capability/help
-evidence for the reviewed apply surface. KAS must not direct-write `.kkachi`
+evidence for the reviewed apply surface and does not advertise a reviewed workflow catalog proposal/apply command mapping when that evidence is missing. KAS must not direct-write `.kkachi`
 workflow state as a fallback.
 
 KAH remains the deterministic project-local state/evidence layer and currently advertises `install_command=false`. Therefore KAS owns this profile-scoped list/install/doctor surface; KAH must not be described as the skill installer.

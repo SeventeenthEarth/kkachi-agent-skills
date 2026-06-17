@@ -154,7 +154,7 @@ consumes the existing WFLOW-004 workflow-create dry-run machine packet shape,
 requires approval-hash-bound evidence, and recomputes the hash with
 WFLOW-004 canonical approval semantics before any write; this is not a second
 hash algorithm. KAS preflights effective KAH workflow capability before non-dry-run materialization.
-If the installed helper
+Installed KAH `0.1.9` lacks the workflow command group. If the installed helper
 lacks the `workflow` command group, KAS fails closed with
 `blocked_missing_kah_workflow_capability` before writing run-local artifacts.
 
