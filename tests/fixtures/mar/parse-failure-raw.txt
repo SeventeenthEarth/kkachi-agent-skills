@@ -1,0 +1,2 @@
+This raw provider output is intentionally not JSON.
+It exercises parser failure handling for a local fixture path.

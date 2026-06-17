@@ -10,9 +10,10 @@ Use this skill only when KAS/Kkachi explicitly requests Multi-agent review
 scaffold, prompt, or disposition support for MAR policy work.
 
 MAR-002 does not execute providers. This skill provides only scaffold, reviewer
-prompt, reference, and disposition-template support. MAR-003 owns any local
-`mar.py` script surface, MAR-004 owns provider execution after adapter proof,
-and MAREV-002 owns deterministic KAH MAR artifact, gate, or schema behavior.
+prompt, reference, and disposition-template support. MAR-003 adds the local
+`mar.py` fixture/mock/read-only script surface, MAR-004 owns provider execution
+after adapter proof, and MAREV-002 owns deterministic KAH MAR artifact, gate,
+or schema behavior.
 
 ## Boundaries
 
@@ -29,10 +30,11 @@ and MAREV-002 owns deterministic KAH MAR artifact, gate, or schema behavior.
 MAR disposition is fail-closed. Supported terminal statuses are:
 
 - `PASS`
+- `PASS_WITH_FINDINGS`
 - `REQUEST_CHANGES`
+- `BLOCKED`
 - `DEGRADED`
 - `FAILED`
-- `BLOCKED`
 
 `DEGRADED`, `FAILED`, and `BLOCKED` are never clean review completion claims.
 

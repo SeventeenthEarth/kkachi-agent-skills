@@ -1,0 +1,11 @@
+{
+  "case": "pass-review",
+  "status": "PASS",
+  "mock_provider_path": true,
+  "reviewer": "zcode_glm_5_2",
+  "findings": [],
+  "coverage": {
+    "required_reviewers": 3,
+    "available_reviewers": 3
+  }
+}

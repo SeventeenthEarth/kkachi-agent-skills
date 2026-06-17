@@ -1,0 +1,10 @@
+{
+  "case": "insufficient-coverage",
+  "status": "BLOCKED",
+  "mock_provider_path": true,
+  "coverage": {
+    "required_reviewers": 3,
+    "available_reviewers": 1,
+    "minimum_met": false
+  }
+}

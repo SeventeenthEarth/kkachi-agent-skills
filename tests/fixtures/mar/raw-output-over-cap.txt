@@ -1,0 +1,2 @@
+raw-output-over-cap fixture seed
+Implementations may repeat or expand this deterministic text to exceed the configured raw-output cap during tests.

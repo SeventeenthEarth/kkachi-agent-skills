@@ -1,0 +1,19 @@
+{
+  "case": "all-failed",
+  "status": "FAILED",
+  "mock_provider_path": true,
+  "reviewers": [
+    {
+      "name": "zcode_glm_5_2",
+      "status": "FAILED"
+    },
+    {
+      "name": "kimi_k2_6",
+      "status": "FAILED"
+    },
+    {
+      "name": "antigravity_gemini",
+      "status": "FAILED"
+    }
+  ]
+}

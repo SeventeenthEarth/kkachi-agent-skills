@@ -1,0 +1,7 @@
+{
+  "case": "provider-unavailable",
+  "status": "DEGRADED",
+  "mock_provider_path": true,
+  "provider": "antigravity_gemini",
+  "reason": "provider command unavailable in local fixture path"
+}

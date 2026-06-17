@@ -1,0 +1,9 @@
+{
+  "case": "mutation-detected",
+  "status": "REQUEST_CHANGES",
+  "mock_provider_path": true,
+  "mutation_guard": {
+    "detected": true,
+    "path": "docs/sot/multi-agent-review-policy.md"
+  }
+}

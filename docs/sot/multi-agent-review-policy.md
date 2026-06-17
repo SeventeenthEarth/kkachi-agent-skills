@@ -2,7 +2,7 @@
 
 Date: 2026-06-17
 Owner: KAS policy and skill layer
-Status: candidate repository promotion SOT; repository implementation pending
+Status: candidate repository promotion SOT; local skill/script surfaces implemented for fixture/mock/read-only paths
 Authority level: KAS planning authority for MAR promotion from accepted Obsidian output SOT; not installed skill behavior or runtime activation
 Source SOT: `/Users/draccoon/Workspace/Hermes/17thHermes/40_outputs/projects/kkachi/2026-06-16-kkachi-multi-agent-review-mar-sot.md`
 Paired KAH planning SOT: KAH `docs/sot/multi-agent-review-evidence-gates.md`
@@ -12,7 +12,7 @@ Scope: KAS MAR policy, skill, prompt templates, reviewer matrix, premium escalat
 
 Kkachi Multi-Agent Review (MAR) is the planned lightweight KAS-local review lane for routine Kkachi development review. It collects specialized AI reviewer outputs, preserves full evidence through KAH artifacts, and returns a compact merge pack plus Blue disposition path. MAR is advisory evidence; Blue disposition and conditional Red adjudication remain the authority.
 
-This repository document promotes the accepted output SOT into KAS planning authority. It does not claim that the `kkachi-multi-agent-review` skill, `mar.py`, provider adapters, KAH gates, or installed runtime behavior exist until the follow-up implementation tasks complete with evidence.
+This repository document promotes the accepted output SOT into KAS planning authority. Current evidence covers the `kkachi-multi-agent-review` scaffold and local `scripts/mar.py` fixture/mock/read-only surfaces only. It does not claim that provider adapters, KAH gates, or installed runtime behavior exist until the follow-up implementation tasks complete with evidence.
 
 ## Canonical operating rule
 

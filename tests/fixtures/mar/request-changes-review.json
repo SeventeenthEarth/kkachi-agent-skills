@@ -1,0 +1,12 @@
+{
+  "case": "request-changes-review",
+  "status": "REQUEST_CHANGES",
+  "mock_provider_path": true,
+  "reviewer": "kimi_k2_6",
+  "findings": [
+    {
+      "severity": "high",
+      "summary": "Contract wording allows implementation claims before evidence exists."
+    }
+  ]
+}

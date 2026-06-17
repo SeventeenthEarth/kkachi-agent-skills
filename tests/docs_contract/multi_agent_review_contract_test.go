@@ -1,8 +1,6 @@
 package docscontract
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -83,15 +81,4 @@ func TestMultiAgentReviewSkillPackRegistrationExists(t *testing.T) {
 	requireContainsAll(t, "skill-pack.yaml", []string{
 		"kkachi-multi-agent-review",
 	})
-}
-
-func TestMultiAgentReviewDoesNotImplementMarScript(t *testing.T) {
-	rel := "scripts/mar.py"
-	_, err := os.Stat(filepath.Join(repoRoot(t), rel))
-	if err == nil {
-		t.Fatalf("%s exists; MAR-002 source must not implement scripts/mar.py", rel)
-	}
-	if !os.IsNotExist(err) {
-		t.Fatalf("stat %s: %v", rel, err)
-	}
 }
