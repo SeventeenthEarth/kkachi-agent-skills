@@ -77,7 +77,7 @@ This SOT does not authorize:
 - replacing KAB `native_codex` or calling the KAB Stage 2 lane Stage 1;
 - changing auth, tokens, model/provider/gateway config, live Codex config, KAB runtime config, or Hermes runtime settings;
 - keeping a cross-project long-lived app-server daemon as default KAS behavior;
-- bypassing plan, ask, approval, color review, GLM Octo, KAH gate, or final verification requirements.
+- bypassing plan, ask, approval, color review, MAR, KAH gate, or final verification requirements.
 
 ## 5. Stage 1 lifecycle
 

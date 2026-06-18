@@ -30,9 +30,10 @@ This reference expands the operating-policy bullets in `../SKILL.md`.
 - Capture Blue self-review plus durable Red/Orange/Gray role-review evidence, or mark the review phase `not_applicable` with a concrete reason only for pure read-only/direct command runs where no durable project artifact changed.
 - Logical backend roles are planner (`plan`, `ask`), implementer (`implement`, `enhance-test`, `optimize`, `docs-update`, `handle-feedback`), and feedback (`request-feedback`). They may map to the same or different physical backends.
 
-## Official GLM Octo review policy
+## MAR review policy
 
-- Official GLM Octo review is mandatory for `development` / implementation tasks unless 주군 explicitly waives it before start.
-- Official Octo must run through a KAB GLM session with KAB session/readback/event evidence, real-user-HOME KAB/GLM path preflight, `/octo:review` as the first submitted command, explicit requirements-and-implemented-code-only review scope, explicit prohibition on tests/linters/builds/installs/package managers/network probes/service starts/runtime verification, and `prompt_confirmed: true`.
-- Direct `glm` CLI review output is preflight-only and fails closed as official Octo evidence, as does any Octo run that executes a forbidden command without an explicit master waiver.
-- When Octo runs, handling its feedback and a fresh post-Octo Blue + Red/Orange/Gray re-review are mandatory before final report or commit approval.
+- MAR review is mandatory for `development` / implementation tasks unless 주군 explicitly waives or replaces it before start.
+- MAR must use role-first required coverage for `logic`, `security`, `arch`, `cve`, and `test_adequacy` with declared primary/secondary provider lanes.
+- Provider preflight/toolchain proof, bounded raw-output artifacts, parsed findings, merge pack, Blue disposition, and any Red adjudication handoff must be preserved as evidence.
+- Provider availability, prompt rendering, dispatch success, degraded providers, failed providers, or unresolved required roles never count as clean review completion.
+- When MAR feedback changes the work, handling its feedback and a fresh post-change Blue + Red/Orange/Gray re-review are mandatory before final report or commit approval.

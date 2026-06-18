@@ -108,8 +108,8 @@ func newFakeRunner(project string) *fakeRunner {
 			"graph --help":        {Stdout: []byte("Usage: graph\n  validate\n  explain\n  diff\n  propose\n  apply\n")},
 			"graph validate --file .kkachi-workflow.yaml --json":                                                                        {Stdout: []byte(`{"ok":true,"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.0.9","checksum":"sha256:old"}`)},
 			"graph explain --file .kkachi-workflow.yaml --json":                                                                         {Stdout: []byte(`{"ok":true,"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.0.9","checksum":"sha256:old"}`)},
-			"graph diff --from .kkachi-workflow.yaml --to .kkachi/graph/candidates/kas-default-96af9b5b030fc4ca.yaml --semantic --json": {Stdout: []byte(`{"ok":true,"summary":"semantic diff ready","risk_flags":["phase_path_change"],"reason_codes":["graph_stale"]}`)},
-			"graph propose --candidate-file .kkachi/graph/candidates/kas-default-96af9b5b030fc4ca.yaml --reason repair --json":          {Stdout: []byte(`{"ok":true,"proposal_id":"prop-1","proposal_path":".kkachi/graph/proposals/prop-1.yaml","approval_required":true,"risk_flags":["phase_path_change"],"reason_codes":["proposal_recorded"]}`)},
+			"graph diff --from .kkachi-workflow.yaml --to .kkachi/graph/candidates/kas-default-3dcade9fff1844f8.yaml --semantic --json": {Stdout: []byte(`{"ok":true,"summary":"semantic diff ready","risk_flags":["phase_path_change"],"reason_codes":["graph_stale"]}`)},
+			"graph propose --candidate-file .kkachi/graph/candidates/kas-default-3dcade9fff1844f8.yaml --reason repair --json":          {Stdout: []byte(`{"ok":true,"proposal_id":"prop-1","proposal_path":".kkachi/graph/proposals/prop-1.yaml","approval_required":true,"risk_flags":["phase_path_change"],"reason_codes":["proposal_recorded"]}`)},
 			"graph apply --proposal prop-1 --approval approved:1 --json":                                                                {Stdout: []byte(`{"ok":true,"proposal_id":"prop-1","approval_ref":"approved:1","audit_event_ids":["evt-1"],"audit_path":".kkachi/events/evt-1.json","backup_path":".kkachi/graph/backups/old.yaml","recovery_path":".kkachi/graph/recovery/prop-1.md"}`)},
 		},
 	}
@@ -275,8 +275,8 @@ func TestProposeCommandOrderForStaleGraph(t *testing.T) {
 		"graph explain --file .kkachi-workflow.yaml --json",
 		"capabilities --json",
 		"graph --help",
-		"graph diff --from .kkachi-workflow.yaml --to .kkachi/graph/candidates/kas-default-96af9b5b030fc4ca.yaml --semantic --json",
-		"graph propose --candidate-file .kkachi/graph/candidates/kas-default-96af9b5b030fc4ca.yaml --reason repair --json",
+		"graph diff --from .kkachi-workflow.yaml --to .kkachi/graph/candidates/kas-default-3dcade9fff1844f8.yaml --semantic --json",
+		"graph propose --candidate-file .kkachi/graph/candidates/kas-default-3dcade9fff1844f8.yaml --reason repair --json",
 	}
 	if strings.Join(runner.calls, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("calls mismatch\ngot:\n%s\nwant:\n%s", strings.Join(runner.calls, "\n"), strings.Join(want, "\n"))

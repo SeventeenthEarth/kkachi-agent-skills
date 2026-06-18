@@ -11,7 +11,7 @@ __pycache__/
 .kkachi-workflow.yaml
 .omc/
 .claude/
-.claude-octopus/
+.external-review-sidecar/
 feedback.md
 
 bin/

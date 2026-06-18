@@ -38,9 +38,7 @@ Required evidence posture:
 - an explicit statement that the run does not claim KAB Codex execution
   evidence.
 
-Allowed KAB use in Stage 1 is limited to independently required review lanes,
-such as official GLM Octo review, with their own KAB evidence. That review lane
-does not turn the implementation lane into Stage 2.
+MAR use in Stage 1 is the default independent review lane and records provider/toolchain evidence separately from implementation evidence. That review lane does not turn the implementation lane into Stage 2.
 
 ## Stage 2 — KAB Codex-first execution
 

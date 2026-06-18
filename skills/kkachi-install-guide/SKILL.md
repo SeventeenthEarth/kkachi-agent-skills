@@ -209,7 +209,7 @@ After project init, update repository ignores for local runtime/tool state befor
 .codegraph/
 .omx/
 .omc/
-.claude-octopus/
+.external-review-sidecar/
 ```
 
 Then verify the project application from the target repo root:

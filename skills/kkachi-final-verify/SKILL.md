@@ -24,7 +24,7 @@ For 주군's KAS/Kkachi development pipeline, final verification happens before 
 - Blue and Red plan vet evidence exists before implementation start, including verdicts and any `REQUEST_CHANGES` loop routed back through the selected planner lane. Color-review and GLM-review requested changes were routed back through the selected implementer lane for mutation, with Blue synthesis/approval and post-change verification evidence.
 - Plan review, first color review, and any later feedback/review round recorded fallback audit when the plan or diff could introduce fallback behavior. Unnecessary fallback paths were removed or converted to fail-closed handling, and any retained fallback has a bounded/evidenced/small-delta rationale or an explicit 주군 decision path.
 - Command evidence shows terminal commands used the real user home (`HOME=<real-user-home>` in reusable artifacts), including Git commands and especially `git commit`, so Git global config and user-level tool config were not accidentally read from a Hermes role/profile home.
-- Official GLM Octo evidence, when required or run, came from a KAB GLM session only: KAB session id, backend type `glm`, selected CLI/capability evidence, bridge session/readback/events, real-user-HOME KAB/GLM path preflight, prompt first line `/octo:review`, explicit requirements-and-implemented-code-only scope for requirements plus implemented code, explicit ban on tests/linters/builds/installs/package managers/network probes/service starts/runtime verification, `prompt_confirmed: true`, bounded watcher/completion evidence, permission rejection evidence for any out-of-scope command request, and feedback artifact are present. Direct `glm` CLI output may be recorded as preflight only; if it is the review source, if the prompt omits the no-test/code-only scope, if Octo executed a forbidden command, or if evidence shows test/lint/build/install/network/service/runtime execution during Octo, the Octo gate fails closed unless 주군 grants an explicit waiver.
+- MAR evidence, when required or run, records role-first coverage for `logic`, `security`, `arch`, `cve`, and `test_adequacy`; selected primary/secondary provider lanes; provider preflight/toolchain proof; bounded raw-output artifacts; parse/disposition status; Blue disposition; and fail-closed handling for degraded, failed, or unresolved required roles. Provider availability, prompt rendering, or dispatch success alone is not review completion evidence.
 - Red/Orange/Gray first color review evidence is captured when the KAS/KAH run changed durable repository artifacts, workflow state, docs, or release/commit evidence, even if the task was not classified as implementation. Pure read-only/no-durable-change runs may mark this not applicable only with a concrete reason.
 - The repo remains review-ready and uncommitted until 주군 receives the report and approves commit.
 
@@ -55,8 +55,8 @@ Final verification must also confirm selected backend caveats were handled:
 - Gemini/OpenCode plan approvals that require explicit start have matching start evidence.
 - OpenCode question-flow claims are backed by real upstream API/SSE question events.
 - Codex evidence is wrapper/API-derived and does not expose raw Codex app-server payloads as public contract.
-- Official GLM Octo review is KAB-only and must be requirements-and-implemented-code-only for requirements plus implemented code. Reject final/pre-commit reports that substitute a direct `glm` CLI review, omit KAB GLM session evidence, omit `/octo:review` as the first submitted command, omit the no-test/code-only prompt scope, show test/lint/build/install/network/service/runtime execution during Octo, or lack `prompt_confirmed: true`/completion evidence.
-- Any GLM reject turn with a response-fidelity warning is called out in the final report.
+- MAR review is role-first and fail-closed. Reject final/pre-commit reports that substitute provider availability for required role coverage, omit provider preflight/toolchain evidence, omit bounded raw-output artifacts, omit Blue disposition, or report degraded/failed/unresolved required roles as clean PASS.
+- Any provider response-fidelity or parse warning is called out in the final report.
 
 ## Outputs
 
@@ -66,7 +66,7 @@ Final verification must also confirm selected backend caveats were handled:
 - `checklist.md` final state check
 - final gate verdict, Korean report source summary, CodeGraph refresh evidence or explicit unavailable/degraded reason, final selected verification profile/gate evidence after the last relevant change, and the review-ready pre-commit repo state summary
 - `kkachi-agent-helper gate final <run_id> --json` result; use `gate check <run_id> final --json` only as an older-helper compatibility fallback
-- before asking for commit approval, use the standardized pre-commit completion report format in `references/pre-commit-completion-report-template.md`; for implementation tasks include official GLM Octo evidence and post-Octo re-review evidence, and for non-implementation tasks include not-applicable reasons when Octo was not requested/declared/run
-- official GLM Octo evidence and the post-Octo Blue/Red/Orange/Gray re-review are required for implementation tasks and for any other workflow where Octo was requested/declared/run
+- before asking for commit approval, use the standardized pre-commit completion report format in `references/pre-commit-completion-report-template.md`; for implementation tasks include MAR role-coverage evidence and post-change re-review evidence when MAR feedback changed the work
+- MAR evidence and any required post-change Blue/Red/Orange/Gray re-review are required for implementation tasks and for any other workflow where MAR or another later feedback round changed the work
 
 See `references/review-readiness-and-final-gate.md` for the late-gate artifact checklist, final gate freshness rule, and close/abort sequence.

@@ -6,7 +6,7 @@ Use this reference when installing or changing a project-specific KAS suite and 
 
 KAS owns the adoption-stage policy. KAH does not need to interpret the stage semantically: graph state, run state, events, locks, artifacts, schemas, and gates use the same helper mechanics across all stages.
 
-KAB owns backend execution and observation evidence when Stage 2 or Stage 3 uses bridge-backed execution. Official GLM Octo review remains an independent KAB GLM review lane and is not replaced by the implementation-stage setting.
+KAB owns backend execution and observation evidence when Stage 2 or Stage 3 uses bridge-backed execution. MAR remains the default review lane and is not replaced by the implementation-stage setting.
 
 ## Preferred installed-profile record
 
@@ -41,7 +41,7 @@ allowed_implementation_backends:
   - codex
 stage_owner: KAS
 kah_semantics: unchanged_graph_run_artifact_gates
-glm_octo_review: independent_review_lane
+mar_review: default_role_first_review_lane
 changed_from: stage1_direct_codex_app_server_baseline
 changed_reason: "KAB native_codex execution is ready for this project"
 evidence_required:

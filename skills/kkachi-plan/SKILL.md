@@ -22,7 +22,7 @@ When 주군 asks to run KAS/Kkachi development work and the task is classified a
 - **Stage 2:** KAB Codex-first planner through `native_codex`; this replaces direct Codex app-server calls without changing the KAS/KAH phase or review scenario.
 - **Stage 3:** KAB backend-selected planner after backend selection chooses an eligible backend from task requirements, project policy, capability evidence, and user preference after gates.
 
-Official GLM Octo review is independent of these planning stages. It remains a KAB GLM feedback lane when required or requested; it does not change the plan/implementation backend and is not satisfied by selecting GLM as an implementation backend.
+MAR review is independent of these planning stages. It remains the default KAS review lane and does not change the plan/implementation backend.
 
 Plan drafts must include a fallback audit note before Blue/Red review. Ask the planner to identify any fallback paths it proposes, remove unnecessary fallback behavior, and prefer fail-closed handling when capability, evidence, approval, or safe state is missing. Allow a fallback only when no safe direct handling exists, the fallback is tightly bounded/evidenced, and the required code/docs delta is genuinely small. If the only viable fallback would add broad code, new state machinery, or unclear policy, stop and report options to 주군 instead of letting the planner quietly add it.
 

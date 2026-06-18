@@ -24,12 +24,10 @@ This backend summary is advisory. If it conflicts with `kkachi-agent-bridge/docs
 The adoption stage controls KAS planner/implementer lane selection. Stage 1
 records direct Codex app-server evidence and no-KAB-Codex rationale; Stage 2
 uses KAB Codex-first through `native_codex`; Stage 3 enables KAB backend
-selection after project policy and capability gates. Official GLM Octo review is
-independent of this implementation-stage setting and must be constrained to
-requirements plus implemented code only: do not run tests, linters, builds,
-installs, package managers, network probes, service starts, or runtime verification
-commands during Octo; inspect requirement artifacts, task contracts,
-plans/checklists, diffs, implemented source, docs, and existing test files as
-implemented code evidence only.
+selection after project policy and capability gates. MAR review is independent of
+this implementation-stage setting and must use role-first coverage for `logic`,
+`security`, `arch`, `cve`, and `test_adequacy`. Record provider preflight,
+bounded raw-output artifacts, parsed findings, merge pack, Blue disposition, and
+fail-closed handling for degraded or unresolved required roles.
 
 Keep volatile backend maturity details here, not in the main `SKILL.md`.

@@ -144,7 +144,7 @@ func TestGRSYNC001DocsAndRoadmapRegisterCompatibilityRegistry(t *testing.T) {
 func TestGRSYNC002ReadOnlyDoctorDocsContract(t *testing.T) {
 	requireRoadmapTaskStatus(t, "GRSYNC-002", "Completed")
 	requireContainsAll(t, "docs/roadmap.md", []string{
-		"post-Octo re-review cards Red `t_f30b1b15`, Orange `t_a52dd584`, Gray `t_8c4e5d3e` all accepted after feedback handling",
+		"post-MAR re-review cards Red `t_f30b1b15`, Orange `t_a52dd584`, Gray `t_8c4e5d3e` all accepted after feedback handling",
 		"GRSYNC-003 | Implement proposal/apply orchestration and periodic check guidance | Completed",
 	})
 	requireContainsAll(t, graphWorkflowSyncSOT, []string{

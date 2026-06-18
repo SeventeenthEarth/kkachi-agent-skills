@@ -165,7 +165,7 @@ Recommended repository ignore entries for local helper/tool state:
 .codegraph/
 .omx/
 .omc/
-.claude-octopus/
+.external-review-sidecar/
 ```
 
 Whether `.kkachi-workflow.yaml` and `docs/kkachi-docs-map.yaml` are tracked is a project policy decision; `.kkachi/` is local helper state and should not be committed unless 주군 explicitly directs otherwise.

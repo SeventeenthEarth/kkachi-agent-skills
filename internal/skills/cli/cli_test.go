@@ -240,10 +240,10 @@ case "$*" in
       echo '{"ok":true,"graph":{"schema_version":"workflow-graph/v1","source_template":"kas-default","template_version":"0.0.9","checksum":"sha256:old"}}'
     fi
     ;;
-  "graph diff --from .kkachi-workflow.yaml --to .kkachi/graph/candidates/kas-default-96af9b5b030fc4ca.yaml --semantic --json")
+  "graph diff --from .kkachi-workflow.yaml --to .kkachi/graph/candidates/kas-default-3dcade9fff1844f8.yaml --semantic --json")
     echo '{"ok":true,"summary":"semantic diff ready","risk_flags":["phase_path_change"],"reason_codes":["graph_stale"]}'
     ;;
-  "graph propose --candidate-file .kkachi/graph/candidates/kas-default-96af9b5b030fc4ca.yaml --reason repair --json")
+  "graph propose --candidate-file .kkachi/graph/candidates/kas-default-3dcade9fff1844f8.yaml --reason repair --json")
     echo '{"ok":true,"proposal_id":"prop-1","proposal_path":".kkachi/graph/proposals/prop-1.yaml","approval_required":true,"risk_flags":["phase_path_change"],"reason_codes":["proposal_recorded"]}'
     ;;
   "graph apply --proposal prop-1 --approval approved:1 --json")

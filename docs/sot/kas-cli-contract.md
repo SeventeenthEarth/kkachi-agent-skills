@@ -452,7 +452,7 @@ Marker output:
 Plan/review fallback audit:
 
 - Any Codex or KAB-authored plan for KAS/KAH development must include a fallback audit note before Blue/Red plan review. The note must identify proposed fallback paths, explain whether each is necessary, and prefer fail-closed behavior when the system lacks capability, evidence, approval, or safe state.
-- Blue and Red plan review, first color review, GLM/Octo review when run, and post-review closure must explicitly check for unnecessary fallback paths. The normal requested change is to remove the fallback and fail closed with operator-readable diagnostics and KAH/KAB evidence.
+- Blue and Red plan review, first color review, MAR review when run, and post-review closure must explicitly check for unnecessary fallback paths. The normal requested change is to remove the fallback and fail closed with operator-readable diagnostics and KAH/KAB evidence.
 - A fallback may be accepted only when there is no safe direct handling, the fallback is explicitly bounded and evidenced, and the implementation/docs delta is genuinely small. The fallback must not bypass KAH gates, approval checks, KAB evidence requirements, auth/token safety, or the selected KAB adoption stage.
 - If handling the condition without a fallback is impossible and the fallback would require broad code, new state machinery, or unclear policy, the run must stop and report options to 주군 instead of quietly adding the fallback.
 

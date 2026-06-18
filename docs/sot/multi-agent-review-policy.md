@@ -32,7 +32,7 @@ MAR promotion is intentionally split so planning documents do not overclaim impl
 
 | Task | Repository | Scope | Completion claim allowed |
 |---|---|---|---|
-| `MAR-001` | KAS | Promote MAR policy/SOT, roadmap/docs-map/docs-index records, stale GLM Octo marker targets, and implementation task boundaries. | KAS repository has a planning SOT for MAR. No skill/script/provider behavior claim. |
+| `MAR-001` | KAS | Promote MAR policy/SOT, roadmap/docs-map/docs-index records, stale legacy-review marker targets, and implementation task boundaries. | KAS repository has a planning SOT for MAR. No skill/script/provider behavior claim. |
 | `MAREV-001` | KAH | Promote KAH-side MAR artifact/gate planning SOT and roadmap/docs-index records. | KAH has a planning SOT for MAR evidence capture. No helper gate/code behavior claim. |
 | `MAR-002` | KAS | Add `kkachi-multi-agent-review` skill scaffold, references, prompt templates, and disposition templates without provider execution. | KAS skill scaffold exists; provider execution still pending unless separately implemented. |
 | `MAR-003` | KAS | Implement stdlib `mar.py` doctor/render/validate/merge-pack MVP using fixture and read-only local evidence. | Local MAR script surfaces exist for non-provider or mocked/fixture paths. |
@@ -191,7 +191,7 @@ not claim that KAH has validated role coverage until MAREV code/test evidence
 exists.
 
 MAR dogfood evidence must run beside the still-active review workflow before
-broad wording claims MAR has replaced legacy GLM Octo or team color review
+broad wording claims MAR has replaced legacy review or team color review
 requirements. Dogfood evidence must include at least one representative KAS/KAH
 diff, role/provider-attempt artifacts, compact merge pack, Blue disposition, and
 Red adjudication when any trigger fires.
@@ -237,16 +237,16 @@ MAR is read-only. Reviewer prompts and scripts must prohibit reviewer models fro
 
 The KAS script must use `subprocess.run([...], shell=False)`, enforce provider timeouts, cap raw output size, preserve parse failures, compare git status before/after execution, fail closed on mutation detection, record unavailable providers as degraded coverage, and never interpret provider failure as clean review.
 
-## Legacy GLM Octo handling
+## Legacy review handling
 
-Existing KAS surfaces that require KAB-mediated GLM Octo as the default routine review lane are stale-marker targets during MAR promotion. They must not be silently deleted. Before replacement, each update must record:
+Existing KAS surfaces that require a pre-MAR default routine review lane are stale-marker targets during MAR promotion. They must not be silently deleted. Before replacement, each update must record:
 
 - exact file path and section;
 - whether the old wording is active, historical, alternate, or still required for a specific workflow;
 - whether MAR dogfood evidence exists;
-- whether KAB GLM Octo remains required by a separate active workflow gate.
+- whether another separate active workflow gate still requires external review.
 
-Dogfood evidence is required before broad wording changes claim that MAR replaces GLM Octo as default routine review behavior.
+Dogfood evidence is required before broad wording changes claim that MAR replaces legacy default routine review behavior.
 
 ## Verification before implementation claim
 

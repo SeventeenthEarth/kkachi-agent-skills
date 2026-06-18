@@ -71,8 +71,8 @@ phases:
     title: "Handle Feedback 1"
     owner_layer: "khs"
     required: true
-  - id: "octo-review"
-    title: "Octo Review"
+  - id: "mar-review"
+    title: "MAR Review"
     owner_layer: "khs"
     required: true
   - id: "second-color-review"
@@ -115,8 +115,8 @@ edges:
   - from: "request-feedback-1"
     to: "handle-feedback-1"
   - from: "handle-feedback-1"
-    to: "octo-review"
-  - from: "octo-review"
+    to: "mar-review"
+  - from: "mar-review"
     to: "second-color-review"
   - from: "second-color-review"
     to: "final"

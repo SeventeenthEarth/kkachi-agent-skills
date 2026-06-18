@@ -29,7 +29,7 @@ func TestToken006SlimmedSkillsKeepDirectReferenceLinks(t *testing.T) {
 			"references/review-readiness-and-final-gate.md",
 		},
 		"skills/kkachi-request-feedback/SKILL.md": {
-			"references/glm-octo-review-lane.md",
+			"references/mar-review-lane.md",
 		},
 		"skills/kkachi-implement/SKILL.md": {
 			"references/bridge-observation-and-start-rules.md",
