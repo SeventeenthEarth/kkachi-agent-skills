@@ -28,9 +28,10 @@ DEFAULT_RAW_CAP = 4096
 DEFAULT_TIMEOUT = 10
 DEFAULT_PROVIDER_REGISTRY = "registries/mar-provider-lanes.json"
 DEFAULT_TOOLCHAIN = ".kkachi/toolchain.yaml"
-PROVIDER_LANES_SCHEMA_VERSION = "mar.provider_lanes.v1"
+ROLE_LANES_SCHEMA_VERSION = "mar.role_lanes.v1"
 PROVIDER_TOOLS_SCHEMA_VERSION = "mar.provider_tools.v1"
 PROVIDER_ATTEMPT_SCHEMA_VERSION = "mar.provider_attempt.v1"
+ROLE_ATTEMPT_SCHEMA_VERSION = "mar.role_attempt.v1"
 PROVIDER_FAILURE_REASONS = (
     "auth_failed",
     "token_exhausted",
@@ -44,6 +45,14 @@ PROVIDER_FAILURE_REASONS = (
     "mutation_detected",
     "adapter_proof_required",
     "unknown_provider_failure",
+)
+REVIEW_PAYLOAD_FIELDS = (
+    "summary",
+    "findings",
+    "confidence",
+    "severity",
+    "role_scoped_acceptance_criteria_verdicts",
+    "acceptance_criteria_verdicts",
 )
 COVERED_STATUSES = ("PASS", "PASS_WITH_FINDINGS")
 NON_CLEAN_STATUSES = ("BLOCKED", "DEGRADED", "FAILED")
@@ -133,19 +142,55 @@ def parse_review_path(path, raw_cap):
     return parse_review_raw(raw, raw_cap, path=str(path))
 
 
+def parse_json_review_payload(raw):
+    try:
+        return json.loads(raw), None
+    except json.JSONDecodeError as exc:
+        direct_error = exc
+
+    def content_candidates(value):
+        candidates = [value]
+        stripped = value.strip()
+        if stripped.startswith("```") and stripped.endswith("```"):
+            lines = stripped.splitlines()
+            if len(lines) >= 3:
+                candidates.append("\n".join(lines[1:-1]).strip())
+        return candidates
+
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            event = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        content = event.get("content") if event.get("role") == "assistant" else None
+        if isinstance(content, dict):
+            return content, None
+        if isinstance(content, str):
+            for candidate in content_candidates(content):
+                try:
+                    return json.loads(candidate), None
+                except json.JSONDecodeError:
+                    continue
+    return None, direct_error
+
+
 def parse_review_raw(raw, raw_cap, path=None):
     capped = cap_raw_output(raw, raw_cap)
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as exc:
+    parsed, parse_error = parse_json_review_payload(raw)
+    if parse_error is not None:
         return structured_failure(
             "DEGRADED",
             "parse_failure",
             path=str(path) if path is not None else None,
             parse_failure={
-                "message": str(exc),
-                "line": exc.lineno,
-                "column": exc.colno,
+                "message": str(parse_error),
+                "line": parse_error.lineno,
+                "column": parse_error.colno,
             },
             raw_output=capped,
         )
@@ -208,12 +253,24 @@ def load_provider_registry(path):
 
     if not isinstance(data, dict):
         raise ValueError("provider registry must be a JSON object")
-    if data.get("schema_version") != PROVIDER_LANES_SCHEMA_VERSION:
-        raise ValueError("provider registry schema_version must be mar.provider_lanes.v1")
-    if not isinstance(data.get("default_reviewers"), list):
-        raise ValueError("provider registry default_reviewers must be a list")
-    if not isinstance(data.get("reviewers"), dict):
-        raise ValueError("provider registry reviewers must be an object")
+    if data.get("schema_version") != ROLE_LANES_SCHEMA_VERSION:
+        raise ValueError("provider registry schema_version must be mar.role_lanes.v1")
+    if not isinstance(data.get("required_roles"), list):
+        raise ValueError("provider registry required_roles must be a list")
+    if not isinstance(data.get("roles"), dict):
+        raise ValueError("provider registry roles must be an object")
+    if not isinstance(data.get("providers"), dict):
+        raise ValueError("provider registry providers must be an object")
+    for role_id in data["required_roles"]:
+        if role_id not in data["roles"]:
+            raise ValueError(f"required role {role_id} missing role config")
+        role = data["roles"][role_id]
+        if not isinstance(role, dict):
+            raise ValueError(f"role {role_id} must be an object")
+        for key in ("primary_provider", "secondary_provider"):
+            provider_id = role.get(key)
+            if not provider_id or provider_id not in data["providers"]:
+                raise ValueError(f"role {role_id} {key} must resolve to provider metadata")
     return data
 
 
@@ -373,24 +430,27 @@ def overlay_provider_toolchain(registry, toolchain_path):
     if not isinstance(providers, dict):
         raise ValueError("toolchain mar_provider_tools.providers must be an object")
 
-    reviewers = registry_copy.get("reviewers", {})
+    providers_registry = registry_copy.get("providers", {})
     applied = []
-    for reviewer_id, provider_tools in providers.items():
-        if reviewer_id not in reviewers:
+    for provider_id, provider_tools in providers.items():
+        if provider_id not in providers_registry:
             continue
         if not isinstance(provider_tools, dict):
-            raise ValueError(f"toolchain provider {reviewer_id} must be an object")
-        config = reviewers[reviewer_id]
+            raise ValueError(f"toolchain provider {provider_id} must be an object")
+        config = providers_registry[provider_id]
         if "resolved_argv" in provider_tools:
             resolved_argv = provider_tools["resolved_argv"]
             if not isinstance(resolved_argv, list) or not resolved_argv or not all(
                 isinstance(item, str) and item for item in resolved_argv
             ):
-                raise ValueError(f"toolchain provider {reviewer_id} resolved_argv must be a non-empty string list")
+                raise ValueError(f"toolchain provider {provider_id} resolved_argv must be a non-empty string list")
             config["resolved_argv"] = list(resolved_argv)
         for key in (
             "command_lane",
             "selected_model",
+            "selected_model_required",
+            "model_selection",
+            "model_selection_note",
             "validated",
             "version",
             "reason",
@@ -404,11 +464,11 @@ def overlay_provider_toolchain(registry, toolchain_path):
             "path": str(resolve_repo_path(toolchain_path)),
             "schema_version": tools.get("schema_version"),
         }
-        applied.append(reviewer_id)
+        applied.append(provider_id)
     if applied:
         registry_copy["toolchain_overlay"] = {
             "path": str(resolve_repo_path(toolchain_path)),
-            "applied_reviewers": applied,
+            "applied_providers": applied,
         }
     return registry_copy
 
@@ -436,6 +496,10 @@ def command_head_available(command):
     return shutil.which(head) is not None
 
 
+def provider_requires_selected_model(config):
+    return config.get("selected_model_required", True) is not False
+
+
 def registry_payload_for_readback(registry):
     payload = dict(registry)
     payload["status"] = "PASS"
@@ -444,35 +508,44 @@ def registry_payload_for_readback(registry):
     return payload
 
 
-def parse_reviewers_arg(value):
+def parse_csv_arg(value):
     if not value:
         return None
-    reviewers = [item.strip() for item in value.split(",") if item.strip()]
-    return reviewers or None
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    return items or None
 
 
-def selected_reviewers_or_blocked(args, registry):
-    default_reviewers = list(registry.get("default_reviewers", []))
-    requested = parse_reviewers_arg(getattr(args, "reviewers", None))
+def selected_roles_or_blocked(args, registry):
+    required_roles = list(registry.get("required_roles", []))
+    requested = parse_csv_arg(getattr(args, "roles", None))
     if not requested:
-        return default_reviewers, None
-    if requested != default_reviewers and not getattr(args, "pre_scoped_evidence", None):
+        return required_roles, None
+    if requested != required_roles and not getattr(args, "pre_scoped_evidence", None):
         return requested, structured_failure(
             "BLOCKED",
             "pre_scoped_evidence_required",
-            required_default_reviewers=default_reviewers,
-            requested_reviewers=requested,
+            required_roles=required_roles,
+            requested_roles=requested,
             no_provider_execution=True,
         )
     return requested, None
 
 
-def reviewer_config(registry, reviewer_id):
-    reviewers = registry.get("reviewers", {})
-    if reviewer_id not in reviewers:
-        raise ValueError(f"unknown reviewer_id: {reviewer_id}")
-    config = dict(reviewers[reviewer_id])
-    config["reviewer_id"] = reviewer_id
+def provider_config(registry, provider_id):
+    providers = registry.get("providers", {})
+    if provider_id not in providers:
+        raise ValueError(f"unknown provider_id: {provider_id}")
+    config = dict(providers[provider_id])
+    config["provider_id"] = provider_id
+    return config
+
+
+def role_config(registry, role_id):
+    roles = registry.get("roles", {})
+    if role_id not in roles:
+        raise ValueError(f"unknown role_id: {role_id}")
+    config = dict(roles[role_id])
+    config["role_id"] = role_id
     return config
 
 
@@ -549,7 +622,10 @@ def base_provider_attempt(args, config, attempt_id, timeout_seconds):
         "run_id": getattr(args, "run_id", None),
         "task_id": getattr(args, "task_id", None),
         "attempt_id": attempt_id,
-        "reviewer_id": config["reviewer_id"],
+        "role_id": config.get("role_id"),
+        "provider_id": config["provider_id"],
+        "provider_candidate": config.get("provider_candidate"),
+        "reviewer_id": config["provider_id"],
         "command_lane": config.get("command_lane"),
         "selected_model": selected_model,
         "started_at": started_at,
@@ -613,7 +689,7 @@ def provider_preflight_attempt(args, config, attempt_id=None):
     attempt = base_provider_attempt(
         args,
         config,
-        attempt_id or f"{config['reviewer_id']}-preflight",
+        attempt_id or f"{config['provider_id']}-preflight",
         timeout_seconds,
     )
 
@@ -624,7 +700,7 @@ def provider_preflight_attempt(args, config, attempt_id=None):
         "detected": False,
     }
 
-    if not config.get("selected_model"):
+    if provider_requires_selected_model(config) and not config.get("selected_model"):
         attempt["ended_at"] = utc_now()
         attempt["terminal_status"] = "BLOCKED"
         attempt["provider_failure_reason"] = "model_unavailable"
@@ -720,6 +796,9 @@ def provider_preflight_attempt(args, config, attempt_id=None):
         attempt["terminal_status"] = parsed.get("status", "DEGRADED")
         attempt["provider_failure_reason"] = None
         attempt["parser_status"] = "parsed"
+        for key in REVIEW_PAYLOAD_FIELDS:
+            if key in parsed:
+                attempt[key] = parsed[key]
 
     if attempt["terminal_status"] in NON_CLEAN_STATUSES and not attempt["provider_failure_reason"]:
         attempt["provider_failure_reason"] = "unknown_provider_failure"
@@ -773,6 +852,7 @@ def cmd_doctor(args):
             "render",
             "validate",
             "merge-pack",
+            "role-lanes",
             "provider-lanes",
             "provider-preflight",
             "provider-attempt",
@@ -857,18 +937,57 @@ def cmd_provider_lanes(args):
     return registry_payload_for_readback(registry)
 
 
+def config_for_role_candidate(registry, role_id, candidate):
+    role = role_config(registry, role_id)
+    provider_id = role.get(f"{candidate}_provider")
+    if not provider_id:
+        raise ValueError(f"role {role_id} missing {candidate}_provider")
+    config = provider_config(registry, provider_id)
+    config["role_id"] = role_id
+    config["role_scope"] = role.get("description")
+    config["provider_candidate"] = candidate
+    return config
+
+
+def attempt_role_candidates(args, registry, role_id):
+    attempts = []
+    primary = config_for_role_candidate(registry, role_id, "primary")
+    primary_attempt = provider_preflight_attempt(
+        args,
+        primary,
+        attempt_id=getattr(args, "attempt_id", None) or f"{role_id}-primary-001",
+    )
+    attempts.append(primary_attempt)
+    if primary_attempt.get("terminal_status") in COVERED_STATUSES:
+        return attempts
+
+    secondary = config_for_role_candidate(registry, role_id, "secondary")
+    secondary_args = argparse.Namespace(**vars(args))
+    secondary_args.retry_of_attempt_id = None
+    secondary_args.alternate_for_reviewer_id = None
+    secondary_args.approval_evidence = None
+    secondary_args.waiver_evidence = None
+    attempts.append(
+        provider_preflight_attempt(
+            secondary_args,
+            secondary,
+            attempt_id=f"{role_id}-secondary-001",
+        )
+    )
+    return attempts
+
+
 def cmd_provider_preflight(args):
     try:
         registry = load_provider_registry_with_toolchain(args.registry, args.toolchain)
-        reviewers, blocked = selected_reviewers_or_blocked(args, registry)
+        roles, blocked = selected_roles_or_blocked(args, registry)
         if blocked:
             return blocked
         attempts = []
-        for reviewer_id in reviewers:
-            config = reviewer_config(registry, reviewer_id)
+        for role_id in roles:
             preflight_args = argparse.Namespace(**vars(args))
             preflight_args.preflight_only = True
-            attempts.append(provider_preflight_attempt(preflight_args, config))
+            attempts.extend(attempt_role_candidates(preflight_args, registry, role_id))
     except ValueError as exc:
         return structured_failure("FAILED", "provider_registry_failure", detail=str(exc))
 
@@ -888,8 +1007,8 @@ def cmd_provider_preflight(args):
         "status": status,
         "reason": reason,
         "schema_version": "mar.provider_preflight.v1",
-        "default_reviewers": registry.get("default_reviewers", []),
-        "requested_reviewers": reviewers,
+        "required_roles": registry.get("required_roles", []),
+        "requested_roles": roles,
         "provider_failure_reasons": reasons,
         "attempts": attempts,
         "no_provider_execution": True,
@@ -899,26 +1018,33 @@ def cmd_provider_preflight(args):
 def cmd_provider_attempt(args):
     try:
         registry = load_provider_registry_with_toolchain(args.registry, args.toolchain)
-        config = reviewer_config(registry, args.reviewer)
+        if args.role:
+            attempts = attempt_role_candidates(args, registry, args.role)
+            coverage = aggregate_provider_coverage(
+                attempts,
+                [args.role],
+                pre_scoped_evidence=args.pre_scoped_evidence,
+            )
+            return {
+                "schema_version": ROLE_ATTEMPT_SCHEMA_VERSION,
+                "status": coverage["status"],
+                "reason": coverage["reason"],
+                "role_id": args.role,
+                "attempts": attempts,
+                "role_coverage": coverage["coverage"],
+                "unresolved_required_roles": coverage["unresolved_required_roles"],
+                "operator_report_text": coverage["operator_report_text"],
+                "no_provider_execution": all(attempt.get("no_provider_execution") for attempt in attempts),
+            }
+        provider_id = args.provider or args.reviewer
+        if not provider_id:
+            raise ValueError("--role or --provider is required")
+        config = provider_config(registry, provider_id)
     except ValueError as exc:
         return structured_failure("FAILED", "provider_registry_failure", detail=str(exc))
 
-    attempt_id = args.attempt_id or f"{args.reviewer}-001"
+    attempt_id = args.attempt_id or f"{config['provider_id']}-001"
     return provider_preflight_attempt(args, config, attempt_id=attempt_id)
-
-
-def parse_waivers(values):
-    waivers = {}
-    for value in values:
-        if "=" not in value:
-            raise ValueError("--waiver must use reviewer_id=evidence_ref")
-        reviewer_id, evidence = value.split("=", 1)
-        reviewer_id = reviewer_id.strip()
-        evidence = evidence.strip()
-        if not reviewer_id or not evidence:
-            raise ValueError("--waiver must include reviewer_id and evidence_ref")
-        waivers[reviewer_id] = evidence
-    return waivers
 
 
 def load_json_object(path, raw_cap):
@@ -949,100 +1075,139 @@ def is_provider_attempt(item):
     return item.get("schema_version") == PROVIDER_ATTEMPT_SCHEMA_VERSION
 
 
-def aggregate_provider_coverage(attempts, required_reviewers, waivers, pre_scoped_evidence=None):
-    coverage_by_reviewer = {}
+def acceptance_verdicts_from_attempt(attempt):
+    verdicts = attempt.get("role_scoped_acceptance_criteria_verdicts")
+    if verdicts is None:
+        verdicts = attempt.get("acceptance_criteria_verdicts")
+    return verdicts if isinstance(verdicts, list) else []
+
+
+def attempt_severities(attempt):
+    severities = []
+    severity = attempt.get("severity")
+    if severity:
+        severities.append(str(severity).lower())
+    findings = attempt.get("findings")
+    if isinstance(findings, list):
+        for finding in findings:
+            if isinstance(finding, dict) and finding.get("severity"):
+                severities.append(str(finding["severity"]).lower())
+    return severities
+
+
+def red_trigger_summary(unresolved, attempts):
+    triggers = []
+    if unresolved:
+        triggers.append("unresolved_required_role_coverage")
+    statuses = [attempt.get("terminal_status") for attempt in attempts]
+    if "REQUEST_CHANGES" in statuses:
+        triggers.append("request_changes_findings")
+    if any(attempt.get("confidence", 1.0) < 0.75 for attempt in attempts):
+        triggers.append("low_confidence")
+    severities = []
+    for attempt in attempts:
+        severities.extend(attempt_severities(attempt))
+    if "blocker" in severities:
+        triggers.append("blocker")
+    if severities.count("high") >= 2:
+        triggers.append("high_risk")
+    if any(attempt.get("provider_failure_reason") == "mutation_detected" for attempt in attempts):
+        triggers.append("fail_closed_mutation")
+    return {
+        "red_adjudication_required": bool(triggers),
+        "triggers": sorted(set(triggers)),
+    }
+
+
+def aggregate_provider_coverage(attempts, required_roles, pre_scoped_evidence=None):
+    coverage_by_role = {}
     unresolved = []
     resolved = []
     all_terminal_statuses = [attempt.get("terminal_status") for attempt in attempts]
 
-    for reviewer_id in required_reviewers:
-        direct_attempts = [
+    for role_id in required_roles:
+        role_attempts = [
             attempt
             for attempt in attempts
-            if attempt.get("reviewer_id") == reviewer_id
-            and not attempt.get("alternate_for_reviewer_id")
+            if attempt.get("role_id") == role_id
         ]
-        direct_success = [
+        primary_attempts = [
             attempt
-            for attempt in direct_attempts
+            for attempt in role_attempts
+            if attempt.get("provider_candidate") == "primary"
+        ]
+        secondary_attempts = [
+            attempt
+            for attempt in role_attempts
+            if attempt.get("provider_candidate") == "secondary"
+        ]
+        primary_success = [
+            attempt
+            for attempt in primary_attempts
             if attempt.get("terminal_status") in COVERED_STATUSES
         ]
-        retry_success = [
+        secondary_success = [
             attempt
-            for attempt in direct_success
-            if attempt.get("retry_of_attempt_id")
-        ]
-        alternate_success = [
-            attempt
-            for attempt in attempts
-            if attempt.get("alternate_for_reviewer_id") == reviewer_id
-            and attempt.get("terminal_status") in COVERED_STATUSES
-            and attempt.get("approval_evidence")
-        ]
-        alternate_without_approval = [
-            attempt
-            for attempt in attempts
-            if attempt.get("alternate_for_reviewer_id") == reviewer_id
-            and attempt.get("terminal_status") in COVERED_STATUSES
-            and not attempt.get("approval_evidence")
+            for attempt in secondary_attempts
+            if attempt.get("terminal_status") in COVERED_STATUSES
         ]
 
-        if retry_success:
+        if primary_success:
+            chosen = primary_success[-1]
             resolution = {
-                "reviewer_id": reviewer_id,
-                "state": "resolved",
-                "resolution": "same_provider_retry_success",
-                "attempt_id": retry_success[-1].get("attempt_id"),
-                "retry_of_attempt_id": retry_success[-1].get("retry_of_attempt_id"),
-            }
-            coverage_by_reviewer[reviewer_id] = resolution
-            resolved.append(resolution)
-        elif direct_success:
-            resolution = {
-                "reviewer_id": reviewer_id,
+                "role_id": role_id,
                 "state": "covered",
-                "resolution": "default_provider_success",
-                "attempt_id": direct_success[-1].get("attempt_id"),
+                "resolution": "primary_provider_success",
+                "attempt_id": chosen.get("attempt_id"),
+                "provider_id": chosen.get("provider_id"),
+                "provider_candidate": "primary",
+                "fallback_reason": None,
+                "role_scoped_acceptance_criteria_verdicts": acceptance_verdicts_from_attempt(chosen),
             }
-            coverage_by_reviewer[reviewer_id] = resolution
+            coverage_by_role[role_id] = resolution
             resolved.append(resolution)
-        elif alternate_success:
+        elif secondary_success:
+            chosen = secondary_success[-1]
+            fallback_reasons = [
+                attempt.get("provider_failure_reason")
+                for attempt in primary_attempts
+                if attempt.get("provider_failure_reason")
+            ]
             resolution = {
-                "reviewer_id": reviewer_id,
-                "state": "resolved",
-                "resolution": "approved_alternate_success",
-                "attempt_id": alternate_success[-1].get("attempt_id"),
-                "approval_evidence": alternate_success[-1].get("approval_evidence"),
+                "role_id": role_id,
+                "state": "covered",
+                "resolution": "secondary_provider_success",
+                "attempt_id": chosen.get("attempt_id"),
+                "provider_id": chosen.get("provider_id"),
+                "provider_candidate": "secondary",
+                "fallback_reason": fallback_reasons[-1] if fallback_reasons else "primary_provider_failed",
+                "role_scoped_acceptance_criteria_verdicts": acceptance_verdicts_from_attempt(chosen),
             }
-            coverage_by_reviewer[reviewer_id] = resolution
-            resolved.append(resolution)
-        elif reviewer_id in waivers:
-            resolution = {
-                "reviewer_id": reviewer_id,
-                "state": "resolved",
-                "resolution": "explicit_waiver",
-                "waiver_evidence": waivers[reviewer_id],
-            }
-            coverage_by_reviewer[reviewer_id] = resolution
+            coverage_by_role[role_id] = resolution
             resolved.append(resolution)
         else:
             failure_reasons = [
                 attempt.get("provider_failure_reason")
-                for attempt in direct_attempts
+                for attempt in role_attempts
                 if attempt.get("provider_failure_reason")
             ]
-            reason = "unresolved_default_coverage"
-            if alternate_without_approval:
-                reason = "approval_evidence_required"
-            elif not direct_attempts:
-                reason = "missing_provider_attempt"
+            reason = "unresolved_required_role_coverage"
+            if not role_attempts:
+                reason = "missing_role_attempt"
             unresolved_item = {
-                "reviewer_id": reviewer_id,
+                "role_id": role_id,
                 "state": "unresolved",
                 "reason": reason,
                 "provider_failure_reasons": failure_reasons,
+                "primary_provider_id": primary_attempts[-1].get("provider_id") if primary_attempts else None,
+                "secondary_provider_id": secondary_attempts[-1].get("provider_id") if secondary_attempts else None,
+                "operator_report_text": (
+                    "주군/operator report: required MAR role "
+                    f"`{role_id}` is unresolved after primary and secondary provider "
+                    "candidates failed or were unavailable; Blue must fail closed and route Red adjudication when required."
+                ),
             }
-            coverage_by_reviewer[reviewer_id] = unresolved_item
+            coverage_by_role[role_id] = unresolved_item
             unresolved.append(unresolved_item)
 
     actionable_statuses = [
@@ -1054,35 +1219,55 @@ def aggregate_provider_coverage(attempts, required_reviewers, waivers, pre_scope
         attempted_required = [
             attempt
             for attempt in attempts
-            if attempt.get("reviewer_id") in required_reviewers
-            and not attempt.get("alternate_for_reviewer_id")
+            if attempt.get("role_id") in required_roles
         ]
-        if attempted_required and len(unresolved) == len(required_reviewers):
-            status, reason = "FAILED", "all_default_reviewers_unresolved"
+        if attempted_required and len(unresolved) == len(required_roles):
+            status, reason = "FAILED", "all_required_roles_unresolved"
         else:
-            status, reason = "DEGRADED", "unresolved_default_reviewer_coverage"
+            status, reason = "DEGRADED", "unresolved_required_role_coverage"
     else:
-        status, reason = "PASS", "all_required_provider_coverage_resolved"
+        status, reason = "PASS", "all_required_role_coverage_resolved"
+
+    unresolved_role_ids = [item["role_id"] for item in unresolved]
+    ac_matrix = {
+        item["role_id"]: item.get("role_scoped_acceptance_criteria_verdicts", [])
+        for item in resolved
+    }
+    trigger_summary = red_trigger_summary(unresolved, attempts)
+    operator_report = "\n".join(
+        item["operator_report_text"] for item in unresolved if item.get("operator_report_text")
+    )
+    blue_matrix_inputs = {
+        "required_roles": required_roles,
+        "covered_roles": [item["role_id"] for item in resolved],
+        "acceptance_criteria_matrix": ac_matrix,
+    }
 
     return {
         "status": status,
         "reason": reason,
+        "unresolved_required_roles": unresolved_role_ids,
+        "operator_report_text": operator_report,
+        "red_trigger_summary": trigger_summary,
+        "blue_matrix_inputs": blue_matrix_inputs,
         "coverage": {
-            "required_reviewers": required_reviewers,
-            "observed_reviewers": sorted(
+            "required_roles": required_roles,
+            "observed_roles": sorted(
                 {
-                    attempt.get("reviewer_id")
+                    attempt.get("role_id")
                     for attempt in attempts
-                    if attempt.get("reviewer_id")
+                    if attempt.get("role_id")
                 }
             ),
+            "covered_roles": [item["role_id"] for item in resolved],
             "minimum_met": not unresolved,
             "pre_scoped_evidence": pre_scoped_evidence,
             "resolved": resolved,
-            "by_reviewer": coverage_by_reviewer,
-            "unresolved_default_reviewers": [
-                item["reviewer_id"] for item in unresolved
-            ],
+            "by_role": coverage_by_role,
+            "unresolved_required_roles": unresolved_role_ids,
+            "operator_report_text": operator_report,
+            "red_trigger_summary": trigger_summary,
+            "blue_matrix_inputs": blue_matrix_inputs,
         },
         "provider_attempts": attempts,
         "no_provider_execution": True,
@@ -1093,10 +1278,9 @@ def cmd_merge_pack(args):
     if args.provider_coverage:
         try:
             registry = load_provider_registry(args.registry)
-            reviewers, blocked = selected_reviewers_or_blocked(args, registry)
+            roles, blocked = selected_roles_or_blocked(args, registry)
             if blocked:
                 return blocked
-            waivers = parse_waivers(args.waiver)
         except ValueError as exc:
             return structured_failure("FAILED", "provider_registry_failure", detail=str(exc))
 
@@ -1116,8 +1300,7 @@ def cmd_merge_pack(args):
         provider_attempts = [item for item in attempts if is_provider_attempt(item)]
         return aggregate_provider_coverage(
             provider_attempts,
-            reviewers,
-            waivers,
+            roles,
             pre_scoped_evidence=args.pre_scoped_evidence,
         )
 
@@ -1180,13 +1363,19 @@ def build_parser():
     merge_pack.add_argument("--raw-cap", type=int, default=DEFAULT_RAW_CAP)
     merge_pack.add_argument("--provider-coverage", action="store_true")
     merge_pack.add_argument("--registry", default=DEFAULT_PROVIDER_REGISTRY)
-    merge_pack.add_argument("--reviewers")
+    merge_pack.add_argument("--roles")
     merge_pack.add_argument("--pre-scoped-evidence")
-    merge_pack.add_argument("--waiver", action="append", default=[])
     merge_pack.set_defaults(func=cmd_merge_pack, guarded=True)
 
+    role_lanes = subparsers.add_parser(
+        "role-lanes", help="read back MAR role lane registry"
+    )
+    role_lanes.add_argument("--registry", default=DEFAULT_PROVIDER_REGISTRY)
+    role_lanes.add_argument("--toolchain", default=DEFAULT_TOOLCHAIN)
+    role_lanes.set_defaults(func=cmd_provider_lanes, guarded=True)
+
     provider_lanes = subparsers.add_parser(
-        "provider-lanes", help="read back MAR provider lane registry"
+        "provider-lanes", help="compatibility alias for role-first MAR lane readback"
     )
     provider_lanes.add_argument("--registry", default=DEFAULT_PROVIDER_REGISTRY)
     provider_lanes.add_argument("--toolchain", default=DEFAULT_TOOLCHAIN)
@@ -1197,7 +1386,7 @@ def build_parser():
     )
     provider_preflight.add_argument("--registry", default=DEFAULT_PROVIDER_REGISTRY)
     provider_preflight.add_argument("--toolchain", default=DEFAULT_TOOLCHAIN)
-    provider_preflight.add_argument("--reviewers")
+    provider_preflight.add_argument("--roles")
     provider_preflight.add_argument("--pre-scoped-evidence")
     provider_preflight.add_argument("--run-id")
     provider_preflight.add_argument("--task-id")
@@ -1210,11 +1399,13 @@ def build_parser():
     provider_preflight.set_defaults(func=cmd_provider_preflight, guarded=True)
 
     provider_attempt = subparsers.add_parser(
-        "provider-attempt", help="run one MAR provider attempt with fail-closed evidence"
+        "provider-attempt", help="run one MAR role/provider attempt with fail-closed evidence"
     )
     provider_attempt.add_argument("--registry", default=DEFAULT_PROVIDER_REGISTRY)
     provider_attempt.add_argument("--toolchain", default=DEFAULT_TOOLCHAIN)
-    provider_attempt.add_argument("--reviewer", required=True)
+    provider_attempt.add_argument("--role")
+    provider_attempt.add_argument("--provider")
+    provider_attempt.add_argument("--reviewer")
     provider_attempt.add_argument("--run-id")
     provider_attempt.add_argument("--task-id")
     provider_attempt.add_argument("--attempt-id")
@@ -1224,6 +1415,7 @@ def build_parser():
     provider_attempt.add_argument("--raw-cap", type=int, default=DEFAULT_RAW_CAP)
     provider_attempt.add_argument("--output-dir")
     provider_attempt.add_argument("--preflight-evidence-path")
+    provider_attempt.add_argument("--pre-scoped-evidence")
     provider_attempt.add_argument("--retry-of-attempt-id")
     provider_attempt.add_argument("--alternate-for-reviewer-id")
     provider_attempt.add_argument("--approval-evidence")

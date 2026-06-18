@@ -1,13 +1,11 @@
-# Antigravity Gemini MAR Reviewer Request
+# Kimi CLI default/latest MAR Reviewer Request
 
 Run ID: `{{ .RunID }}`
 Task: `{{ .TaskID }}`
 Role ID: `{{ .RoleID }}`
 Provider ID: `{{ .ProviderID }}`
 
-Perform a read-only review for this MAR role only. Antigravity/Gemini is
-explicit non-default metadata for MAR-005 and is not required clean coverage
-until agy selected-model and health evidence are fixed.
+Perform a read-only review for this MAR role only.
 
 ## Inputs
 
@@ -41,8 +39,9 @@ Role scope:
 - Do not mutate auth, tokens, provider settings, gateway config, model config,
   profile config, or runtime state.
 - provider execution is not completion evidence.
-- Escalate boundary, security, auth, runtime, KAS/KAH/KAB ownership, and
-  approval findings explicitly.
+- Failed primary coverage may fall back only to the declared secondary provider
+  for the same role; do not assume undeclared fallback.
+- Report missing or inconsistent evidence as fail-closed findings.
 - Return role-scoped acceptance-criteria verdicts only.
 - Do not issue global pass/fail, final Blue disposition, or model-voting
   authority.

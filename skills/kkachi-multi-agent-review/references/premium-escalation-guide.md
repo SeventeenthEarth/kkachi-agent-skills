@@ -9,5 +9,6 @@ approval is absent, MAR must fail closed as `DEGRADED`, `BLOCKED`, or
 `REQUEST_CHANGES` according to the Blue disposition and Red adjudication
 trigger state.
 
-Premium use does not erase default reviewer coverage failures, provider
-unavailability, parse failures, or missing evidence.
+Premium use does not erase unresolved required role coverage, provider
+unavailability, parse failures, or missing evidence. It cannot become an
+undeclared tertiary provider for clean MAR-005 coverage.

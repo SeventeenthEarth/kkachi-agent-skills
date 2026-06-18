@@ -2,7 +2,7 @@
   "case": "request-changes-review",
   "status": "REQUEST_CHANGES",
   "mock_provider_path": true,
-  "reviewer": "kimi_k2_7",
+  "reviewer": "kimi_default",
   "findings": [
     {
       "severity": "high",

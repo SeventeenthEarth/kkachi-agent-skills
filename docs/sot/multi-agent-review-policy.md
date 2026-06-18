@@ -2,7 +2,7 @@
 
 Date: 2026-06-17
 Owner: KAS policy and skill layer
-Status: candidate repository promotion SOT; local skill/script surfaces implemented for fixture/mock/read-only paths; MAR-004 provider-run implementation contract prepared
+Status: candidate repository promotion SOT; local skill/script/provider-run surfaces implemented in source; MAR-005 role-first coverage implementation in review
 Authority level: KAS planning authority for MAR promotion from accepted Obsidian output SOT; not installed skill behavior or runtime activation
 Source SOT: `/Users/draccoon/Workspace/Hermes/17thHermes/40_outputs/projects/kkachi/2026-06-16-kkachi-multi-agent-review-mar-sot.md`
 Paired KAH planning SOT: KAH `docs/sot/multi-agent-review-evidence-gates.md`
@@ -12,7 +12,7 @@ Scope: KAS MAR policy, skill, prompt templates, reviewer matrix, premium escalat
 
 Kkachi Multi-Agent Review (MAR) is the planned lightweight KAS-local review lane for routine Kkachi development review. It collects specialized AI reviewer outputs, preserves full evidence through KAH artifacts, and returns a compact merge pack plus Blue disposition path. MAR is advisory evidence; Blue disposition and conditional Red adjudication remain the authority.
 
-This repository document promotes the accepted output SOT into KAS planning authority. Current evidence covers the `kkachi-multi-agent-review` scaffold and local `scripts/mar.py` fixture/mock/read-only surfaces only. It does not claim that provider adapters, KAH gates, or installed runtime behavior exist until the follow-up implementation tasks complete with evidence.
+This repository document promotes the accepted output SOT into KAS planning authority. Current source evidence covers the `kkachi-multi-agent-review` scaffold, local `scripts/mar.py` fixture/mock/read-only surfaces, provider-run fail-closed surfaces, and role-first registry/script work under review. It does not claim that KAH gates or installed runtime behavior exist until the follow-up implementation tasks complete with evidence.
 
 ## Canonical operating rule
 
@@ -22,7 +22,7 @@ KAS defines the skill and script.
 KAH preserves evidence.
 Red adjudicates only when risk, conflict, or workflow gates require it.
 Codex and Claude require explicit 주군 approval unless pre-authorized.
-zcode/glm-5.2, Kimi K2.7, and Antigravity/Gemini are the default reviewer set once adapter proof exists.
+Required roles are logic, security, arch, cve, and test_adequacy; providers are primary/secondary candidates for those roles.
 Model consensus is advisory; Blue/Red disposition is authority.
 ```
 
@@ -36,8 +36,9 @@ MAR promotion is intentionally split so planning documents do not overclaim impl
 | `MAREV-001` | KAH | Promote KAH-side MAR artifact/gate planning SOT and roadmap/docs-index records. | KAH has a planning SOT for MAR evidence capture. No helper gate/code behavior claim. |
 | `MAR-002` | KAS | Add `kkachi-multi-agent-review` skill scaffold, references, prompt templates, and disposition templates without provider execution. | KAS skill scaffold exists; provider execution still pending unless separately implemented. |
 | `MAR-003` | KAS | Implement stdlib `mar.py` doctor/render/validate/merge-pack MVP using fixture and read-only local evidence. | Local MAR script surfaces exist for non-provider or mocked/fixture paths. |
-| `MAR-004` | KAS | Implement provider run path after adapter proof, authorization boundaries, default-attempt coverage, provider-failure semantics, retry/alternate/waiver decision paths, and dogfood evidence are recorded. | Default reviewer execution is available only for validated providers; failed coverage cannot become clean PASS without same-provider retry success, approved alternate success, or explicit 주군 waiver evidence. |
-| `MAREV-002` | KAH | Implement deterministic KAH artifact/gate/schema support for MAR evidence if needed by final gates. | KAH helper behavior exists only after code/tests/docs/release evidence. |
+| `MAR-004` | KAS | Implement provider run path after adapter proof, authorization boundaries, provider-failure semantics, mutation guards, toolchain overlay proof, and dogfood evidence are recorded. | Provider execution is available only for validated providers; provider failure cannot become clean coverage by availability, prompt rendering, or dispatch success alone. |
+| `MAR-005` | KAS | Convert coverage from provider-first reviewer slots to role-first required coverage with primary/secondary provider candidates. | Required roles (`logic`, `security`, `arch`, `cve`, `test_adequacy`) are covered only by their declared primary/secondary provider path; unresolved required roles fail closed with 주군/operator report wording. |
+| `MAREV-002` | KAH | Implement deterministic KAH artifact/gate/schema support for KAS-declared MAR role coverage evidence if needed by final gates. | KAH helper behavior exists only after code/tests/docs/release evidence; KAH does not choose roles or providers. |
 
 `MAREV-001` is docs/SOT only. It must not be read as implementing KAH behavior. Actual KAH code or gate behavior belongs in `MAREV-002` or later.
 
@@ -68,59 +69,69 @@ KAH owns deterministic evidence only after its paired tasks implement or documen
 
 KAB remains non-default for routine MAR. KAB is used only when a later task explicitly selects KAB runtime orchestration or premium/heavier review support.
 
-## Default reviewer set
+## Role-first reviewer coverage
 
-Default reviewer policy after adapter proof:
+MAR-005 makes review role coverage the default MAR completion unit. Providers are
+execution candidates attached to role ids; KAS must not treat provider ids as
+role ids or report provider availability as clean review coverage.
 
-| Reviewer | Command lane | Primary role | Notes |
-|---|---|---|---|
-| `zcode_glm_5_2` | `zcode` to `glm-5.2` | Kkachi SOT, fail-closed, approval, fallback, and evidence-risk review | Legacy `glm` CLI is not a MAR lane. Non-interactive command template must be proven before success coverage. |
-| `kimi_k2_7` | `kimi` to `k2.7` | Requirement, artifact, and traceability review | Unavailable Kimi creates degraded coverage; it must not become clean PASS. |
-| `antigravity_gemini` | `agy` to selected Gemini model | Architecture, integration, security, and operational-risk review | Flash-class model is only sufficient for quick low-risk smoke; high-risk final MAR needs Pro-class or recorded policy. |
+Required MAR roles are:
 
-Codex and Claude are premium reviewers. They require explicit 주군 approval unless the active task contract already grants that escalation.
+1. `logic` — requirement logic, acceptance-criteria consistency, and
+   fail-closed reasoning review;
+2. `security` — security-sensitive behavior, auth/secret boundaries, unsafe
+   mutation, and fail-closed risk review;
+3. `arch` — generic architecture, integration, API/schema, modularity, and
+   ownership-boundary review;
+4. `cve` — known-vulnerability, dependency-risk, exploitability, and advisory
+   relevance review from supplied evidence;
+5. `test_adequacy` — test and verification adequacy against the task contract
+   and acceptance criteria.
+
+Each required role has a declared primary and secondary provider candidate in
+`registries/mar-provider-lanes.json` (`schema_version: mar.role_lanes.v1`). The
+current default is `zcode_glm_5_2` primary and `kimi_default` secondary for every
+required role. `kimi_default` uses the authenticated Kimi Code CLI default/latest
+model (`selected_model: null`, `selected_model_required: false`) with
+`--output-format stream-json --prompt {prompt_text}` so MAR can parse the
+assistant content deterministically. It may become primary only when a task
+records role-specific evidence that the Kimi default/latest lane is materially
+better for that role.
+`antigravity_gemini` remains explicit provider metadata, but it is non-default
+and not required for clean coverage until selected-model and health evidence are
+fixed.
+
+`scripts/mar.py role-lanes` is the stdlib readback surface for required roles,
+role-to-provider candidates, provider metadata, validation posture, toolchain
+overlay evidence, and provider-failure reason vocabulary. `scripts/mar.py
+provider-lanes` remains a compatibility alias for readback only; the registry is
+role-first.
 
 ## MAR-004 provider-run contract
 
-MAR-004 must make provider execution evidence-driven and fail-closed. It may not
-claim default MAR coverage until all required default reviewers have an attempt
-record or a pre-scoped narrower reviewer set is approved before execution.
+MAR-004 made provider execution evidence-driven and fail-closed. Provider attempt
+records must preserve:
 
-Required default reviewers for MAR-004 are:
-
-1. `zcode_glm_5_2` using `zcode` with `glm-5.2`;
-2. `kimi_k2_7` using `kimi` with `k2.7`;
-3. `antigravity_gemini` using Antigravity/Gemini with the selected model
-   recorded in evidence.
-
-For each default reviewer, KAS must preserve:
-
-- provider id, command lane, selected model, started/ended timestamps, timeout,
-  exit code, and mutation-check result;
+- role id, provider id, provider candidate (`primary` or `secondary`), command
+  lane, selected model or explicit default/latest model-selection mode,
+  started/ended timestamps, timeout, exit code, and mutation-check result;
 - redacted command/preflight evidence sufficient to prove the selected lane and
-  model without exposing secrets;
+  explicit model or default/latest model-selection posture without exposing
+  secrets;
 - raw output path, parsed finding path, parser status, and capped-output note;
 - terminal status from the MAR vocabulary;
 - provider failure reason when status is `DEGRADED`, `BLOCKED`, or `FAILED`.
-
-The KAS provider lane source is `registries/mar-provider-lanes.json`
-(`schema_version: mar.provider_lanes.v1`). `scripts/mar.py provider-lanes`
-is the stdlib readback surface for default reviewer ids, selected models,
-prompt templates, validation posture, and the provider-failure reason
-vocabulary. Registry entries may exist with `validated: false`; such entries
-are not successful live coverage until preflight/adapter proof and successful
-provider-attempt evidence exist.
 
 Host-specific executable resolution belongs in the existing project toolchain
 state, not in the portable registry. MAR provider proof may extend
 `.kkachi/toolchain.yaml` with `mar_provider_tools` (`schema_version:
 mar.provider_tools.v1`) containing non-secret `resolved_argv`, selected model,
-version, validation status, and proof-evidence references for reviewer ids. KAS
-merges the portable registry with this toolchain overlay at provider readback,
-preflight, and attempt time. The overlay may resolve user-interactive aliases or
-PATH-only commands to explicit argv arrays, but it must not store auth tokens,
-session files, provider cookies, or gateway credentials. Per-run artifacts must
-still snapshot the resolved proof used for that run.
+version, validation status, and proof-evidence references for provider ids. KAS
+merges the portable registry with this toolchain overlay at readback, preflight,
+and attempt time. The overlay may resolve user-interactive aliases or PATH-only
+commands to explicit argv arrays, but it must not store auth tokens, session
+files, provider cookies, or gateway credentials. Per-run artifacts must still
+snapshot the resolved proof used for that run.
 
 Supported provider-failure reason codes are:
 
@@ -135,34 +146,41 @@ timeout
 nonzero_exit
 parse_failure
 mutation_detected
+adapter_proof_required
 unknown_provider_failure
 ```
 
-Default policy is attempt-all-first: zcode/glm-5.2, kimi/k2.7, and
-Antigravity/Gemini must all be attempted before Blue disposition unless the task
-contract pre-scopes a narrower set. When one or more default reviewers fail,
-KAS must not silently substitute another provider and must not report clean
-`PASS`. Blue must record one of these explicit paths for each failed default
-reviewer:
+## MAR-005 role-first run contract
 
-- same-provider retry succeeds, with linkage to the failed attempt;
-- 주군 approves a named alternate provider for that reviewer slot and the
-  approved alternate provider attempt succeeds;
-- 주군 grants explicit waiver for the missing reviewer coverage;
-- external condition remains unresolved, so the MAR result is `BLOCKED`,
-  `DEGRADED`, or `FAILED` as appropriate.
+MAR-005 attempts required roles, not default reviewer slots. For each required
+role, KAS attempts the declared primary provider first. If the primary provider
+does not produce a covered status (`PASS` or `PASS_WITH_FINDINGS`), KAS may
+attempt only that role's declared secondary provider. If both primary and
+secondary fail for a required role, KAS must emit `unresolved_required_roles`,
+include explicit 주군/operator report wording, and fail closed. KAS must not
+silently try undeclared tertiary, premium, alternate, or waiver-as-clean coverage
+for that role.
+
+Role reviewers return role-scoped findings and role-scoped
+acceptance-criteria verdicts only. Reviewers must not issue global pass/fail,
+final Blue disposition, model-voting authority, or KAH gate claims. Blue owns the
+final disposition and matrix synthesis; Red adjudication is triggered by
+unresolved required role coverage, conflict, low confidence,
+high/blocker/security/fail-closed findings, premium escalation suggestions, or
+explicit task policy.
 
 KAS owns provider execution, parsing, merge-pack creation, status aggregation,
-and Blue disposition. KAH owns deterministic evidence/gate validation after the
-paired MAREV implementation exists. KAH must not choose retries, alternates, or
-waivers, and KAS must not claim that KAH has validated provider attempts until
-MAREV code/test evidence exists.
+role coverage, Blue matrix inputs, and Blue disposition. KAH owns deterministic
+evidence/gate validation only after the paired MAREV implementation exists. KAH
+must not choose roles, providers, retries, alternates, or waivers, and KAS must
+not claim that KAH has validated role coverage until MAREV code/test evidence
+exists.
 
-MAR-004 dogfood evidence must run beside the still-active review workflow before
+MAR dogfood evidence must run beside the still-active review workflow before
 broad wording claims MAR has replaced legacy GLM Octo or team color review
 requirements. Dogfood evidence must include at least one representative KAS/KAH
-diff, provider-attempt artifacts, compact merge pack, Blue disposition, and Red
-adjudication when any trigger fires.
+diff, role/provider-attempt artifacts, compact merge pack, Blue disposition, and
+Red adjudication when any trigger fires.
 
 ## Coverage and status semantics
 
@@ -179,12 +197,12 @@ FAILED
 
 Rules:
 
-1. `PASS` requires complete default coverage or a pre-scoped narrower reviewer set recorded before execution, resolved failed-coverage paths when applicable, and no actionable findings.
+1. `PASS` requires complete required-role coverage or a pre-scoped narrower role set recorded before execution, resolved failed-role paths when applicable, and no actionable findings.
 2. `DEGRADED` is not a soft pass. It requires a Blue reason and may require Red adjudication.
-3. All-provider failure is `FAILED` or `BLOCKED`, never clean review. Partial default failure is `DEGRADED`, `BLOCKED`, or `FAILED` until retry, approved alternate, or explicit waiver evidence resolves the missing coverage.
-4. One successful default reviewer on nontrivial development is insufficient coverage and requires Red adjudication before final Blue disposition.
+3. All required roles unresolved is `FAILED` or `BLOCKED`, never clean review. Any unresolved required role is `DEGRADED`, `BLOCKED`, or `FAILED` until the declared primary/secondary path produces covered evidence or the task is explicitly re-scoped before execution.
+4. One successful provider on nontrivial development is insufficient unless all required roles are covered; unresolved role coverage requires Red adjudication before final Blue disposition.
 5. Provider disagreement creates a disposition obligation, not a vote.
-6. Premium review does not erase default coverage failures.
+6. Premium review does not erase required role coverage failures.
 
 ## Red adjudication triggers
 
@@ -192,9 +210,9 @@ Red adjudication is required when any of the following are true:
 
 - blocker finding exists;
 - two or more high-severity findings exist;
-- providers disagree on a high/blocker issue;
+- role reviewers or providers disagree on a high/blocker issue;
 - findings involve SOT, approval, fallback, runtime, auth, secret, security, architecture boundary, or KAS/KAH/KAB responsibility;
-- all default reviewers fail or any default reviewer failure remains unresolved;
+- all required roles remain unresolved or any required role remains unresolved;
 - Blue confidence is below 0.75;
 - premium escalation is suggested;
 - task class is release readiness, architecture SOT change, or workflow policy change.
@@ -224,7 +242,7 @@ KAS must not claim MAR implementation until evidence exists for the specific cla
 - skill scaffold readback for `kkachi-multi-agent-review`;
 - prompt template readback and reviewer-role matrix;
 - `mar.py` help/doctor/render/validate tests;
-- provider adapter proof for any reviewer counted as successful coverage;
+- provider adapter proof for any provider counted as successful role coverage;
 - fixture tests for degraded, insufficient, failed, and request-changes semantics;
 - KAH artifact/gate evidence once MAREV implementation is claimed;
 - Red/Orange/Gray review or a recorded 주군-approved exception when required by workflow risk.

@@ -1,40 +1,84 @@
 {
-  "schema_version": "mar.provider_lanes.v1",
-  "default_reviewers": [
-    "zcode_glm_5_2",
-    "kimi_k2_7",
-    "antigravity_gemini"
+  "schema_version": "mar.role_lanes.v1",
+  "required_roles": [
+    "logic",
+    "security",
+    "arch",
+    "cve",
+    "test_adequacy"
   ],
-  "reviewers": {
+  "roles": {
+    "logic": {
+      "required": true,
+      "description": "Requirement logic, acceptance-criteria consistency, and fail-closed reasoning review.",
+      "primary_provider": "zcode_glm_5_2",
+      "secondary_provider": "kimi_default",
+      "provider_selection_rationale": "zcode_glm_5_2 is the default primary; no documented role-specific Kimi superiority exists for logic."
+    },
+    "security": {
+      "required": true,
+      "description": "Security-sensitive behavior, secrets/auth boundaries, unsafe mutation, and fail-closed risk review.",
+      "primary_provider": "zcode_glm_5_2",
+      "secondary_provider": "kimi_default",
+      "provider_selection_rationale": "zcode_glm_5_2 is the default primary; Kimi CLI default/latest remains the declared secondary."
+    },
+    "arch": {
+      "required": true,
+      "description": "Project-agnostic architecture, integration, API/schema, modularity, and ownership-boundary review.",
+      "primary_provider": "zcode_glm_5_2",
+      "secondary_provider": "kimi_default",
+      "provider_selection_rationale": "zcode_glm_5_2 is the default primary; arch remains generic unless the reviewed scope is project-specific."
+    },
+    "cve": {
+      "required": true,
+      "description": "Known-vulnerability, dependency-risk, exploitability, and security-advisory relevance review from provided evidence.",
+      "primary_provider": "zcode_glm_5_2",
+      "secondary_provider": "kimi_default",
+      "provider_selection_rationale": "zcode_glm_5_2 is the default primary; no documented role-specific Kimi superiority exists for CVE review."
+    },
+    "test_adequacy": {
+      "required": true,
+      "description": "Test and verification adequacy against the task contract and acceptance criteria.",
+      "primary_provider": "zcode_glm_5_2",
+      "secondary_provider": "kimi_default",
+      "provider_selection_rationale": "zcode_glm_5_2 is the default primary; Kimi CLI default/latest remains the declared secondary for independent adequacy review."
+    }
+  },
+  "providers": {
     "zcode_glm_5_2": {
       "command_lane": "zcode",
       "executable": "zcode",
       "selected_model": "glm-5.2",
       "prompt_template": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
       "command_args": [
-        "--model",
-        "{model}",
-        "--prompt-file",
-        "{prompt_path}"
+        "--mode",
+        "plan",
+        "--prompt",
+        "{prompt_text}"
       ],
-      "timeout_seconds": 120,
+      "timeout_seconds": 1800,
       "validated": false,
-      "validation_required_before_success_coverage": true
+      "validation_required_before_success_coverage": true,
+      "default_required": true
     },
-    "kimi_k2_7": {
+    "kimi_default": {
       "command_lane": "kimi",
       "executable": "kimi",
-      "selected_model": "k2.7",
-      "prompt_template": "templates/prompts/mar/kimi-k2-7-reviewer-request.md.tmpl",
+      "selected_model": null,
+      "prompt_template": "templates/prompts/mar/kimi-default-reviewer-request.md.tmpl",
       "command_args": [
-        "--model",
-        "{model}",
-        "--prompt-file",
-        "{prompt_path}"
+        "--output-format",
+        "stream-json",
+        "--prompt",
+        "{prompt_text}"
       ],
       "timeout_seconds": 120,
       "validated": false,
-      "validation_required_before_success_coverage": true
+      "validation_required_before_success_coverage": true,
+      "default_required": true,
+      "selected_model_required": false,
+      "model_selection": "cli_default_latest",
+      "model_selection_note": "Kimi Code CLI uses the authenticated CLI default/latest model in this environment; no stable explicit model alias is configured locally."
     },
     "antigravity_gemini": {
       "command_lane": "agy",
@@ -53,7 +97,9 @@
       ],
       "timeout_seconds": 120,
       "validated": false,
-      "validation_required_before_success_coverage": true
+      "validation_required_before_success_coverage": true,
+      "default_required": false,
+      "degraded_posture": "explicit_non_default_until_agy_selected_model_and_health_evidence_is_fixed"
     }
   }
 }

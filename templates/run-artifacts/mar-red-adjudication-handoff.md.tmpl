@@ -7,6 +7,8 @@ blocker: `{{ .Blocker }}`
 high_risk: `{{ .HighRisk }}`
 disagreement: `{{ .Disagreement }}`
 degraded: `{{ .Degraded }}`
+unresolved_required_roles: `{{ .UnresolvedRequiredRoles }}`
+operator_report_text: `{{ .OperatorReportText }}`
 premium_escalation: `{{ .PremiumEscalation }}`
 
 ## Trigger Summary
@@ -26,3 +28,6 @@ premium_escalation: `{{ .PremiumEscalation }}`
 - Red adjudication resolves risk and disposition; reviewer consensus is not
   authority.
 - Premium escalation requires explicit approval before Codex or Claude review.
+- Required role coverage remains unresolved when primary and secondary provider
+  candidates both fail; Red must not treat undeclared tertiary or premium output
+  as clean coverage.

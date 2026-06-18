@@ -11,27 +11,27 @@ scaffold, prompt, or disposition support for MAR policy work.
 
 MAR-002 does not execute providers. This skill provides only scaffold, reviewer
 prompt, reference, and disposition-template support. MAR-003 adds the local
-`mar.py` fixture/mock/read-only script surface. MAR-004 owns provider execution,
-attempt-all-first coverage, failure reason codes, retry/alternate/waiver decision
-paths, merge-pack evidence, and dogfood evidence after adapter proof. MAR-004
-also uses the existing `.kkachi/toolchain.yaml` `mar_provider_tools` section as
-the local non-secret provider proof overlay for host-specific executable argv,
-version, selected model, and validation state; portable defaults remain in
-`registries/mar-provider-lanes.json`. MAREV-002 owns deterministic KAH MAR
-artifact, gate, or schema behavior.
+`mar.py` fixture/mock/read-only script surface. MAR-004 owns provider execution
+safety, failure reason codes, raw-output caps, mutation guards, and adapter-proof
+blocking after provider proof. MAR-005 owns role-first required coverage:
+`logic`, `security`, `arch`, `cve`, and `test_adequacy` are required roles, and
+each role has declared primary and secondary provider candidates in
+`registries/mar-provider-lanes.json`. MAREV-002 owns later deterministic KAH MAR
+artifact, gate, or schema validation behavior.
 
 ## Boundaries
 
 - Do not execute reviewers or providers from this skill until MAR-004 provider-run implementation evidence exists.
 - Do not treat provider dispatch success, provider availability, rendered
-  prompt creation, or unresolved failed reviewer coverage as completion evidence.
+  prompt creation, or unresolved required role coverage as completion evidence.
 - Do not activate KAB as a default MAR path.
 - Do not mutate auth, token, provider, gateway, profile, model, or live runtime
   settings.
 - Codex/Claude premium reviewers require explicit approval.
-- Default reviewer failure requires same-provider retry, 주군-approved alternate,
-  explicit 주군 waiver, or non-clean `DEGRADED`/`BLOCKED`/`FAILED` disposition;
-  automatic fallback is forbidden.
+- Required role coverage tries only the declared primary provider and then the
+  declared secondary provider for that same role. If both fail, report the
+  unresolved role to 주군/operator and fail closed; do not silently try
+  undeclared tertiary, premium, alternate, or waiver-as-clean coverage.
 
 ## Status Semantics
 
@@ -49,16 +49,16 @@ MAR disposition is fail-closed. Supported terminal statuses are:
 ## Red Adjudication
 
 Red adjudication triggers include blocker findings, high-risk findings,
-reviewer disagreement on high or blocker issues, degraded reviewer coverage,
-premium escalation suggestions, low Blue confidence, and KAS/KAH/KAB boundary
-or security-sensitive findings.
+reviewer disagreement on high or blocker issues, unresolved required role
+coverage, premium escalation suggestions, low Blue confidence, and KAS/KAH/KAB
+boundary or security-sensitive findings.
 
 ## References and Templates
 
 - `references/reviewer-role-matrix.md`
 - `references/premium-escalation-guide.md`
 - `templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl`
-- `templates/prompts/mar/kimi-k2-7-reviewer-request.md.tmpl`
+- `templates/prompts/mar/kimi-default-reviewer-request.md.tmpl`
 - `templates/prompts/mar/antigravity-gemini-reviewer-request.md.tmpl`
 - `templates/prompts/mar/premium-reviewer-request.md.tmpl`
 - `templates/run-artifacts/mar-blue-disposition.md.tmpl`

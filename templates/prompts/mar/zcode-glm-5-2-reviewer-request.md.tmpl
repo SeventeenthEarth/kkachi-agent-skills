@@ -2,8 +2,10 @@
 
 Run ID: `{{ .RunID }}`
 Task: `{{ .TaskID }}`
+Role ID: `{{ .RoleID }}`
+Provider ID: `{{ .ProviderID }}`
 
-Perform a read-only review of the task contract and diff summary.
+Perform a read-only review for this MAR role only.
 
 ## Inputs
 
@@ -11,9 +13,17 @@ Task contract:
 
 {{ .TaskContract }}
 
+Acceptance criteria:
+
+{{ .AcceptanceCriteria }}
+
 Diff summary:
 
 {{ .DiffSummary }}
+
+Role scope:
+
+{{ .RoleScope }}
 
 ## Rules
 
@@ -31,9 +41,13 @@ Diff summary:
 - provider execution is not completion evidence.
 - Report findings only from the provided task contract, diff summary, and
   referenced read-only artifacts.
+- Return role-scoped acceptance-criteria verdicts only.
+- Do not issue global pass/fail, final Blue disposition, or model-voting
+  authority.
 
 ## Output
 
-Return concise findings with severity, evidence, and recommendation. Use
-`PASS`, `PASS_WITH_FINDINGS`, `REQUEST_CHANGES`, `BLOCKED`, `DEGRADED`, or
-`FAILED`.
+Return concise role-scoped findings with severity, evidence, recommendation,
+and role-scoped acceptance-criteria verdicts. Any `PASS`, `PASS_WITH_FINDINGS`,
+`REQUEST_CHANGES`, `BLOCKED`, `DEGRADED`, or `FAILED` label applies only to
+this role and is not a global MAR disposition.

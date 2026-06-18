@@ -2,10 +2,14 @@
 
 Run ID: `{{ .RunID }}`
 Task: `{{ .TaskID }}`
+Role ID: `{{ .RoleID }}`
+Provider ID: `{{ .ProviderID }}`
 Approval evidence: `{{ .PremiumApprovalEvidence }}`
 
 Perform a read-only review only when explicit approval for the premium reviewer
-is present in the task contract or approval evidence.
+is present in the task contract or approval evidence. Premium review is not
+clean required role coverage unless a later policy explicitly declares it as a
+role candidate before execution.
 
 ## Inputs
 
@@ -13,9 +17,17 @@ Task contract:
 
 {{ .TaskContract }}
 
+Acceptance criteria:
+
+{{ .AcceptanceCriteria }}
+
 Diff summary:
 
 {{ .DiffSummary }}
+
+Role scope:
+
+{{ .RoleScope }}
 
 ## Rules
 
@@ -33,9 +45,13 @@ Diff summary:
 - provider execution is not completion evidence.
 - If approval evidence is absent or ambiguous, return `BLOCKED` and do not
   perform premium review.
+- Return role-scoped acceptance-criteria verdicts only.
+- Do not issue global pass/fail, final Blue disposition, or model-voting
+  authority.
 
 ## Output
 
-Return concise findings with severity, evidence, and recommendation. Use
-`PASS`, `PASS_WITH_FINDINGS`, `REQUEST_CHANGES`, `BLOCKED`, `DEGRADED`, or
-`FAILED`.
+Return concise role-scoped findings with severity, evidence, recommendation,
+and role-scoped acceptance-criteria verdicts. Any `PASS`, `PASS_WITH_FINDINGS`,
+`REQUEST_CHANGES`, `BLOCKED`, `DEGRADED`, or `FAILED` label applies only to
+this role and is not a global MAR disposition.

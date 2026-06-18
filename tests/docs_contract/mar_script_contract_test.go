@@ -19,16 +19,9 @@ var marStatusVocabulary = []string{
 }
 
 func TestMAR003ScriptHelpExposesLocalMVPSurfaces(t *testing.T) {
-	root := repoRoot(t)
-	cmd := exec.Command("python3", "scripts/mar.py", "--help")
-	cmd.Dir = root
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("python3 scripts/mar.py --help failed: %v\n%s", err, output)
-	}
-
+	output := runMARCommand(t, "--help")
 	help := string(output)
-	for _, want := range []string{"doctor", "render", "validate", "merge-pack", "provider-lanes", "provider-preflight", "provider-attempt"} {
+	for _, want := range []string{"doctor", "render", "validate", "merge-pack", "role-lanes", "provider-lanes", "provider-preflight", "provider-attempt"} {
 		if !strings.Contains(help, want) {
 			t.Fatalf("scripts/mar.py --help missing %q\n%s", want, help)
 		}
@@ -134,6 +127,30 @@ func TestMAR003ValidatePreservesParseFailureAsDegradedEvidence(t *testing.T) {
 	}
 }
 
+func TestMAR005ValidateParsesKimiStreamJSONAssistantContent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "kimi-stream.jsonl")
+	raw := "{\"role\":\"assistant\",\"content\":\"```json\\n{\\\"status\\\":\\\"PASS\\\",\\\"summary\\\":\\\"stream parsed\\\",\\\"confidence\\\":0.9,\\\"findings\\\":[],\\\"role_scoped_acceptance_criteria_verdicts\\\":[]}\\n```\"}\n" +
+		"{\"role\":\"meta\",\"type\":\"session.resume_hint\",\"content\":\"resume\"}"
+	if err := os.WriteFile(path, []byte(raw), 0644); err != nil {
+		t.Fatalf("write kimi stream fixture: %v", err)
+	}
+
+	output := runMARCommand(t,
+		"validate",
+		"--input", path,
+	)
+	var result struct {
+		Status  string `json:"status"`
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse validate output: %v\n%s", err, output)
+	}
+	if result.Status != "PASS" || result.Summary != "stream parsed" {
+		t.Fatalf("kimi stream-json assistant content must parse as review JSON\n%s", output)
+	}
+}
+
 func TestMAR003DoctorAcceptsFixtureEvidenceWithoutProviderExecution(t *testing.T) {
 	output := runMARCommand(t,
 		"doctor",
@@ -156,14 +173,8 @@ func TestMAR003DoctorAcceptsFixtureEvidenceWithoutProviderExecution(t *testing.T
 	if result.Status != "PASS" || result.CapabilityStatus != "PASS" {
 		t.Fatalf("doctor capability status = %q/%q, want PASS/PASS\n%s", result.Status, result.CapabilityStatus, output)
 	}
-	if !result.NoProviderExecution {
-		t.Fatalf("doctor output must record no_provider_execution=true\n%s", output)
-	}
-	if result.FixtureEvidence.Status != "DEGRADED" {
-		t.Fatalf("doctor fixture status = %q, want DEGRADED\n%s", result.FixtureEvidence.Status, output)
-	}
-	if !result.FixtureEvidence.NoProviderExecution {
-		t.Fatalf("doctor fixture evidence must record no_provider_execution=true\n%s", output)
+	if !result.NoProviderExecution || result.FixtureEvidence.Status != "DEGRADED" || !result.FixtureEvidence.NoProviderExecution {
+		t.Fatalf("doctor fixture evidence mismatch\n%s", output)
 	}
 	if result.FixtureEvidence.Path != "tests/fixtures/mar/provider-unavailable.json" {
 		t.Fatalf("doctor fixture path = %q, want fixture path\n%s", result.FixtureEvidence.Path, output)
@@ -176,40 +187,10 @@ func TestMAR003MergePackAggregatesFailClosedLocalStatuses(t *testing.T) {
 		args []string
 		want string
 	}{
-		{
-			name: "request changes beats pass",
-			args: []string{
-				"merge-pack",
-				"tests/fixtures/mar/pass-review.json",
-				"tests/fixtures/mar/request-changes-review.json",
-			},
-			want: "REQUEST_CHANGES",
-		},
-		{
-			name: "all failed remains failed",
-			args: []string{
-				"merge-pack",
-				"tests/fixtures/mar/all-failed.json",
-			},
-			want: "FAILED",
-		},
-		{
-			name: "insufficient coverage blocks",
-			args: []string{
-				"merge-pack",
-				"--required-reviewers", "3",
-				"tests/fixtures/mar/pass-review.json",
-			},
-			want: "BLOCKED",
-		},
-		{
-			name: "provider unavailable degrades",
-			args: []string{
-				"merge-pack",
-				"tests/fixtures/mar/provider-unavailable.json",
-			},
-			want: "DEGRADED",
-		},
+		{"request changes beats pass", []string{"merge-pack", "tests/fixtures/mar/pass-review.json", "tests/fixtures/mar/request-changes-review.json"}, "REQUEST_CHANGES"},
+		{"all failed remains failed", []string{"merge-pack", "tests/fixtures/mar/all-failed.json"}, "FAILED"},
+		{"insufficient coverage blocks", []string{"merge-pack", "--required-reviewers", "3", "tests/fixtures/mar/pass-review.json"}, "BLOCKED"},
+		{"provider unavailable degrades", []string{"merge-pack", "tests/fixtures/mar/provider-unavailable.json"}, "DEGRADED"},
 	}
 
 	for _, tc := range cases {
@@ -222,11 +203,8 @@ func TestMAR003MergePackAggregatesFailClosedLocalStatuses(t *testing.T) {
 			if err := json.Unmarshal(output, &result); err != nil {
 				t.Fatalf("parse merge-pack output: %v\n%s", err, output)
 			}
-			if result.Status != tc.want {
-				t.Fatalf("merge-pack status = %q, want %q\n%s", result.Status, tc.want, output)
-			}
-			if !result.NoProviderExecution {
-				t.Fatalf("merge-pack output must record no_provider_execution=true\n%s", output)
+			if result.Status != tc.want || !result.NoProviderExecution {
+				t.Fatalf("merge-pack status/no-provider = %q/%v, want %q/true\n%s", result.Status, result.NoProviderExecution, tc.want, output)
 			}
 		})
 	}
@@ -249,16 +227,13 @@ func TestMAR003RenderUsesLocalTemplateOnly(t *testing.T) {
 	if err := json.Unmarshal(output, &result); err != nil {
 		t.Fatalf("parse render output: %v\n%s", err, output)
 	}
-	if result.Status != "PASS" {
-		t.Fatalf("render status = %q, want PASS\n%s", result.Status, output)
+	if result.Status != "PASS" || !result.NoProviderExecution {
+		t.Fatalf("render status/no-provider = %q/%v\n%s", result.Status, result.NoProviderExecution, output)
 	}
 	for _, want := range []string{"run-local", "MAR-003", "contract text", "diff text"} {
 		if !strings.Contains(result.RenderedPrompt, want) {
 			t.Fatalf("rendered prompt missing %q\n%s", want, result.RenderedPrompt)
 		}
-	}
-	if !result.NoProviderExecution {
-		t.Fatalf("render output must record no_provider_execution=true\n%s", output)
 	}
 }
 
@@ -284,77 +259,93 @@ func TestMAR003ScriptDoesNotClaimOutOfScopeExecution(t *testing.T) {
 	}
 }
 
-func TestMAR004ProviderLaneRegistryReadbackIsFailClosed(t *testing.T) {
-	output := runMARCommand(t, "provider-lanes")
+func TestMAR005RoleLaneRegistryReadbackIsFailClosed(t *testing.T) {
+	output := runMARCommand(t, "role-lanes")
 	var result struct {
-		Status           string   `json:"status"`
-		SchemaVersion    string   `json:"schema_version"`
-		DefaultReviewers []string `json:"default_reviewers"`
-		Reviewers        map[string]struct {
-			CommandLane                     string   `json:"command_lane"`
-			SelectedModel                   *string  `json:"selected_model"`
-			ValidationRequiredBeforeSuccess bool     `json:"validation_required_before_success_coverage"`
-			PromptTemplate                  string   `json:"prompt_template"`
-			CommandArgs                     []string `json:"command_args"`
-		} `json:"reviewers"`
+		Status        string   `json:"status"`
+		SchemaVersion string   `json:"schema_version"`
+		RequiredRoles []string `json:"required_roles"`
+		Roles         map[string]struct {
+			PrimaryProvider   string `json:"primary_provider"`
+			SecondaryProvider string `json:"secondary_provider"`
+			Description       string `json:"description"`
+		} `json:"roles"`
+		Providers map[string]struct {
+			SelectedModel         *string  `json:"selected_model"`
+			SelectedModelRequired *bool    `json:"selected_model_required"`
+			ModelSelection        string   `json:"model_selection"`
+			DefaultRequired       bool     `json:"default_required"`
+			CommandArgs           []string `json:"command_args"`
+			TimeoutSeconds        int      `json:"timeout_seconds"`
+			DegradedPosture       string   `json:"degraded_posture"`
+		} `json:"providers"`
 		ProviderFailureReasons []string `json:"provider_failure_reasons"`
 		NoProviderExecution    bool     `json:"no_provider_execution"`
 	}
 	if err := json.Unmarshal(output, &result); err != nil {
-		t.Fatalf("parse provider-lanes output: %v\n%s", err, output)
+		t.Fatalf("parse role-lanes output: %v\n%s", err, output)
 	}
-	if result.Status != "PASS" || result.SchemaVersion != "mar.provider_lanes.v1" {
-		t.Fatalf("provider-lanes status/schema = %q/%q\n%s", result.Status, result.SchemaVersion, output)
+	if result.Status != "PASS" || result.SchemaVersion != "mar.role_lanes.v1" {
+		t.Fatalf("role-lanes status/schema = %q/%q\n%s", result.Status, result.SchemaVersion, output)
 	}
-	wantDefault := []string{"zcode_glm_5_2", "kimi_k2_7", "antigravity_gemini"}
-	if strings.Join(result.DefaultReviewers, ",") != strings.Join(wantDefault, ",") {
-		t.Fatalf("default reviewers = %v, want %v", result.DefaultReviewers, wantDefault)
+	wantRoles := []string{"logic", "security", "arch", "cve", "test_adequacy"}
+	if strings.Join(result.RequiredRoles, ",") != strings.Join(wantRoles, ",") {
+		t.Fatalf("required roles = %v, want %v", result.RequiredRoles, wantRoles)
 	}
-	for _, reviewer := range wantDefault {
-		lane, ok := result.Reviewers[reviewer]
-		if !ok {
-			t.Fatalf("provider-lanes missing reviewer %q\n%s", reviewer, output)
-		}
-		if lane.CommandLane == "" || lane.PromptTemplate == "" || !lane.ValidationRequiredBeforeSuccess {
-			t.Fatalf("provider-lanes has incomplete fail-closed lane for %q: %+v", reviewer, lane)
+	for _, roleID := range wantRoles {
+		role := result.Roles[roleID]
+		if role.PrimaryProvider != "zcode_glm_5_2" || role.SecondaryProvider != "kimi_default" || role.Description == "" {
+			t.Fatalf("role %s has wrong provider candidates: %+v", roleID, role)
 		}
 	}
-	if model := result.Reviewers["kimi_k2_7"].SelectedModel; model == nil || *model != "k2.7" {
-		t.Fatalf("kimi_k2_7 selected_model = %v, want k2.7", model)
+	zcode := result.Providers["zcode_glm_5_2"]
+	zcodeArgs := strings.Join(zcode.CommandArgs, "\x00")
+	if !zcode.DefaultRequired || !containsString(zcode.CommandArgs, "--prompt") || !containsString(zcode.CommandArgs, "--mode") || !containsString(zcode.CommandArgs, "plan") {
+		t.Fatalf("zcode_glm_5_2 must use zcode headless prompt plan mode: %+v", zcode)
 	}
-	if model := result.Reviewers["antigravity_gemini"].SelectedModel; model != nil {
-		t.Fatalf("antigravity_gemini selected_model = %v, want nil until explicitly selected", *model)
+	if zcode.TimeoutSeconds < 1800 {
+		t.Fatalf("zcode_glm_5_2 must allow a 30 minute MAR review timeout, got %d", zcode.TimeoutSeconds)
 	}
-	agyArgs := strings.Join(result.Reviewers["antigravity_gemini"].CommandArgs, "\x00")
-	if strings.Contains(agyArgs, "read-only") {
-		t.Fatalf("antigravity_gemini command_args must not pass a value to boolean --sandbox flag: %v", result.Reviewers["antigravity_gemini"].CommandArgs)
+	for _, forbidden := range []string{"--model", "--prompt-file"} {
+		if strings.Contains(zcodeArgs, forbidden) {
+			t.Fatalf("zcode_glm_5_2 command_args use unsupported zcode option %q: %v", forbidden, zcode.CommandArgs)
+		}
+	}
+	kimi := result.Providers["kimi_default"]
+	kimiArgs := strings.Join(kimi.CommandArgs, "\x00")
+	if !kimi.DefaultRequired || kimi.SelectedModel != nil || kimi.SelectedModelRequired == nil || *kimi.SelectedModelRequired || kimi.ModelSelection != "cli_default_latest" {
+		t.Fatalf("kimi_default must use CLI default/latest without explicit selected_model: %+v", kimi)
+	}
+	if !containsString(kimi.CommandArgs, "--output-format") || !containsString(kimi.CommandArgs, "stream-json") || !containsString(kimi.CommandArgs, "--prompt") || !containsString(kimi.CommandArgs, "{prompt_text}") {
+		t.Fatalf("kimi_default must pass prompt text through Kimi stream-json prompt mode: %+v", kimi)
+	}
+	for _, forbidden := range []string{"--model", "--prompt-file"} {
+		if strings.Contains(kimiArgs, forbidden) {
+			t.Fatalf("kimi_default command_args use unsupported explicit model/file option %q: %v", forbidden, kimi.CommandArgs)
+		}
+	}
+	agy := result.Providers["antigravity_gemini"]
+	if agy.DefaultRequired || agy.SelectedModel != nil || agy.DegradedPosture == "" {
+		t.Fatalf("antigravity_gemini must be explicit degraded non-default metadata: %+v", agy)
+	}
+	if strings.Contains(strings.Join(agy.CommandArgs, "\x00"), "read-only") {
+		t.Fatalf("antigravity command_args must not pass a value to --sandbox: %v", agy.CommandArgs)
 	}
 	for _, reason := range []string{"cli_missing", "model_unavailable", "mutation_detected", "unknown_provider_failure"} {
 		if !containsString(result.ProviderFailureReasons, reason) {
-			t.Fatalf("provider-lanes missing failure reason %q in %v", reason, result.ProviderFailureReasons)
+			t.Fatalf("role-lanes missing failure reason %q in %v", reason, result.ProviderFailureReasons)
 		}
 	}
 	if !result.NoProviderExecution {
-		t.Fatalf("provider-lanes must not execute providers\n%s", output)
+		t.Fatalf("role-lanes must not execute providers\n%s", output)
 	}
 }
 
-func TestMAR004ProviderToolchainOverlayResolvesExplicitArgv(t *testing.T) {
-	registry := writeTempProviderRegistry(t, map[string]any{
-		"schema_version":    "mar.provider_lanes.v1",
-		"default_reviewers": []string{"alias_backed"},
-		"reviewers": map[string]any{
-			"alias_backed": map[string]any{
-				"command_lane":    "zcode",
-				"executable":      "definitely-missing-shell-alias",
-				"selected_model":  "glm-5.2",
-				"prompt_template": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
-				"command_args":    []string{"--version"},
-				"validated":       false,
-				"validation_required_before_success_coverage": true,
-			},
-		},
-	})
+func TestMAR005ProviderToolchainOverlayResolvesExplicitArgv(t *testing.T) {
+	registry := writeTempProviderRegistry(t, roleRegistryPayload([]string{"logic"}, map[string]any{
+		"alias_backed":     providerPayload("zcode", "definitely-missing-shell-alias", "glm-5.2", []string{"--version"}, false),
+		"secondary_backed": providerPayload("kimi", "python3", "fixture-kimi-default", []string{"--version"}, true),
+	}, map[string]any{"logic": rolePayload("alias_backed", "secondary_backed")}))
 	toolchain := writeTempToolchain(t, `kas_cli: v0.1.4
 kah_cli: v0.1.10
 mar_provider_tools:
@@ -375,7 +366,9 @@ mar_provider_tools:
 		Status   string `json:"status"`
 		Reason   string `json:"reason"`
 		Attempts []struct {
-			ReviewerID            string   `json:"reviewer_id"`
+			RoleID                string   `json:"role_id"`
+			ProviderID            string   `json:"provider_id"`
+			ProviderCandidate     string   `json:"provider_candidate"`
 			TerminalStatus        string   `json:"terminal_status"`
 			ProviderFailureReason *string  `json:"provider_failure_reason"`
 			RedactedCommand       []string `json:"redacted_command"`
@@ -385,13 +378,13 @@ mar_provider_tools:
 	if err := json.Unmarshal(output, &result); err != nil {
 		t.Fatalf("parse provider-preflight output: %v\n%s", err, output)
 	}
-	if result.Status != "PASS" || result.Reason != "provider_preflight_passed" {
-		t.Fatalf("toolchain-resolved provider preflight = %q/%q, want PASS/provider_preflight_passed\n%s", result.Status, result.Reason, output)
-	}
-	if len(result.Attempts) != 1 || result.Attempts[0].ReviewerID != "alias_backed" {
-		t.Fatalf("unexpected preflight attempts: %+v\n%s", result.Attempts, output)
+	if result.Status != "PASS" || result.Reason != "provider_preflight_passed" || len(result.Attempts) != 1 {
+		t.Fatalf("toolchain-resolved provider preflight mismatch\n%s", output)
 	}
 	attempt := result.Attempts[0]
+	if attempt.RoleID != "logic" || attempt.ProviderID != "alias_backed" || attempt.ProviderCandidate != "primary" {
+		t.Fatalf("unexpected preflight attempt identity: %+v\n%s", attempt, output)
+	}
 	if attempt.TerminalStatus != "PASS" || attempt.ProviderFailureReason != nil || !attempt.NoProviderExecution {
 		t.Fatalf("toolchain-resolved preflight attempt = %+v\n%s", attempt, output)
 	}
@@ -400,43 +393,46 @@ mar_provider_tools:
 	}
 }
 
-func TestMAR004ProviderValidationGateBlocksUnvalidatedExecutableLanes(t *testing.T) {
-	registry := writeTempProviderRegistry(t, map[string]any{
-		"schema_version":    "mar.provider_lanes.v1",
-		"default_reviewers": []string{"unvalidated_available"},
-		"reviewers": map[string]any{
-			"unvalidated_available": map[string]any{
-				"command_lane":    "python3",
-				"executable":      "python3",
-				"selected_model":  "fixture-model",
-				"prompt_template": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
-				"command_args":    []string{"--version"},
-				"validated":       false,
-				"validation_required_before_success_coverage": true,
-			},
-		},
-	})
+func TestMAR005ProviderSafetyAndPreflightFailures(t *testing.T) {
+	registry := writeTempProviderRegistry(t, roleRegistryPayload([]string{"logic"}, map[string]any{
+		"missing_cli":       providerPayload("missing", "definitely-missing-mar-cli", "glm-5.2", []string{"--model", "{model}"}, false),
+		"missing_model":     providerPayload("agy", "agy", nil, []string{"--model", "{model}"}, false),
+		"unvalidated":       providerPayload("python3", "python3", "fixture-model", []string{"--version"}, false),
+		"unvalidated_other": providerPayload("python3", "python3", "fixture-model", []string{"--version"}, false),
+	}, map[string]any{"logic": rolePayload("missing_cli", "missing_model")}))
 
-	preflightOutput := runMARCommand(t, "provider-preflight", "--registry", registry)
-	var preflight struct {
-		Status   string `json:"status"`
-		Attempts []struct {
-			ReviewerID            string  `json:"reviewer_id"`
-			TerminalStatus        string  `json:"terminal_status"`
-			ProviderFailureReason string  `json:"provider_failure_reason"`
-			SelectedModel         *string `json:"selected_model"`
-			ExitCode              *int    `json:"exit_code"`
-		} `json:"attempts"`
+	output := runMARCommand(t, "provider-preflight", "--registry", registry)
+	var result struct {
+		Status   string          `json:"status"`
+		Reason   string          `json:"reason"`
+		Attempts []attemptReason `json:"attempts"`
 	}
-	if err := json.Unmarshal(preflightOutput, &preflight); err != nil {
-		t.Fatalf("parse provider-preflight output: %v\n%s", err, preflightOutput)
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse provider-preflight output: %v\n%s", err, output)
 	}
-	if preflight.Status == "PASS" {
-		t.Fatalf("unvalidated executable provider lane must not preflight PASS\n%s", preflightOutput)
+	if result.Status == "PASS" {
+		t.Fatalf("provider-preflight must fail closed when CLI/model evidence is absent\n%s", output)
 	}
-	requireAttemptReason(t, preflight.Attempts, "unvalidated_available", "adapter_proof_required")
+	requireAttemptReason(t, result.Attempts, "missing_cli", "cli_missing")
+	requireAttemptReason(t, result.Attempts, "missing_model", "model_unavailable")
 
-	attemptOutput := runMARCommand(t, "provider-attempt", "--registry", registry, "--reviewer", "unvalidated_available")
+	blocked := runMARCommand(t, "provider-preflight", "--roles", "logic")
+	var blockedResult struct {
+		Status string `json:"status"`
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(blocked, &blockedResult); err != nil {
+		t.Fatalf("parse narrower preflight output: %v\n%s", err, blocked)
+	}
+	if blockedResult.Status != "BLOCKED" || blockedResult.Reason != "pre_scoped_evidence_required" {
+		t.Fatalf("narrower role set without evidence = %q/%q\n%s", blockedResult.Status, blockedResult.Reason, blocked)
+	}
+
+	unvalidatedRegistry := writeTempProviderRegistry(t, roleRegistryPayload([]string{"logic"}, map[string]any{
+		"unvalidated":       providerPayload("python3", "python3", "fixture-model", []string{"--version"}, false),
+		"unvalidated_other": providerPayload("python3", "python3", "fixture-model", []string{"--version"}, false),
+	}, map[string]any{"logic": rolePayload("unvalidated", "unvalidated_other")}))
+	attemptOutput := runMARCommand(t, "provider-attempt", "--registry", unvalidatedRegistry, "--provider", "unvalidated")
 	var attempt struct {
 		TerminalStatus        string `json:"terminal_status"`
 		ProviderFailureReason string `json:"provider_failure_reason"`
@@ -451,97 +447,48 @@ func TestMAR004ProviderValidationGateBlocksUnvalidatedExecutableLanes(t *testing
 	}
 }
 
-func TestMAR004ProviderPreflightMapsMissingCLIAndMissingModel(t *testing.T) {
-	registry := writeTempProviderRegistry(t, map[string]any{
-		"schema_version":    "mar.provider_lanes.v1",
-		"default_reviewers": []string{"missing_cli", "missing_model"},
-		"reviewers": map[string]any{
-			"missing_cli": map[string]any{
-				"command_lane":    "definitely-missing-mar-cli",
-				"executable":      "definitely-missing-mar-cli",
-				"selected_model":  "glm-5.2",
-				"prompt_template": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
-				"command_args":    []string{"--model", "{model}"},
-				"validated":       false,
-				"validation_required_before_success_coverage": true,
-			},
-			"missing_model": map[string]any{
-				"command_lane":    "agy",
-				"executable":      "agy",
-				"selected_model":  nil,
-				"prompt_template": "templates/prompts/mar/antigravity-gemini-reviewer-request.md.tmpl",
-				"command_args":    []string{"--model", "{model}"},
-				"validated":       false,
-				"validation_required_before_success_coverage": true,
-			},
-		},
-	})
+func TestMAR005ProviderPreflightAllowsExplicitDefaultModelLane(t *testing.T) {
+	defaultModel := providerPayload("kimi", "python3", nil, []string{"--version"}, true)
+	defaultModel["selected_model_required"] = false
+	defaultModel["model_selection"] = "cli_default_latest"
+	registry := writeTempProviderRegistry(t, roleRegistryPayload([]string{"logic"}, map[string]any{
+		"default_model": defaultModel,
+	}, map[string]any{"logic": rolePayload("default_model", "default_model")}))
 
 	output := runMARCommand(t, "provider-preflight", "--registry", registry)
 	var result struct {
-		Status   string `json:"status"`
-		Reason   string `json:"reason"`
-		Attempts []struct {
-			ReviewerID            string  `json:"reviewer_id"`
-			TerminalStatus        string  `json:"terminal_status"`
-			ProviderFailureReason string  `json:"provider_failure_reason"`
-			SelectedModel         *string `json:"selected_model"`
-			ExitCode              *int    `json:"exit_code"`
-		} `json:"attempts"`
+		Status   string          `json:"status"`
+		Reason   string          `json:"reason"`
+		Attempts []attemptReason `json:"attempts"`
 	}
 	if err := json.Unmarshal(output, &result); err != nil {
-		t.Fatalf("parse provider-preflight output: %v\n%s", err, output)
+		t.Fatalf("parse default-model provider-preflight output: %v\n%s", err, output)
 	}
-	if result.Status == "PASS" {
-		t.Fatalf("provider-preflight must fail closed when CLI/model evidence is absent\n%s", output)
+	if result.Status != "PASS" || result.Reason != "provider_preflight_passed" || len(result.Attempts) != 1 {
+		t.Fatalf("default-model provider-preflight mismatch\n%s", output)
 	}
-	requireAttemptReason(t, result.Attempts, "missing_cli", "cli_missing")
-	requireAttemptReason(t, result.Attempts, "missing_model", "model_unavailable")
-}
-
-func TestMAR004PreScopedNarrowerSetRequiresPriorEvidence(t *testing.T) {
-	output := runMARCommand(t, "provider-preflight", "--reviewers", "zcode_glm_5_2")
-	var result struct {
-		Status string `json:"status"`
-		Reason string `json:"reason"`
-	}
-	if err := json.Unmarshal(output, &result); err != nil {
-		t.Fatalf("parse provider-preflight output: %v\n%s", err, output)
-	}
-	if result.Status != "BLOCKED" || result.Reason != "pre_scoped_evidence_required" {
-		t.Fatalf("narrower reviewer set without evidence = %q/%q, want BLOCKED/pre_scoped_evidence_required\n%s", result.Status, result.Reason, output)
+	attempt := result.Attempts[0]
+	if attempt.ProviderID != "default_model" || attempt.SelectedModel != nil || attempt.TerminalStatus != "PASS" || attempt.ProviderFailureReason != "" {
+		t.Fatalf("default-model preflight attempt should pass without selected_model: %+v\n%s", attempt, output)
 	}
 }
 
-func TestMAR004ProviderAttemptEmitsFailClosedMissingCLIArtifact(t *testing.T) {
-	registry := writeTempProviderRegistry(t, map[string]any{
-		"schema_version":    "mar.provider_lanes.v1",
-		"default_reviewers": []string{"missing_cli"},
-		"reviewers": map[string]any{
-			"missing_cli": map[string]any{
-				"command_lane":    "definitely-missing-mar-cli",
-				"executable":      "definitely-missing-mar-cli",
-				"selected_model":  "glm-5.2",
-				"prompt_template": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
-				"command_args":    []string{"--model", "{model}"},
-				"validated":       false,
-				"validation_required_before_success_coverage": true,
-			},
-		},
-	})
+func TestMAR005ProviderAttemptEmitsFailClosedMissingCLIArtifact(t *testing.T) {
+	registry := writeTempProviderRegistry(t, roleRegistryPayload([]string{"logic"}, map[string]any{
+		"missing_cli":       providerPayload("missing", "definitely-missing-mar-cli", "glm-5.2", []string{"--model", "{model}"}, false),
+		"secondary_missing": providerPayload("missing", "definitely-missing-secondary-cli", "fixture-kimi-default", []string{"--model", "{model}"}, false),
+	}, map[string]any{"logic": rolePayload("missing_cli", "secondary_missing")}))
 
 	output := runMARCommand(t,
 		"provider-attempt",
 		"--registry", registry,
-		"--reviewer", "missing_cli",
+		"--provider", "missing_cli",
 		"--run-id", "run-test",
-		"--task-id", "MAR-004",
+		"--task-id", "MAR-005",
 	)
 	var attempt struct {
 		SchemaVersion         string   `json:"schema_version"`
-		ReviewerID            string   `json:"reviewer_id"`
-		CommandLane           string   `json:"command_lane"`
-		SelectedModel         string   `json:"selected_model"`
+		ProviderID            string   `json:"provider_id"`
 		TerminalStatus        string   `json:"terminal_status"`
 		ProviderFailureReason string   `json:"provider_failure_reason"`
 		ParserStatus          string   `json:"parser_status"`
@@ -555,134 +502,249 @@ func TestMAR004ProviderAttemptEmitsFailClosedMissingCLIArtifact(t *testing.T) {
 	if err := json.Unmarshal(output, &attempt); err != nil {
 		t.Fatalf("parse provider-attempt output: %v\n%s", err, output)
 	}
-	if attempt.SchemaVersion != "mar.provider_attempt.v1" || attempt.ReviewerID != "missing_cli" {
+	if attempt.SchemaVersion != "mar.provider_attempt.v1" || attempt.ProviderID != "missing_cli" {
 		t.Fatalf("provider-attempt identity mismatch: %+v\n%s", attempt, output)
 	}
-	if attempt.TerminalStatus == "PASS" || attempt.ProviderFailureReason != "cli_missing" {
-		t.Fatalf("provider-attempt missing CLI = %q/%q, want non-PASS/cli_missing\n%s", attempt.TerminalStatus, attempt.ProviderFailureReason, output)
+	if attempt.TerminalStatus == "PASS" || attempt.ProviderFailureReason != "cli_missing" || attempt.ParserStatus != "not_run" {
+		t.Fatalf("provider-attempt missing CLI metadata mismatch\n%s", output)
 	}
-	if attempt.ParserStatus != "not_run" || len(attempt.RedactedCommand) == 0 {
-		t.Fatalf("provider-attempt missing parser/redacted command evidence\n%s", output)
-	}
-	if !attempt.MutationCheck.Checked || attempt.MutationCheck.Detected {
-		t.Fatalf("provider-attempt missing clean mutation check\n%s", output)
-	}
-	if !attempt.NoProviderExecution {
-		t.Fatalf("missing CLI attempt must record no_provider_execution=true\n%s", output)
+	if len(attempt.RedactedCommand) == 0 || !attempt.MutationCheck.Checked || attempt.MutationCheck.Detected || !attempt.NoProviderExecution {
+		t.Fatalf("provider-attempt safety evidence mismatch\n%s", output)
 	}
 }
 
-func TestMAR004ProviderMergePackResolvesCoverageOnlyWithExplicitEvidence(t *testing.T) {
+func TestMAR005RoleProviderAttemptMergesParsedReviewerPayload(t *testing.T) {
+	provider := writeTempExecutable(t, "mar-provider-reviewer", `#!/bin/sh
+cat <<'JSON'
+{"status":"PASS_WITH_FINDINGS","summary":"reviewed role","confidence":0.6,"findings":[{"id":"LIVE-001","severity":"blocker","message":"synthetic blocker"}],"role_scoped_acceptance_criteria_verdicts":[{"criterion":"role/provider separation","verdict":"pass","evidence":"fixture"}],"no_provider_execution":false}
+JSON
+`)
+	secondary := writeTempExecutable(t, "mar-provider-secondary", `#!/bin/sh
+echo '{"status":"PASS","summary":"secondary should not run"}'
+`)
+	registry := writeTempProviderRegistry(t, roleRegistryPayload([]string{"test_adequacy"}, map[string]any{
+		"primary":   providerPayload("fixture", provider, "fixture-model", []string{}, true),
+		"secondary": providerPayload("fixture", secondary, "fixture-model", []string{}, true),
+	}, map[string]any{"test_adequacy": rolePayload("primary", "secondary")}))
+
+	output := runMARCommand(t,
+		"provider-attempt",
+		"--registry", registry,
+		"--role", "test_adequacy",
+		"--run-id", "run-test",
+		"--task-id", "MAR-005",
+		"--pre-scoped-evidence", "live-provider-test",
+	)
+	var result struct {
+		Status       string `json:"status"`
+		RoleCoverage struct {
+			RedTriggerSummary struct {
+				RedAdjudicationRequired bool     `json:"red_adjudication_required"`
+				Triggers                []string `json:"triggers"`
+			} `json:"red_trigger_summary"`
+			BlueMatrixInputs struct {
+				CoveredRoles             []string                    `json:"covered_roles"`
+				AcceptanceCriteriaMatrix map[string][]map[string]any `json:"acceptance_criteria_matrix"`
+			} `json:"blue_matrix_inputs"`
+		} `json:"role_coverage"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse role provider-attempt output: %v\n%s", err, output)
+	}
+	if result.Status != "PASS" || !containsString(result.RoleCoverage.BlueMatrixInputs.CoveredRoles, "test_adequacy") {
+		t.Fatalf("role provider-attempt must cover test_adequacy when primary provider succeeds\n%s", output)
+	}
+	if len(result.RoleCoverage.BlueMatrixInputs.AcceptanceCriteriaMatrix["test_adequacy"]) != 1 {
+		t.Fatalf("parsed provider AC verdicts must feed Blue matrix\n%s", output)
+	}
+	if !result.RoleCoverage.RedTriggerSummary.RedAdjudicationRequired || !containsString(result.RoleCoverage.RedTriggerSummary.Triggers, "low_confidence") || !containsString(result.RoleCoverage.RedTriggerSummary.Triggers, "blocker") {
+		t.Fatalf("parsed confidence/finding severity must feed Red trigger summary\n%s", output)
+	}
+}
+
+func TestMAR005RoleMergePackCoversPrimarySecondaryAndFailClosedPaths(t *testing.T) {
 	cases := []struct {
-		name     string
-		attempts []map[string]any
-		args     []string
-		want     string
-		notWant  string
+		name       string
+		attempts   []map[string]any
+		want       string
+		wantReason string
+		notWant    string
 	}{
 		{
-			name: "partial default failure cannot pass",
-			attempts: []map[string]any{
-				providerAttemptFixture("z-ok", "zcode_glm_5_2", "PASS", nil),
-				providerAttemptFixture("k-fail", "kimi_k2_7", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
-				providerAttemptFixture("a-ok", "antigravity_gemini", "PASS", nil),
-			},
-			want:    "DEGRADED",
-			notWant: "PASS",
+			name:       "primary success covers role",
+			attempts:   []map[string]any{providerAttemptFixture("logic-primary", "logic", "zcode_glm_5_2", "primary", "PASS", nil)},
+			want:       "PASS",
+			wantReason: "all_required_role_coverage_resolved",
 		},
 		{
-			name: "all default failure cannot pass",
+			name: "primary failure secondary success covers role",
 			attempts: []map[string]any{
-				providerAttemptFixture("z-fail", "zcode_glm_5_2", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
-				providerAttemptFixture("k-fail", "kimi_k2_7", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
-				providerAttemptFixture("a-fail", "antigravity_gemini", "BLOCKED", map[string]any{"provider_failure_reason": "model_unavailable"}),
+				providerAttemptFixture("logic-primary", "logic", "zcode_glm_5_2", "primary", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
+				providerAttemptFixture("logic-secondary", "logic", "kimi_default", "secondary", "PASS", map[string]any{"acceptance_criteria_verdicts": []map[string]any{{"id": "AC-1", "verdict": "covered"}}}),
+			},
+			want:       "PASS",
+			wantReason: "all_required_role_coverage_resolved",
+		},
+		{
+			name: "primary and secondary failure fails closed",
+			attempts: []map[string]any{
+				providerAttemptFixture("logic-primary", "logic", "zcode_glm_5_2", "primary", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
+				providerAttemptFixture("logic-secondary", "logic", "kimi_default", "secondary", "BLOCKED", map[string]any{"provider_failure_reason": "model_unavailable"}),
+			},
+			want:       "FAILED",
+			wantReason: "all_required_roles_unresolved",
+			notWant:    "PASS",
+		},
+		{
+			name: "undeclared tertiary cannot cover role",
+			attempts: []map[string]any{
+				providerAttemptFixture("logic-primary", "logic", "zcode_glm_5_2", "primary", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
+				providerAttemptFixture("logic-secondary", "logic", "kimi_default", "secondary", "DEGRADED", map[string]any{"provider_failure_reason": "nonzero_exit"}),
+				providerAttemptFixture("logic-tertiary", "logic", "antigravity_gemini", "tertiary", "PASS", nil),
 			},
 			want:    "FAILED",
 			notWant: "PASS",
-		},
-		{
-			name: "same provider retry success resolves failed coverage",
-			attempts: []map[string]any{
-				providerAttemptFixture("z-ok", "zcode_glm_5_2", "PASS", nil),
-				providerAttemptFixture("k-fail", "kimi_k2_7", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
-				providerAttemptFixture("k-retry", "kimi_k2_7", "PASS", map[string]any{"retry_of_attempt_id": "k-fail"}),
-				providerAttemptFixture("a-ok", "antigravity_gemini", "PASS", nil),
-			},
-			want: "PASS",
-		},
-		{
-			name: "same provider retry failure stays non clean",
-			attempts: []map[string]any{
-				providerAttemptFixture("z-ok", "zcode_glm_5_2", "PASS", nil),
-				providerAttemptFixture("k-fail", "kimi_k2_7", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
-				providerAttemptFixture("k-retry-fail", "kimi_k2_7", "DEGRADED", map[string]any{
-					"provider_failure_reason": "nonzero_exit",
-					"retry_of_attempt_id":     "k-fail",
-				}),
-				providerAttemptFixture("a-ok", "antigravity_gemini", "PASS", nil),
-			},
-			want:    "DEGRADED",
-			notWant: "PASS",
-		},
-		{
-			name: "alternate success without approval stays non clean",
-			attempts: []map[string]any{
-				providerAttemptFixture("z-ok", "zcode_glm_5_2", "PASS", nil),
-				providerAttemptFixture("k-fail", "kimi_k2_7", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
-				providerAttemptFixture("alt-ok", "alternate_reviewer", "PASS", map[string]any{"alternate_for_reviewer_id": "kimi_k2_7"}),
-				providerAttemptFixture("a-ok", "antigravity_gemini", "PASS", nil),
-			},
-			want:    "DEGRADED",
-			notWant: "PASS",
-		},
-		{
-			name: "approved alternate success resolves coverage",
-			attempts: []map[string]any{
-				providerAttemptFixture("z-ok", "zcode_glm_5_2", "PASS", nil),
-				providerAttemptFixture("k-fail", "kimi_k2_7", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
-				providerAttemptFixture("alt-ok", "alternate_reviewer", "PASS", map[string]any{
-					"alternate_for_reviewer_id": "kimi_k2_7",
-					"approval_evidence":         "주군-approved alternate alt-ok",
-				}),
-				providerAttemptFixture("a-ok", "antigravity_gemini", "PASS", nil),
-			},
-			want: "PASS",
-		},
-		{
-			name: "explicit waiver resolves coverage",
-			attempts: []map[string]any{
-				providerAttemptFixture("z-ok", "zcode_glm_5_2", "PASS", nil),
-				providerAttemptFixture("k-ok", "kimi_k2_7", "PASS", nil),
-				providerAttemptFixture("a-fail", "antigravity_gemini", "BLOCKED", map[string]any{"provider_failure_reason": "model_unavailable"}),
-			},
-			args: []string{"--waiver", "antigravity_gemini=주군-waiver-model-unavailable"},
-			want: "PASS",
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			paths := writeTempAttemptFixtures(t, tc.attempts)
-			args := append([]string{"merge-pack", "--provider-coverage"}, tc.args...)
-			args = append(args, paths...)
+			args := append([]string{"merge-pack", "--provider-coverage", "--roles", "logic", "--pre-scoped-evidence", "test"}, paths...)
 			output := runMARCommand(t, args...)
-			var result struct {
-				Status   string `json:"status"`
-				Reason   string `json:"reason"`
-				Coverage struct {
-					UnresolvedDefaultReviewers []string `json:"unresolved_default_reviewers"`
-				} `json:"coverage"`
-			}
+			var result roleMergeResult
 			if err := json.Unmarshal(output, &result); err != nil {
-				t.Fatalf("parse provider merge-pack output: %v\n%s", err, output)
+				t.Fatalf("parse role merge-pack output: %v\n%s", err, output)
 			}
 			if result.Status != tc.want {
-				t.Fatalf("provider merge-pack status = %q, want %q (%s)\n%s", result.Status, tc.want, result.Reason, output)
+				t.Fatalf("role merge-pack status = %q, want %q (%s)\n%s", result.Status, tc.want, result.Reason, output)
+			}
+			if tc.wantReason != "" && result.Reason != tc.wantReason {
+				t.Fatalf("role merge-pack reason = %q, want %q\n%s", result.Reason, tc.wantReason, output)
 			}
 			if tc.notWant != "" && result.Status == tc.notWant {
-				t.Fatalf("provider merge-pack status = forbidden %q\n%s", tc.notWant, output)
+				t.Fatalf("role merge-pack status = forbidden %q\n%s", tc.notWant, output)
+			}
+			if result.Status == "FAILED" && (!containsString(result.UnresolvedRequiredRoles, "logic") || !strings.Contains(result.OperatorReportText, "주군/operator report")) {
+				t.Fatalf("failed role coverage must report unresolved role to operator\n%s", output)
+			}
+			if tc.name == "primary failure secondary success covers role" {
+				role := result.Coverage.ByRole["logic"]
+				if role.ProviderID != "kimi_default" || role.ProviderCandidate != "secondary" || role.FallbackReason != "cli_missing" {
+					t.Fatalf("secondary coverage metadata wrong: %+v\n%s", role, output)
+				}
+				if len(result.BlueMatrixInputs.AcceptanceCriteriaMatrix["logic"]) != 1 {
+					t.Fatalf("secondary success must feed role-scoped AC verdicts into Blue matrix\n%s", output)
+				}
 			}
 		})
+	}
+}
+
+func TestMAR005RedTriggerDetectionAndTestAdequacyCoverage(t *testing.T) {
+	paths := writeTempAttemptFixtures(t, []map[string]any{
+		providerAttemptFixture("test-primary", "test_adequacy", "zcode_glm_5_2", "primary", "PASS_WITH_FINDINGS", map[string]any{
+			"confidence": 0.6,
+			"acceptance_criteria_verdicts": []map[string]any{
+				{"id": "AC-9", "verdict": "test_gap"},
+			},
+		}),
+	})
+	args := append([]string{"merge-pack", "--provider-coverage", "--roles", "test_adequacy", "--pre-scoped-evidence", "test"}, paths...)
+	output := runMARCommand(t, args...)
+	var result roleMergeResult
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse test_adequacy merge-pack output: %v\n%s", err, output)
+	}
+	if result.Status != "PASS" || !containsString(result.BlueMatrixInputs.CoveredRoles, "test_adequacy") {
+		t.Fatalf("test_adequacy role must produce clean role coverage when provider succeeds\n%s", output)
+	}
+	if !result.RedTriggerSummary.RedAdjudicationRequired || !containsString(result.RedTriggerSummary.Triggers, "low_confidence") {
+		t.Fatalf("low confidence role output must trigger Red summary\n%s", output)
+	}
+	if len(result.BlueMatrixInputs.AcceptanceCriteriaMatrix["test_adequacy"]) != 1 {
+		t.Fatalf("test_adequacy AC verdict must feed Blue matrix\n%s", output)
+	}
+}
+
+func TestMAR005RoleMergePackDegradesPartialRequiredCoverage(t *testing.T) {
+	paths := writeTempAttemptFixtures(t, []map[string]any{
+		providerAttemptFixture("logic-primary", "logic", "zcode_glm_5_2", "primary", "PASS", nil),
+		providerAttemptFixture("security-primary", "security", "zcode_glm_5_2", "primary", "DEGRADED", map[string]any{"provider_failure_reason": "cli_missing"}),
+		providerAttemptFixture("security-secondary", "security", "kimi_default", "secondary", "BLOCKED", map[string]any{"provider_failure_reason": "model_unavailable"}),
+	})
+	args := append([]string{"merge-pack", "--provider-coverage", "--roles", "logic,security", "--pre-scoped-evidence", "partial-test"}, paths...)
+	output := runMARCommand(t, args...)
+	var result roleMergeResult
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse partial role merge-pack output: %v\n%s", err, output)
+	}
+	if result.Status != "DEGRADED" || !containsString(result.BlueMatrixInputs.CoveredRoles, "logic") || !containsString(result.UnresolvedRequiredRoles, "security") {
+		t.Fatalf("partial role coverage must degrade with unresolved security role\n%s", output)
+	}
+	if !strings.Contains(result.OperatorReportText, "security") {
+		t.Fatalf("partial role coverage must report unresolved security role\n%s", output)
+	}
+}
+
+type attemptReason struct {
+	ProviderID            string  `json:"provider_id"`
+	TerminalStatus        string  `json:"terminal_status"`
+	ProviderFailureReason string  `json:"provider_failure_reason"`
+	SelectedModel         *string `json:"selected_model"`
+	ExitCode              *int    `json:"exit_code"`
+}
+
+type roleMergeResult struct {
+	Status                  string   `json:"status"`
+	Reason                  string   `json:"reason"`
+	UnresolvedRequiredRoles []string `json:"unresolved_required_roles"`
+	OperatorReportText      string   `json:"operator_report_text"`
+	RedTriggerSummary       struct {
+		RedAdjudicationRequired bool     `json:"red_adjudication_required"`
+		Triggers                []string `json:"triggers"`
+	} `json:"red_trigger_summary"`
+	Coverage struct {
+		ByRole map[string]struct {
+			ProviderID        string `json:"provider_id"`
+			ProviderCandidate string `json:"provider_candidate"`
+			FallbackReason    string `json:"fallback_reason"`
+		} `json:"by_role"`
+	} `json:"coverage"`
+	BlueMatrixInputs struct {
+		CoveredRoles             []string                    `json:"covered_roles"`
+		AcceptanceCriteriaMatrix map[string][]map[string]any `json:"acceptance_criteria_matrix"`
+	} `json:"blue_matrix_inputs"`
+}
+
+func roleRegistryPayload(requiredRoles []string, providers map[string]any, roles map[string]any) map[string]any {
+	return map[string]any{
+		"schema_version": "mar.role_lanes.v1",
+		"required_roles": requiredRoles,
+		"providers":      providers,
+		"roles":          roles,
+	}
+}
+
+func rolePayload(primary, secondary string) map[string]any {
+	return map[string]any{
+		"required":                     true,
+		"description":                  "test role",
+		"primary_provider":             primary,
+		"secondary_provider":           secondary,
+		"provider_selection_rationale": "test",
+	}
+}
+
+func providerPayload(commandLane, executable string, model any, args []string, validated bool) map[string]any {
+	return map[string]any{
+		"command_lane":    commandLane,
+		"executable":      executable,
+		"selected_model":  model,
+		"prompt_template": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+		"command_args":    args,
+		"validated":       validated,
+		"validation_required_before_success_coverage": true,
 	}
 }
 
@@ -729,6 +791,15 @@ func writeTempToolchain(t *testing.T, content string) string {
 	return path
 }
 
+func writeTempExecutable(t *testing.T, name, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, []byte(content), 0755); err != nil {
+		t.Fatalf("write temp executable %s: %v", name, err)
+	}
+	return path
+}
+
 func writeTempAttemptFixtures(t *testing.T, attempts []map[string]any) []string {
 	t.Helper()
 	dir := t.TempDir()
@@ -751,14 +822,17 @@ func writeTempAttemptFixtures(t *testing.T, attempts []map[string]any) []string 
 	return paths
 }
 
-func providerAttemptFixture(attemptID, reviewerID, terminalStatus string, extra map[string]any) map[string]any {
+func providerAttemptFixture(attemptID, roleID, providerID, candidate, terminalStatus string, extra map[string]any) map[string]any {
 	attempt := map[string]any{
 		"schema_version":            "mar.provider_attempt.v1",
 		"run_id":                    "run-test",
-		"task_id":                   "MAR-004",
+		"task_id":                   "MAR-005",
 		"attempt_id":                attemptID,
-		"reviewer_id":               reviewerID,
-		"command_lane":              reviewerID,
+		"role_id":                   roleID,
+		"provider_id":               providerID,
+		"provider_candidate":        candidate,
+		"reviewer_id":               providerID,
+		"command_lane":              providerID,
 		"selected_model":            "fixture-model",
 		"started_at":                "2026-06-17T00:00:00Z",
 		"ended_at":                  "2026-06-17T00:00:01Z",
@@ -783,23 +857,17 @@ func providerAttemptFixture(attemptID, reviewerID, terminalStatus string, extra 
 	return attempt
 }
 
-func requireAttemptReason(t *testing.T, attempts []struct {
-	ReviewerID            string  `json:"reviewer_id"`
-	TerminalStatus        string  `json:"terminal_status"`
-	ProviderFailureReason string  `json:"provider_failure_reason"`
-	SelectedModel         *string `json:"selected_model"`
-	ExitCode              *int    `json:"exit_code"`
-}, reviewerID, reason string) {
+func requireAttemptReason(t *testing.T, attempts []attemptReason, providerID, reason string) {
 	t.Helper()
 	for _, attempt := range attempts {
-		if attempt.ReviewerID == reviewerID {
+		if attempt.ProviderID == providerID {
 			if attempt.TerminalStatus == "PASS" || attempt.ProviderFailureReason != reason {
-				t.Fatalf("attempt %s status/reason = %q/%q, want non-PASS/%s", reviewerID, attempt.TerminalStatus, attempt.ProviderFailureReason, reason)
+				t.Fatalf("attempt %s status/reason = %q/%q, want non-PASS/%s", providerID, attempt.TerminalStatus, attempt.ProviderFailureReason, reason)
 			}
 			return
 		}
 	}
-	t.Fatalf("missing attempt for reviewer %q in %+v", reviewerID, attempts)
+	t.Fatalf("missing attempt for provider %q in %+v", providerID, attempts)
 }
 
 func containsString(values []string, want string) bool {

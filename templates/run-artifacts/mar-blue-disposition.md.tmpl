@@ -8,16 +8,26 @@ status: `{{ .Status }}`
 red_adjudication_trigger: `{{ .RedAdjudicationTrigger }}`
 no_provider_execution_claim: `{{ .NoProviderExecutionClaim }}`
 provider_attempt_paths: `{{ .ProviderAttemptPaths }}`
-unresolved_default_reviewers: `{{ .UnresolvedDefaultReviewers }}`
-retry_alternate_waiver_refs: `{{ .RetryAlternateWaiverRefs }}`
+required_roles: `{{ .RequiredRoles }}`
+covered_roles: `{{ .CoveredRoles }}`
+unresolved_required_roles: `{{ .UnresolvedRequiredRoles }}`
+operator_report_text: `{{ .OperatorReportText }}`
+role_provider_candidates: `{{ .RoleProviderCandidates }}`
+role_fallback_reasons: `{{ .RoleFallbackReasons }}`
+role_acceptance_criteria_matrix: `{{ .RoleAcceptanceCriteriaMatrix }}`
+red_trigger_summary: `{{ .RedTriggerSummary }}`
 
-## Reviewer Coverage
+## Role Coverage
 
-{{ .ReviewerCoverage }}
+{{ .RoleCoverage }}
 
 ## Provider Attempt Coverage
 
 {{ .ProviderAttemptCoverage }}
+
+## Blue Matrix Inputs
+
+{{ .BlueMatrixInputs }}
 
 ## Finding Disposition
 
@@ -31,7 +41,9 @@ retry_alternate_waiver_refs: `{{ .RetryAlternateWaiverRefs }}`
 
 - Provider dispatch success, provider availability, or prompt rendering is not
   completion evidence.
-- Failed default reviewer coverage cannot become clean `PASS` without
-  same-provider retry success, approved named alternate success, or explicit
-  주군 waiver evidence.
+- Required role coverage is clean only when the role's declared primary or
+  secondary provider candidate succeeds.
+- If primary and secondary both fail for a required role, report the unresolved
+  role to 주군/operator and fail closed. Do not silently try undeclared tertiary,
+  premium, alternate, or waiver-as-clean coverage.
 - This disposition does not claim KAB-backed execution or KAH MAR gate support.

@@ -31,9 +31,19 @@ requested_verdict_vocabulary:
 
 role_verdicts:
   - role: "{{ reviewer_role }}"
+    provider_id: "{{ provider_id }}"
+    provider_candidate: "{{ primary_or_secondary }}"
+    fallback_reason: "{{ fallback_reason_or_not_applicable }}"
     verdict: "{{ accepted_accepted_with_required_rework_rejected_or_blocked }}"
     artifact_path: "{{ role_review_artifact_path }}"
     artifact_checksum: "sha256:{{ role_review_artifact_sha256 }}"
+
+mar_role_coverage:
+  required_roles: "{{ required_roles }}"
+  covered_roles: "{{ covered_roles }}"
+  unresolved_required_roles: "{{ unresolved_required_roles }}"
+  operator_report_text: "{{ operator_report_text }}"
+  role_acceptance_criteria_matrix: "{{ role_acceptance_criteria_matrix }}"
 
 finding_dispositions:
   - finding_id: "{{ finding_id }}"
@@ -47,6 +57,7 @@ artifact_pointers:
 
 blue_synthesis_inputs:
   role_verdicts: "{{ compact_role_verdict_table }}"
+  mar_role_coverage: "{{ compact_mar_role_coverage_table }}"
   finding_dispositions: "{{ compact_finding_disposition_table }}"
   artifact_pointers: "{{ compact_artifact_pointer_table }}"
 
