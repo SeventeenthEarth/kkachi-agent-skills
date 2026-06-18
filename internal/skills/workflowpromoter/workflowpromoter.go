@@ -7,12 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kahrunner"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowregistry"
 )
@@ -236,18 +236,8 @@ type nodeContractBundle struct {
 type commandRunner struct{}
 
 func (commandRunner) Run(workDir string, args ...string) CommandResult {
-	cmd := exec.Command("kkachi-agent-helper", args...)
-	if workDir != "" {
-		cmd.Dir = workDir
-	}
-	out, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return CommandResult{Stdout: out, Stderr: exitErr.Stderr, Err: err}
-		}
-		return CommandResult{Stdout: out, Err: err}
-	}
-	return CommandResult{Stdout: out}
+	result := kahrunner.Runner{}.Run(workDir, args...)
+	return CommandResult{Stdout: result.Stdout, Stderr: result.Stderr, Err: result.Err}
 }
 
 func BuildDryRun(opts Options) (Result, error) {

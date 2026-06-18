@@ -7,13 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kahrunner"
 )
 
 const kabBoundaryMessage = "KAB is not required for minimum CLI doctor; KAB is required for execution-runtime/code-change KAS runs."
@@ -222,12 +222,8 @@ func RenderHuman(result Result) string {
 }
 
 func defaultRunner(workDir string, args ...string) CommandResult {
-	cmd := exec.Command("kkachi-agent-helper", args...)
-	if workDir != "" {
-		cmd.Dir = workDir
-	}
-	out, err := cmd.CombinedOutput()
-	return CommandResult{Stdout: out, Err: err}
+	result := kahrunner.Runner{}.Run(workDir, args...)
+	return CommandResult{Stdout: result.Stdout, Stderr: result.Stderr, Err: result.Err}
 }
 
 func readManifest(result *Result, path string) (map[string]any, []byte, bool) {
@@ -523,13 +519,14 @@ func warnUnknownProfileSkillDirs(result *Result, profileRoot string, installed [
 
 func probeKAH(runner CommandRunner, project string) KAH {
 	kah := KAH{}
-	version := runner("", "--version")
+	probeWorkDir := project
+	version := runner(probeWorkDir, "--version")
 	if version.Err != nil {
 		return kah
 	}
 	kah.Available = true
 	kah.Version = strings.TrimSpace(string(version.Stdout))
-	capabilities := runner("", "capabilities", "--json")
+	capabilities := runner(probeWorkDir, "capabilities", "--json")
 	if capabilities.Err != nil {
 		kah.Capabilities = "unavailable"
 	} else {

@@ -122,6 +122,36 @@ func TestMultiAgentReviewSOTDefinesRoleFirstFailureDecisionPolicy(t *testing.T) 
 	})
 }
 
+func TestMultiAgentReviewSOTDefinesMAR006KAHRunnerOwnershipBoundary(t *testing.T) {
+	requireContainsAll(t, "docs/sot/multi-agent-review-policy.md", []string{
+		"MAR-006",
+		"selecting which `kkachi-agent-helper` binary its own doctor",
+		"workflow-create",
+		"workflow-promote",
+		"workflow-trigger",
+		"graphsync /",
+		"workflow-graph repair surfaces execute",
+		"Resolver success is not KAH capability, evidence, project-state, or gate success.",
+		"`mar_provider_tools.resolved_argv` is authority only for MAR provider command",
+		"execution. It must not be used as KAH CLI selection authority.",
+		"`KKACHI_KAH_BIN`",
+		"`kah_cli_path`/`kah_cli`",
+		"ambient PATH only when no",
+		"explicit repo KAH selection exists",
+	})
+}
+
+func TestRoadmapDefinesMAR006WithoutClaimingKAHGateBehavior(t *testing.T) {
+	requireContainsAll(t, "docs/roadmap.md", []string{
+		"MAR-006",
+		"Resolve KAH CLI through repo toolchain-aware KAS runner",
+		"doctor, workflow-create, workflow-promote, workflow-trigger, and graphsync/workflow-graph repair",
+		"Explicit repo selection mismatch or missing binaries fail closed",
+		"MAR provider `resolved_argv` overlay semantics remain distinct from KAH CLI selection",
+		"KAS binary selection does not claim KAH deterministic evidence/gate behavior",
+	})
+}
+
 func TestMultiAgentReviewProviderLaneRegistryIsRegistered(t *testing.T) {
 	requireContainsAll(t, "docs/README.md", []string{
 		"registries/mar-provider-lanes.json",

@@ -2,7 +2,7 @@
 
 Date: 2026-06-17
 Owner: KAS policy and skill layer
-Status: candidate repository promotion SOT; local skill/script/provider-run surfaces implemented in source; MAR-005 role-first coverage implementation in review
+Status: candidate repository promotion SOT; local skill/script/provider-run surfaces implemented in source; MAR-006 KAH CLI binary selection implemented for KAS doctor/workflow surfaces
 Authority level: KAS planning authority for MAR promotion from accepted Obsidian output SOT; not installed skill behavior or runtime activation
 Source SOT: `/Users/draccoon/Workspace/Hermes/17thHermes/40_outputs/projects/kkachi/2026-06-16-kkachi-multi-agent-review-mar-sot.md`
 Paired KAH planning SOT: KAH `docs/sot/multi-agent-review-evidence-gates.md`
@@ -38,6 +38,7 @@ MAR promotion is intentionally split so planning documents do not overclaim impl
 | `MAR-003` | KAS | Implement stdlib `mar.py` doctor/render/validate/merge-pack MVP using fixture and read-only local evidence. | Local MAR script surfaces exist for non-provider or mocked/fixture paths. |
 | `MAR-004` | KAS | Implement provider run path after adapter proof, authorization boundaries, provider-failure semantics, mutation guards, toolchain overlay proof, and dogfood evidence are recorded. | Provider execution is available only for validated providers; provider failure cannot become clean coverage by availability, prompt rendering, or dispatch success alone. |
 | `MAR-005` | KAS | Convert coverage from provider-first reviewer slots to role-first required coverage with primary/secondary provider candidates. | Required roles (`logic`, `security`, `arch`, `cve`, `test_adequacy`) are covered only by their declared primary/secondary provider path; unresolved required roles fail closed with 주군/operator report wording. |
+| `MAR-006` | KAS | Select the `kkachi-agent-helper` binary used by KAS doctor/workflow KAH probes through `KKACHI_KAH_BIN`, `.kkachi/toolchain.yaml`, repo `.kkachi/bin`, then ambient PATH. | KAS owns binary selection for its own CLI surfaces only; explicit repo KAH selection mismatch fails closed and refuses PATH. Resolver success is not KAH capability, evidence, project-state, or gate success. |
 | `MAREV-002` | KAH | Implement deterministic KAH artifact/gate/schema support for KAS-declared MAR role coverage evidence if needed by final gates. | KAH helper behavior exists only after code/tests/docs/release evidence; KAH does not choose roles or providers. |
 
 `MAREV-001` is docs/SOT only. It must not be read as implementing KAH behavior. Actual KAH code or gate behavior belongs in `MAREV-002` or later.
@@ -53,6 +54,9 @@ KAS owns:
 - bundled `scripts/mar.py`;
 - output schema and parsing rules;
 - Blue disposition template guidance.
+- selecting which `kkachi-agent-helper` binary its own doctor,
+  workflow-create, workflow-promote, workflow-trigger, and graphsync /
+  workflow-graph repair surfaces execute when invoking KAH capabilities.
 
 KAH owns deterministic evidence only after its paired tasks implement or document support:
 
@@ -66,6 +70,9 @@ KAH owns deterministic evidence only after its paired tasks implement or documen
 - Blue disposition record;
 - optional Red adjudication record;
 - final gate evidence when implemented.
+- helper command behavior, deterministic project state, capability output, and
+  gate validation. A KAS resolver selecting a binary does not prove KAH command
+  success unless the effective KAH command returns the required evidence.
 
 KAB remains non-default for routine MAR. KAB is used only when a later task explicitly selects KAB runtime orchestration or premium/heavier review support.
 
@@ -132,6 +139,13 @@ and attempt time. The overlay may resolve user-interactive aliases or PATH-only
 commands to explicit argv arrays, but it must not store auth tokens, session
 files, provider cookies, or gateway credentials. Per-run artifacts must still
 snapshot the resolved proof used for that run.
+
+`mar_provider_tools.resolved_argv` is authority only for MAR provider command
+execution. It must not be used as KAH CLI selection authority. KAS KAH invoker
+surfaces select `kkachi-agent-helper` through `KKACHI_KAH_BIN`, top-level
+`kah_cli_path`/`kah_cli` in `.kkachi/toolchain.yaml`, repo
+`.kkachi/bin/kkachi-agent-helper`, and finally ambient PATH only when no
+explicit repo KAH selection exists.
 
 Supported provider-failure reason codes are:
 
