@@ -18,7 +18,7 @@ Plan from durable authority, not chat-only instruction. Path A plans prepare imp
 
 When 주군 asks to run KAS/Kkachi development work and the task is classified as `development`, treat the preferred default as a Codex-led plan-first loop, with the transport determined by the current KAS KAB adoption stage:
 
-- **Stage 1:** direct Codex SDK/app-server planner through `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl`; the runner imports `openai_codex` and lets the SDK start `codex app-server --listen stdio://`, with direct Codex evidence and no-KAB-Codex rationale. Do not use `codex exec` or generic `openai` SDK evidence.
+- **Stage 1:** direct Codex SDK/app-server planner through `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl`; the runner imports `openai_codex` and lets the SDK start `codex app-server --listen stdio://`, with direct Codex evidence and no-KAB-Codex rationale. Do not use `codex exec` or generic `openai` SDK evidence. Do not pass an explicit `--model` by default; use the configured Codex account default model. For plan-only turns, pass reasoning effort `high` and record any lower-effort exception in the run artifacts. A KAS/KAH task should use one Codex thread across its plan/revision/implementation/feedback turns by resuming the recorded `thread_id`; start a new thread for the next task. This thread continuity is task-bound and is not Discord-session-bound.
 - **Stage 2:** KAB Codex-first planner through `native_codex`; this replaces direct Codex app-server calls without changing the KAS/KAH phase or review scenario.
 - **Stage 3:** KAB backend-selected planner after backend selection chooses an eligible backend from task requirements, project policy, capability evidence, and user preference after gates.
 

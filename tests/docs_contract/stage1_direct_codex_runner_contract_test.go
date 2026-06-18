@@ -17,6 +17,9 @@ func TestStage1DirectCodexRunnerSOTDefinesSDKAppServerContract(t *testing.T) {
 		"completion notification and bounded polling/watch evidence",
 		"a single foreground Hermes terminal call whose tool timeout can kill the parent before metadata/output artifacts are flushed",
 		"thread_id",
+		"one Codex thread per KAS/KAH task",
+		"plan-only and plan-revision turns use effort `high` by default",
+		"implementation, feedback-fix, cleanup, and verification-support turns use effort `medium` by default",
 		"no-KAB-Codex rationale",
 		"Stage 2 KAB Codex-first",
 		"native_codex",
@@ -67,6 +70,17 @@ func TestStage1DirectCodexRunnerGuidanceWiredIntoSkillsAndTemplates(t *testing.T
 	requireContainsAll(t, "skills/kkachi-implement/SKILL.md", []string{
 		"Hermes-tracked background runner with completion notification and bounded polling/watch evidence",
 		"Foreground calls are acceptable for short preflight and bounded plan-only/review turns only",
+		"Use reasoning effort `medium` for non-plan Stage 1 turns by default",
+		"Do not bind Codex continuity to the Discord/Hermes chat session",
+	})
+	requireContainsAll(t, "skills/kkachi-plan/SKILL.md", []string{
+		"For plan-only turns, pass reasoning effort `high`",
+		"This thread continuity is task-bound and is not Discord-session-bound",
+	})
+	requireContainsAll(t, "skills/kkachi-prompt-compose/SKILL.md", []string{
+		"use reasoning effort `high` for plan-only turns",
+		"use `medium` for non-plan implementation/feedback/cleanup/verification-support turns",
+		"resume the task's recorded `thread_id`",
 	})
 }
 

@@ -60,7 +60,7 @@ Required runner behavior:
 3. Run with the real user home, for example `HOME=/Users/draccoon`, not a Hermes role-profile home.
 4. Accept explicit run inputs: project directory, phase, prompt/artifact path, sandbox mode, model/reasoning settings when policy allows, and optional prior `thread_id`.
 5. Use `Sandbox.read_only` for planning/review-like phases and `Sandbox.workspace_write` only for authorized mutation phases.
-6. Preserve `thread_id` and runner metadata in KAH artifacts so later phases can resume the correct Codex thread when appropriate.
+6. Preserve `thread_id` and runner metadata in KAH artifacts so later phases can resume the correct task-scoped Codex thread when appropriate.
 7. Write detailed backend output to the configured run artifact such as `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md` instead of dumping full detail into chat.
 8. Exit non-zero and fail closed on missing Codex CLI, missing `openai_codex`, missing prompt artifact, unsupported sandbox, stale approval evidence, missing writable artifact path, or Codex/app-server startup failure.
 9. For long-running implementation, feedback-fix, cleanup, and verification-support phases, invoke the runner through a supervised background process with completion notification and bounded polling/watch evidence. Do not run those phases as a single foreground Hermes terminal call whose tool timeout can kill the parent before metadata/output artifacts are flushed.
@@ -94,7 +94,22 @@ Default lifecycle:
 
 Thread continuity comes from `thread_id` and KAH artifacts, not from assuming a long-lived app-server remains running across phases. A persistent daemon may be explored only as a separate KAB/wrapper or explicit infrastructure task.
 
-### 5.1 Invocation supervision and timeout policy
+### 5.1 Task-scoped Codex thread and effort policy
+
+The desired Stage 1 continuity model is one Codex thread per KAS/KAH task:
+
+1. The first plan-only turn for a task starts a new Codex thread and records the returned `thread_id` in KAH artifacts.
+2. Plan revision, implementation, feedback-fix, cleanup, and verification-support turns for the same task resume that `thread_id` unless the thread is unavailable, unsafe, or explicitly superseded by a recorded exception.
+3. The next task starts a fresh Codex thread; threads are not reused across task boundaries merely because the Discord/Hermes chat session is the same.
+4. App-server process lifetime remains invocation-scoped in Stage 1: each runner call may start and clean up an SDK-managed `codex app-server --listen stdio://` subprocess. The durable continuity artifact is the Codex `thread_id`, not a hidden long-lived app-server process.
+
+Reasoning effort policy is phase-bound:
+
+- plan-only and plan-revision turns use effort `high` by default;
+- implementation, feedback-fix, cleanup, and verification-support turns use effort `medium` by default;
+- any explicit model override or effort deviation requires a task-specific rationale recorded in KAH artifacts.
+
+### 5.2 Invocation supervision and timeout policy
 
 Codex app-server itself may run longer than an ordinary shell command, but KAS must not treat an unbounded foreground shell call as durable execution. The operator-facing invocation policy is:
 

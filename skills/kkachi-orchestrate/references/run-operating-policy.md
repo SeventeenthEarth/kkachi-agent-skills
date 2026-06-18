@@ -8,6 +8,7 @@ This reference expands the operating-policy bullets in `../SKILL.md`.
   - Stage 1 direct Codex SDK/app-server runner via `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` (`openai_codex` -> `codex app-server --listen stdio://`), not `codex exec` or generic `openai` SDK
   - Stage 2 KAB Codex-first through `native_codex`
   - Stage 3 selected eligible KAB backend
+- Stage 1 Codex continuity is task-scoped: one task uses one recorded Codex `thread_id` across plan, implementation, feedback, cleanup, and verification-support turns when safe; the next task starts a new thread. Plan-only turns use effort `high`; non-plan turns use effort `medium`; deviations require artifacted rationale. This is not bound to the Discord/Hermes chat session, and the app-server subprocess may remain invocation-scoped.
 - Blue/Red/Orange/Gray supervise, review, record evidence, ask/answer, and verify. They must not directly author the plan or patch repository artifacts as a substitute for the selected implementer unless 주군 explicitly asks for direct role editing or the work is outside the roadmap/KAS+KAH path.
 - Record any exception and its no-Codex/backend rationale in KAH artifacts and the final report.
 
