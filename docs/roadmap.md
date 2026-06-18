@@ -6,7 +6,7 @@ Confirming role: Responsible approver / governance evidence record; INITDOC post
 Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced, KAH v0.1.10 workflow catalog promotion substrate released, KASROLE is the KAS v0.1.3 release baseline, and WFLOW epic completion is the KAS v0.1.4 release baseline
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/role-aware-project-suite-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/multi-agent-review-policy.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/role-aware-project-suite-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/multi-agent-review-policy.md`, `sot/policy-promotion-governance-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -58,6 +58,7 @@ INITDOC-003
   -> KASROLE-001..004
   -> WFLOW-002..004 paired with KAH DAGSM-001..003 (WFLOW-001 planning SOT already completed)
   -> MAR-001..005 paired with KAH MAREV-001..003 when MAR repository promotion is selected
+  -> POLPR-001..008 shared across KAS and KAH
 ```
 
 INITDOC is closed before implementation begins so the temporary transition SOT does not become new legacy. `BOOTSTRAP` should happen first because it gives later KAS work a deterministic KAH project state and doctor evidence. `STALECLEAN` may run in parallel with late CLIMVP/GRAPHMVP tasks only when the touched surfaces do not overlap.
@@ -289,6 +290,23 @@ TOKEN deferrals unless separately approved: Hermes runtime context-pruning chang
 | MAR-006 | Resolve KAH CLI through repo toolchain-aware KAS runner | In Review | KAS doctor, workflow-create, workflow-promote, workflow-trigger, and graphsync/workflow-graph repair KAH probes select `kkachi-agent-helper` through `KKACHI_KAH_BIN`, top-level `.kkachi/toolchain.yaml` `kah_cli_path`/`kah_cli`, repo `.kkachi/bin/kkachi-agent-helper`, then ambient PATH only when no explicit repo KAH selection exists. Explicit repo selection mismatch or missing binaries fail closed with source, expected version/path, resolved path, actual `--version` output when available, PATH-refusal reason, and durable recovery guidance. MAR provider `resolved_argv` overlay semantics remain distinct from KAH CLI selection, and KAS binary selection does not claim KAH deterministic evidence/gate behavior. | Targeted resolver and surface tests, docs-contract readback, `scripts/mar.py` compile check, `git diff --check`, and final review evidence before completion. |
 
 MAR deferrals unless separately approved: automatic PR inline comments, automatic code mutation, reviewer models running tests/builds/installs, model voting as authority, silent premium-provider fallback, broad replacement of required color review gates, KAB runtime activation as the default MAR path, and auth/token/provider/gateway/model mutation.
+
+
+### EPIC: POLPR — policy-promotion and workflow-governance alignment
+
+> Goal: promote the accepted KAS/KAH policy-promotion candidate lessons into durable KAS source policy, default workflow graph guidance, CLI/test contracts, skill mirrors, and companion KAH deterministic evidence support without widening KAH into policy ownership.
+>
+> Source of truth: `docs/sot/policy-promotion-governance-contract.md`. Paired KAH planning epic: `POLPR` in `kkachi-agent-helper/docs/roadmap.md` and KAH SOT `docs/sot/policy-promotion-helper-evidence.md`. Candidate-source evidence: `/Users/draccoon/Workspace/Hermes/17thHermes/40_outputs/projects/kkachi/2026-06-14-kas-policy-promotion-candidates.md`.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| POLPR-001 | Register KAS POLPR docs/SOT and roadmap epic | In Progress | `docs/sot/policy-promotion-governance-contract.md` names the epic, records source evidence, principles, cross-repo PR-candidate sequence, impact-map baseline, boundaries, and deferrals; KAS roadmap, docs index, and docs map register the SOT. | Docs readback, docs-map parse, `git diff --check`, repository tests or explicit blocker/degraded reason, and 주군 confirmation before treating the planning SOT as accepted. No source policy/code behavior is implemented by this task. |
+| POLPR-003 | Promote KAS review governance and policy cleanup | Planned | Promote plan/vet, color-review convergence, MAR-only review, official evidence boundary, project-Gray docs review, failed-test split, and Kanban watcher/CLI fallback rules into KAS policy/docs/skills. | Plan gate, impact map, Red/Orange/project-Gray review, stale wording scans, docs-contract tests, and no `GLM Octo` review wording in active KAS/KAH source policy. |
+| POLPR-004 | Align KAS default workflow graph and MAR phase naming | Planned | Update phase policy, graph registry/template, default configurable spine, and tests so active default workflows use `mar-review` rather than `octo-review`. | KAS graph/template tests, custom workflow preservation evidence, and no universal forced graph shape; KAH companion is `POLPR-005`. |
+| POLPR-006 | Add KAS agent-instruction lifecycle and test-layer contract | Planned | Add/align `AGENTS.md` / `CLAUDE.md` lifecycle contract, CLI/help/test expectations, unit/integration/e2e taxonomy, e2e isolation rules, and failed-test repair ownership. | CLI/docs tests, dry-run/apply hash contract evidence, explicit managed-block behavior, and no profile/runtime mutation without approval. |
+| POLPR-008 | Mirror accepted policy, stale-scan, and close rollout | Planned | Mirror accepted source policy into KAS skills/profile guidance, perform stale wording scans, verify docs-update impact-map/project-Gray guidance, and collect final review evidence. | Final stale scan, docs-update impact map, Red/Orange/project-Gray review closure, MAR evidence when required, and Blue final synthesis. |
+
+POLPR deferrals unless separately approved: profile skill installation, KAB activation, provider/gateway/auth/token/model mutation, push/release tagging, automatic review comments, automatic code mutation by reviewers, model voting as authority, warning-only MAR gate states, and universal forced workflow graphs.
 
 ## Deferred / non-MVP work
 
