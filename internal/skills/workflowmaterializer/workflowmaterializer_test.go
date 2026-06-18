@@ -132,9 +132,9 @@ func TestMaterializeFromCustomPacketRequiresApprovalAndMatchesHashBeforeWrite(t 
 		t.Fatalf("missing approval wrote run-local state: %v", err)
 	}
 
-	wrong := strings.Replace(approval, approval[len(approval)-1:], "0", 1)
+	wrong := approval[:len(approval)-1] + "0"
 	if wrong == approval {
-		wrong = strings.Replace(approval, approval[len(approval)-1:], "1", 1)
+		wrong = approval[:len(approval)-1] + "1"
 	}
 	result, err = MaterializeFromCustomPacket(Options{Project: project, RunID: "run-20260616T105614Z-4b0ebe11b67d", CustomWorkflowPacket: packetPath, Approval: wrong})
 	if err != nil {

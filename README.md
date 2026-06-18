@@ -11,7 +11,7 @@ backend execution, automated review-by-different-tool transport, KAB plan
 lifecycle, or bridge evidence, KHS must select a KAB backend lane, render the
 backend-specific prompt, call KAB, and preserve KAB runtime evidence.
 
-Maturity note: KAS v0.1.4 completes the WFLOW task-DAG workflow release lane. It remains an
+Maturity note: KAS v0.1.5 adds MAR role-first multi-agent review lane support on top of the v0.1.4 WFLOW task-DAG workflow release lane. It remains an
 early skill/process pack rather than a final polished product, but KAH graph,
 configurable-feedback, and workflow catalog promotion substrates are capability-evidenced. Real Hermes/Kkachi
 runs should mature KAS through captured evidence, project overlays, prompt/phase
