@@ -113,6 +113,17 @@ KHS must not:
 
 Boundary rule: KHS may recommend, explain, render, and propose. KAH validates and records deterministic state. KAB executes and observes backends. KHC/Hermes accepts risk and evidence. No layer may silently substitute for another layer.
 
+POLPR-003 review-governance boundary: for active KAS/KAH source policy,
+workflow, template, test, and shared skill mirror changes, KAS uses
+Blue+Red+Orange plan vet before implementation, resolves Red/Orange reviewers
+and project-Gray documentation/integrity review through the project/team role
+registry when applicable, and uses MAR as the only independent implementation
+review lane unless 주군 explicitly waives or replaces it before start and the
+decision is recorded in KAH/run evidence artifacts. `delegate_task`, temporary
+subagents, and
+ad hoc advisor notes are pre-review analysis only; KAH evidence, official color
+review, project-Gray review, and MAR artifacts remain the review record.
+
 ## 6. How Hermes uses KHS
 
 ### 6.1 Activation
@@ -202,9 +213,9 @@ Stage 2 is a transport migration from direct Codex app-server to KAB Codex. Stag
 
 The Stage 1 direct runner contract is detailed by `docs/sot/stage1-direct-codex-sdk-appserver-runner.md`. KAS Stage 1 support means a shared Python runner template at `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` uses `openai_codex` so the SDK starts `codex app-server --listen stdio://` and records direct runner evidence. Raw app-server transports and long-lived daemons are not ordinary Stage 1 KAS guidance; those belong to KAB/wrapper or explicit infrastructure work. When an installed/project marker selects Stage 2, the Stage 1 runner must not be used as a silent fallback.
 
-Fallback posture is fail-closed by default across the KAS/KAH development loop. Codex or KAB-authored plans must surface proposed fallback paths for Blue/Red review; Blue, Red, Orange, Gray, and optional MAR review must request removal of unnecessary fallback paths rather than preserve convenience behavior. A fallback is acceptable only when there is no safe direct handling, the fallback is narrowly bounded, evidence-backed, approval-safe, and very small to implement. If avoiding fallback is impossible and the required fallback would add broad code or new policy/state complexity, the run reports options to 주군 instead of quietly implementing it.
+Fallback posture is fail-closed by default across the KAS/KAH development loop. Codex or KAB-authored plans must surface proposed fallback paths for required plan review, including Blue synthesis plus Red and Orange plan-vet acceptance where policy requires it; Blue, Red, Orange, Gray, and optional MAR review must request removal of unnecessary fallback paths rather than preserve convenience behavior. A fallback is acceptable only when there is no safe direct handling, the fallback is narrowly bounded, evidence-backed, approval-safe, and very small to implement. If avoiding fallback is impossible and the required fallback would add broad code or new policy/state complexity, the run reports options to 주군 instead of quietly implementing it.
 
-MAR review is an independent feedback/review lane. It remains KAB GLM `MAR role review` with its existing trigger policy, preflight, prompt-confirmation, watcher/readback, feedback artifact, and post-MAR re-review requirements. The MAR prompt and permission handling must constrain the lane to requirements plus implemented code only: MAR may inspect requirement artifacts, task contracts, plans/checklists, diffs, implemented source, docs, existing test files as implemented code evidence, but must not run tests, linters, builds, installs, package managers, network probes, service starts, or runtime verification commands. Out-of-scope command requests are rejected and recorded; an MAR run that executes a forbidden command fails closed unless 주군 explicitly waives the boundary. Selecting GLM as a possible Stage 3 implementation backend does not satisfy or replace MAR review, and running MAR review does not imply GLM was the implementation backend.
+MAR review is an independent feedback/review lane. It remains a KAS role-first MAR lane with its existing trigger policy, preflight, prompt-confirmation, watcher/readback, feedback artifact, and post-MAR re-review requirements. The MAR prompt and permission handling must constrain the lane to requirements plus implemented code only: MAR may inspect requirement artifacts, task contracts, plans/checklists, diffs, implemented source, docs, existing test files as implemented code evidence, but must not run tests, linters, builds, installs, package managers, network probes, service starts, or runtime verification commands. Out-of-scope command requests are rejected and recorded; an MAR run that executes a forbidden command fails closed unless 주군 explicitly waives the boundary and records the waiver in KAH/run evidence artifacts. Selecting any provider as a possible Stage 3 implementation backend does not satisfy or replace MAR review, and running MAR review does not imply that provider was the implementation backend.
 
 The active stage is a project/profile operating setting, not just prose in a
 single phase skill. KAS install or project application must choose the stage,

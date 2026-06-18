@@ -16,6 +16,8 @@ Git commits, chat memory, and implementation notes are not durable project docs.
 
 When a roadmap task is completed, update the roadmap only after implementation scope, verification, KAH evidence, and required review gates support completion. If completion confidence is insufficient, record `Blocked` or `In Progress` with the missing evidence instead of marking `Completed`. After docs changes that affect generated outputs, examples, or tested contracts, run the selected verification profile/gate command or the repository's docs validation target.
 
+For active KAS/KAH policy, workflow, template, test, or shared skill mirror docs work, preserve a docs impact map and require project-Gray documentation/integrity review through the project role/registry. The review checks authority ladder, source trace, stale terminology, and cross-doc consistency; do not hard-code the role to an individual.
+
 ## Outputs
 
 - `docs-update.md`

@@ -8,9 +8,9 @@ This reference expands the planner-lane procedure in `../SKILL.md`.
 2. Ask the Stage 1 direct Codex SDK/app-server runner planner (`templates/runners/direct-codex-sdk-appserver-runner.py.tmpl`, `openai_codex` -> SDK-managed `codex app-server --listen stdio://`), Stage 2 KAB Codex planner, or Stage 3 selected KAB planner for a plan-only response; do not allow implementation before plan capture. Stage 1 planner evidence must not be `codex exec`, generic `openai` SDK output, raw app-server transport, or KAB `native_codex` evidence.
 3. Copy the fixed plan into `.kkachi/runs/<run_id>/plan.md` and normalize `checklist.md` from the plan plus the KHS phase contract.
 4. Blue vets the backend-produced plan for SOT alignment, acceptance criteria, evidence, phase rows, and verification clarity, but must not directly author or rewrite the substantive implementation plan unless 주군 explicitly requests direct Blue planning or the work is outside the roadmap/KAS+KAH path.
-5. Require Red plan vet/approval from 하후연 before implementation when the work is KAS/Kkachi code-development or another risk-bearing project run.
-6. Route Blue or Red `REQUEST_CHANGES` back to the same planner lane for a revised plan, then repeat Blue/Red vetting.
-7. Only after Blue+Red approval, approve or start the implementer backend.
+5. Require Red and Orange plan vet/approval before implementation when active KAS/KAH roadmap policy requires it for code-development, source policy, workflow, template, test, or shared skill mirror work. Resolve Red/Orange reviewers and Gray documentation/integrity review through the project/team role registry when applicable rather than hard-coded individuals.
+6. Route Blue, Red, Orange, or project-Gray `REQUEST_CHANGES` back to the same planner lane for a revised plan, then repeat the required vetting.
+7. Only after the required Blue+Red+Orange plan approval and Blue synthesis, approve or start the implementer backend.
 
 ## KAB plan capture rule
 

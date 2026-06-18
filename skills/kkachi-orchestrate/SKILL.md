@@ -63,9 +63,9 @@ This full spine is the default only for `development` tasks. Path B replaces pro
 - Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when that lane is explicitly authorized and recorded; do not claim KAB runtime support in those cases.
 - `ask`, `request-feedback-1`, `handle-feedback-1`, and `final-verify` are mandatory for every KHS run. `optimize` is conditional but strongly recommended for code-change runs, and skipping it requires a reason.
 - Feedback runs at least once and at most five rounds. Round 1 is the normal first color review/feedback round. Rounds 2..5 are optional continuation rounds, and each requested feedback round must have a matching handle-feedback round.
-- MAR review is required for `development` / implementation tasks after first color review and feedback handling, unless the master explicitly waives or replaces MAR before start. MAR is a role-first independent review lane for `logic`, `security`, `arch`, `cve`, and `test_adequacy`; unresolved required role coverage fails closed. For non-implementation durable-change runs, run MAR when the master explicitly requests independent review, a project-local approved workflow declares it required, or a recorded high-risk policy gate opts in.
+- MAR review is required for `development` / implementation tasks after first color review and feedback handling, unless the master explicitly waives or replaces MAR before start and the decision is recorded in KAH/run evidence artifacts. MAR is a role-first independent review lane for `logic`, `security`, `arch`, `cve`, and `test_adequacy`; unresolved required role coverage fails closed. For non-implementation durable-change runs, run MAR when the master explicitly requests independent review, a project-local approved workflow declares it required, or a recorded high-risk policy gate opts in.
 
-See `references/run-operating-policy.md` for the full Stage 1/2/3 lane ownership rules, Blue/Red plan-vet loop, fallback-audit expectations, and the MAR review details.
+See `references/run-operating-policy.md` for the full Stage 1/2/3 lane ownership rules, required plan-vet loop, fallback-audit expectations, and the MAR review details.
 
 ## Implementation approval policy
 

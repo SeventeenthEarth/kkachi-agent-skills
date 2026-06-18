@@ -13,13 +13,13 @@ This reference expands the operating-policy bullets in `../SKILL.md`.
 
 ## Plan-vet loop
 
-- Blue and Red own the plan vet/approval gate.
-- Blue asks the selected planner lane for a plan-only draft; the backend returns the plan; Blue and Red vet it; any `REQUEST_CHANGES` goes back to the same planner lane for revision; only Blue+Red approval unlocks implementation.
-- Do not let Blue or Red rewrite the substantive plan as a shortcut.
+- Blue owns synthesis, with Red and Orange plan vet required for active KAS/KAH roadmap source policy, workflow, template, test, or shared skill mirror work. Red/Orange plan-vet reviewers and project-Gray documentation/integrity review are resolved through the project/team role registry when applicable, not hard-coded to individuals.
+- Blue asks the selected planner lane for a plan-only draft; the backend returns the plan; required reviewers vet it; any `REQUEST_CHANGES` goes back to the same planner lane for revision; only required approval unlocks implementation.
+- Do not let Blue, Red, Orange, or Gray rewrite the substantive plan as a shortcut.
 
 ## Fallback audit policy
 
-- Blue/Red plan vet and later color reviews must include fallback audit.
+- Blue+Red+Orange plan vet and later color reviews must include fallback audit when active KAS/KAH roadmap policy requires those plan reviewers.
 - The preferred outcome is no fallback and fail-closed behavior for missing capability, evidence, approval, or safe state.
 - Accept fallback only when it is unavoidable, bounded, evidence-backed, approval-safe, and very small.
 - Broad fallback design or unclear policy must be reported to 주군 for a decision instead of merged into the run silently.
@@ -28,11 +28,14 @@ This reference expands the operating-policy bullets in `../SKILL.md`.
 
 - First color review is the default review gate for every active KAS/KAH run that creates or changes durable repository artifacts, even when the task class is `docs_only`, `research_evidence`, `bootstrap_config`, or `collaboration_review`.
 - Capture Blue self-review plus durable Red/Orange/Gray role-review evidence, or mark the review phase `not_applicable` with a concrete reason only for pure read-only/direct command runs where no durable project artifact changed.
+- `delegate_task`, temporary subagents, and ad hoc advisor notes are pre-review analysis only. They do not substitute for official color review, MAR role coverage, project-Gray documentation/integrity review, or KAH evidence.
+- For async review fan-in, attach the watcher as a mechanical observer only. If direct Kanban tools are absent, use the durable Hermes Kanban CLI surface before declaring review unavailable.
 - Logical backend roles are planner (`plan`, `ask`), implementer (`implement`, `enhance-test`, `optimize`, `docs-update`, `handle-feedback`), and feedback (`request-feedback`). They may map to the same or different physical backends.
 
 ## MAR review policy
 
-- MAR review is mandatory for `development` / implementation tasks unless 주군 explicitly waives or replaces it before start.
+- MAR review is mandatory for `development` / implementation tasks unless 주군 explicitly waives or replaces it before start and the decision is recorded in KAH/run evidence artifacts.
+- For active KAS/KAH source policy, workflow, template, test, and shared skill mirror work, MAR is the only independent implementation review lane. Do not promote GLM Octo as a default, optional, fallback, or legacy review path in active artifacts.
 - MAR must use role-first required coverage for `logic`, `security`, `arch`, `cve`, and `test_adequacy` with declared primary/secondary provider lanes.
 - Provider preflight/toolchain proof, bounded raw-output artifacts, parsed findings, merge pack, Blue disposition, and any Red adjudication handoff must be preserved as evidence.
 - Provider availability, prompt rendering, dispatch success, degraded providers, failed providers, or unresolved required roles never count as clean review completion.

@@ -85,6 +85,43 @@ Hermes may auto-start low-risk work after notifying the master. Explicit master 
 - low confidence
 - unresolved ask-phase ambiguity
 
+## KAS/KAH roadmap policy review governance
+
+For active KAS/KAH roadmap policy, workflow, template, test, or shared skill
+mirror work, implementation starts only after the backend-authored plan has
+Blue synthesis plus Red and Orange plan-vet acceptance. Red/Orange reviewers
+and Gray documentation/integrity review are resolved through the project/team
+role registry when applicable, not hard-coded to individuals. Any requested plan
+change returns to the same selected planner lane before implementation.
+
+Official review evidence is limited to recorded color review, MAR role review,
+project-Gray review, KAH artifacts, and accepted run evidence. `delegate_task`
+calls, temporary subagents, and ad hoc advisor notes may support pre-review
+analysis, but they are not official Red/Orange/Gray color review or MAR
+evidence.
+
+MAR is the only independent implementation review lane for active KAS/KAH
+source policy, workflow, template, test, and shared skill mirror changes unless
+주군 explicitly waives or replaces it before the run starts and the decision is
+recorded in KAH/run evidence artifacts. Do not promote GLM Octo as a default,
+optional, fallback, or legacy independent-review path in active KAS/KAH
+artifacts.
+
+When verification fails, Blue owns compact triage: reproduce or classify the
+failure, route it to the selected implementer lane, and accept or reject the
+resulting fix. The selected implementer owns detailed RCA, code/docs mutation,
+and rerunning the affected verification.
+
+For asynchronous review fan-in, attach the watcher only as an observer. When
+direct Kanban tools are absent, check and use the durable Hermes Kanban CLI
+surface before declaring review unavailable. Do not substitute `delegate_task`
+or temporary subagents for official review cards or verdicts.
+
+Fallback behavior fails closed by default. Do not add fallback behavior unless
+it is necessary, bounded, evidenced, small, and accepted through the plan/review
+path; otherwise stop and report the policy choice instead of silently widening
+the system.
+
 ## Enhance-test and optimize
 
 - `enhance-test` is conditional; skipping requires a reason when no test enhancement is useful or feasible.

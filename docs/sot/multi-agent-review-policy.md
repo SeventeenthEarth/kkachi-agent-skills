@@ -26,6 +26,22 @@ Required roles are logic, security, arch, cve, and test_adequacy; providers are 
 Model consensus is advisory; Blue/Red disposition is authority.
 ```
 
+## POLPR-003 official evidence boundary
+
+For active KAS/KAH source policy, workflow, template, test, and shared skill
+mirror work, MAR is the only independent implementation review lane unless
+주군 explicitly waives or replaces it before start and the decision is recorded
+in KAH/run evidence artifacts. KAS/KAH artifacts must not
+promote GLM Octo as a default, optional, fallback, or legacy independent-review
+path.
+
+`delegate_task`, temporary subagents, and other ad hoc advisor surfaces may be
+used only as pre-review analysis. They do not count as official Red/Orange/Gray
+color review, project-Gray documentation/integrity review, MAR role coverage,
+or KAH review evidence. Official evidence requires review cards/artifacts,
+bounded raw outputs where applicable, parsed findings, Blue disposition, and
+the recorded verdict path.
+
 ## Task split and promotion boundary
 
 MAR promotion is intentionally split so planning documents do not overclaim implementation.

@@ -26,10 +26,10 @@ Use this template for 주군-facing Kkachi/KAS reports before asking for commit 
    - This section is required for KAS/KAH runs with durable repo/artifact changes, even when the task is not implementation.
 
 6. `MAR Review 및 개선`
-   - For implementation tasks, include MAR role-coverage evidence or an explicit 주군 waiver/blocker. For non-implementation tasks, state whether MAR was requested/declared/run, or mark `해당 없음` with the reason when MAR was not part of the active policy.
+   - For implementation tasks, include MAR role-coverage evidence or an explicit 주군 waiver/blocker recorded in KAH/run evidence artifacts. For non-implementation tasks, state whether MAR was requested/declared/run, or mark `해당 없음` with the reason when MAR was not part of the active policy.
    - When MAR ran, include run id, provider toolchain/preflight evidence, required role coverage for `logic`, `security`, `arch`, `cve`, and `test_adequacy`, primary/secondary provider attempts, bounded raw-output artifact paths, merge pack path, Blue disposition path, and verdict.
    - Summarize MAR findings by severity and disposition: fixed/deferred/rejected.
-   - If provider availability, prompt rendering, or dispatch success is the only evidence, keep the gate failed or blocked unless 주군 gave an explicit waiver.
+   - If provider availability, prompt rendering, or dispatch success is the only evidence, keep the gate failed or blocked unless 주군 gave an explicit waiver recorded in KAH/run evidence artifacts.
 
 7. `재리뷰 및 개선 확인`
    - Required for implementation tasks after MAR feedback changes the work, and for any other task when MAR or another later feedback round changed the work after first color review; otherwise mark `해당 없음` with the reason.

@@ -82,7 +82,7 @@ task_classification_policy:
     - "Do not apply the full development spine to read-only research, evidence collection, simple command/report, or pure docs tasks."
     - "Every skipped development phase must have an explicit reason in task-contract.yaml, phase-plan.yaml, checklist.md, and final report."
     - "Simple command/report tasks normally stay outside KHS unless the master explicitly keeps them inside a KHS/KAH run."
-    - "Long-lived team-member collaboration uses Kanban evidence; temporary subagents do not count as team-member delegation."
+    - "Long-lived team-member collaboration uses Kanban evidence; temporary subagents and delegate_task do not count as team-member delegation, official color review, MAR role coverage, or project-Gray documentation/integrity review."
     - "State investigation that only reports current facts maps to research_evidence; changing spec/SOT/roadmap/handoff from that evidence maps to docs_only + Path B unless it also changes executable behavior or execution policy."
     - "If a docs-only task changes architecture, process policy, contracts, roadmap status, or examples that tests validate, require docs validation and consider CodeGraph refresh."
     - "SOT aliases are accepted only through the explicit mapping simple_report/simple_command_report, investigation/research_evidence, review/collaboration_review, and docs_only/docs_only."

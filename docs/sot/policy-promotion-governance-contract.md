@@ -34,7 +34,7 @@ When shared numbering is approved, each roadmap should list only the tasks owned
 
 ## Promotion principles
 
-1. **Plan-first implementation gate:** roadmap/source-policy changes that affect KAS/KAH development flow require a plan artifact, impact map, Blue vet, Red technical review, and Orange operator-value review before implementation starts.
+1. **Plan-first implementation gate:** roadmap/source-policy changes that affect KAS/KAH development flow require a plan artifact, impact map, Blue vet, and Red/Orange plan-vet review before implementation starts. Red/Orange reviewers are resolved from the active project/team role registry when that registry exists, rather than hard-coded to individuals.
 2. **MAR-only independent review:** KAS/KAH source policy, workflow phases, templates, tests, and skill mirrors must not promote `GLM Octo` review wording. Independent review is MAR-only unless 주군 explicitly authorizes a separate non-KAS/KAH legacy note.
 3. **Official review evidence boundary:** `delegate_task`, temporary subagents, local helper processes, and draft model feedback are not official color-review or MAR evidence. Official long-lived routing uses Kanban/KAH evidence and named review artifacts.
 4. **Default, configurable workflow spine:** KAS may define a no-input default development workflow, but project-specific/custom graphs remain supported when they pass the applicable KAS/KAH supportability envelope.
