@@ -30,7 +30,7 @@ This document records the current user-confirmed KHS behavior for software-devel
 - Hermes does not normally author production code inside a KHS run.
 - KHS defines three logical backend roles:
   - planner: `plan`, `ask`
-  - implementer: `implement`, `enhance-test`, `optimize`, `docs-update`, `handle-feedback`
+  - implementer: `implement`, `enhance-test`, `ai-slop-cleaner`, `optimize`, `docs-update`, `handle-feedback`
   - feedback: `request-feedback`
 - These logical roles may map to one physical KAB backend/session or to different backends according to project policy, user preference, Hermes judgment, and capability evidence.
 
@@ -43,9 +43,20 @@ This document records the current user-confirmed KHS behavior for software-devel
 
 ## Canonical phase spine
 
+The active default/base development workflow graph is:
+
 ```text
-plan -> ask -> implement -> enhance-test -> optimize -> docs-update -> request-feedback -> handle-feedback -> final-verify -> improve
+intake -> sot -> roadmap -> task-classification -> plan -> vet -> ask -> implement -> enhance-test -> ai-slop-cleaner -> optimize -> docs -> verify -> review -> request-feedback-1 -> handle-feedback-1 -> mar-review -> second-color-review -> final
 ```
+
+This is the no-input/default KAS development template, not a universal forced
+shape. Project-specific `.kkachi-workflow.yaml` composition remains supported
+when selected and validated through capability-checked KAH graph evidence.
+The graph phase ids `docs`, `verify`, and `final` are intentional graph-facing
+names. Older phase-contract and skill/activity aliases such as `update_docs`
+and `final_verify` may still appear in compatibility surfaces until downstream
+POLPR-008/POLPR-005 reconciliation, but they do not rename the active default
+graph phases for POLPR-004.
 
 Mandatory for every KHS run:
 
@@ -53,9 +64,14 @@ Mandatory for every KHS run:
 - `ask`
 - `request-feedback-1`
 - `handle-feedback-1`
-- `final-verify`
+- `mar-review`
+- `final` graph phase; `final-verify` is only the skill/activity alias where
+  older phase-contract wording still requires it
 
-Conditional phases remain visible in `phase-plan.yaml` and `checklist.md`; skipped or not-applicable phases require explicit reasons.
+Required graph rows are required in the default/base template path. Run-local
+phase applicability can still be marked skipped or not-applicable with concrete
+reasons in `phase-plan.yaml` and `checklist.md`; POLPR-004 does not force one
+universal graph shape onto every run.
 
 ## Plan and checklist
 
@@ -103,9 +119,9 @@ evidence.
 MAR is the only independent implementation review lane for active KAS/KAH
 source policy, workflow, template, test, and shared skill mirror changes unless
 주군 explicitly waives or replaces it before the run starts and the decision is
-recorded in KAH/run evidence artifacts. Do not promote GLM Octo as a default,
-optional, fallback, or legacy independent-review path in active KAS/KAH
-artifacts.
+recorded in KAH/run evidence artifacts. Do not promote prior Octo-style review
+wording as a default, optional, fallback, or legacy independent-review path in
+active KAS/KAH artifacts.
 
 When verification fails, Blue owns compact triage: reproduce or classify the
 failure, route it to the selected implementer lane, and accept or reject the
@@ -122,9 +138,10 @@ it is necessary, bounded, evidenced, small, and accepted through the plan/review
 path; otherwise stop and report the policy choice instead of silently widening
 the system.
 
-## Enhance-test and optimize
+## Enhance-test, ai-slop-cleaner, and optimize
 
 - `enhance-test` is conditional; skipping requires a reason when no test enhancement is useful or feasible.
+- `ai-slop-cleaner` is conditional but part of the default development template; skipping requires a reason when no cleanup/refactor/deslop pass is useful or feasible.
 - For code-change runs, `optimize` is conditional but strongly recommended.
 - Optimize focuses on AI slop removal, duplicated logic, dead/verbose code, and small structural waste.
 - Skipping optimize in a code-change run requires a reason in both `phase-plan.yaml` and `checklist.md`.

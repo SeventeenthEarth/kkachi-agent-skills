@@ -35,7 +35,7 @@ When shared numbering is approved, each roadmap should list only the tasks owned
 ## Promotion principles
 
 1. **Plan-first implementation gate:** roadmap/source-policy changes that affect KAS/KAH development flow require a plan artifact, impact map, Blue vet, and Red/Orange plan-vet review before implementation starts. Red/Orange reviewers are resolved from the active project/team role registry when that registry exists, rather than hard-coded to individuals.
-2. **MAR-only independent review:** KAS/KAH source policy, workflow phases, templates, tests, and skill mirrors must not promote `GLM Octo` review wording. Independent review is MAR-only unless 주군 explicitly authorizes a separate non-KAS/KAH legacy note.
+2. **MAR-only independent review:** KAS/KAH source policy, workflow phases, templates, tests, and skill mirrors must not promote prior Octo-style review wording. Independent review is MAR-only unless 주군 explicitly authorizes a separate non-KAS/KAH legacy note.
 3. **Official review evidence boundary:** `delegate_task`, temporary subagents, local helper processes, and draft model feedback are not official color-review or MAR evidence. Official long-lived routing uses Kanban/KAH evidence and named review artifacts.
 4. **Default, configurable workflow spine:** KAS may define a no-input default development workflow, but project-specific/custom graphs remain supported when they pass the applicable KAS/KAH supportability envelope.
 5. **Repo-local agent-instruction lifecycle:** `AGENTS.md` and `CLAUDE.md` lifecycle work is a KAS repo/project command surface with dry-run/apply hash discipline and managed-block preservation; it is distinct from Hermes profile-local skill installation.
@@ -57,7 +57,7 @@ When shared numbering is approved, each roadmap should list only the tasks owned
 | `POLPR-005` | KAH default phase-plan and MAR naming support | Update KAH default phase-plan support/tests from `octo-review` to `mar-review` without making KAH the policy owner. | KAH repo PR; custom workflows remain supportability-based. |
 | `POLPR-006` | KAS agent-instruction lifecycle and test-layer contract | Add/align `AGENTS.md` / `CLAUDE.md` lifecycle contract, help/test expectations, test taxonomy, e2e isolation, and failed-test repair rules. | KAH evidence fields remain separate in `POLPR-007` if needed. |
 | `POLPR-007` | KAH deterministic docs/test/review evidence support | Add deterministic evidence labels or docs wording only if KAH surfaces need to record impact-map, project-Gray, test-layer, or failed-test ownership fields. | Evidence presence/shape only; KAS owns policy and reviewer meaning. |
-| `POLPR-008` | KAS skill mirror, stale scan, and rollout closure | Mirror accepted source policy into KAS skills/profile guidance, perform stale `GLM Octo`/compressed workflow/docs-impact scans, and collect final review evidence. | Validate KAH companion docs/tests are aligned and no stale KAH `GLM Octo` review wording remains. |
+| `POLPR-008` | KAS skill mirror, stale scan, and rollout closure | Mirror accepted source policy into KAS skills/profile guidance, perform stale legacy-review/compressed workflow/docs-impact scans, and collect final review evidence. | Validate KAH companion docs/tests are aligned and no stale KAH legacy-review wording remains. |
 
 ## Impact map baseline
 

@@ -91,6 +91,20 @@ Each future `templates[]` entry must provide these fields:
 
 Allowed `applicability` values are `required`, `conditional`, `optional`, and `not_applicable`. Required phases must have a gate or evidence artifact. Conditional phases must name the condition. Phase ids should align with `registries/phase-contracts.yaml` unless the registry entry explicitly marks a compatibility exception.
 
+For the active `kas-default` POLPR-004 template, `required` means required in
+the default/base graph template path. It is not a universal applicability claim
+for every run-local `phase-plan.yaml`: a run may still mark a phase skipped or
+not_applicable with a concrete KAH phase-plan reason when the selected task
+class or approved project graph warrants it.
+
+The active `kas-default` template intentionally uses graph-facing phase ids
+such as `docs`, `verify`, `final`, and kebab-case ids such as
+`enhance-test`, `request-feedback-1`, and `handle-feedback-1`. Older
+`registries/phase-contracts.yaml` and skill/activity aliases may use activity
+names such as `update_docs` and `final_verify`. That translation is an explicit
+POLPR-004 compatibility exception; downstream reconciliation remains
+POLPR-008/POLPR-005 if needed.
+
 `edges[]` entries must include `from`, `to`, and `type`. Allowed edge types are `sequence`, `conditional`, and `feedback_loop`. Every edge endpoint must reference a declared phase id. Cycles are forbidden except explicit feedback loops with a bounded maximum round count.
 
 ## Gate and approval rules

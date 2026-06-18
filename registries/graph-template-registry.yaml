@@ -76,7 +76,7 @@ templates:
         - hahuyeon
         - yeomong
         - jingung
-    summary: Default KAS MVP workflow graph template for capability-checked KAH graph initialization.
+    summary: Default KAS development workflow graph template for capability-checked KAH graph initialization; custom project workflows remain supportable.
     compatibility:
       kah_min_version: 0.1.4
       required_capabilities:
@@ -88,6 +88,12 @@ templates:
         - kkachi-agent-helper graph apply
         - kkachi-agent-helper graph export
         - workflow_graph_configurable_feedback_intake
+      phase_id_translation:
+        policy: "POLPR-004 compatibility exception: graph phase ids are the canonical kas-default graph ids, while older phase-contract/skill activity aliases remain translation-only until POLPR-008/POLPR-005 reconciliation."
+        aliases:
+          docs: update_docs
+          final: final_verify
+        required_scope: "Required phases are required in the default/base kas-default template path; run-local phase-plan applicability may still be skipped or not_applicable with concrete KAH policy reasons."
     phases:
       - id: intake
         applicability: required
@@ -101,10 +107,18 @@ templates:
         applicability: required
         owner_role: hwangchung
         evidence_artifact: roadmap-update.md
+      - id: task-classification
+        applicability: required
+        owner_role: hwangchung
+        evidence_artifact: intake-classification.md
       - id: plan
         applicability: required
         owner_role: planner_backend
         evidence_artifact: plan.md
+      - id: vet
+        applicability: required
+        owner_role: hwangchung
+        evidence_artifact: review.md
       - id: ask
         applicability: required
         owner_role: planner_backend_plus_hwangchung
@@ -113,10 +127,30 @@ templates:
         applicability: required
         owner_role: implementer_backend
         evidence_artifact: impl-log.md
+      - id: enhance-test
+        applicability: required
+        owner_role: implementer_backend
+        evidence_artifact: enhance-test.md
+      - id: ai-slop-cleaner
+        applicability: required
+        owner_role: implementer_backend
+        evidence_artifact: ai-slop-cleaner.md
       - id: optimize
         applicability: required
         owner_role: implementer_backend
         evidence_artifact: improvement-note.md
+      - id: docs
+        applicability: required
+        owner_role: hwangchung
+        evidence_artifact: docs-update.md
+      - id: verify
+        applicability: required
+        owner_role: hwangchung
+        evidence_artifact: verification.md
+      - id: review
+        applicability: required
+        owner_role: color_reviewers
+        evidence_artifact: review.md
       - id: request-feedback-1
         applicability: required
         owner_role: feedback_backend
@@ -125,18 +159,14 @@ templates:
         applicability: required
         owner_role: implementer_backend
         evidence_artifact: handle-feedback-1.md
-      - id: review
+      - id: mar-review
         applicability: required
-        owner_role: hahuyeon
-        evidence_artifact: review.md
-      - id: verify
+        owner_role: mar_reviewers
+        evidence_artifact: mar-review.md
+      - id: second-color-review
         applicability: required
-        owner_role: hwangchung
-        evidence_artifact: verification.md
-      - id: docs
-        applicability: required
-        owner_role: hwangchung
-        evidence_artifact: docs-update.md
+        owner_role: color_reviewers
+        evidence_artifact: second-color-review.md
       - id: final
         applicability: required
         owner_role: hwangchung
@@ -149,33 +179,51 @@ templates:
         to: roadmap
         type: sequence
       - from: roadmap
+        to: task-classification
+        type: sequence
+      - from: task-classification
         to: plan
         type: sequence
       - from: plan
+        to: vet
+        type: sequence
+      - from: vet
         to: ask
         type: sequence
       - from: ask
         to: implement
         type: sequence
       - from: implement
+        to: enhance-test
+        type: sequence
+      - from: enhance-test
+        to: ai-slop-cleaner
+        type: sequence
+      - from: ai-slop-cleaner
         to: optimize
         type: sequence
       - from: optimize
+        to: docs
+        type: sequence
+      - from: docs
+        to: verify
+        type: sequence
+      - from: verify
+        to: review
+        type: sequence
+      - from: review
         to: request-feedback-1
         type: sequence
       - from: request-feedback-1
         to: handle-feedback-1
         type: sequence
       - from: handle-feedback-1
-        to: review
+        to: mar-review
         type: sequence
-      - from: review
-        to: verify
+      - from: mar-review
+        to: second-color-review
         type: sequence
-      - from: verify
-        to: docs
-        type: sequence
-      - from: docs
+      - from: second-color-review
         to: final
         type: sequence
     gates:
@@ -187,8 +235,12 @@ templates:
           - sot-basis.md
           - roadmap-update.md
           - plan.md
+          - enhance-test.md
+          - ai-slop-cleaner.md
           - impl-log.md
           - review.md
+          - mar-review.md
+          - second-color-review.md
           - verification.md
           - docs-update.md
           - final-report.md
@@ -233,9 +285,9 @@ templates:
       init_profile_allowed: false
       kah_graph_alias_authoritative: false
       temp_repo_verification_required: true
-      expected_phase_count: 13
-      expected_edge_count: 12
-      phase_path_note: Mirrors the KAH 0.1.4 built-in khs-default graph path; enhance-test remains a phase-contract policy concern until KAH graph schema exposes it as a separate phase.
+      expected_phase_count: 19
+      expected_edge_count: 18
+      phase_path_note: Mirrors the active kas-default template MAR development spine with graph ids docs, verify, and final; older activity aliases such as update_docs and final_verify are translation-only compatibility names. Custom project workflows remain supportable and must not be replaced without proposal/apply approval evidence.
     evidence_contract:
       canonical_artifact: templates/run-artifacts/graph-evidence.md.tmpl
       run_artifact_path: graph-evidence.md

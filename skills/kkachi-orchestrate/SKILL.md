@@ -50,10 +50,10 @@ Detailed phase content is artifact-first. Use `.kkachi/runs/<run_id>/artifacts/<
 ## Default phase spine
 
 ```text
-plan -> ask -> implement -> enhance-test -> optimize -> docs-update -> request-feedback -> handle-feedback -> final-verify -> improve
+intake -> sot -> roadmap -> task-classification -> plan -> vet -> ask -> implement -> enhance-test -> ai-slop-cleaner -> optimize -> docs -> verify -> review -> request-feedback-1 -> handle-feedback-1 -> mar-review -> second-color-review -> final
 ```
 
-This full spine is the default only for `development` tasks. Path B replaces production code implementation with shaping, SOT, roadmap, acceptance, and handoff artifacts until Path A gates pass.
+This full spine is the default/base graph only for no-input `development` tasks. It must not be forced onto custom project workflows or non-development task classes. Its graph phase ids are `docs`, `verify`, and `final`; older activity aliases such as `update_docs` and `final_verify` are translation-only compatibility names. Path B replaces production code implementation with shaping, SOT, roadmap, acceptance, and handoff artifacts until Path A gates pass.
 
 ## Operating policy
 
@@ -61,7 +61,7 @@ This full spine is the default only for `development` tasks. Path B replaces pro
 - All terminal commands for an active KAS/KAH run must execute with the real user home, not a Hermes role/profile home. Use `HOME=<real-user-home> ...` in reusable prompts/artifacts, including Git, tests, KAH/KAB/Hermes/Kanban commands, and Codex probes.
 - KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. Stage 1 direct Codex SDK/app-server work uses `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` and is a no-KAB-Codex lane unless the task explicitly selects KAB Codex; do not substitute `codex exec` or generic `openai` SDK evidence. Stage 2 replaces that direct Codex transport with KAB Codex-first execution; Stage 3 enables capability-gated backend selection among eligible KAB backends.
 - Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when that lane is explicitly authorized and recorded; do not claim KAB runtime support in those cases.
-- `ask`, `request-feedback-1`, `handle-feedback-1`, and `final-verify` are mandatory for every KHS run. `optimize` is conditional but strongly recommended for code-change runs, and skipping it requires a reason.
+- `ask`, `request-feedback-1`, `handle-feedback-1`, `mar-review`, and the `final` graph phase are mandatory in the default/base KHS development graph unless a recorded policy decision says otherwise; `final-verify` is only the skill/activity alias where older phase-contract wording still requires it. `ai-slop-cleaner` and `optimize` are conditional but strongly recommended for code-change runs, and skipping either requires a reason.
 - Feedback runs at least once and at most five rounds. Round 1 is the normal first color review/feedback round. Rounds 2..5 are optional continuation rounds, and each requested feedback round must have a matching handle-feedback round.
 - MAR review is required for `development` / implementation tasks after first color review and feedback handling, unless the master explicitly waives or replaces MAR before start and the decision is recorded in KAH/run evidence artifacts. MAR is a role-first independent review lane for `logic`, `security`, `arch`, `cve`, and `test_adequacy`; unresolved required role coverage fails closed. For non-implementation durable-change runs, run MAR when the master explicitly requests independent review, a project-local approved workflow declares it required, or a recorded high-risk policy gate opts in.
 

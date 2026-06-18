@@ -266,7 +266,7 @@ orchestrate
   -> optimize(duplication, abstraction, algorithm/structure) / selected verification profile or gate
   -> docs-update / roadmap-update
   -> Blue first review / request-feedback(하후연, 여몽, 진궁 when required) / handle-feedback
-  -> verify / final-verify
+  -> verify / final graph phase (final-verify skill alias)
   -> improve
 ```
 
