@@ -12,7 +12,7 @@ Scope: KAS MAR policy, skill, prompt templates, reviewer matrix, premium escalat
 
 Kkachi Multi-Agent Review (MAR) is the planned lightweight KAS-local review lane for routine Kkachi development review. It collects specialized AI reviewer outputs, preserves full evidence through KAH artifacts, and returns a compact merge pack plus Blue disposition path. MAR is advisory evidence; Blue disposition and conditional Red adjudication remain the authority.
 
-This repository document promotes the accepted output SOT into KAS planning authority. Current source evidence covers the `kkachi-multi-agent-review` scaffold, local `scripts/mar.py` fixture/mock/read-only surfaces, provider-run fail-closed surfaces, and role-first registry/script work under review. It does not claim that KAH gates or installed runtime behavior exist until the follow-up implementation tasks complete with evidence.
+This repository document promotes the accepted output SOT into KAS planning authority. Current source evidence covers the `kkachi-multi-agent-review` scaffold, local `scripts/mar.py` fixture/mock/read-only surfaces, provider-run fail-closed surfaces, and role-first registry/script work implemented in source. It does not claim that KAH gates or installed runtime behavior exist until the follow-up implementation tasks complete with evidence.
 
 ## Canonical operating rule
 
