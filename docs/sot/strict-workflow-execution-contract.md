@@ -97,7 +97,7 @@ Unexpected node ids should not be appended and then rolled back. The default saf
 | Task ID | Repo | Title | Status | Outcome |
 |---|---|---|---|---|
 | `STRICT-001` | KAS | Strict workflow execution SOT and roadmap registration | Completed | Registered the shared epic, KAS policy contract, KAH companion SOT link, and cross-repo PR-candidate sequence. |
-| `STRICT-002` | KAH | Workflow-managed run marker and strict final-gate mode | Planned | Workflow-managed runs fail final when the KAH workflow instance is absent or mismatched. |
+| `STRICT-002` | KAH | Workflow-managed run marker and strict final-gate mode | In Progress | KAH source-side implementation adds workflow-managed run markers and final-gate missing-marker/absence/mismatch failures; review/final closeout remains pending before the shared sequence advances to `STRICT-003`. |
 | `STRICT-003` | KAS | Classification route/trigger mandatory orchestration | Planned | Classified KAS/KAH runs must route, materialize/resume, and record selected workflow evidence before dispatch. |
 | `STRICT-004` | KAH | Node claim ledger and transition-order verification | Planned | KAH records/verifies append-only node transition order against the selected DAG. |
 | `STRICT-005` | KAS | Dispatch packet expected-revision and node execution guard | Planned | Dispatch packets include current revision/ready-node evidence and require KAH start success before backend/agent work. |
@@ -122,4 +122,4 @@ Unexpected node ids should not be appended and then rolled back. The default saf
 
 ## Next action
 
-After responsible review of `STRICT-001`, implement `STRICT-002` in KAH so workflow-managed runs fail closed when the workflow instance is absent or mismatched.
+Complete review/final closeout for KAH `STRICT-002`; after acceptance, advance to KAS `STRICT-003` so classification route/trigger becomes mandatory before dispatch.
