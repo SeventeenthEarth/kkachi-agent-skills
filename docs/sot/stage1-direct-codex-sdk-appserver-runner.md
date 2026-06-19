@@ -62,7 +62,7 @@ Required runner behavior:
 5. Use `Sandbox.read_only` for planning/review-like phases and `Sandbox.workspace_write` only for authorized mutation phases.
 6. Preserve `thread_id` and runner metadata in KAH artifacts so later phases can resume the correct task-scoped Codex thread when appropriate.
 7. Write detailed backend output to the configured run artifact such as `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md` instead of dumping full detail into chat.
-8. Exit non-zero and fail closed on missing Codex CLI, missing `openai_codex`, missing prompt artifact, unsupported sandbox, stale approval evidence, missing writable artifact path, or Codex/app-server startup failure.
+8. Exit non-zero and fail closed on missing Codex CLI, missing `openai_codex`, missing prompt artifact, unsupported sandbox, stale approval evidence, missing writable artifact path, invalid workflow dispatch packet, stale KAH start revision, KAH start/complete failure, or Codex/app-server startup failure.
 9. For long-running implementation, feedback-fix, cleanup, and verification-support phases, invoke the runner through a supervised background process with completion notification and bounded polling/watch evidence. Do not run those phases as a single foreground Hermes terminal call whose tool timeout can kill the parent before metadata/output artifacts are flushed.
 10. Foreground runner invocation is acceptable only for short preflight and bounded plan-only/review turns. If an implementation turn exceeds the current foreground budget, restart or continue it through the supervised background pattern rather than increasing a foreground timeout as a substitute for process supervision.
 
@@ -88,9 +88,11 @@ Default lifecycle:
 1. KAS/KAH create or select the run artifact paths.
 2. KAS renders the prompt and runner invocation record.
 3. The runner starts an SDK-managed Codex app-server subprocess for the invocation.
-4. The runner starts or resumes a Codex thread and executes the turn.
-5. The runner records output, metadata, and evidence paths.
-6. The runner exits and lets the SDK clean up the app-server child process.
+4. When a workflow dispatch packet is supplied, the runner validates `expected_start_revision` and calls KAH `workflow node start --expect-revision` before any Codex `thread.run`.
+5. The runner starts or resumes a Codex thread and executes the turn only after KAH start succeeds.
+6. The runner records output, metadata, and evidence paths.
+7. When a workflow dispatch packet is supplied, the runner calls KAH `workflow node complete --expect-revision` using the post-start revision from KAH start; if KAH complete fails, metadata must preserve `kah_completion_claimed:false`.
+8. The runner exits and lets the SDK clean up the app-server child process.
 
 Thread continuity comes from `thread_id` and KAH artifacts, not from assuming a long-lived app-server remains running across phases. A persistent daemon may be explored only as a separate KAB/wrapper or explicit infrastructure task.
 
@@ -136,6 +138,7 @@ Minimum evidence fields:
 - KAS phase and run id;
 - prompt artifact path and checksum when available;
 - output artifact path;
+- optional workflow dispatch packet path, node id, `strict_order`, `run_id`, `instance_revision`, `expected_start_revision`, KAH start output/revision, KAH complete output/revision, and `kah_completion_claimed`;
 - SDK/app-server mode: `openai_codex -> codex app-server --listen stdio://`;
 - `thread_id` and whether it was started or resumed;
 - sandbox mode;

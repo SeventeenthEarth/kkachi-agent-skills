@@ -273,7 +273,7 @@ case "$*" in
     ;;
   "capabilities --json")
     if [ "` + boolShellValue(workflowSupported) + `" = "1" ]; then
-      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true}}'
+      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true}}'
     else
       echo '{"command_groups":[{"name":"graph","status":"supported","subcommands":["validate"]}],"compatibility_flags":{"workflow_instance_state":false}}'
     fi
@@ -332,7 +332,7 @@ case "$*" in
     ;;
   "capabilities --json")
     if [ "` + boolShellValue(workflowSupported) + `" = "1" ]; then
-      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true}}'
+      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true}}'
     else
       echo '{"command_groups":[{"name":"graph","status":"supported","subcommands":["validate"]}],"compatibility_flags":{"workflow_instance_state":false}}'
     fi

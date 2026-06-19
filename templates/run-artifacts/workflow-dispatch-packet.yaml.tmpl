@@ -1,6 +1,10 @@
 schema_version: kas-workflow-dispatch-packet/v1
+strict_order: true
 workflow_id: "{{workflow_id}}"
+workflow_file: "{{workflow_file}}"
+run_id: "{{run_id}}"
 instance_id: "{{instance_id}}"
+instance_revision: {{instance_revision}}
 node_id: "{{node_id}}"
 owner_role: "{{owner_role}}"
 execution_lane: "{{execution_lane}}"
@@ -25,6 +29,9 @@ changed_surfaces:
   - "{{changed_surface}}"
 required_capabilities:
   - "{{required_capability}}"
+expected_start_revision: {{expected_start_revision}}
+ready_node_reasons:
+  - "{{ready_node_reason}}"
 completion_authority: kah_only
 stage1_direct_codex_is_kab_native_codex: false
 direct_kah_state_write: false

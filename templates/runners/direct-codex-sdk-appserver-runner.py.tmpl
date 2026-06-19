@@ -95,6 +95,12 @@ def metadata_base(args: argparse.Namespace) -> dict[str, Any]:
         "effort": args.effort,
         "summary": args.summary,
         "preflight_only": args.preflight_only,
+        "dispatch_packet_path": str(Path(args.dispatch_packet).resolve()) if args.dispatch_packet else None,
+        "kah_bin": args.kah_bin,
+        "completion_evidence": list(args.completion_evidence),
+        "kah_start_revision": None,
+        "kah_complete_revision": None,
+        "kah_completion_claimed": False,
         "exit_code": None,
         "status": "started",
     }
@@ -110,6 +116,201 @@ def write_error(path: Path | None, text: str) -> None:
         return
     ensure_parent(path)
     path.write_text(text, encoding="utf-8")
+
+
+def parse_scalar(value: str) -> Any:
+    value = value.strip()
+    if value in {"true", "True"}:
+        return True
+    if value in {"false", "False"}:
+        return False
+    if value.startswith('"') and value.endswith('"'):
+        return value[1:-1]
+    try:
+        return int(value)
+    except ValueError:
+        return value
+
+
+def load_dispatch_packet(path: str | None) -> dict[str, Any] | None:
+    if not path:
+        return None
+    packet_path = Path(path)
+    raw = packet_path.read_text(encoding="utf-8")
+    try:
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError("dispatch packet JSON must be an object")
+        return data
+    except json.JSONDecodeError:
+        pass
+    data: dict[str, Any] = {}
+    current_list: str | None = None
+    for line in raw.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line.startswith("  - ") and current_list:
+            data[current_list].append(parse_scalar(line[4:]))
+            continue
+        current_list = None
+        if ":" not in line or line.startswith(" "):
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        if value == "":
+            data[key] = []
+            current_list = key
+        else:
+            data[key] = parse_scalar(value)
+    return data
+
+
+def positive_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = int(value)
+        except ValueError:
+            return None
+        if parsed > 0:
+            return parsed
+    return None
+
+
+def validate_dispatch_packet(packet: dict[str, Any], args: argparse.Namespace) -> tuple[str, int]:
+    errors: list[str] = []
+    node_id = str(packet.get("node_id") or "").strip()
+    expected_revision = positive_int(packet.get("expected_start_revision"))
+    if not node_id:
+        errors.append("node_id is required")
+    if packet.get("strict_order") is not True:
+        errors.append("strict_order must be true")
+    if packet.get("run_id") != args.run_id:
+        errors.append("run_id must match --run-id")
+    if packet.get("instance_id") != args.run_id:
+        errors.append("instance_id must match --run-id")
+    if packet.get("status") != "ready_for_declared_lane":
+        errors.append("status must be ready_for_declared_lane")
+    if packet.get("fallback_policy") != "none_fail_closed":
+        errors.append("fallback_policy must be none_fail_closed")
+    if packet.get("completion_authority") != "kah_only":
+        errors.append("completion_authority must be kah_only")
+    if packet.get("direct_kah_state_write") is not False:
+        errors.append("direct_kah_state_write must be false")
+    instance_revision = positive_int(packet.get("instance_revision"))
+    if instance_revision != expected_revision:
+        errors.append("instance_revision must equal expected_start_revision")
+    if expected_revision is None:
+        errors.append("expected_start_revision must be a positive integer")
+    if errors:
+        raise RuntimeError("invalid workflow dispatch packet: " + "; ".join(errors))
+    return node_id, expected_revision
+
+
+def run_kah(args: argparse.Namespace, action: str, node_id: str, expected_revision: int, evidence: str | None = None) -> subprocess.CompletedProcess[str]:
+    # STRICT-005 command shape: workflow node start / workflow node complete with --expect-revision.
+    if not args.kah_bin:
+        raise RuntimeError("--kah-bin is required when --dispatch-packet is supplied")
+    command = [
+        args.kah_bin,
+        "workflow",
+        "node",
+        action,
+        "--run",
+        args.run_id,
+        "--node",
+        node_id,
+        "--expect-revision",
+        str(expected_revision),
+    ]
+    if evidence:
+        command.extend(["--evidence", evidence])
+    command.append("--json")
+    env = os.environ.copy()
+    env.update({"HOME": args.home})
+    return subprocess.run(command, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=args.project_dir, env=env)
+
+
+def parse_kah_revision(stdout: str) -> int | None:
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError:
+        return None
+    if not payload.get("ok"):
+        return None
+    instance = payload.get("instance") or {}
+    revision = instance.get("revision")
+    return positive_int(revision)
+
+
+def start_guarded_node(args: argparse.Namespace, meta: dict[str, Any]) -> tuple[str | None, int | None, int | None]:
+    packet = load_dispatch_packet(args.dispatch_packet)
+    if packet is None:
+        return None, None, None
+    node_id, expected_revision = validate_dispatch_packet(packet, args)
+    meta["workflow_node_id"] = node_id
+    meta["expected_start_revision"] = expected_revision
+    started = run_kah(args, "start", node_id, expected_revision)
+    meta["kah_start_exit_code"] = started.returncode
+    meta["kah_start_stdout"] = started.stdout.strip()
+    meta["kah_start_stderr"] = started.stderr.strip()
+    if started.returncode != 0:
+        meta.update({"status": "kah_start_failed", "exit_code": started.returncode or 1, "completed_at": utc_now()})
+        return node_id, expected_revision, None
+    start_revision = parse_kah_revision(started.stdout)
+    if start_revision is None:
+        meta.update({"status": "kah_start_failed", "exit_code": 1, "completed_at": utc_now(), "failure_excerpt": "KAH start did not return ok:true with instance.revision"})
+        return node_id, expected_revision, None
+    meta["kah_start_revision"] = start_revision
+    return node_id, expected_revision, start_revision
+
+
+def validated_completion_evidence(args: argparse.Namespace) -> str:
+    if not args.completion_evidence:
+        raise RuntimeError("at least one --completion-evidence path is required before KAH complete")
+    first: str | None = None
+    project_dir = Path(args.project_dir).resolve()
+    for evidence in args.completion_evidence:
+        rel = Path(evidence)
+        if rel.is_absolute() or ".." in rel.parts:
+            raise RuntimeError(f"completion evidence must be a safe project-relative path: {evidence}")
+        path = (project_dir / rel).resolve()
+        try:
+            path.relative_to(project_dir)
+        except ValueError as exc:
+            raise RuntimeError(f"completion evidence escapes project dir: {evidence}") from exc
+        if not path.exists():
+            raise RuntimeError(f"completion evidence does not exist: {evidence}")
+        if first is None:
+            first = evidence
+    assert first is not None
+    return first
+
+
+def complete_guarded_node(args: argparse.Namespace, meta: dict[str, Any], node_id: str, expected_revision: int) -> bool:
+    try:
+        evidence = validated_completion_evidence(args)
+    except Exception as exc:
+        meta.update({"status": "kah_complete_failed", "exit_code": 1, "completed_at": utc_now(), "failure_excerpt": str(exc), "kah_completion_claimed": False})
+        return False
+    completed = run_kah(args, "complete", node_id, expected_revision, evidence=evidence)
+    meta["kah_complete_exit_code"] = completed.returncode
+    meta["kah_complete_stdout"] = completed.stdout.strip()
+    meta["kah_complete_stderr"] = completed.stderr.strip()
+    if completed.returncode != 0:
+        meta.update({"status": "kah_complete_failed", "exit_code": completed.returncode or 1, "completed_at": utc_now(), "kah_completion_claimed": False})
+        return False
+    complete_revision = parse_kah_revision(completed.stdout)
+    if complete_revision is None:
+        meta.update({"status": "kah_complete_failed", "exit_code": 1, "completed_at": utc_now(), "failure_excerpt": "KAH complete did not return ok:true with instance.revision", "kah_completion_claimed": False})
+        return False
+    meta["kah_complete_revision"] = complete_revision
+    meta["kah_completion_claimed"] = True
+    return True
 
 
 def preflight(args: argparse.Namespace, meta: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
@@ -166,6 +367,10 @@ def run_codex(args: argparse.Namespace, meta: dict[str, Any]) -> dict[str, Any]:
     if args.preflight_only:
         meta["status"] = "preflight_pass"
         meta["exit_code"] = 0
+        return meta
+
+    guarded_node_id, _, post_start_revision = start_guarded_node(args, meta)
+    if guarded_node_id is not None and post_start_revision is None:
         return meta
 
     prompt = Path(args.prompt_path).read_text(encoding="utf-8")
@@ -246,6 +451,11 @@ def run_codex(args: argparse.Namespace, meta: dict[str, Any]) -> dict[str, Any]:
         "usage": getattr(result.usage, "model_dump", lambda **_: result.usage)(mode="json") if result.usage is not None else None,
         "completed_at": utc_now(),
     })
+    if guarded_node_id is not None:
+        assert post_start_revision is not None
+        if not complete_guarded_node(args, meta, guarded_node_id, post_start_revision):
+            return meta
+        meta["completed_at"] = utc_now()
     return meta
 
 
@@ -278,6 +488,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config-override", action="append", default=[])
     parser.add_argument("--env", action="append", default=[])
     parser.add_argument("--no-kab-codex-rationale", required=True)
+    parser.add_argument("--dispatch-packet", help="workflow dispatch packet JSON/YAML with expected_start_revision")
+    parser.add_argument("--kah-bin", default=os.environ.get("KAH_BIN", "kkachi-agent-helper"))
+    parser.add_argument("--completion-evidence", action="append", default=[])
     parser.add_argument("--preflight-only", action="store_true")
     return parser
 

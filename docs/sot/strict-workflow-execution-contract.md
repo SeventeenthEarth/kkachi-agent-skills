@@ -77,14 +77,15 @@ A strict dispatch packet must include at least:
 ```
 
 The packet is not a completion authority. It is an execution permit for one KAH-ready node at one observed instance revision.
+KAS `workflow-trigger --workflow-managed` must fail closed instead of rendering a packet when effective KAH capability evidence is missing any of `task_dag_schema_validation`, `workflow_instance_state`, `workflow_strict_transition_ledger`, or `workflow_transition_order_verification`, or when KAH show/ready evidence does not expose a positive instance revision for `expected_start_revision`.
 
 ### 4. Start before work
 
-An agent must call KAH node start/claim before performing node work. If KAH rejects the start because the node is not ready, the revision is stale, dependencies are incomplete, or the node state is not pending, the agent must not execute the node.
+An agent must call KAH node start/claim with `--expect-revision <expected_start_revision>` before performing node work. If KAH rejects the start because the node is not ready, the revision is stale, dependencies are incomplete, or the node state is not pending, the agent must not execute the node. For the Stage 1 direct Codex runner this means no `thread.run` before KAH start succeeds.
 
 ### 5. Complete after evidence
 
-An agent must call KAH node complete only after the node artifacts/evidence exist. Completion must fail closed when required outputs are missing, evidence paths are unsafe, the node is not running, or the revision is stale.
+An agent must call KAH node complete only after the node artifacts/evidence exist, using the post-start instance revision returned by KAH start. Completion must fail closed when required outputs are missing, evidence paths are unsafe, the node is not running, KAH complete fails, or the revision is stale. A runner may preserve backend output after a complete failure, but it must not set completion-claimed metadata; Stage 1 metadata must keep `kah_completion_claimed:false` on complete failure.
 
 ### 6. Reject instead of rollback by default
 
@@ -99,8 +100,8 @@ Unexpected node ids should not be appended and then rolled back. The default saf
 | `STRICT-001` | KAS | Strict workflow execution SOT and roadmap registration | Completed | Registered the shared epic, KAS policy contract, KAH companion SOT link, and cross-repo PR-candidate sequence. |
 | `STRICT-002` | KAH | Workflow-managed run marker and strict final-gate mode | Completed | KAH source-side implementation added workflow-managed run markers and final-gate missing-marker/absence/mismatch failures; KAH commit `97acd29` recorded the completed strict marker enforcement slice before `STRICT-003` began. |
 | `STRICT-003` | KAS | Classification route/trigger mandatory orchestration | Completed | This KAS source commit records classified KAS/KAH runs using `workflow-trigger --workflow-managed` to require preserved `workflow-route` evidence, selected workflow id/bundle trace, run-local materialization or route-backed safe resume evidence, KAH workflow capability evidence, and KAH ready-node-derived dispatch packets before dispatch. Missing, malformed, failed, or mismatched route/materialization/capability/resume evidence fails closed with no selector/explicit/custom fallback and no legacy development spine fallback. |
-| `STRICT-004` | KAH | Node claim ledger and transition-order verification | Planned | KAH records/verifies append-only node transition order against the selected DAG. |
-| `STRICT-005` | KAS | Dispatch packet expected-revision and node execution guard | Planned | Dispatch packets include current revision/ready-node evidence and require KAH start success before backend/agent work. |
+| `STRICT-004` | KAH | Node claim ledger and transition-order verification | Source-side complete | KAH source commit `264c12c` records/verifies append-only node transition order against the selected DAG. Installed/effective runtime support must still be verified before runtime claims. |
+| `STRICT-005` | KAS | Dispatch packet expected-revision and node execution guard | Completed | KAS source-side implementation adds strict dispatch packet metadata (`strict_order`, `run_id`, `instance_revision`, `expected_start_revision`, ready-node evidence), strict KAH capability gating, Stage 1 runner start-before-work and complete-before-claim guards, focused tests, full `make test` evidence, and review/final artifacts. Installed/effective runtime support remains a separate verification before runtime claims. |
 | `STRICT-006` | KAH | Phase-plan projection and workflow consistency gate | Planned | Workflow-managed phase-plan/checklist evidence must project from the workflow instance rather than contradict it. |
 | `STRICT-007` | KAS | Strict orchestration skill/templates/e2e adoption | Planned | Active KAS skills, runner prompts, templates, and fixtures enforce strict dispatch/start/complete flow. |
 
@@ -122,4 +123,4 @@ Unexpected node ids should not be appended and then rolled back. The default saf
 
 ## Next action
 
-`STRICT-003` is complete in this KAS source commit; install, release, push, and downstream strict runtime adoption remain separate approvals. Next, advance to KAH `STRICT-004` so node claim ledger and transition-order verification can become deterministic KAH enforcement.
+`STRICT-005` is source-side complete after KAH `STRICT-004` source-side completion. Install, release, push, downstream strict runtime adoption, and effective-runtime claims remain separate approvals. Next, advance to KAH `STRICT-006` for phase-plan projection and workflow consistency gating.

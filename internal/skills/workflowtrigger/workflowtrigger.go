@@ -118,10 +118,11 @@ type SelectorEvidence struct {
 }
 
 type KAHCapability struct {
-	Available        bool     `json:"available"`
-	Version          string   `json:"version,omitempty"`
-	WorkflowCommands []string `json:"workflow_commands"`
-	Reason           string   `json:"reason,omitempty"`
+	Available          bool            `json:"available"`
+	Version            string          `json:"version,omitempty"`
+	WorkflowCommands   []string        `json:"workflow_commands"`
+	CompatibilityFlags map[string]bool `json:"compatibility_flags,omitempty"`
+	Reason             string          `json:"reason,omitempty"`
 }
 
 type InstanceEvidence struct {
@@ -136,9 +137,12 @@ type ReadyNode struct {
 }
 
 type DispatchPacket struct {
+	StrictOrder                       bool     `json:"strict_order"`
 	WorkflowID                        string   `json:"workflow_id"`
 	WorkflowFile                      string   `json:"workflow_file,omitempty"`
+	RunID                             string   `json:"run_id"`
 	InstanceID                        string   `json:"instance_id"`
+	InstanceRevision                  int      `json:"instance_revision"`
 	NodeID                            string   `json:"node_id"`
 	OwnerRole                         string   `json:"owner_role"`
 	ExecutionLane                     string   `json:"execution_lane"`
@@ -157,6 +161,8 @@ type DispatchPacket struct {
 	Labels                            []string `json:"labels,omitempty"`
 	ChangedSurfaces                   []string `json:"changed_surfaces,omitempty"`
 	RequiredCapabilities              []string `json:"required_capabilities,omitempty"`
+	ExpectedStartRevision             int      `json:"expected_start_revision"`
+	ReadyNodeReasons                  []string `json:"ready_node_reasons,omitempty"`
 	CompletionAuthority               string   `json:"completion_authority"`
 	DirectKAHStateWrite               bool     `json:"direct_kah_state_write"`
 	Stage1DirectCodexIsKABNativeCodex bool     `json:"stage1_direct_codex_is_kab_native_codex"`
@@ -356,6 +362,9 @@ func Trigger(opts Options) (Result, error) {
 		return result, nil
 	}
 	result.ReadyNodes = ready
+	if opts.WorkflowManaged && result.Instance.Revision <= 0 {
+		return fail(result, "strict_workflow_expected_start_revision_missing", "workflow-managed dispatch requires KAH ready/show revision evidence before rendering a packet."), nil
+	}
 	if len(ready) == 0 {
 		result.OK = true
 		result.Status = "no_ready_nodes"
@@ -371,7 +380,10 @@ func Trigger(opts Options) (Result, error) {
 			result.Diagnostics[len(result.Diagnostics)-1].NodeID = node.ID
 			return result, nil
 		}
-		packets = append(packets, packetFromContract(contract, runID, opts.NodeContractSource, opts.NodeContractRef, checksum, result))
+		if opts.WorkflowManaged && result.Instance.Revision <= 0 {
+			return fail(result, "strict_workflow_expected_start_revision_missing", "workflow-managed dispatch requires KAH ready/show revision evidence before rendering a packet."), nil
+		}
+		packets = append(packets, packetFromContract(contract, node, runID, opts.NodeContractSource, opts.NodeContractRef, checksum, result))
 	}
 	result.DispatchPackets = packets
 	result.OK = true
@@ -490,6 +502,12 @@ func fail(result Result, code string, message string) Result {
 }
 
 func nextActionForFailure(code string) string {
+	switch code {
+	case "strict_workflow_missing_kah_capability":
+		return "Verify the effective kkachi-agent-helper binary selected for this repo exposes task_dag_schema_validation, workflow_instance_state, workflow_strict_transition_ledger, and workflow_transition_order_verification; then rerun workflow-trigger with the same route-backed workflow-managed inputs."
+	case "strict_workflow_expected_start_revision_missing":
+		return "Inspect KAH workflow show/ready JSON for a positive instance.revision, repair or recreate the route-backed workflow instance if the revision evidence is missing, then rerun workflow-trigger before dispatch."
+	}
 	if strings.HasPrefix(code, "strict_workflow_") {
 		return "Preserve a matched workflow-route result, then rerun workflow-trigger with --route-result --materialize-run-local --run <run-id> --workflow-managed; for resume, use only inputs that match existing route-backed run-local materialization evidence."
 	}
@@ -613,7 +631,7 @@ type preflightResult struct {
 }
 
 func preflightKAH(opts Options) preflightResult {
-	capability := KAHCapability{WorkflowCommands: []string{}}
+	capability := KAHCapability{WorkflowCommands: []string{}, CompatibilityFlags: map[string]bool{}}
 	version := opts.Runner(opts.Project, "--version")
 	if version.Err != nil {
 		return preflightResult{capability: capability, err: errors.New("kkachi-agent-helper --version failed")}
@@ -624,8 +642,9 @@ func preflightKAH(opts Options) preflightResult {
 	if caps.Err != nil {
 		return preflightResult{capability: capability, err: errors.New("kkachi-agent-helper capabilities --json failed")}
 	}
-	commands, flagsOK := parseWorkflowCapabilities(caps.Stdout)
+	commands, flags, flagsOK := parseWorkflowCapabilities(caps.Stdout, opts.WorkflowManaged)
 	capability.WorkflowCommands = commands
+	capability.CompatibilityFlags = flags
 
 	help := opts.Runner(opts.Project, "workflow", "--help")
 	if help.Err != nil {
@@ -647,7 +666,7 @@ func preflightKAH(opts Options) preflightResult {
 	return preflightResult{capability: capability}
 }
 
-func parseWorkflowCapabilities(data []byte) ([]string, bool) {
+func parseWorkflowCapabilities(data []byte, strict bool) ([]string, map[string]bool, bool) {
 	var payload struct {
 		CommandGroups []struct {
 			Name        string   `json:"name"`
@@ -658,7 +677,7 @@ func parseWorkflowCapabilities(data []byte) ([]string, bool) {
 		CompatibilityFlags map[string]bool `json:"compatibility_flags"`
 	}
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return nil, false
+		return nil, nil, false
 	}
 	commands := []string{}
 	for _, group := range payload.CommandGroups {
@@ -671,8 +690,17 @@ func parseWorkflowCapabilities(data []byte) ([]string, bool) {
 			commands = append(commands, strings.TrimPrefix(command, "workflow "))
 		}
 	}
-	flagsOK := payload.CompatibilityFlags["task_dag_schema_validation"] && payload.CompatibilityFlags["workflow_instance_state"]
-	return appendUnique(commands...), flagsOK
+	requiredFlags := []string{"task_dag_schema_validation", "workflow_instance_state"}
+	if strict {
+		requiredFlags = append(requiredFlags, "workflow_strict_transition_ledger", "workflow_transition_order_verification")
+	}
+	flagsOK := true
+	for _, flag := range requiredFlags {
+		if !payload.CompatibilityFlags[flag] {
+			flagsOK = false
+		}
+	}
+	return appendUnique(commands...), payload.CompatibilityFlags, flagsOK
 }
 
 func runWorkflowValidateExplain(result *Result, opts Options) ([]string, bool, bool) {
@@ -764,6 +792,7 @@ func runWorkflowReady(result *Result, opts Options, runID string) ([]ReadyNode, 
 		*result = fail(*result, "blocked_kah_workflow_ready_failed", "KAH workflow ready returned ok:false.")
 		return nil, false
 	}
+	updateInstanceEvidence(result, payload)
 	ready := []ReadyNode{}
 	for _, raw := range list(payload["ready"]) {
 		item, ok := raw.(map[string]any)
@@ -797,9 +826,14 @@ func normalizeInstanceResult(result *Result, payload map[string]any, code string
 		*result = fail(*result, code, "KAH workflow instance command returned ok:false.")
 		return false
 	}
+	updateInstanceEvidence(result, payload)
+	return true
+}
+
+func updateInstanceEvidence(result *Result, payload map[string]any) {
 	instance, _ := payload["instance"].(map[string]any)
 	if instance == nil {
-		return true
+		return
 	}
 	if id, _ := instance["run_id"].(string); id != "" {
 		result.Instance.ID = id
@@ -810,7 +844,6 @@ func normalizeInstanceResult(result *Result, payload map[string]any, code string
 	if revision, ok := instance["revision"].(float64); ok {
 		result.Instance.Revision = int(revision)
 	}
-	return true
 }
 
 func findContract(contracts []NodeContract, workflowID string, nodeID string) (NodeContract, bool) {
@@ -822,11 +855,14 @@ func findContract(contracts []NodeContract, workflowID string, nodeID string) (N
 	return NodeContract{}, false
 }
 
-func packetFromContract(contract NodeContract, instanceID string, source string, ref string, checksum string, result Result) DispatchPacket {
+func packetFromContract(contract NodeContract, ready ReadyNode, instanceID string, source string, ref string, checksum string, result Result) DispatchPacket {
 	return DispatchPacket{
+		StrictOrder:                       true,
 		WorkflowID:                        contract.WorkflowID,
 		WorkflowFile:                      result.Workflow.Path,
+		RunID:                             instanceID,
 		InstanceID:                        instanceID,
+		InstanceRevision:                  result.Instance.Revision,
 		NodeID:                            contract.NodeID,
 		OwnerRole:                         contract.OwnerRole,
 		ExecutionLane:                     contract.ExecutionLane,
@@ -845,6 +881,8 @@ func packetFromContract(contract NodeContract, instanceID string, source string,
 		Labels:                            result.Labels,
 		ChangedSurfaces:                   result.ChangedSurfaces,
 		RequiredCapabilities:              result.RequiredCapabilities,
+		ExpectedStartRevision:             result.Instance.Revision,
+		ReadyNodeReasons:                  ready.Reasons,
 		CompletionAuthority:               "kah_only",
 		DirectKAHStateWrite:               false,
 		Stage1DirectCodexIsKABNativeCodex: false,

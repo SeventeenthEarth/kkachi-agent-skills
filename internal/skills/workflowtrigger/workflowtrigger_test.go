@@ -72,14 +72,26 @@ func TestTriggerRendersDispatchPacketsFromExplicitWorkflowAndContract(t *testing
 		t.Fatalf("dispatch packets = %+v", result.DispatchPackets)
 	}
 	packet := result.DispatchPackets[0]
-	if packet.WorkflowID != "demo" || packet.InstanceID != "run-20260615T010203Z-abcdef123456" || packet.NodeID != "setup" {
+	if !packet.StrictOrder || packet.WorkflowID != "demo" || packet.RunID != "run-20260615T010203Z-abcdef123456" || packet.InstanceID != "run-20260615T010203Z-abcdef123456" || packet.NodeID != "setup" {
 		t.Fatalf("unexpected packet identity: %+v", packet)
+	}
+	if packet.InstanceRevision != 1 {
+		t.Fatalf("packet instance_revision = %d, want 1", packet.InstanceRevision)
 	}
 	if packet.OwnerRole != "implementer_backend" || packet.ExecutionLane != "direct_kas_skill" || !packet.ApprovalRequired {
 		t.Fatalf("unexpected packet contract fields: %+v", packet)
 	}
 	if packet.FallbackPolicy != "none_fail_closed" || packet.NodeContractRef != "contracts-a" || packet.SourceChecksum == "" {
 		t.Fatalf("packet missing source/fallback evidence: %+v", packet)
+	}
+	if packet.ExpectedStartRevision != 1 {
+		t.Fatalf("packet expected_start_revision = %d, want ready instance revision 1", packet.ExpectedStartRevision)
+	}
+	if packet.InstanceRevision != packet.ExpectedStartRevision {
+		t.Fatalf("packet instance_revision and expected_start_revision diverged: %+v", packet)
+	}
+	if !reflect.DeepEqual(packet.ReadyNodeReasons, []string{"dependencies_satisfied", "state_pending"}) {
+		t.Fatalf("packet missing ready-node evidence: %+v", packet)
 	}
 	wantCalls := []string{
 		"--version",
@@ -457,6 +469,104 @@ func TestTriggerRunLocalMaterializationPreflightsBeforeWrite(t *testing.T) {
 	}
 }
 
+func TestTriggerWorkflowManagedRequiresStrictKAHCapabilityFlags(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeRegistry(t, project, validRegistry("demo", "setup"))
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routeResult := writeTriggerRouteResult(t, project, registry, "demo")
+	runner := &fakeKAHRunner{responses: map[string]CommandResult{
+		"--version":           {Stdout: []byte("kkachi-agent-helper 0.1.10\n")},
+		"capabilities --json": {Stdout: []byte(`{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true}}`)},
+		"workflow --help":     {Stdout: []byte("Subcommands:\n  validate\n  explain\n  create\n  show\n  ready\n  node\n")},
+	}}
+
+	result, err := Trigger(Options{
+		Project:             project,
+		RouteResult:         routeResult,
+		MaterializeRunLocal: true,
+		WorkflowManaged:     true,
+		RunID:               "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:              runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "strict_workflow_missing_kah_capability" {
+		t.Fatalf("expected strict capability blocker, got %+v", result)
+	}
+	if result.KAHCapability.CompatibilityFlags["workflow_strict_transition_ledger"] || result.KAHCapability.CompatibilityFlags["workflow_transition_order_verification"] {
+		t.Fatalf("test fixture unexpectedly reports strict flags: %+v", result.KAHCapability.CompatibilityFlags)
+	}
+	assertStrictWorkflowNextAction(t, result.NextAction)
+}
+
+func TestTriggerWorkflowManagedFailsClosedWhenReadyRevisionMissing(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeRegistry(t, project, validRegistry("demo", "setup"))
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routeResult := writeTriggerRouteResult(t, project, registry, "demo")
+	workflowFile := ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/workflow.yaml"
+	runner := newWorkflowFakeRunnerForFile("demo", "run-20260616T105614Z-4b0ebe11b67d", workflowFile, []string{"setup"})
+	missingRevisionInstance := `{"ok":true,"status":"pass","run_id":"run-20260616T105614Z-4b0ebe11b67d","instance":{"run_id":"run-20260616T105614Z-4b0ebe11b67d","source_path":"` + workflowFile + `"}}`
+	runner.responses["workflow create --run run-20260616T105614Z-4b0ebe11b67d --file "+workflowFile+" --json"] = CommandResult{Stdout: []byte(missingRevisionInstance)}
+	runner.responses["workflow ready --run run-20260616T105614Z-4b0ebe11b67d --json"] = CommandResult{Stdout: []byte(`{"ok":true,"status":"pass","run_id":"run-20260616T105614Z-4b0ebe11b67d","ready":[{"id":"setup","reasons":["dependencies_satisfied","state_pending"]}]}`)}
+
+	result, err := Trigger(Options{
+		Project:             project,
+		RouteResult:         routeResult,
+		MaterializeRunLocal: true,
+		WorkflowManaged:     true,
+		RunID:               "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:              runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "strict_workflow_expected_start_revision_missing" {
+		t.Fatalf("expected missing revision blocker, got %+v", result)
+	}
+	if len(result.DispatchPackets) != 0 {
+		t.Fatalf("stale/missing revision blocker must not render packets: %+v", result.DispatchPackets)
+	}
+	assertStrictWorkflowNextAction(t, result.NextAction)
+}
+
+func TestTriggerWorkflowManagedFailsClosedWhenNoReadyRevisionMissing(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeRegistry(t, project, validRegistry("demo", "setup"))
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routeResult := writeTriggerRouteResult(t, project, registry, "demo")
+	workflowFile := ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/workflow.yaml"
+	runner := newWorkflowFakeRunnerForFile("demo", "run-20260616T105614Z-4b0ebe11b67d", workflowFile, nil)
+	missingRevisionInstance := `{"ok":true,"status":"pass","run_id":"run-20260616T105614Z-4b0ebe11b67d","instance":{"run_id":"run-20260616T105614Z-4b0ebe11b67d","source_path":"` + workflowFile + `"}}`
+	runner.responses["workflow create --run run-20260616T105614Z-4b0ebe11b67d --file "+workflowFile+" --json"] = CommandResult{Stdout: []byte(missingRevisionInstance)}
+	runner.responses["workflow ready --run run-20260616T105614Z-4b0ebe11b67d --json"] = CommandResult{Stdout: []byte(`{"ok":true,"status":"pass","run_id":"run-20260616T105614Z-4b0ebe11b67d","ready":[]}`)}
+
+	result, err := Trigger(Options{
+		Project:             project,
+		RouteResult:         routeResult,
+		MaterializeRunLocal: true,
+		WorkflowManaged:     true,
+		RunID:               "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:              runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "strict_workflow_expected_start_revision_missing" {
+		t.Fatalf("expected missing revision blocker before no-ready success, got %+v", result)
+	}
+}
+
 func TestTriggerRunLocalMaterializationRendersDispatchPackets(t *testing.T) {
 	project := t.TempDir()
 	registryPath := writeRegistry(t, project, validRegistry("demo", "setup"))
@@ -674,7 +784,7 @@ func TestTriggerWorkflowManagedRouteMaterializationRejectsFallbackInputsBeforeKA
 
 func assertStrictWorkflowNextAction(t *testing.T, nextAction string) {
 	t.Helper()
-	for _, want := range []string{"workflow-route", "--route-result", "--materialize-run-local", "--workflow-managed", "route-backed run-local materialization evidence"} {
+	for _, want := range []string{"rerun", "workflow"} {
 		if !strings.Contains(nextAction, want) {
 			t.Fatalf("strict next_action missing %q: %q", want, nextAction)
 		}
@@ -1033,7 +1143,7 @@ func newWorkflowFakeRunnerForFile(workflowID string, runID string, workflowFile 
 
 	return &fakeKAHRunner{responses: map[string]CommandResult{
 		"--version":           {Stdout: []byte("kkachi-agent-helper 0.1.10\n")},
-		"capabilities --json": {Stdout: []byte(`{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true}}`)},
+		"capabilities --json": {Stdout: []byte(`{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true}}`)},
 		"workflow --help":     {Stdout: []byte("Subcommands:\n  validate\n  explain\n  create\n  show\n  ready\n  node\n")},
 		"workflow validate --file " + workflowFile + " --json": {Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"` + workflowID + `","schema_version":"task-dag/v1"}`)},
 		"workflow explain --file " + workflowFile + " --json":  {Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"` + workflowID + `","schema_version":"task-dag/v1"}`)},

@@ -128,14 +128,24 @@ The trigger fails closed unless the effective `kkachi-agent-helper` supports all
 - `kkachi-agent-helper capabilities --json`
 - `kkachi-agent-helper workflow --help`
 - workflow subcommands: `validate`, `explain`, `create`, `show`, `ready`, and `node`
-- capability flags: `task_dag_schema_validation` and `workflow_instance_state`
+- capability flags: `task_dag_schema_validation` and `workflow_instance_state`; in `--workflow-managed` mode also require `workflow_strict_transition_ledger` and `workflow_transition_order_verification`
 
 Missing workflow capability returns `ok:false`,
-`status: blocked_missing_kah_workflow_capability`,
+`status: blocked_missing_kah_workflow_capability` in ordinary mode or
+`status: strict_workflow_missing_kah_capability` in workflow-managed mode,
 `direct_kah_state_write:false`, and no dispatch packets. Run-local
 materialization also performs this preflight before writes, so installed KAH
 without the `workflow` command group must not create `.kkachi/runs/.../workflow`
 artifacts.
+
+Recovery for `strict_workflow_missing_kah_capability`: verify the effective
+repo-selected KAH binary exposes `task_dag_schema_validation`,
+`workflow_instance_state`, `workflow_strict_transition_ledger`, and
+`workflow_transition_order_verification` before rerunning the same route-backed
+workflow-managed trigger. Recovery for
+`strict_workflow_expected_start_revision_missing`: inspect KAH `workflow show`
+and `workflow ready` JSON for a positive `instance.revision`; repair/recreate
+the route-backed workflow instance if revision evidence is absent.
 
 ## Node-Contract JSON
 
@@ -187,7 +197,7 @@ The trigger:
 2. validates/explains the selected workflow through KAH;
 3. creates a KAH workflow instance with `workflow create --run <run-id> --file <path>` or resumes with `workflow show --run <instance-id>`;
 4. reads ready nodes with `workflow ready --run <id>`;
-5. renders one dispatch packet per ready node;
+5. renders one dispatch packet per ready node with `strict_order:true`, run id, instance revision, KAH ready-node reasons, and `expected_start_revision` from the observed instance revision; workflow-managed mode fails closed with `strict_workflow_expected_start_revision_missing` if that revision is unavailable;
 6. returns `ok:true/status:no_ready_nodes` when KAH has no ready nodes;
 7. always reports `direct_kah_state_write:false`, `completion_authority:kah_only`, `fallback_policy:none_fail_closed`, and `stage1_direct_codex_is_kab_native_codex:false`.
 
