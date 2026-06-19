@@ -97,8 +97,8 @@ Unexpected node ids should not be appended and then rolled back. The default saf
 | Task ID | Repo | Title | Status | Outcome |
 |---|---|---|---|---|
 | `STRICT-001` | KAS | Strict workflow execution SOT and roadmap registration | Completed | Registered the shared epic, KAS policy contract, KAH companion SOT link, and cross-repo PR-candidate sequence. |
-| `STRICT-002` | KAH | Workflow-managed run marker and strict final-gate mode | In Progress | KAH source-side implementation adds workflow-managed run markers and final-gate missing-marker/absence/mismatch failures; review/final closeout remains pending before the shared sequence advances to `STRICT-003`. |
-| `STRICT-003` | KAS | Classification route/trigger mandatory orchestration | Planned | Classified KAS/KAH runs must route, materialize/resume, and record selected workflow evidence before dispatch. |
+| `STRICT-002` | KAH | Workflow-managed run marker and strict final-gate mode | Completed | KAH source-side implementation added workflow-managed run markers and final-gate missing-marker/absence/mismatch failures; KAH commit `97acd29` recorded the completed strict marker enforcement slice before `STRICT-003` began. |
+| `STRICT-003` | KAS | Classification route/trigger mandatory orchestration | Completed | This KAS source commit records classified KAS/KAH runs using `workflow-trigger --workflow-managed` to require preserved `workflow-route` evidence, selected workflow id/bundle trace, run-local materialization or route-backed safe resume evidence, KAH workflow capability evidence, and KAH ready-node-derived dispatch packets before dispatch. Missing, malformed, failed, or mismatched route/materialization/capability/resume evidence fails closed with no selector/explicit/custom fallback and no legacy development spine fallback. |
 | `STRICT-004` | KAH | Node claim ledger and transition-order verification | Planned | KAH records/verifies append-only node transition order against the selected DAG. |
 | `STRICT-005` | KAS | Dispatch packet expected-revision and node execution guard | Planned | Dispatch packets include current revision/ready-node evidence and require KAH start success before backend/agent work. |
 | `STRICT-006` | KAH | Phase-plan projection and workflow consistency gate | Planned | Workflow-managed phase-plan/checklist evidence must project from the workflow instance rather than contradict it. |
@@ -122,4 +122,4 @@ Unexpected node ids should not be appended and then rolled back. The default saf
 
 ## Next action
 
-Complete review/final closeout for KAH `STRICT-002`; after acceptance, advance to KAS `STRICT-003` so classification route/trigger becomes mandatory before dispatch.
+`STRICT-003` is complete in this KAS source commit; install, release, push, and downstream strict runtime adoption remain separate approvals. Next, advance to KAH `STRICT-004` so node claim ledger and transition-order verification can become deterministic KAH enforcement.

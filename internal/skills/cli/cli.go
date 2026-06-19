@@ -626,6 +626,7 @@ func runWorkflowTrigger(argv []string, stdout io.Writer, stderr io.Writer, env m
 	customWorkflowPacket := fs.String("custom-workflow-packet", "", "approved workflow-create dry-run JSON packet to materialize under the run")
 	approval := fs.String("approval", "", "approval evidence dry-run:sha256:<hash> for custom workflow packet materialization")
 	materializeRunLocal := fs.Bool("materialize-run-local", false, "materialize selected route result or approved custom packet under .kkachi/runs/<run-id>/workflow")
+	workflowManaged := fs.Bool("workflow-managed", false, "require classified workflow-route and run-local materialization/resume evidence before dispatch")
 	taskClass := fs.String("task-class", "", "selector task class")
 	labels := fs.String("labels", "", "selector labels, comma-separated")
 	changedSurfaces := fs.String("changed-surfaces", "", "selector changed surfaces, comma-separated")
@@ -658,6 +659,7 @@ func runWorkflowTrigger(argv []string, stdout io.Writer, stderr io.Writer, env m
 		CustomWorkflowPacket: *customWorkflowPacket,
 		Approval:             *approval,
 		MaterializeRunLocal:  *materializeRunLocal,
+		WorkflowManaged:      *workflowManaged,
 		TaskClass:            *taskClass,
 		Labels:               splitFlagList(*labels),
 		ChangedSurfaces:      splitFlagList(*changedSurfaces),

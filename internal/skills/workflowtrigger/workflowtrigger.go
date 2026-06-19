@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -37,6 +38,7 @@ type Options struct {
 	CustomWorkflowPacket string
 	Approval             string
 	MaterializeRunLocal  bool
+	WorkflowManaged      bool
 	TaskClass            string
 	Labels               []string
 	ChangedSurfaces      []string
@@ -187,9 +189,21 @@ func Trigger(opts Options) (Result, error) {
 	if opts.Project == "" {
 		return fail(result, "project_required", "workflow-trigger requires --project <path>."), nil
 	}
+	if opts.WorkflowManaged && strings.TrimSpace(opts.RouteResult) == "" {
+		evidence, loadErr := validateWorkflowManagedResume(opts)
+		if loadErr != nil {
+			return fail(result, loadErr.Code, loadErr.Message), nil
+		}
+		result.Mode = "workflow_managed_resume_trigger"
+		result.Materialization = &evidence
+		result.TaskClass = evidence.TaskClass
+	}
 	if opts.MaterializeRunLocal || strings.TrimSpace(opts.RouteResult) != "" || strings.TrimSpace(opts.CustomWorkflowPacket) != "" {
 		hasRouteResult := strings.TrimSpace(opts.RouteResult) != ""
 		hasCustomPacket := strings.TrimSpace(opts.CustomWorkflowPacket) != ""
+		if opts.WorkflowManaged && hasCustomPacket {
+			return fail(result, "strict_workflow_custom_packet_rejected", "workflow-managed KAS/KAH dispatch requires matched workflow-route evidence; custom workflow packets are outside classified workflow-managed dispatch."), nil
+		}
 		if hasRouteResult == hasCustomPacket {
 			return fail(result, "run_local_materialization_source_required", "workflow-trigger --materialize-run-local requires exactly one of --route-result or --custom-workflow-packet."), nil
 		}
@@ -200,18 +214,33 @@ func Trigger(opts Options) (Result, error) {
 			return fail(result, "approval_evidence_required", "workflow-trigger custom workflow packet materialization requires --approval dry-run:sha256:<hash>."), nil
 		}
 		if hasRouteResult && strings.TrimSpace(opts.Approval) != "" {
-			return fail(result, "run_local_materialization_mode_conflict", "workflow-trigger route-result materialization does not accept --approval; approval is only for custom workflow packets."), nil
+			code := "run_local_materialization_mode_conflict"
+			if opts.WorkflowManaged {
+				code = "strict_workflow_materialization_mode_conflict"
+			}
+			return fail(result, code, "workflow-trigger route-result materialization does not accept --approval; approval is only for custom workflow packets."), nil
+		}
+		if opts.WorkflowManaged && !hasRouteResult {
+			return fail(result, "strict_workflow_route_result_required", "workflow-managed KAS/KAH dispatch requires a matched workflow-route result; approved one-off custom packets are outside classified workflow-managed dispatch."), nil
 		}
 		if strings.TrimSpace(opts.RunID) == "" {
-			return fail(result, "run_id_required", "workflow-trigger run-local materialization requires --run <run-id>."), nil
+			code := "run_id_required"
+			if opts.WorkflowManaged {
+				code = "strict_workflow_run_id_required"
+			}
+			return fail(result, code, "workflow-trigger run-local materialization requires --run <run-id>."), nil
 		}
 		if hasSelectorInput(opts) || strings.TrimSpace(opts.WorkflowID) != "" || strings.TrimSpace(opts.WorkflowFile) != "" || strings.TrimSpace(opts.NodeContractSource) != "" || strings.TrimSpace(opts.InstanceID) != "" {
-			return fail(result, "run_local_materialization_mode_conflict", "workflow-trigger --materialize-run-local accepts exactly one run-local source plus --run only; do not mix explicit, selector, or resume inputs."), nil
+			code := "run_local_materialization_mode_conflict"
+			if opts.WorkflowManaged {
+				code = "strict_workflow_materialization_mode_conflict"
+			}
+			return fail(result, code, "workflow-trigger --materialize-run-local accepts exactly one run-local source plus --run only; do not mix explicit, selector, or resume inputs."), nil
 		}
 		preflight := preflightKAH(opts)
 		result.KAHCapability = preflight.capability
 		if preflight.err != nil {
-			return fail(result, "blocked_missing_kah_workflow_capability", preflight.err.Error()), nil
+			return fail(result, workflowCapabilityFailureCode(opts), preflight.err.Error()), nil
 		}
 		materialized, err := materializeRunLocal(opts, hasCustomPacket)
 		if err != nil {
@@ -290,7 +319,7 @@ func Trigger(opts Options) (Result, error) {
 		preflight := preflightKAH(opts)
 		result.KAHCapability = preflight.capability
 		if preflight.err != nil {
-			return fail(result, "blocked_missing_kah_workflow_capability", preflight.err.Error()), nil
+			return fail(result, workflowCapabilityFailureCode(opts), preflight.err.Error()), nil
 		}
 	}
 
@@ -381,6 +410,37 @@ func normalizeOptions(opts Options) Options {
 	return opts
 }
 
+func validateWorkflowManagedResume(opts Options) (MaterializationEvidence, *codedError) {
+	if hasSelectorInput(opts) {
+		return MaterializationEvidence{}, &codedError{Code: "strict_workflow_route_result_required", Message: "workflow-managed KAS/KAH dispatch must not use selector mode directly; preserve workflow-route output and run-local trigger materialization first."}
+	}
+	if strings.TrimSpace(opts.CustomWorkflowPacket) != "" || opts.MaterializeRunLocal || strings.TrimSpace(opts.RunID) != "" {
+		return MaterializationEvidence{}, &codedError{Code: "strict_workflow_route_result_required", Message: "workflow-managed KAS/KAH dispatch requires --route-result with --materialize-run-local, or an explicit resume from existing run-local materialization evidence."}
+	}
+	if strings.TrimSpace(opts.InstanceID) == "" || strings.TrimSpace(opts.WorkflowID) == "" || strings.TrimSpace(opts.WorkflowFile) == "" || strings.TrimSpace(opts.NodeContractSource) == "" {
+		return MaterializationEvidence{}, &codedError{Code: "strict_workflow_route_result_required", Message: "workflow-managed KAS/KAH dispatch requires a matched route result before dispatch; safe resume requires --instance-id, --workflow-id, --workflow-file, and --node-contract-source."}
+	}
+	path := filepath.Join(opts.Project, ".kkachi", "runs", filepath.FromSlash(opts.InstanceID), "workflow", "materialization.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return MaterializationEvidence{}, &codedError{Code: "strict_workflow_materialization_evidence_required", Message: "workflow-managed resume requires readable run-local materialization evidence from prior workflow-trigger route-result materialization."}
+	}
+	var materialized workflowmaterializer.Result
+	if err := json.Unmarshal(data, &materialized); err != nil {
+		return MaterializationEvidence{}, &codedError{Code: "strict_workflow_materialization_evidence_invalid", Message: "workflow-managed resume materialization evidence is not parseable."}
+	}
+	if !materialized.OK || materialized.Status != "materialized" || materialized.DirectKAHStateWrite {
+		return MaterializationEvidence{}, &codedError{Code: "strict_workflow_materialization_evidence_invalid", Message: "workflow-managed resume materialization evidence must be ok:true/status:materialized with direct_kah_state_write:false."}
+	}
+	if materialized.RouteResultCopy == "" || materialized.SourceEvidence.RouteResultPath == "" || materialized.SourceEvidence.RouteResultChecksum == "" {
+		return MaterializationEvidence{}, &codedError{Code: "strict_workflow_materialization_evidence_invalid", Message: "workflow-managed resume requires route-result materialization evidence; custom one-off materialization is not a classified route result."}
+	}
+	if materialized.RunID != opts.InstanceID || materialized.WorkflowID != opts.WorkflowID || filepath.ToSlash(materialized.WorkflowFile) != filepath.ToSlash(opts.WorkflowFile) || filepath.ToSlash(materialized.NodeContractSource) != filepath.ToSlash(opts.NodeContractSource) {
+		return MaterializationEvidence{}, &codedError{Code: "strict_workflow_materialization_evidence_mismatch", Message: "workflow-managed resume inputs must match the preserved run-local materialization workflow and node-contract evidence."}
+	}
+	return materializationEvidence(materialized), nil
+}
+
 func materializeRunLocal(opts Options, custom bool) (workflowmaterializer.Result, error) {
 	materializerOpts := workflowmaterializer.Options{
 		Project:              opts.Project,
@@ -419,14 +479,28 @@ func newResult(opts Options) Result {
 
 func fail(result Result, code string, message string) Result {
 	result.OK = false
-	if result.Status == "" || result.Status == "blocked" {
+	if result.Status == "" || result.Status == "dispatch_packets_rendered" || result.Status == "blocked" {
 		result.Status = code
 	}
 	result.ReasonCodes = appendUnique(append(result.ReasonCodes, code)...)
 	result.Diagnostics = append(result.Diagnostics, Diagnostic{Level: "error", Code: code, Message: message})
-	result.NextAction = "Fix the reported workflow trigger blocker and rerun with explicit workflow and node-contract inputs."
+	result.NextAction = nextActionForFailure(code)
 	result.DispatchPackets = []DispatchPacket{}
 	return result
+}
+
+func nextActionForFailure(code string) string {
+	if strings.HasPrefix(code, "strict_workflow_") {
+		return "Preserve a matched workflow-route result, then rerun workflow-trigger with --route-result --materialize-run-local --run <run-id> --workflow-managed; for resume, use only inputs that match existing route-backed run-local materialization evidence."
+	}
+	return "Fix the reported workflow trigger blocker and rerun with explicit workflow and node-contract inputs."
+}
+
+func workflowCapabilityFailureCode(opts Options) string {
+	if opts.WorkflowManaged {
+		return "strict_workflow_missing_kah_capability"
+	}
+	return "blocked_missing_kah_workflow_capability"
 }
 
 type codedError struct {

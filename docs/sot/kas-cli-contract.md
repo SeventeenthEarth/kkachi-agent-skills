@@ -134,6 +134,7 @@ previously matched route result or an approved one-off custom workflow packet:
 ```text
 kkachi-agent-skills workflow-trigger --project <path> --route-result <workflow-route-json> --materialize-run-local --run <run-id> --json
 kkachi-agent-skills workflow-trigger --project <path> --run <run-id> --custom-workflow-packet <workflow-create-dry-run.json> --approval dry-run:sha256:<hash> --materialize-run-local --json
+kkachi-agent-skills workflow-trigger --project <path> --route-result <workflow-route-json> --materialize-run-local --run <run-id> --workflow-managed --json
 ```
 
 The route-result path consumes a `workflow-route` JSON file only. It does not
@@ -176,6 +177,19 @@ copied from approved generated node contracts, and dispatch packets include
 `fallback_policy:none_fail_closed`, and `direct_kah_state_write:false`.
 Missing KAH-ready node contracts fail the whole command with no partial
 packets.
+
+STRICT-003 adds `--workflow-managed` for classified KAS/KAH
+workflow-managed dispatch. When this flag is present, KAS must have a
+successful preserved route result (`ok:true`, `status: bundle_route_matched`),
+selected workflow id/bundle trace, run-local materialization or safe resume
+evidence, KAH workflow capability evidence, KAH ready-node evidence, and
+dispatch packets derived only from those ready nodes before dispatch. The safe
+resume path requires `--instance-id`, `--workflow-id`, `--workflow-file`, and
+`--node-contract-source` that match
+`.kkachi/runs/<run_id>/workflow/materialization.json`; that materialization
+must be route-result backed, not a custom one-off packet. Missing, malformed,
+failed, or mismatched route/materialization/capability/resume evidence fails
+closed with no dispatch packets. Selector mode, explicit workflow mode, custom packet mode, skill order, phase-plan text, and the legacy default development spine are not fallback paths for `--workflow-managed`.
 
 WFLOW-008 materialization must reject unsafe paths, symlink/path escapes,
 project-local `.kkachi/workflows`, `.kkachi/workflow-catalog.yaml`,

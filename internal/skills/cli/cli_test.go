@@ -949,6 +949,54 @@ node_contracts:
 	}
 }
 
+func TestWorkflowTriggerCLIWorkflowManagedRejectsBypass(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(project, "node-contracts.json")
+	if err := os.WriteFile(source, []byte(`{
+  "schema_version": "kas-node-contracts/v1",
+  "contracts": [
+    {
+      "workflow_id": "demo",
+      "node_id": "setup",
+      "owner_role": "implementer_backend",
+      "execution_lane": "direct_kas_skill",
+      "required_inputs": ["task-contract.yaml"],
+      "expected_artifacts": ["artifacts/setup.md"],
+      "prompt_ref": "skills/kkachi-implement/SKILL.md",
+      "approval_required": false,
+      "fallback_policy": "none_fail_closed",
+      "verification_gate": "make test"
+    }
+  ]
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	installCLIWorkflowTriggerFakeKAH(t, true)
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"workflow-trigger", "--project", project, "--workflow-id", "demo", "--node-contract-source", source, "--run", "run-20260615T010203Z-abcdef123456", "--workflow-managed", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected strict workflow-managed blocker, got code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "strict_workflow_route_result_required")
+	var blocked map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &blocked); err != nil {
+		t.Fatal(err)
+	}
+	if packets, ok := blocked["dispatch_packets"].([]any); !ok || len(packets) != 0 {
+		t.Fatalf("strict blocker must not render packets: %+v", blocked)
+	}
+	nextAction, _ := blocked["next_action"].(string)
+	for _, want := range []string{"workflow-route", "--route-result", "--materialize-run-local", "--workflow-managed", "route-backed run-local materialization evidence"} {
+		if !strings.Contains(nextAction, want) {
+			t.Fatalf("strict next_action missing %q: %q", want, nextAction)
+		}
+	}
+	if strings.Contains(nextAction, "explicit workflow and node-contract inputs") {
+		t.Fatalf("strict next_action must not steer operators to explicit workflow fallback: %q", nextAction)
+	}
+}
+
 func TestWorkflowRouteCLIRoutesClassifiedTaskWithoutKAH(t *testing.T) {
 	root := cliRepoRoot(t)
 	taxonomy := filepath.Join(root, "registries", "task-taxonomy.yaml")
@@ -1013,7 +1061,7 @@ func TestWorkflowTriggerCLIRunLocalMaterialization(t *testing.T) {
 	installCLIWorkflowTriggerRunLocalFakeKAH(t, true)
 
 	var stdout, stderr bytes.Buffer
-	code := Main([]string{"workflow-trigger", "--project", project, "--route-result", routeResult, "--materialize-run-local", "--run", "run-20260616T105614Z-4b0ebe11b67d", "--json"}, &stdout, &stderr, nil)
+	code := Main([]string{"workflow-trigger", "--project", project, "--route-result", routeResult, "--materialize-run-local", "--run", "run-20260616T105614Z-4b0ebe11b67d", "--workflow-managed", "--json"}, &stdout, &stderr, nil)
 	if code != 0 {
 		t.Fatalf("run-local workflow trigger failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
 	}

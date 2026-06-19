@@ -424,15 +424,17 @@ func TestTriggerRunLocalMaterializationPreflightsBeforeWrite(t *testing.T) {
 		Project:             project,
 		RouteResult:         routeResult,
 		MaterializeRunLocal: true,
+		WorkflowManaged:     true,
 		RunID:               "run-20260616T105614Z-4b0ebe11b67d",
 		Runner:              runner.Run,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.OK || result.Status != "blocked_missing_kah_workflow_capability" {
-		t.Fatalf("expected capability blocker, got %+v", result)
+	if result.OK || result.Status != "strict_workflow_missing_kah_capability" {
+		t.Fatalf("expected strict capability blocker, got %+v", result)
 	}
+	assertStrictWorkflowNextAction(t, result.NextAction)
 	if result.Materialization != nil {
 		t.Fatalf("preflight blocker exposed materialization evidence: %+v", result.Materialization)
 	}
@@ -510,6 +512,241 @@ func TestTriggerRunLocalMaterializationRendersDispatchPackets(t *testing.T) {
 		if strings.Contains(call, ".kkachi/workflows/") {
 			t.Fatalf("run-local trigger fell back to persistent workflow path: %#v", runner.calls)
 		}
+	}
+}
+
+func TestTriggerWorkflowManagedFailsClosedWithoutRouteOrMaterializationEvidence(t *testing.T) {
+	project := t.TempDir()
+	source := writeNodeContractBundle(t, project, validNodeContractBundle("demo", "setup"))
+	runner := newWorkflowFakeRunner("demo", "run-20260615T010203Z-abcdef123456", []string{"setup"})
+
+	result, err := Trigger(Options{
+		Project:            project,
+		WorkflowID:         "demo",
+		NodeContractSource: source,
+		RunID:              "run-20260615T010203Z-abcdef123456",
+		WorkflowManaged:    true,
+		Runner:             runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "strict_workflow_route_result_required" {
+		t.Fatalf("expected strict route-result blocker, got %+v", result)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("strict route-result blocker must not call KAH: %#v", runner.calls)
+	}
+	if len(result.DispatchPackets) != 0 {
+		t.Fatalf("strict blocker must not render dispatch packets: %+v", result.DispatchPackets)
+	}
+	assertStrictWorkflowNextAction(t, result.NextAction)
+}
+
+func TestTriggerWorkflowManagedRejectsSelectorBypassBeforeKAH(t *testing.T) {
+	project := t.TempDir()
+	registry := writeRegistry(t, project, validRegistry("demo", "setup"))
+	runner := newWorkflowFakeRunner("demo", "run-20260615T010203Z-abcdef123456", []string{"setup"})
+
+	result, err := Trigger(Options{
+		Project:              project,
+		SelectorRegistry:     registry,
+		TaskClass:            "development",
+		ChangedSurfaces:      []string{"code"},
+		RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"},
+		RunID:                "run-20260615T010203Z-abcdef123456",
+		WorkflowManaged:      true,
+		Runner:               runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "strict_workflow_route_result_required" {
+		t.Fatalf("expected selector bypass blocker, got %+v", result)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("selector bypass blocker must not call KAH: %#v", runner.calls)
+	}
+	assertStrictWorkflowNextAction(t, result.NextAction)
+}
+
+func TestTriggerWorkflowManagedRouteMaterializationRejectsFallbackInputsBeforeKAH(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeRegistry(t, project, validRegistry("demo", "setup"))
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routeResult := writeTriggerRouteResult(t, project, registry, "demo")
+	customPacket, customApproval := writeTriggerCustomWorkflowPacket(t, project, "demo")
+
+	tests := []struct {
+		name       string
+		mutateOpts func(*Options)
+		wantStatus string
+	}{
+		{
+			name: "approval conflict",
+			mutateOpts: func(opts *Options) {
+				opts.Approval = "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+			},
+			wantStatus: "strict_workflow_materialization_mode_conflict",
+		},
+		{
+			name: "custom packet without approval rejected",
+			mutateOpts: func(opts *Options) {
+				opts.CustomWorkflowPacket = customPacket
+			},
+			wantStatus: "strict_workflow_custom_packet_rejected",
+		},
+		{
+			name: "custom packet with approval rejected",
+			mutateOpts: func(opts *Options) {
+				opts.CustomWorkflowPacket = customPacket
+				opts.Approval = customApproval
+			},
+			wantStatus: "strict_workflow_custom_packet_rejected",
+		},
+		{
+			name: "missing run id",
+			mutateOpts: func(opts *Options) {
+				opts.RunID = ""
+			},
+			wantStatus: "strict_workflow_run_id_required",
+		},
+		{
+			name: "explicit workflow conflict",
+			mutateOpts: func(opts *Options) {
+				opts.WorkflowID = "demo"
+			},
+			wantStatus: "strict_workflow_materialization_mode_conflict",
+		},
+		{
+			name: "selector conflict",
+			mutateOpts: func(opts *Options) {
+				opts.SelectorRegistry = registryPath
+				opts.TaskClass = "development"
+			},
+			wantStatus: "strict_workflow_materialization_mode_conflict",
+		},
+		{
+			name: "resume instance conflict",
+			mutateOpts: func(opts *Options) {
+				opts.InstanceID = "run-20260616T105614Z-4b0ebe11b67d"
+			},
+			wantStatus: "strict_workflow_materialization_mode_conflict",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner := newWorkflowFakeRunner("demo", "run-20260616T105614Z-4b0ebe11b67d", []string{"setup"})
+			opts := Options{
+				Project:             project,
+				RouteResult:         routeResult,
+				MaterializeRunLocal: true,
+				RunID:               "run-20260616T105614Z-4b0ebe11b67d",
+				WorkflowManaged:     true,
+				Runner:              runner.Run,
+			}
+			tt.mutateOpts(&opts)
+
+			result, err := Trigger(opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.OK || result.Status != tt.wantStatus {
+				t.Fatalf("expected %s, got %+v", tt.wantStatus, result)
+			}
+			if result.Status == "run_local_materialization_mode_conflict" {
+				t.Fatalf("workflow-managed materialization returned non-strict mode conflict: %+v", result)
+			}
+			if !strings.HasPrefix(result.Status, "strict_workflow_") {
+				t.Fatalf("workflow-managed materialization status must be strict-prefixed: %+v", result)
+			}
+			if len(runner.calls) != 0 {
+				t.Fatalf("strict materialization blocker must not call KAH: %#v", runner.calls)
+			}
+			assertStrictWorkflowNextAction(t, result.NextAction)
+		})
+	}
+}
+
+func assertStrictWorkflowNextAction(t *testing.T, nextAction string) {
+	t.Helper()
+	for _, want := range []string{"workflow-route", "--route-result", "--materialize-run-local", "--workflow-managed", "route-backed run-local materialization evidence"} {
+		if !strings.Contains(nextAction, want) {
+			t.Fatalf("strict next_action missing %q: %q", want, nextAction)
+		}
+	}
+	if strings.Contains(nextAction, "explicit workflow and node-contract inputs") {
+		t.Fatalf("strict next_action must not steer operators to explicit workflow fallback: %q", nextAction)
+	}
+}
+
+func TestTriggerWorkflowManagedResumeRequiresRunLocalMaterializationEvidence(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeRegistry(t, project, validRegistry("demo", "setup"))
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routeResult := writeTriggerRouteResult(t, project, registry, "demo")
+	workflowFile := ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/workflow.yaml"
+	runner := newWorkflowFakeRunnerForFile("demo", "run-20260616T105614Z-4b0ebe11b67d", workflowFile, []string{"setup"})
+
+	materialized, err := Trigger(Options{
+		Project:             project,
+		RouteResult:         routeResult,
+		MaterializeRunLocal: true,
+		WorkflowManaged:     true,
+		RunID:               "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:              runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !materialized.OK {
+		t.Fatalf("materialization setup failed: %+v", materialized)
+	}
+
+	resumeRunner := newWorkflowFakeRunnerForFile("demo", "run-20260616T105614Z-4b0ebe11b67d", workflowFile, []string{"setup"})
+	resumed, err := Trigger(Options{
+		Project:            project,
+		WorkflowID:         "demo",
+		WorkflowFile:       workflowFile,
+		NodeContractSource: ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/node-contracts.json",
+		InstanceID:         "run-20260616T105614Z-4b0ebe11b67d",
+		WorkflowManaged:    true,
+		Runner:             resumeRunner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resumed.OK || resumed.Mode != "workflow_managed_resume_trigger" || resumed.Materialization == nil || resumed.Materialization.RouteResultCopy == "" {
+		t.Fatalf("unexpected strict resume result: %+v", resumed)
+	}
+	if containsCall(resumeRunner.calls, "workflow create --run run-20260616T105614Z-4b0ebe11b67d --file "+workflowFile+" --json") {
+		t.Fatalf("strict resume must not create: %#v", resumeRunner.calls)
+	}
+	if !containsCall(resumeRunner.calls, "workflow show --run run-20260616T105614Z-4b0ebe11b67d --json") {
+		t.Fatalf("strict resume did not read existing KAH instance: %#v", resumeRunner.calls)
+	}
+
+	mismatched, err := Trigger(Options{
+		Project:            project,
+		WorkflowID:         "demo",
+		WorkflowFile:       workflowFile,
+		NodeContractSource: ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/node-contracts.json",
+		InstanceID:         "run-20260616T105614Z-missing",
+		WorkflowManaged:    true,
+		Runner:             resumeRunner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mismatched.OK || mismatched.Status != "strict_workflow_materialization_evidence_required" {
+		t.Fatalf("expected missing materialization blocker, got %+v", mismatched)
 	}
 }
 

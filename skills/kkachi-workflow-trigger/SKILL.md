@@ -62,6 +62,19 @@ kkachi-agent-skills workflow-trigger \
   --json
 ```
 
+Classified workflow-managed KAS/KAH mode adds:
+
+```bash
+  --workflow-managed
+```
+
+Use `--workflow-managed` for STRICT-003 KAS/KAH runs after task classification
+selects a workflow. In this mode dispatch must come from a preserved
+`workflow-route` result plus run-local materialization, or from an explicit
+resume of an already materialized run-local workflow whose
+`.kkachi/runs/<run_id>/workflow/materialization.json` proves route-result
+materialization. Direct explicit or selector dispatch is rejected before KAH calls.
+
 Approved one-off WFLOW-008 custom packet mode:
 
 ```bash
@@ -87,7 +100,7 @@ Rules:
 - Selector mode uses deterministic registry predicates. Exactly one workflow may proceed; zero matches return `selector_no_match`, multiple matches return `selector_ambiguous`, and mixed explicit/selector inputs return `selector_explicit_mode_conflict`.
 - In run-local mode, the route result must already be `ok:true` with
   `status: bundle_route_matched`; `workflow-trigger` does not reroute raw task
-  metadata or infer a task class.
+  metadata or infer a task class. It produces route-backed run-local materialization evidence before workflow-managed dispatch.
 - In approved one-off custom packet mode, the packet must be the existing
   `workflow-create` dry-run machine packet shape, `--approval` must be exactly
   `dry-run:sha256:<hash>`, and the hash is recomputed with WFLOW-004 canonical
@@ -99,6 +112,10 @@ Rules:
   `checksums.json`.
 - Run-local materialization is preflighted: if the effective KAH binary lacks
   workflow support, the command fails closed before writing run-local files.
+- In workflow-managed mode, missing route-result evidence, selector bypass,
+  explicit dispatch bypass, custom one-off packet materialization, missing
+  materialization evidence, or mismatched resume inputs fail closed with no
+  dispatch packets and no fallback to the legacy development spine.
 - Use `--run <run-id>` when KAH should create the workflow instance.
 - Use `--instance-id <id>` when KAH should resume by `workflow show`; the instance id is passed to KAH as the run id.
 - JSON output is the stable contract. Human output is compact status only.
@@ -175,6 +192,15 @@ The trigger:
 7. always reports `direct_kah_state_write:false`, `completion_authority:kah_only`, `fallback_policy:none_fail_closed`, and `stage1_direct_codex_is_kab_native_codex:false`.
 
 Dispatch packets are instructions for the declared lane only. This skill does not start, complete, block, retry, or roll back KAH nodes.
+
+For classified workflow-managed KAS/KAH runs, step 1 is narrowed by STRICT-003:
+the trigger must consume a successful `workflow-route` result
+(`ok:true/status:bundle_route_matched`) through `--route-result
+--materialize-run-local --run <run-id> --workflow-managed`, or resume an
+existing KAH instance only after reading matching route-backed run-local
+materialization evidence. It must not substitute selector mode, explicit
+`.kkachi/workflows/<workflow-id>.yaml` mode, custom one-off packet mode, skill
+order, phase-plan text, or the old default development spine.
 
 Run-local materialization records the selected bundle, task class,
 classification reason or approved one-off packet evidence, source
