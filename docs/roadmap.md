@@ -56,7 +56,8 @@ INITDOC-003
   -> TOKEN-001..010
   -> GRSYNC-001..003
   -> KASROLE-001..004
-  -> WFLOW-002..004 paired with KAH DAGSM-001..003 (WFLOW-001 planning SOT already completed)
+  -> WFLOW-002..009 paired with KAH DAGSM-001..006 (WFLOW-001 planning SOT already completed)
+  -> STRICT-001..007 shared across KAS and KAH after the WFLOW/DAGSM baseline
   -> MAR-001..005 paired with KAH MAREV-001..003 when MAR repository promotion is selected
   -> POLPR-001..008 shared across KAS and KAH
 ```
@@ -254,6 +255,23 @@ KASROLE deferrals unless separately approved: dynamic subset derivation from DAG
 | WFLOW-009 | Implement explicit promotion from run-local workflow to project-local persistent workflow | Completed | Provide dry-run-first, approval-hash-bound promotion from a run-local DAG/node-contract bundle to project-local workflow/catalog/trigger artifacts only when the operator explicitly requests repeated reuse. | Completed in KAH run `run-20260616T143247Z-f2c0e7b777a9`: added explicit `workflow-promote`, `kas-workflow-promote-packet/v1`, source materialization/checksum verification, required `--target-workflow-id` and `--reuse-reason`, mutually exclusive `--dry-run` / `--apply dry-run:sha256:<hash>`, optional thin trigger proposal content, approval-hash recomputation, CLI/docs/skill registration, and docs-contract coverage. First color review found missing checksum-evidence and status-marker blockers; fixes added `source_checksum_missing` fail-closed behavior and focused missing-checksum tests, then Red/Gray focused re-review accepted (`t_6f89bc48`, `t_107537e1`) after first-round cards `t_436355dd`, `t_9f44dd51`, `t_aba844eb`. MAR accepted in KAB session `b1c3bc9e-52ab-4e96-a630-2636b62718a8`; post-MAR Red/Orange/Gray accepted (`t_47a8039e`, `t_d166012d`, `t_f9a0bcfe`). Verification passed focused workflowpromoter/CLI/docs-contract tests, `make test`, `git diff --check`, and gofmt check. Correct-hash apply now requires effective KAH DAGSM-006 / v0.1.10 catalog proposal/apply capability evidence; KAS does not direct-write `.kkachi/workflows/*`, `.kkachi/workflow-catalog.yaml`, `.kkachi-workflow.yaml`, profile files, KAH/KAB state, auth/token/provider/gateway/model config, or fallback backend selection. |
 
 WFLOW deferrals unless separately approved: dynamic node generation during execution, retry/rollback automation, arbitrary webhook runtime, automatic workflow choice when selector or classification is ambiguous, automatic fallback agent/backend selection, install-time bundle persistence, automatic project-local workflow promotion, KAB graph authority, Kkachi v2 workflow merge/fallback, profile/provider/gateway/auth/token/model mutation, and broad promotion of custom skills into shared KAS source without review.
+
+### EPIC: STRICT — classification-selected workflow strict execution
+
+> Goal: make the workflow selected at task-classification time the execution-order authority for KAS/KAH runs. KAS must route/materialize/dispatch only KAH-ready nodes, and KAH must own strict node start/complete admission, transition ledger verification, and final projection checks.
+>
+> Source of truth: `docs/sot/strict-workflow-execution-contract.md`. Paired KAH companion SOT: KAH `docs/sot/strict-workflow-enforcement.md`. Dependency baseline: KAS `WFLOW-007..009` plus KAH `DAGSM-001..006`.
+>
+> Shared cross-repo order: `STRICT-001 -> STRICT-002 -> STRICT-003 -> STRICT-004 -> STRICT-005 -> STRICT-006 -> STRICT-007`. KAS owns `STRICT-001`, `STRICT-003`, `STRICT-005`, and `STRICT-007`; KAH owns `STRICT-002`, `STRICT-004`, and `STRICT-006`.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| STRICT-001 | Register strict workflow execution SOT and shared roadmap sequence | Completed | `docs/sot/strict-workflow-execution-contract.md` defines classification-selected workflow order authority, KAS/KAH/KAB/Kanban boundaries, strict dispatch/start/complete policy, reject-not-rollback behavior, cross-repo `STRICT-001..007` sequence, and deferrals. KAS roadmap, docs index, docs map, and paired KAH companion docs are updated. | Completed after docs readback, docs-map YAML parse in both repos, `git diff --check`, both repo `make test`, Red `t_9827eaaf`, Orange `t_2b8d4a53`, Gray `t_4bb7db25`, Blue synthesis `t_676c392b`, focused re-review for the KAH test-expectation repair (`t_9455d325`, `t_e9a780ee`, `t_ca4ee26e`), and Blue focused synthesis `t_8d182425`. No runtime behavior or commit/install/release is authorized by this docs task alone. |
+| STRICT-003 | Make classification route/trigger mandatory before KAS dispatch | Planned | Classified KAS/KAH runs must preserve route result, selected workflow id, run-local materialization evidence, and KAH capability evidence before dispatch; failure to route/materialize/resume blocks execution instead of falling back to a development spine. | Depends on KAH `STRICT-002`; requires route/trigger implementation tests, docs/skill/template updates, strict failure fixtures, review gates, final KAH gate, and commit approval. |
+| STRICT-005 | Add expected-revision dispatch and node execution guard | Planned | KAS dispatch packets include strict order metadata, ready-node/revision evidence, `expected_start_revision`, and stale-packet handling; KAS runner/skills require KAH node start success before backend/agent work and KAH node complete success before completion claims. | Depends on KAH `STRICT-004`; requires packet schema tests, stale/non-ready node fixtures, skill/template readback, review gates, final verification, and commit approval. |
+| STRICT-007 | Adopt strict flow in active KAS orchestration skills/templates/e2e | Planned | Active KAS orchestration, phase skills, backend prompt templates, final verification guidance, and e2e/golden fixtures require strict route -> trigger -> ready -> start -> work -> complete flow for workflow-managed runs. | Depends on KAH `STRICT-006`; requires development/docs-only happy paths, violation fixtures, stale wording scan, docs-contract/e2e coverage, MAR/color review as applicable, final gate, and commit approval. |
+
+STRICT deferrals unless separately approved: realtime alerting/watchers, automatic rollback/checkpoint behavior, dynamic node generation, retry automation, fallback agent/backend selection, KAB runtime activation, profile/provider/gateway/auth/token/model mutation, push/release/install, or claiming strict runtime behavior before implementation/effective-binary evidence exists.
 
 ### EPIC: TOKEN — KAS token economy and English operator surfaces
 
