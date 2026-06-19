@@ -163,6 +163,22 @@ Project-specific instructions preserved by KAS.
 
 If an existing file lacks markers, KAS should produce a dry-run merge plan and require approval before rewriting or inserting managed blocks.
 
+POLPR-006 implements the repo-local agent-instruction lifecycle through
+`kkachi-agent-skills update agent-instructions`. This lifecycle is distinct from profile-local skill installation: it targets repository-root `AGENTS.md`
+and `CLAUDE.md`, reports dry-run hash evidence, updates only the KAS managed
+block, reports any preserved `PROJECT:LOCAL` block as the preservation action
+`preserve_project_local_block`, and fails closed with
+`blocked_unmarked_existing_file` when an existing instruction file lacks
+markers. Malformed KAS source templates that lack the managed block are
+reported as the `error` outcome with diagnostic
+`source_template_missing_managed_block`. Existing repo-local instruction files
+with missing, reversed, or duplicate KAS managed markers are non-approvable
+with diagnostic `existing_managed_block_malformed` unless they are fully
+unmarked, which remains `blocked_unmarked_existing_file`. The lifecycle must
+not use profile install, profile manifests, runtime activation, KAH state
+writes, KAB session control, or auth/token/provider/model configuration as a
+fallback.
+
 ### 5.4 Project-specific adaptation
 
 Templates must include project-role substitutions so KAS/KAH/KAB repositories receive different boundary wording:
@@ -304,6 +320,11 @@ Acceptance criteria:
 - `templates/agent-instructions/AGENTS.md.tmpl` and `templates/agent-instructions/CLAUDE.md.tmpl` or accepted equivalent exist.
 - Templates include English managed block content, managed block markers, and project-local preservation guidance.
 - CLI or documented dry-run workflow reports create/update/no-change/not_applicable posture without blind overwrite.
+- CLI dry-run workflow reports `create`, `update_managed_block`, `no_change`, `not_applicable`, `blocked_unmarked_existing_file`, and `error` outcomes without blind overwrite.
+- CLI dry-run workflow reports `preserve_project_local_block` as a preservation action for existing `PROJECT:LOCAL` blocks, not as a top-level file-plan outcome.
+- Malformed KAS source templates missing managed markers report `source_template_missing_managed_block` and remain non-approvable.
+- Existing repo-local instruction files with malformed managed markers report `existing_managed_block_malformed` and remain non-approvable.
+- Approved repo-local writes use an exact `--apply dry-run:sha256:<hash>` token and fail closed on stale, malformed, mismatched, or blocked dry-run hash evidence.
 - Project-specific adaptation fields preserve KAS/KAH/KAB boundaries and English compact output rules.
 
 ### 7.4 KAS PR 4: project KAS lifecycle UX and read-only planner surface

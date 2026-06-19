@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/agentinstructions"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/doctor"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/graphsync"
@@ -286,6 +287,9 @@ func runPublicProjectInstall(repo string, profile string, project string, source
 }
 
 func runUpdate(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	if len(argv) > 0 && argv[0] == "agent-instructions" {
+		return runUpdateAgentInstructions(argv[1:], stdout, stderr)
+	}
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	profile := fs.String("profile", "", "Hermes target profile name")
@@ -327,6 +331,70 @@ func runUpdate(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	}
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return kasstate.RenderHumanLifecycleUpdate(result)
+	})
+}
+
+func runUpdateAgentInstructions(argv []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("update agent-instructions", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	repoPath := fs.String("repo-path", "", "target repository root containing AGENTS.md / CLAUDE.md")
+	sourceRepo := fs.String("source-repo", "", "KAS source repository root containing templates/agent-instructions")
+	project := fs.String("project", "", "project name/id for template rendering")
+	repositoryRole := fs.String("repository-role", "", "repository role for template rendering")
+	projectSuiteID := fs.String("project-suite-id", "", "project suite id for template rendering")
+	kabAdoptionStage := fs.String("kab-adoption-stage", "", "selected KAB adoption stage label for template rendering")
+	upstreamKASBaseline := fs.String("upstream-kas-baseline", "", "upstream KAS baseline label for template rendering")
+	localAuthorityNotes := fs.String("local-authority-notes", "", "local authority notes for template rendering")
+	notApplicable := fs.String("not-applicable", "", "comma-separated AGENTS.md/CLAUDE.md files to mark not_applicable")
+	notApplicableReason := fs.String("not-applicable-reason", "", "reason used for not_applicable file outcomes")
+	dryRun := fs.Bool("dry-run", false, "plan repo-local instruction changes without writing")
+	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash> for approved repo-local instruction writes")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "update agent-instructions does not accept positional arguments after the subcommand.", "update agent-instructions", *jsonOutput, "")
+	}
+	if *dryRun && *apply != "" {
+		return emitError(stderr, "agent_instructions_mode_ambiguous", "update agent-instructions accepts either --dry-run or --apply, not both.", "update agent-instructions", *jsonOutput, "Run dry-run first, then rerun with only --apply dry-run:sha256:<hash>.")
+	}
+	if !*dryRun && *apply == "" {
+		return emitError(stderr, "agent_instructions_requires_dry_run_or_apply", "update agent-instructions requires --dry-run or --apply dry-run:sha256:<hash>.", "update agent-instructions", *jsonOutput, "Rerun with update agent-instructions --repo-path <path> --dry-run.")
+	}
+	if *repoPath == "" {
+		return emitError(stderr, "repo_path_required", "update agent-instructions requires --repo-path <path>.", "update agent-instructions", *jsonOutput, "")
+	}
+	opts := agentinstructions.Options{
+		RepoPath:            *repoPath,
+		SourceRepoPath:      *sourceRepo,
+		Project:             *project,
+		RepositoryRole:      *repositoryRole,
+		ProjectSuiteID:      *projectSuiteID,
+		KABAdoptionStage:    *kabAdoptionStage,
+		UpstreamKASBaseline: *upstreamKASBaseline,
+		LocalAuthorityNotes: *localAuthorityNotes,
+		NotApplicable:       splitFlagList(*notApplicable),
+		NotApplicableReason: *notApplicableReason,
+	}
+	var result agentinstructions.Result
+	var err error
+	if *apply != "" {
+		result, err = agentinstructions.Apply(opts, *apply)
+	} else {
+		result, err = agentinstructions.BuildDryRun(opts)
+	}
+	if err != nil {
+		return emitError(stderr, "agent_instructions_planner_failed", err.Error(), "update agent-instructions", *jsonOutput, "")
+	}
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return agentinstructions.RenderHuman(result)
 	})
 }
 
@@ -1137,7 +1205,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "Available commands:")
 	fmt.Fprintln(w, "  list     List available KAS skill packs")
 	fmt.Fprintln(w, "  install  Plan KAS install or project-suite migration")
-	fmt.Fprintln(w, "  update   Classify project KAS updates without writing")
+	fmt.Fprintln(w, "  update   Classify project KAS updates, or update agent-instructions")
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
 	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
 	fmt.Fprintln(w, "  workflow-create   Plan custom task-DAG workflow candidates without writing")

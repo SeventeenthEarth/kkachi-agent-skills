@@ -14,6 +14,8 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 Review findings must be grounded in current artifacts, current diff, or reproducible evidence. Reviews must respect `phase-plan.yaml` as the workflow SOT and call out any missing checklist/evidence row instead of silently accepting incomplete phases.
 
+For project-Gray documentation/integrity review, explicitly verify roadmap/task status rows and status values against accepted evidence, review gates, and commits. If a completed task still says `Planned`, `In Progress`, or `In Review`, or an incomplete task says `Completed`, record it as a traceability finding and request a status-value update before closeout.
+
 Default review order for KAS/KAH runs:
 
 1. Treat first color review as the normal required review layer for any KAS/KAH run that changes repository files, durable artifacts, workflow state, docs, or release/commit evidence — not only implementation/code tasks. Pure read-only explanations should usually not open a KAS/KAH run; if a run is opened but review is genuinely not applicable, mark the phase `not_applicable` with an explicit reason rather than silently skipping it.

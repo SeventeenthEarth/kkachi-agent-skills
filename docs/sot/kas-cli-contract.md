@@ -1036,6 +1036,46 @@ repair dry-run planner. Public write/apply forms failed closed before TOKEN-005.
 The old `install-project-kas`, `repair-project-kas`, and `migrate-project-kas`
 commands remain compatibility surfaces for existing tests and scripts.
 
+POLPR-006 adds the `AGENTS.md` / `CLAUDE.md` repo-local lifecycle as a
+separate public update subcommand:
+
+```bash
+kkachi-agent-skills update agent-instructions --repo-path <path> --source-repo <kas-source-repo> --dry-run --json
+kkachi-agent-skills update agent-instructions --repo-path <path> --source-repo <kas-source-repo> --apply dry-run:sha256:<hash> --json
+```
+
+`--source-repo` identifies the KAS source checkout that contains
+`templates/agent-instructions/*.tmpl`. It defaults to the current working
+directory for source-repo dogfood runs, so installed-binary or out-of-tree
+operator flows must pass the source repo explicitly until a later task adds an
+embedded-template or installed-template locator.
+
+This surface manages repository-root instruction files only. It is distinct
+from profile-local skill installation and must not read profile manifests,
+write Hermes profile skills, activate profiles, mutate KAH state, control KAB
+runtime sessions, or change auth/token/provider/gateway/model settings.
+
+The dry-run result reports per-file outcomes for `AGENTS.md` and `CLAUDE.md`:
+`create`, `update_managed_block`, `no_change`, `not_applicable`,
+`blocked_unmarked_existing_file`, and `error`. A missing file may be created
+from `templates/agent-instructions/*.tmpl`; an existing file with
+`KAS:MANAGED` markers may update only that managed block; an existing
+`PROJECT:LOCAL` block is preserved and reported as the preservation action
+`preserve_project_local_block`, not as a top-level file-plan outcome; an
+unmarked existing file is
+`blocked_unmarked_existing_file`; a malformed KAS source template lacking the
+managed block is `error` with diagnostic
+`source_template_missing_managed_block`; an existing repo-local instruction
+file with missing, reversed, or duplicate KAS managed markers is non-approvable
+with diagnostic `existing_managed_block_malformed` unless it is fully unmarked,
+which remains `blocked_unmarked_existing_file`.
+
+Apply mode recomputes the current dry-run plan and writes only when
+`--apply dry-run:sha256:<hash>` exactly matches the current plan hash and the
+plan has no blocked files. Malformed, stale, mismatched, blocked, or ambiguous
+plans fail closed with no writes. There is no automatic migration path for
+unmarked instruction files and no fallback to profile-local install behavior.
+
 `uninstall --dry-run` is planner-only in TOKEN-004. It reads the profile
 manifest and filesystem, then reports manifest-tracked planned removals,
 skipped local-only or unmanifested files, checksums, changed paths,

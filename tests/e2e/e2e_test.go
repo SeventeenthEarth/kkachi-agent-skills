@@ -71,6 +71,61 @@ func TestRootInstalledBinaryVersion(t *testing.T) {
 	}
 }
 
+func TestRootBinaryUpdateAgentInstructionsDryRun(t *testing.T) {
+	binary := buildRootBinary(t)
+	repo := t.TempDir()
+	cmd := exec.Command(binary, "update", "agent-instructions", "--repo-path", repo, "--source-repo", repoRoot(t), "--project", "kan-control", "--dry-run", "--json")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("update agent-instructions dry-run failed: %v\n%s", err, out)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if payload["command"] != "update agent-instructions" || payload["mode"] != "dry_run" || payload["plan_hash"] == "" {
+		t.Fatalf("unexpected payload: %+v", payload)
+	}
+	noWrite := payload["no_write"].(map[string]any)
+	if noWrite["guaranteed"] != true || noWrite["profile_write_count"] != float64(0) || noWrite["kab_runtime_mutation_count"] != float64(0) {
+		t.Fatalf("missing no-write evidence: %+v", noWrite)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Fatalf("dry-run wrote repo-local AGENTS.md: %v", err)
+	}
+}
+
+func TestRootBinaryUpdateAgentInstructionsApply(t *testing.T) {
+	binary := buildRootBinary(t)
+	repo := t.TempDir()
+	dryRun := exec.Command(binary, "update", "agent-instructions", "--repo-path", repo, "--source-repo", repoRoot(t), "--project", "kan-control", "--dry-run", "--json")
+	dryOut, err := dryRun.CombinedOutput()
+	if err != nil {
+		t.Fatalf("update agent-instructions dry-run failed: %v\n%s", err, dryOut)
+	}
+	var dryPayload map[string]any
+	if err := json.Unmarshal(dryOut, &dryPayload); err != nil {
+		t.Fatalf("invalid dry-run JSON: %v\n%s", err, dryOut)
+	}
+	evidence := dryPayload["approval_request"].(map[string]any)["evidence_ref"].(string)
+	apply := exec.Command(binary, "update", "agent-instructions", "--repo-path", repo, "--source-repo", repoRoot(t), "--project", "kan-control", "--apply", evidence, "--json")
+	applyOut, err := apply.CombinedOutput()
+	if err != nil {
+		t.Fatalf("update agent-instructions apply failed: %v\n%s", err, applyOut)
+	}
+	var applyPayload map[string]any
+	if err := json.Unmarshal(applyOut, &applyPayload); err != nil {
+		t.Fatalf("invalid apply JSON: %v\n%s", err, applyOut)
+	}
+	noWrite := applyPayload["no_write"].(map[string]any)
+	if noWrite["guaranteed"] != false || noWrite["repo_write_count"].(float64) <= 0 || noWrite["profile_write_count"] != float64(0) {
+		t.Fatalf("unexpected apply write evidence: %+v", noWrite)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "AGENTS.md")); err != nil {
+		t.Fatalf("expected AGENTS.md to be written: %v", err)
+	}
+}
+
 func writeFakeKAH(t *testing.T) string {
 	t.Helper()
 	binDir := t.TempDir()

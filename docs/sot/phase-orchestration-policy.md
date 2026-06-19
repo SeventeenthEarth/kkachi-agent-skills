@@ -128,6 +128,16 @@ failure, route it to the selected implementer lane, and accept or reject the
 resulting fix. The selected implementer owns detailed RCA, code/docs mutation,
 and rerunning the affected verification.
 
+Test-layer vocabulary must stay explicit in task contracts and verification
+records. `test-prepare` is for formatting, lint, vet, generation, docs, and
+other static pre-test gates. `test-unit` runs isolated unit tests. `test-int`
+runs integration tests against mocks, fakes, stubs, in-memory substitutes, or
+other controlled doubles rather than real external services. `test-e2e` runs
+e2e tests only against disposable isolated processes/resources and must not
+mutate production/shared systems. `test` is the aggregate contract and, when a
+repository exposes this standard Make interface, runs `test-prepare`,
+`test-unit`, `test-int`, then `test-e2e`.
+
 For asynchronous review fan-in, attach the watcher only as an observer. When
 direct Kanban tools are absent, check and use the durable Hermes Kanban CLI
 surface before declaring review unavailable. Do not substitute `delegate_task`

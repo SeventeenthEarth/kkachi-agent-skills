@@ -18,7 +18,7 @@ test-prepare:
 	go test ./tests/docs_contract
 
 test-unit:
-	go test ./internal/skills/discovery ./internal/skills/install ./internal/skills/doctor ./internal/skills/graphsync ./internal/skills/kasstate ./internal/skills/projectinstall ./internal/skills/workflowcreator ./internal/skills/workflowmaterializer ./internal/skills/workflowpromoter ./internal/skills/workflowregistry ./internal/skills/workflowrouting ./internal/skills/workflowtrigger
+	go test ./internal/skills/agentinstructions ./internal/skills/discovery ./internal/skills/install ./internal/skills/doctor ./internal/skills/graphsync ./internal/skills/kasstate ./internal/skills/projectinstall ./internal/skills/workflowcreator ./internal/skills/workflowmaterializer ./internal/skills/workflowpromoter ./internal/skills/workflowregistry ./internal/skills/workflowrouting ./internal/skills/workflowtrigger
 
 test-int:
 	go test ./internal/skills/cli

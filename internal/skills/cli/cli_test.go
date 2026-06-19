@@ -533,7 +533,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 			if !strings.Contains(out, "Compatibility commands:") || !strings.Contains(out, "sync-project-kas") || !strings.Contains(out, "migrate-project-kas") {
 				t.Fatalf("root help did not list available commands: %q", out)
 			}
-			if !strings.Contains(out, "update   Classify project KAS updates without writing") || !strings.Contains(out, "version  Print CLI version information") || !strings.Contains(out, "Compatibility commands:") {
+			if !strings.Contains(out, "update   Classify project KAS updates, or update agent-instructions") || !strings.Contains(out, "version  Print CLI version information") || !strings.Contains(out, "Compatibility commands:") {
 				t.Fatalf("root help did not prioritize public dry-run lifecycle UX over legacy sync/migrate verbs: %q", out)
 			}
 			if stderr.Len() != 0 {
@@ -541,6 +541,136 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateAgentInstructionsHelpAndDryRunAreRepoLocal(t *testing.T) {
+	t.Run("help", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		code := Main([]string{"update", "agent-instructions", "--help"}, &stdout, &stderr, nil)
+		if code != 0 {
+			t.Fatalf("code=%d stderr=%s", code, stderr.String())
+		}
+		out := stdout.String()
+		for _, want := range []string{"Usage of update agent-instructions:", "repo-path", "dry-run", "apply", "not-applicable"} {
+			if !strings.Contains(out, want) {
+				t.Fatalf("agent-instructions help missing %q: %s", want, out)
+			}
+		}
+		if strings.Contains(out, "--profile-root") || strings.Contains(out, "Hermes target profile") {
+			t.Fatalf("repo-local help leaked profile install flags: %s", out)
+		}
+	})
+
+	t.Run("dry-run", func(t *testing.T) {
+		repo := t.TempDir()
+		var stdout, stderr bytes.Buffer
+		code := Main([]string{"update", "agent-instructions", "--repo-path", repo, "--source-repo", cliRepoRoot(t), "--project", "kan-control", "--dry-run", "--json"}, &stdout, &stderr, nil)
+		if code != 0 {
+			t.Fatalf("code=%d stderr=%s", code, stderr.String())
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload["command"] != "update agent-instructions" || payload["mode"] != "dry_run" || payload["plan_hash"] == "" {
+			t.Fatalf("unexpected payload: %+v", payload)
+		}
+		noWrite := payload["no_write"].(map[string]any)
+		if noWrite["guaranteed"] != true || noWrite["profile_write_count"] != float64(0) || noWrite["auth_provider_config_write_count"] != float64(0) {
+			t.Fatalf("missing no-write proof: %+v", noWrite)
+		}
+		if _, err := os.Stat(filepath.Join(repo, "AGENTS.md")); !os.IsNotExist(err) {
+			t.Fatalf("dry-run wrote repo-local AGENTS.md: %v", err)
+		}
+		if stderr.Len() != 0 {
+			t.Fatalf("expected JSON on stdout only, got stderr=%q", stderr.String())
+		}
+	})
+
+	t.Run("validation errors", func(t *testing.T) {
+		repo := t.TempDir()
+		hash := "dry-run:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+		for _, tc := range []struct {
+			name string
+			args []string
+			code string
+		}{
+			{
+				name: "both dry-run and apply",
+				args: []string{"update", "agent-instructions", "--repo-path", repo, "--source-repo", cliRepoRoot(t), "--dry-run", "--apply", hash, "--json"},
+				code: "agent_instructions_mode_ambiguous",
+			},
+			{
+				name: "neither dry-run nor apply",
+				args: []string{"update", "agent-instructions", "--repo-path", repo, "--source-repo", cliRepoRoot(t), "--json"},
+				code: "agent_instructions_requires_dry_run_or_apply",
+			},
+			{
+				name: "missing repo path",
+				args: []string{"update", "agent-instructions", "--source-repo", cliRepoRoot(t), "--dry-run", "--json"},
+				code: "repo_path_required",
+			},
+			{
+				name: "unexpected positional",
+				args: []string{"update", "agent-instructions", "--repo-path", repo, "--source-repo", cliRepoRoot(t), "--dry-run", "--json", "extra"},
+				code: "unexpected_argument",
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				var stdout, stderr bytes.Buffer
+				code := Main(tc.args, &stdout, &stderr, nil)
+				if code != 2 {
+					t.Fatalf("expected exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+				}
+				if stdout.Len() != 0 {
+					t.Fatalf("expected error JSON on stderr only, got stdout=%q", stdout.String())
+				}
+				assertCLIErrorCode(t, stderr.Bytes(), tc.code)
+			})
+		}
+	})
+
+	t.Run("unknown profile flag rejected", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		code := Main([]string{"update", "agent-instructions", "--profile-root", t.TempDir(), "--repo-path", t.TempDir(), "--source-repo", cliRepoRoot(t), "--dry-run"}, &stdout, &stderr, nil)
+		if code == 0 {
+			t.Fatalf("expected unknown profile flag to fail, stdout=%s stderr=%s", stdout.String(), stderr.String())
+		}
+	})
+
+	t.Run("apply writes repo-local instructions", func(t *testing.T) {
+		repo := t.TempDir()
+		var dryStdout, dryStderr bytes.Buffer
+		code := Main([]string{"update", "agent-instructions", "--repo-path", repo, "--source-repo", cliRepoRoot(t), "--project", "kan-control", "--dry-run", "--json"}, &dryStdout, &dryStderr, nil)
+		if code != 0 {
+			t.Fatalf("dry-run code=%d stderr=%s", code, dryStderr.String())
+		}
+		var dryRun map[string]any
+		if err := json.Unmarshal(dryStdout.Bytes(), &dryRun); err != nil {
+			t.Fatal(err)
+		}
+		evidence := dryRun["approval_request"].(map[string]any)["evidence_ref"].(string)
+
+		var applyStdout, applyStderr bytes.Buffer
+		code = Main([]string{"update", "agent-instructions", "--repo-path", repo, "--source-repo", cliRepoRoot(t), "--project", "kan-control", "--apply", evidence, "--json"}, &applyStdout, &applyStderr, nil)
+		if code != 0 {
+			t.Fatalf("apply code=%d stderr=%s", code, applyStderr.String())
+		}
+		var applied map[string]any
+		if err := json.Unmarshal(applyStdout.Bytes(), &applied); err != nil {
+			t.Fatal(err)
+		}
+		noWrite := applied["no_write"].(map[string]any)
+		if noWrite["guaranteed"] != false || noWrite["repo_write_count"].(float64) <= 0 || noWrite["profile_write_count"] != float64(0) {
+			t.Fatalf("unexpected apply write evidence: %+v", noWrite)
+		}
+		if _, err := os.Stat(filepath.Join(repo, "AGENTS.md")); err != nil {
+			t.Fatalf("expected AGENTS.md to be written: %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(repo, "CLAUDE.md")); err != nil {
+			t.Fatalf("expected CLAUDE.md to be written: %v", err)
+		}
+	})
 }
 
 func TestRootVersionExitsZeroAndPrintsVersion(t *testing.T) {
