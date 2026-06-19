@@ -102,8 +102,10 @@ such as `docs`, `verify`, `final`, and kebab-case ids such as
 `enhance-test`, `request-feedback-1`, and `handle-feedback-1`. Older
 `registries/phase-contracts.yaml` and skill/activity aliases may use activity
 names such as `update_docs` and `final_verify`. That translation is an explicit
-POLPR-004 compatibility exception; downstream reconciliation remains
-POLPR-008/POLPR-005 if needed.
+POLPR-008 compatibility translation: aliases are translation-only names for
+older phase-contract and skill/activity surfaces, not pending phase-renaming
+work, graph fallback authority, or a reason to change the canonical
+`kas-default` graph ids.
 
 `edges[]` entries must include `from`, `to`, and `type`. Allowed edge types are `sequence`, `conditional`, and `feedback_loop`. Every edge endpoint must reference a declared phase id. Cycles are forbidden except explicit feedback loops with a bounded maximum round count.
 

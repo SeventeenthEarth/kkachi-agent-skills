@@ -89,7 +89,7 @@ templates:
         - kkachi-agent-helper graph export
         - workflow_graph_configurable_feedback_intake
       phase_id_translation:
-        policy: "POLPR-004 compatibility exception: graph phase ids are the canonical kas-default graph ids, while older phase-contract/skill activity aliases remain translation-only until POLPR-008/POLPR-005 reconciliation."
+        policy: "POLPR-008 closeout: graph phase ids are the canonical kas-default graph ids, while older phase-contract/skill activity aliases remain translation-only compatibility names as explicit compatibility translations, not pending phase-renaming work or fallback authority."
         aliases:
           docs: update_docs
           final: final_verify

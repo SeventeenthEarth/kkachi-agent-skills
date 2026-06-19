@@ -54,9 +54,9 @@ shape. Project-specific `.kkachi-workflow.yaml` composition remains supported
 when selected and validated through capability-checked KAH graph evidence.
 The graph phase ids `docs`, `verify`, and `final` are intentional graph-facing
 names. Older phase-contract and skill/activity aliases such as `update_docs`
-and `final_verify` may still appear in compatibility surfaces until downstream
-POLPR-008/POLPR-005 reconciliation, but they do not rename the active default
-graph phases for POLPR-004.
+and `final_verify` are explicit translation-only compatibility names, not
+pending reconciliation work, graph fallback authority, or names that rename the
+active default graph phases.
 
 Mandatory for every KHS run:
 
