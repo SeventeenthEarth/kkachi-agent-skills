@@ -6,7 +6,7 @@ Confirming role: Responsible approver / governance evidence record; INITDOC post
 Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced, KAH v0.1.10 workflow catalog promotion substrate released, KASROLE is the KAS v0.1.3 release baseline, and WFLOW epic completion is the KAS v0.1.4 release baseline
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/role-aware-project-suite-contract.md`, `sot/project-kas-sync-state.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/multi-agent-review-policy.md`, `sot/policy-promotion-governance-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/role-aware-project-suite-contract.md`, `sot/project-kas-sync-state.md`, `sot/toolchain-local-metadata-registry.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/multi-agent-review-policy.md`, `sot/policy-promotion-governance-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -60,6 +60,7 @@ INITDOC-003
   -> STRICT-001..007 shared across KAS and KAH after the WFLOW/DAGSM baseline
   -> MARTL-001..002 KAS-only MAR task-loop alignment after STRICT and the existing MAR/MAREV substrate
   -> MAR-001..006 paired with KAH MAREV-001..003 when MAR repository promotion is selected
+  -> TOLMR-001..004 shared across KAS and KAH for generated `.kkachi/toolchain.yaml` local state
   -> POLPR-001..008 shared across KAS and KAH
 ```
 
@@ -324,6 +325,24 @@ TOKEN deferrals unless separately approved: Hermes runtime context-pruning chang
 | MAR-006 | Resolve KAH CLI through repo toolchain-aware KAS runner | In Review | KAS doctor, workflow-create, workflow-promote, workflow-trigger, and graphsync/workflow-graph repair KAH probes select `kkachi-agent-helper` through `KKACHI_KAH_BIN`, top-level `.kkachi/toolchain.yaml` `kah_cli_path`/`kah_cli`, repo `.kkachi/bin/kkachi-agent-helper`, then ambient PATH only when no explicit repo KAH selection exists. Explicit repo selection mismatch or missing binaries fail closed with source, expected version/path, resolved path, actual `--version` output when available, PATH-refusal reason, and durable recovery guidance. MAR provider `resolved_argv` overlay semantics remain distinct from KAH CLI selection, and KAS binary selection does not claim KAH deterministic evidence/gate behavior. | Targeted resolver and surface tests, docs-contract readback, `scripts/mar.py` compile check, `git diff --check`, and final review evidence before completion. |
 
 MAR deferrals unless separately approved: automatic PR inline comments, automatic code mutation, reviewer models running tests/builds/installs, model voting as authority, silent premium-provider fallback, broad replacement of required color review gates, KAB runtime activation as the default MAR path, and auth/token/provider/gateway/model mutation.
+
+
+### EPIC: TOLMR — toolchain local metadata registry
+
+> Goal: make `.kkachi/toolchain.yaml` the generated project-local KAS/KAH toolchain state surface for KAS/KAH-governed development, replacing hidden profile-skill-local stage/state dependence with KAS-owned schema/generation and KAH-owned read-only system facts.
+>
+> Source of truth: `docs/sot/toolchain-local-metadata-registry.md`. Paired KAH companion SOT: KAH `docs/sot/toolchain-probe-contract.md`.
+>
+> Cross-repo task rule: TOLMR uses one logical task, one acceptance/evidence package, and physical repo-specific commits/PRs. KAS and KAH still require independent tests, enhance-test, AI-slop cleanup/optimize, docs-impact checks, and repo-local verification before Blue synthesis.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| TOLMR-001 | Register toolchain local-state SOT and KAH probe contract | Completed | KAS SOT defines `.kkachi/toolchain.yaml` as ignored generated local state, KAS ownership of schema/generation/Stage/MAR/legacy import, KAH read-only probe boundary, logical-one-task/physical-commits rule, and independent repo-local gates. KAH companion SOT, both roadmaps, docs indexes, and docs maps are updated. | Completed as docs-only registration after docs readback, docs-map YAML parse in both repos, `git diff --check`, both repo `make test` gates, Red `t_7d0ba8c6` ACCEPT, Orange `t_54007ea3` ACCEPT, Gray `t_41a4dfb4` ACCEPT, and Blue synthesis. No command behavior, profile mutation, KAB activation, release, push, or provider/auth/gateway/model mutation is authorized. |
+| TOLMR-002 | Implement generated toolchain init, doctor, refresh, and KAH probe consumption | Planned | KAS adds toolchain init/doctor/refresh with atomic `.kkachi/toolchain.yaml` writes, no-secret validation, current KAS/KAH fact capture through KAH `project probe-toolchain --json`, and compatibility reads for existing top-level `kah_cli` / `kah_cli_path`. KAH implements the read-only probe JSON with no-write proof. | Separate KAS and KAH tests/enhance-test/cleanup/docs evidence; cross-repo smoke where KAS calls the KAH probe and validates generated toolchain; no silent fallback from invalid/unreadable toolchain. |
+| TOLMR-003 | Migrate legacy project KAS state and integrate Stage/MAR semantics | Planned | KAS imports legacy `kas-project-state.yaml` and `kab-adoption-stage.md` only through explicit import/compatibility paths, detects conflicts fail-closed, preserves Stage 1/2 semantics, and integrates MAR provider proof without treating provider availability as review completion. KAH changes only if a deterministic probe gap is proven. | Legacy-only and conflict fixtures, Stage 1 no-KAB-claim tests, Stage 2 approval/capability failures, MAR provider proof parsing tests, KAS/KAH repo-local quality gates, and repo-tagged review findings. |
+| TOLMR-004 | Cross-repo rollout, evidence, and release readiness | Planned | One KAS PR and one KAH PR are verified as a single logical feature package with generated toolchain readback, run-local snapshots, compatibility/release notes as needed, and repo-specific final readiness. | KAS local gate PASS, KAH local gate PASS, cross-repo E2E PASS, MAR/Red/Orange/Gray closure, final Blue synthesis, and 주군 commit approval before commits. |
+
+TOLMR deferrals unless separately approved: tracked project-doc copies of local toolchain values, automatic KAS/KAH binary installation, broad profile skill rewrite, KAB Stage 2 activation, KAB code changes unless preflight gaps are proven, warning-only degraded toolchain behavior, auth/token/gateway/provider/model mutation, release, push, or installed-runtime claims.
 
 
 ### EPIC: POLPR — policy-promotion and workflow-governance alignment
