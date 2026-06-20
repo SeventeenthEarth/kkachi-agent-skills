@@ -93,6 +93,9 @@ func TestTriggerRendersDispatchPacketsFromExplicitWorkflowAndContract(t *testing
 	if !reflect.DeepEqual(packet.ReadyNodeReasons, []string{"dependencies_satisfied", "state_pending"}) {
 		t.Fatalf("packet missing ready-node evidence: %+v", packet)
 	}
+	if !reflect.DeepEqual(packet.RequiredOutputs, []string{"artifacts/setup.md"}) {
+		t.Fatalf("packet missing KAH required_outputs evidence: %+v", packet)
+	}
 	wantCalls := []string{
 		"--version",
 		"capabilities --json",
@@ -497,8 +500,45 @@ func TestTriggerWorkflowManagedRequiresStrictKAHCapabilityFlags(t *testing.T) {
 	if result.OK || result.Status != "strict_workflow_missing_kah_capability" {
 		t.Fatalf("expected strict capability blocker, got %+v", result)
 	}
-	if result.KAHCapability.CompatibilityFlags["workflow_strict_transition_ledger"] || result.KAHCapability.CompatibilityFlags["workflow_transition_order_verification"] {
+	if result.KAHCapability.CompatibilityFlags["workflow_strict_transition_ledger"] || result.KAHCapability.CompatibilityFlags["workflow_transition_order_verification"] || result.KAHCapability.CompatibilityFlags["workflow_phase_projection_validation"] {
 		t.Fatalf("test fixture unexpectedly reports strict flags: %+v", result.KAHCapability.CompatibilityFlags)
+	}
+	assertStrictWorkflowNextAction(t, result.NextAction)
+}
+
+func TestTriggerWorkflowManagedRequiresPhaseProjectionCapabilityFlag(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeRegistry(t, project, validRegistry("demo", "setup"))
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routeResult := writeTriggerRouteResult(t, project, registry, "demo")
+	runner := &fakeKAHRunner{responses: map[string]CommandResult{
+		"--version":           {Stdout: []byte("kkachi-agent-helper 0.1.10\n")},
+		"capabilities --json": {Stdout: []byte(`{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true}}`)},
+		"workflow --help":     {Stdout: []byte("Subcommands:\n  validate\n  explain\n  create\n  show\n  ready\n  node\n")},
+	}}
+
+	result, err := Trigger(Options{
+		Project:             project,
+		RouteResult:         routeResult,
+		MaterializeRunLocal: true,
+		WorkflowManaged:     true,
+		RunID:               "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:              runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "strict_workflow_missing_kah_capability" {
+		t.Fatalf("expected phase projection capability blocker, got %+v", result)
+	}
+	if len(result.DispatchPackets) != 0 {
+		t.Fatalf("capability blocker must not render dispatch packets: %+v", result.DispatchPackets)
+	}
+	if result.KAHCapability.CompatibilityFlags["workflow_phase_projection_validation"] {
+		t.Fatalf("test fixture unexpectedly reports phase projection flag: %+v", result.KAHCapability.CompatibilityFlags)
 	}
 	assertStrictWorkflowNextAction(t, result.NextAction)
 }
@@ -953,6 +993,28 @@ func TestTriggerCustomMaterializationRendersDispatchPackets(t *testing.T) {
 	}
 }
 
+func TestTriggerRunLocalMaterializationRejectsRootRequiredOutputsFromKAH(t *testing.T) {
+	project := t.TempDir()
+	packetPath, approval := writeTriggerCustomWorkflowPacket(t, project, "demo")
+	workflowFile := ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/workflow.yaml"
+	runner := newWorkflowFakeRunnerForFileWithRequiredOutputs("demo", "run-20260616T105614Z-4b0ebe11b67d", workflowFile, "plan", []string{"artifacts/plan.md"})
+
+	result, err := Trigger(Options{
+		Project:              project,
+		CustomWorkflowPacket: packetPath,
+		Approval:             approval,
+		MaterializeRunLocal:  true,
+		RunID:                "run-20260616T105614Z-4b0ebe11b67d",
+		Runner:               runner.Run,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "strict_workflow_run_local_outputs_invalid" || len(result.DispatchPackets) != 0 {
+		t.Fatalf("expected run-local KAH output path blocker, got %+v", result)
+	}
+}
+
 func writeNodeContractBundle(t *testing.T, dir string, content string) string {
 	t.Helper()
 	path := filepath.Join(dir, "node-contracts.json")
@@ -964,7 +1026,9 @@ func writeNodeContractBundle(t *testing.T, dir string, content string) string {
 
 func writeTriggerCustomWorkflowPacket(t *testing.T, dir string, workflowID string) (string, string) {
 	t.Helper()
-	dag := "workflow_id: " + workflowID + "\nschema_version: task-dag/v1\nnodes:\n  - id: plan\n    depends_on: []\n    join: all_of\n    required_outputs:\n      - artifacts/plan.md\n"
+	runID := "run-20260616T105614Z-4b0ebe11b67d"
+	artifactPath := ".kkachi/runs/" + runID + "/artifacts/plan.md"
+	dag := "workflow_id: " + workflowID + "\nschema_version: task-dag/v1\nnodes:\n  - id: plan\n    depends_on: []\n    join: all_of\n    required_outputs:\n      - " + artifactPath + "\n"
 	result := workflowcreator.Result{
 		OK:                  true,
 		Command:             workflowcreator.Command,
@@ -987,8 +1051,8 @@ func writeTriggerCustomWorkflowPacket(t *testing.T, dir string, workflowID strin
 				TaskClass:           "development",
 				OwnerRole:           "planner_backend",
 				ExecutionLane:       "stage1_direct_codex_app_server",
-				RequiredInputs:      []string{"task-contract.yaml"},
-				ExpectedArtifacts:   []string{"artifacts/plan.md"},
+				RequiredInputs:      []string{".kkachi/runs/" + runID + "/task-contract.yaml"},
+				ExpectedArtifacts:   []string{artifactPath},
 				PromptRef:           "skills/kkachi-plan/SKILL.md",
 				ApprovalRequired:    false,
 				FallbackPolicy:      workflowregistry.NoFallbackPolicy,
@@ -1124,8 +1188,12 @@ func newWorkflowFakeRunnerForFile(workflowID string, runID string, workflowFile 
 	ready := make([]map[string]any, 0, len(readyNodes))
 	nodes := make([]map[string]any, 0, len(readyNodes))
 	for _, id := range readyNodes {
+		requiredOutputs := []string{"artifacts/" + id + ".md"}
+		if strings.HasPrefix(workflowFile, ".kkachi/runs/"+runID+"/workflow/") {
+			requiredOutputs = []string{".kkachi/runs/" + runID + "/artifacts/" + id + ".md"}
+		}
 		ready = append(ready, map[string]any{"id": id, "reasons": []string{"dependencies_satisfied", "state_pending"}})
-		nodes = append(nodes, map[string]any{"id": id, "state": "pending", "depends_on": []string{}, "join": "all_of", "required_outputs": []string{"artifacts/" + id + ".md"}})
+		nodes = append(nodes, map[string]any{"id": id, "state": "pending", "depends_on": []string{}, "join": "all_of", "required_outputs": requiredOutputs})
 	}
 	instance := map[string]any{
 		"version":        "workflow-instance/v1",
@@ -1143,7 +1211,41 @@ func newWorkflowFakeRunnerForFile(workflowID string, runID string, workflowFile 
 
 	return &fakeKAHRunner{responses: map[string]CommandResult{
 		"--version":           {Stdout: []byte("kkachi-agent-helper 0.1.10\n")},
-		"capabilities --json": {Stdout: []byte(`{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true}}`)},
+		"capabilities --json": {Stdout: []byte(`{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true,"workflow_phase_projection_validation":true}}`)},
+		"workflow --help":     {Stdout: []byte("Subcommands:\n  validate\n  explain\n  create\n  show\n  ready\n  node\n")},
+		"workflow validate --file " + workflowFile + " --json": {Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"` + workflowID + `","schema_version":"task-dag/v1"}`)},
+		"workflow explain --file " + workflowFile + " --json":  {Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"` + workflowID + `","schema_version":"task-dag/v1"}`)},
+		"workflow create --run " + runID + " --file " + workflowFile + " --json": {
+			Stdout: instanceJSON,
+		},
+		"workflow show --run " + runID + " --json": {
+			Stdout: instanceJSON,
+		},
+		"workflow ready --run " + runID + " --json": {
+			Stdout: readyJSON,
+		},
+	}}
+}
+
+func newWorkflowFakeRunnerForFileWithRequiredOutputs(workflowID string, runID string, workflowFile string, nodeID string, requiredOutputs []string) *fakeKAHRunner {
+	ready := []map[string]any{{"id": nodeID, "reasons": []string{"dependencies_satisfied", "state_pending"}, "required_outputs": requiredOutputs}}
+	nodes := []map[string]any{{"id": nodeID, "state": "pending", "depends_on": []string{}, "join": "all_of", "required_outputs": requiredOutputs}}
+	instance := map[string]any{
+		"version":        "workflow-instance/v1",
+		"run_id":         runID,
+		"workflow_id":    workflowID,
+		"schema_version": "task-dag/v1",
+		"source_path":    workflowFile,
+		"revision":       1,
+		"nodes":          nodes,
+	}
+	instanceResult := map[string]any{"ok": true, "status": "pass", "reason": "workflow_instance_loaded", "run_id": runID, "instance": instance, "ready": ready}
+	instanceJSON, _ := json.Marshal(instanceResult)
+	readyResult := map[string]any{"ok": true, "status": "pass", "reason": "workflow_ready_nodes_computed", "run_id": runID, "instance": instance, "ready": ready}
+	readyJSON, _ := json.Marshal(readyResult)
+	return &fakeKAHRunner{responses: map[string]CommandResult{
+		"--version":           {Stdout: []byte("kkachi-agent-helper 0.1.10\n")},
+		"capabilities --json": {Stdout: []byte(`{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true,"workflow_phase_projection_validation":true}}`)},
 		"workflow --help":     {Stdout: []byte("Subcommands:\n  validate\n  explain\n  create\n  show\n  ready\n  node\n")},
 		"workflow validate --file " + workflowFile + " --json": {Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"` + workflowID + `","schema_version":"task-dag/v1"}`)},
 		"workflow explain --file " + workflowFile + " --json":  {Stdout: []byte(`{"ok":true,"status":"valid","workflow_id":"` + workflowID + `","schema_version":"task-dag/v1"}`)},

@@ -132,8 +132,9 @@ type InstanceEvidence struct {
 }
 
 type ReadyNode struct {
-	ID      string   `json:"id"`
-	Reasons []string `json:"reasons,omitempty"`
+	ID              string   `json:"id"`
+	Reasons         []string `json:"reasons,omitempty"`
+	RequiredOutputs []string `json:"required_outputs,omitempty"`
 }
 
 type DispatchPacket struct {
@@ -148,6 +149,7 @@ type DispatchPacket struct {
 	ExecutionLane                     string   `json:"execution_lane"`
 	RequiredInputs                    []string `json:"required_inputs"`
 	ExpectedArtifacts                 []string `json:"expected_artifacts"`
+	RequiredOutputs                   []string `json:"required_outputs"`
 	PromptRef                         string   `json:"prompt_ref"`
 	ApprovalRequired                  bool     `json:"approval_required"`
 	FallbackPolicy                    string   `json:"fallback_policy"`
@@ -380,6 +382,17 @@ func Trigger(opts Options) (Result, error) {
 			result.Diagnostics[len(result.Diagnostics)-1].NodeID = node.ID
 			return result, nil
 		}
+		if opts.WorkflowManaged && len(node.RequiredOutputs) == 0 {
+			result = fail(result, "strict_workflow_required_outputs_missing", "workflow-managed dispatch requires KAH instance required_outputs evidence before rendering a packet.")
+			result.Diagnostics[len(result.Diagnostics)-1].NodeID = node.ID
+			return result, nil
+		}
+		outputs := requiredOutputsForPacket(node, contract)
+		if runLocalWorkflowPath(result.Workflow.Path, runID) && !runLocalOutputsForRun(runID, outputs) {
+			result = fail(result, "strict_workflow_run_local_outputs_invalid", "run-local workflow dispatch requires KAH required_outputs to remain under .kkachi/runs/<run_id>.")
+			result.Diagnostics[len(result.Diagnostics)-1].NodeID = node.ID
+			return result, nil
+		}
 		if opts.WorkflowManaged && result.Instance.Revision <= 0 {
 			return fail(result, "strict_workflow_expected_start_revision_missing", "workflow-managed dispatch requires KAH ready/show revision evidence before rendering a packet."), nil
 		}
@@ -504,7 +517,7 @@ func fail(result Result, code string, message string) Result {
 func nextActionForFailure(code string) string {
 	switch code {
 	case "strict_workflow_missing_kah_capability":
-		return "Verify the effective kkachi-agent-helper binary selected for this repo exposes task_dag_schema_validation, workflow_instance_state, workflow_strict_transition_ledger, and workflow_transition_order_verification; then rerun workflow-trigger with the same route-backed workflow-managed inputs."
+		return "Verify the effective kkachi-agent-helper binary selected for this repo exposes task_dag_schema_validation, workflow_instance_state, workflow_strict_transition_ledger, workflow_transition_order_verification, and workflow_phase_projection_validation; then rerun workflow-trigger with the same route-backed workflow-managed inputs."
 	case "strict_workflow_expected_start_revision_missing":
 		return "Inspect KAH workflow show/ready JSON for a positive instance.revision, repair or recreate the route-backed workflow instance if the revision evidence is missing, then rerun workflow-trigger before dispatch."
 	}
@@ -692,7 +705,7 @@ func parseWorkflowCapabilities(data []byte, strict bool) ([]string, map[string]b
 	}
 	requiredFlags := []string{"task_dag_schema_validation", "workflow_instance_state"}
 	if strict {
-		requiredFlags = append(requiredFlags, "workflow_strict_transition_ledger", "workflow_transition_order_verification")
+		requiredFlags = append(requiredFlags, "workflow_strict_transition_ledger", "workflow_transition_order_verification", "workflow_phase_projection_validation")
 	}
 	flagsOK := true
 	for _, flag := range requiredFlags {
@@ -793,6 +806,7 @@ func runWorkflowReady(result *Result, opts Options, runID string) ([]ReadyNode, 
 		return nil, false
 	}
 	updateInstanceEvidence(result, payload)
+	requiredOutputs := instanceRequiredOutputs(payload)
 	ready := []ReadyNode{}
 	for _, raw := range list(payload["ready"]) {
 		item, ok := raw.(map[string]any)
@@ -803,9 +817,37 @@ func runWorkflowReady(result *Result, opts Options, runID string) ([]ReadyNode, 
 		if id == "" {
 			continue
 		}
-		ready = append(ready, ReadyNode{ID: id, Reasons: stringList(item["reasons"])})
+		outputs := stringList(item["required_outputs"])
+		if len(outputs) == 0 {
+			outputs = requiredOutputs[id]
+		}
+		ready = append(ready, ReadyNode{ID: id, Reasons: stringList(item["reasons"]), RequiredOutputs: outputs})
 	}
 	return ready, true
+}
+
+func instanceRequiredOutputs(payload map[string]any) map[string][]string {
+	outputs := map[string][]string{}
+	instance, _ := payload["instance"].(map[string]any)
+	for _, raw := range list(instance["nodes"]) {
+		node, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, _ := node["id"].(string)
+		if id == "" {
+			continue
+		}
+		outputs[id] = stringList(node["required_outputs"])
+	}
+	return outputs
+}
+
+func requiredOutputsForPacket(ready ReadyNode, contract NodeContract) []string {
+	if len(ready.RequiredOutputs) > 0 {
+		return ready.RequiredOutputs
+	}
+	return contract.ExpectedArtifacts
 }
 
 func parseKAHJSON(result *Result, command CommandResult, code string, message string) (map[string]any, bool) {
@@ -868,6 +910,7 @@ func packetFromContract(contract NodeContract, ready ReadyNode, instanceID strin
 		ExecutionLane:                     contract.ExecutionLane,
 		RequiredInputs:                    contract.RequiredInputs,
 		ExpectedArtifacts:                 contract.ExpectedArtifacts,
+		RequiredOutputs:                   requiredOutputsForPacket(ready, contract),
 		PromptRef:                         contract.PromptRef,
 		ApprovalRequired:                  contract.ApprovalRequired,
 		FallbackPolicy:                    contract.FallbackPolicy,
@@ -889,6 +932,26 @@ func packetFromContract(contract NodeContract, ready ReadyNode, instanceID strin
 		SourceChecksum:                    checksum,
 		Status:                            "ready_for_declared_lane",
 	}
+}
+
+func runLocalWorkflowPath(path string, runID string) bool {
+	path = filepath.ToSlash(strings.TrimSpace(path))
+	prefix := filepath.ToSlash(filepath.Join(".kkachi", "runs", runID, "workflow")) + "/"
+	return strings.HasPrefix(path, prefix)
+}
+
+func runLocalOutputsForRun(runID string, outputs []string) bool {
+	prefix := filepath.ToSlash(filepath.Join(".kkachi", "runs", runID)) + "/"
+	if len(outputs) == 0 {
+		return false
+	}
+	for _, output := range outputs {
+		output = filepath.ToSlash(strings.TrimSpace(output))
+		if output == "" || strings.HasPrefix(output, "/") || strings.Contains(output, "\\") || strings.Contains(output, "..") || !strings.HasPrefix(output, prefix) {
+			return false
+		}
+	}
+	return true
 }
 
 func workflowPath(workflowID string) string {

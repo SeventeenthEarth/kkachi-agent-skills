@@ -77,7 +77,7 @@ WFLOW-002 node-contract input is JSON-only:
 }
 ```
 
-Every ready node must match one contract by `workflow_id` and `node_id`; missing or invalid source/ref, missing KAH workflow capability, KAH validation failure, and missing ready-node contracts fail closed with JSON and no partial packets. `ok:true/status:no_ready_nodes` is the successful no-packet state. Selector search and the full node-contract registry are WFLOW-003 deferrals. Custom workflow creation, dynamic node generation, thin trigger scaffolding, retry/rollback automation, arbitrary webhook runtime, automatic backend/agent fallback, direct KAH state writes, KAB graph authority, and Hermes profile/provider/gateway/auth/token/model mutation are outside WFLOW-002 and remain deferred.
+Every ready node must match one contract by `workflow_id` and `node_id`; missing or invalid source/ref, missing KAH workflow capability, KAH validation failure, and missing ready-node contracts fail closed with JSON and no partial packets. `ok:true/status:no_ready_nodes` is the successful no-packet state. The example above is for explicit/persistent WFLOW-002 mode; WFLOW-008 run-local materialization must rewrite route-backed contract `required_inputs`, `expected_artifacts`, and generated DAG `required_outputs` under `.kkachi/runs/<run_id>/...`, and approved custom packets must already declare those run-local paths or fail closed with no writes. Custom workflow creation, dynamic node generation, thin trigger scaffolding, retry/rollback automation, arbitrary webhook runtime, automatic backend/agent fallback, direct KAH state writes, KAB graph authority, and Hermes profile/provider/gateway/auth/token/model mutation are outside WFLOW-002 and remain deferred.
 
 WFLOW-003 extends `workflow-trigger` with deterministic selector mode:
 
@@ -171,12 +171,17 @@ checksums for route results, approval hash and source packet checksum for
 approved custom packets, selected bundle or one-off workflow id, task class,
 classification reason, run-local posture, `persistent_promotion:false`,
 `no_promotion:true`, and `direct_kah_state_write:false`. The generated
-`node-contracts.json` uses `kas-node-contracts/v1`; custom packet contracts are
-copied from approved generated node contracts, and dispatch packets include
-`workflow_file`, `completion_authority:kah_only`,
-`fallback_policy:none_fail_closed`, and `direct_kah_state_write:false`.
-Missing KAH-ready node contracts fail the whole command with no partial
-packets.
+`workflow.yaml` and `node-contracts.json` are process/run evidence contracts:
+route-backed materialization rewrites `required_outputs`, `required_inputs`,
+and `expected_artifacts` under `.kkachi/runs/<run_id>/...`; unsafe traversal,
+absolute, backslash, or other-run `.kkachi/runs/*` paths fail closed before any
+writes. Approved custom packets must already declare `.kkachi/runs/<run_id>/...`
+required output/input/artifact paths because their dry-run content is
+hash-approved; root-like custom paths such as `artifacts/plan.md` fail closed
+with no writes. Dispatch packets include `workflow_file`,
+`completion_authority:kah_only`, `fallback_policy:none_fail_closed`, and
+`direct_kah_state_write:false`. Missing KAH-ready node contracts fail the whole
+command with no partial packets.
 
 STRICT-003 adds `--workflow-managed` for classified KAS/KAH
 workflow-managed dispatch. When this flag is present, KAS must have a

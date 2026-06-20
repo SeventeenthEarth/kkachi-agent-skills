@@ -53,6 +53,19 @@ func TestMaterializeFromRouteWritesOnlyRunLocalWorkflowArtifacts(t *testing.T) {
 			t.Fatalf("workflow missing %q:\n%s", want, workflow)
 		}
 	}
+	for _, forbidden := range []string{"      - artifacts/setup.md\n", "      - artifacts/verify.md\n"} {
+		if strings.Contains(workflow, forbidden) {
+			t.Fatalf("workflow required_outputs must not target project-root artifacts, found %q:\n%s", forbidden, workflow)
+		}
+	}
+	for _, want := range []string{
+		"      - .kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/artifacts/setup.md\n",
+		"      - .kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/artifacts/verify.md\n",
+	} {
+		if !strings.Contains(workflow, want) {
+			t.Fatalf("workflow missing run-local required output %q:\n%s", want, workflow)
+		}
+	}
 	contractsBytes, err := os.ReadFile(filepath.Join(project, filepath.FromSlash(result.NodeContractSource)))
 	if err != nil {
 		t.Fatal(err)
@@ -71,6 +84,11 @@ func TestMaterializeFromRouteWritesOnlyRunLocalWorkflowArtifacts(t *testing.T) {
 	for _, contract := range contracts.Contracts {
 		if contract.CompletionAuthority != workflowregistry.KAHOnlyAuthority || contract.DirectKAHStateWrite == nil || *contract.DirectKAHStateWrite {
 			t.Fatalf("contract authority drift: %+v", contract)
+		}
+		for _, artifact := range contract.ExpectedArtifacts {
+			if !strings.HasPrefix(artifact, ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/") {
+				t.Fatalf("run-local node contract expected_artifacts must not target project root: %+v", contract.ExpectedArtifacts)
+			}
 		}
 	}
 }
@@ -114,6 +132,70 @@ func TestMaterializeFromRouteFailsClosedForUnmatchedRouteAndSymlinkParent(t *tes
 	}
 	if result.OK || result.Status != "unsafe_run_local_path" {
 		t.Fatalf("expected symlink parent blocker, got %+v", result)
+	}
+}
+
+func TestMaterializeFromRouteFailsClosedForUnsafeRunLocalArtifactPaths(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeMaterializerRegistry(t, project, "demo")
+	registryBytes, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registryBytes = []byte(strings.Replace(string(registryBytes), "expected_artifacts: [artifacts/setup.md]", "expected_artifacts: [../../../final-report.md]", 1))
+	if err := os.WriteFile(registryPath, registryBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routePath := writeRouteResult(t, project, registry, "demo")
+
+	result, err := MaterializeFromRoute(Options{Project: project, RunID: "run-20260616T105614Z-4b0ebe11b67d", RouteResult: routePath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "unsafe_run_local_artifact_path" || len(result.WrittenPaths) != 0 {
+		t.Fatalf("expected unsafe artifact path blocker with no writes, got %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".kkachi")); !os.IsNotExist(err) {
+		t.Fatalf("unsafe artifact path wrote run-local state: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(project, "final-report.md")); !os.IsNotExist(err) {
+		t.Fatalf("unsafe artifact path created project-root evidence: %v", err)
+	}
+}
+
+func TestMaterializeFromCustomPacketRejectsProjectRootEvidencePaths(t *testing.T) {
+	project := t.TempDir()
+	packetPath, approval := writeCustomWorkflowPacketWithArtifact(t, project, "demo", "artifacts/plan.md")
+
+	result, err := MaterializeFromCustomPacket(Options{Project: project, RunID: "run-20260616T105614Z-4b0ebe11b67d", CustomWorkflowPacket: packetPath, Approval: approval})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "custom_workflow_run_local_path_required" || len(result.WrittenPaths) != 0 {
+		t.Fatalf("expected custom packet run-local path blocker, got %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".kkachi")); !os.IsNotExist(err) {
+		t.Fatalf("root-directed custom packet wrote run-local state: %v", err)
+	}
+}
+
+func TestMaterializeFromCustomPacketRejectsInlineProjectRootRequiredOutputs(t *testing.T) {
+	project := t.TempDir()
+	packetPath, approval := writeCustomWorkflowPacketWithInlineDAGOutput(t, project, "demo", "artifacts/plan.md", ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/artifacts/plan.md")
+
+	result, err := MaterializeFromCustomPacket(Options{Project: project, RunID: "run-20260616T105614Z-4b0ebe11b67d", CustomWorkflowPacket: packetPath, Approval: approval})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "custom_workflow_run_local_path_required" || len(result.WrittenPaths) != 0 {
+		t.Fatalf("expected inline DAG root path blocker, got %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".kkachi")); !os.IsNotExist(err) {
+		t.Fatalf("inline root-directed custom packet wrote run-local state: %v", err)
 	}
 }
 
@@ -330,8 +412,42 @@ node_contracts:
 }
 
 func writeCustomWorkflowPacket(t *testing.T, dir string, workflowID string) (string, string) {
+	return writeCustomWorkflowPacketWithArtifact(t, dir, workflowID, ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/artifacts/plan.md")
+}
+
+func writeCustomWorkflowPacketWithInlineDAGOutput(t *testing.T, dir string, workflowID string, dagArtifactPath string, contractArtifactPath string) (string, string) {
+	packetPath, _ := writeCustomWorkflowPacketWithArtifact(t, dir, workflowID, contractArtifactPath)
+	data, err := os.ReadFile(packetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var packet workflowcreator.Result
+	if err := json.Unmarshal(data, &packet); err != nil {
+		t.Fatal(err)
+	}
+	dag := "workflow_id: " + workflowID + "\nschema_version: task-dag/v1\nnodes:\n  - id: plan\n    depends_on: []\n    join: all_of\n    required_outputs: [" + dagArtifactPath + "]\n"
+	for i := range packet.MachinePacket.GeneratedContent {
+		if packet.MachinePacket.GeneratedContent[i].Kind == "workflow_dag" {
+			packet.MachinePacket.GeneratedContent[i].Content = dag
+			packet.MachinePacket.GeneratedContent[i].SHA256 = checksumBytes([]byte(dag))
+		}
+	}
+	packet.MachinePacket.ApprovalHash = workflowcreator.RecomputeApprovalHash(packet)
+	packet.ApprovalRequest.EvidenceRef = "dry-run:" + packet.MachinePacket.ApprovalHash
+	packet.ApprovalRequest.DryRunPlanHash = packet.MachinePacket.ApprovalHash
+	data, err = json.MarshalIndent(packet, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(packetPath, append(data, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return packetPath, packet.ApprovalRequest.EvidenceRef
+}
+
+func writeCustomWorkflowPacketWithArtifact(t *testing.T, dir string, workflowID string, artifactPath string) (string, string) {
 	t.Helper()
-	dag := "workflow_id: " + workflowID + "\nschema_version: task-dag/v1\nnodes:\n  - id: plan\n    depends_on: []\n    join: all_of\n    required_outputs:\n      - artifacts/plan.md\n"
+	dag := "workflow_id: " + workflowID + "\nschema_version: task-dag/v1\nnodes:\n  - id: plan\n    depends_on: []\n    join: all_of\n    required_outputs:\n      - " + artifactPath + "\n"
 	packet := workflowcreator.Result{
 		OK:      true,
 		Command: workflowcreator.Command,
@@ -363,8 +479,8 @@ func writeCustomWorkflowPacket(t *testing.T, dir string, workflowID string) (str
 					TaskClass:           "development",
 					OwnerRole:           "planner_backend",
 					ExecutionLane:       "stage1_direct_codex_app_server",
-					RequiredInputs:      []string{"task-contract.yaml"},
-					ExpectedArtifacts:   []string{"artifacts/plan.md"},
+					RequiredInputs:      []string{".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/task-contract.yaml"},
+					ExpectedArtifacts:   []string{artifactPath},
 					PromptRef:           "skills/kkachi-plan/SKILL.md",
 					ApprovalRequired:    false,
 					FallbackPolicy:      workflowregistry.NoFallbackPolicy,

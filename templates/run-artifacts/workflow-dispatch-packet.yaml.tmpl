@@ -12,6 +12,8 @@ required_inputs:
   - "{{required_input}}"
 expected_artifacts:
   - "{{expected_artifact}}"
+required_outputs:
+  - "{{required_output}}"
 prompt_ref: "{{prompt_ref}}"
 approval_required: {{approval_required}}
 fallback_policy: "none_fail_closed"
@@ -32,6 +34,11 @@ required_capabilities:
 expected_start_revision: {{expected_start_revision}}
 ready_node_reasons:
   - "{{ready_node_reason}}"
+completion_requirements:
+  - kah_node_start_succeeded_at_expected_start_revision
+  - required_outputs_exist_before_complete
+  - kah_node_complete_succeeded_before_completion_claim
+  - workflow_phase_projection_validation_before_phase_completion_claim
 completion_authority: kah_only
 stage1_direct_codex_is_kab_native_codex: false
 direct_kah_state_write: false

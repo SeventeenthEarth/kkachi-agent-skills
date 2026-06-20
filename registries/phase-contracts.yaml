@@ -1,8 +1,11 @@
 version: 0.2.0
-purpose: "Canonical KHS phase contracts. KHS phase_plan is the workflow SOT; KAH metadata remains deterministic helper classification and must not decide which KHS phases execute."
+purpose: "Canonical KHS phase contracts. For workflow-managed runs, the selected KAH workflow instance plus transition ledger is the execution-order SOT; phase_plan records phase applicability/evidence and must project from KAH workflow state. KAH metadata remains deterministic helper classification and must not decide which KHS phases execute."
 
 workflow_authority:
-  sot: phase_plan
+  sot: phase_plan_for_phase_applicability__kah_workflow_instance_for_workflow_managed_order
+  workflow_managed_order_sot: kah_workflow_instance_and_transition_ledger
+  phase_projection_required: true
+  phase_projection_capability: workflow_phase_projection_validation
   kah_metadata_role: helper_classification
   kah_metadata_fields:
     - work_path
@@ -10,7 +13,7 @@ workflow_authority:
     - execution_mode
     - urgency
     - sot_policy
-  rule: "KHS decides phase applicability; KAH records artifacts/gates/events deterministically."
+  rule: "KHS decides phase applicability; when a classification-selected workflow is active, KAS must follow KAH ready/start/complete admission, required outputs, and KAH final projection verifies phase-plan/checklist evidence against workflow instance state."
 
 canonical_spine:
   - plan

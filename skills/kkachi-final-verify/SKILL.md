@@ -17,6 +17,7 @@ Completion is artifact-backed and Hermes-owned. Do not claim done when required 
 For 주군's KAS/Kkachi development pipeline, final verification happens before commit and must also confirm:
 
 - CodeGraph was refreshed at task start (`codegraph index <repo>` when `.codegraph/` exists, or `codegraph init -i <repo>` when source code already exists but no index exists), or a no-code bootstrap deferral / explicit unavailable-degraded reason was recorded.
+- Workflow-managed STRICT runs preserved route/materialization/dispatch evidence, KAH ready-node evidence, KAH node start and complete evidence, required outputs, transition ledger verification, and `workflow_phase_projection_validation` before any phase/checklist/final completion claim.
 - Implementation, test-enhance, AI-slop-cleaner, optimize, and docs-affecting passes each have evidence for the selected verification profile/gate after the final relevant change, or an explicit `not_applicable`/blocker reason. Do not assume a global `make test`; final verification must preserve the selected profile/gate id, command, timeout, applicability, status, exit code, duration, log path, log checksum, bounded failure excerpt, and deterministic failure extractor posture.
 - Docs under `docs/` and the roadmap were updated, or a no-change/no-roadmap-update artifact explains why.
 - Blue completed a first review and any actionable fixes were routed back to the selected implementer lane or responsible shaping/docs lane.

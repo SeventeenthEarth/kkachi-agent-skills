@@ -273,7 +273,7 @@ case "$*" in
     ;;
   "capabilities --json")
     if [ "` + boolShellValue(workflowSupported) + `" = "1" ]; then
-      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true}}'
+      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true,"workflow_phase_projection_validation":true}}'
     else
       echo '{"command_groups":[{"name":"graph","status":"supported","subcommands":["validate"]}],"compatibility_flags":{"workflow_instance_state":false}}'
     fi
@@ -321,6 +321,7 @@ func installCLIWorkflowTriggerRunLocalFakeKAH(t *testing.T, workflowSupported bo
 	binDir := t.TempDir()
 	helper := filepath.Join(binDir, "kkachi-agent-helper")
 	workflowFile := ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/workflow/workflow.yaml"
+	requiredOutput := ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/artifacts/setup.md"
 	script := `#!/bin/sh
 case "$*" in
   "--version")
@@ -332,7 +333,7 @@ case "$*" in
     ;;
   "capabilities --json")
     if [ "` + boolShellValue(workflowSupported) + `" = "1" ]; then
-      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true}}'
+      echo '{"command_groups":[{"name":"workflow","status":"supported","subcommands":["validate","explain","create","show","ready","node"]}],"compatibility_flags":{"task_dag_schema_validation":true,"workflow_instance_state":true,"workflow_strict_transition_ledger":true,"workflow_transition_order_verification":true,"workflow_phase_projection_validation":true}}'
     else
       echo '{"command_groups":[{"name":"graph","status":"supported","subcommands":["validate"]}],"compatibility_flags":{"workflow_instance_state":false}}'
     fi
@@ -358,10 +359,10 @@ case "$*" in
     echo '{"ok":true,"status":"valid","workflow_id":"demo","schema_version":"task-dag/v1","nodes":[{"id":"setup"}]}'
     ;;
   "workflow create --run run-20260616T105614Z-4b0ebe11b67d --file ` + workflowFile + ` --json")
-    echo '{"ok":true,"status":"pass","reason":"workflow_instance_created","run_id":"run-20260616T105614Z-4b0ebe11b67d","instance":{"version":"workflow-instance/v1","run_id":"run-20260616T105614Z-4b0ebe11b67d","workflow_id":"demo","schema_version":"task-dag/v1","source_path":"` + workflowFile + `","revision":1,"nodes":[{"id":"setup","depends_on":[],"join":"all_of","required_outputs":["artifacts/setup.md"],"state":"pending"}]},"ready":[{"id":"setup","reasons":["dependencies_satisfied","state_pending"]}]}'
+    echo '{"ok":true,"status":"pass","reason":"workflow_instance_created","run_id":"run-20260616T105614Z-4b0ebe11b67d","instance":{"version":"workflow-instance/v1","run_id":"run-20260616T105614Z-4b0ebe11b67d","workflow_id":"demo","schema_version":"task-dag/v1","source_path":"` + workflowFile + `","revision":1,"nodes":[{"id":"setup","depends_on":[],"join":"all_of","required_outputs":["` + requiredOutput + `"],"state":"pending"}]},"ready":[{"id":"setup","reasons":["dependencies_satisfied","state_pending"]}]}'
     ;;
   "workflow ready --run run-20260616T105614Z-4b0ebe11b67d --json")
-    echo '{"ok":true,"status":"pass","reason":"workflow_ready_nodes_computed","run_id":"run-20260616T105614Z-4b0ebe11b67d","instance":{"version":"workflow-instance/v1","run_id":"run-20260616T105614Z-4b0ebe11b67d","workflow_id":"demo","schema_version":"task-dag/v1","source_path":"` + workflowFile + `","revision":1,"nodes":[{"id":"setup","depends_on":[],"join":"all_of","required_outputs":["artifacts/setup.md"],"state":"pending"}]},"ready":[{"id":"setup","reasons":["dependencies_satisfied","state_pending"]}]}'
+    echo '{"ok":true,"status":"pass","reason":"workflow_ready_nodes_computed","run_id":"run-20260616T105614Z-4b0ebe11b67d","instance":{"version":"workflow-instance/v1","run_id":"run-20260616T105614Z-4b0ebe11b67d","workflow_id":"demo","schema_version":"task-dag/v1","source_path":"` + workflowFile + `","revision":1,"nodes":[{"id":"setup","depends_on":[],"join":"all_of","required_outputs":["` + requiredOutput + `"],"state":"pending"}]},"ready":[{"id":"setup","reasons":["dependencies_satisfied","state_pending"]}]}'
     ;;
   *)
     echo "unexpected kkachi-agent-helper call: $*" >&2
@@ -1131,9 +1132,11 @@ func TestWorkflowTriggerCLICustomWorkflowPacketMaterialization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	runLocalSetup := ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/artifacts/setup.md"
 	requestText := strings.ReplaceAll(string(requestBytes), `"node_id": "plan"`, `"node_id": "setup"`)
-	requestText = strings.ReplaceAll(requestText, `["artifacts/plan.md"]`, `["artifacts/setup.md"]`)
-	requestText = strings.ReplaceAll(requestText, `["plan.md"]`, `["artifacts/setup.md"]`)
+	requestText = strings.ReplaceAll(requestText, `["artifacts/plan.md"]`, `["`+runLocalSetup+`"]`)
+	requestText = strings.ReplaceAll(requestText, `["plan.md"]`, `["`+runLocalSetup+`"]`)
+	requestText = strings.ReplaceAll(requestText, `["task-contract.yaml"]`, `[".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/task-contract.yaml"]`)
 	if err := os.WriteFile(request, []byte(requestText), 0o644); err != nil {
 		t.Fatal(err)
 	}

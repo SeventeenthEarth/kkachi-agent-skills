@@ -4,7 +4,7 @@
 Control path: this runner imports `openai_codex`; the SDK starts
 `codex app-server --listen stdio://` and drives JSON-RPC thread/run APIs.
 It must not shell out to `codex exec`, must not use the generic `openai` SDK,
-and must not claim KAB `native_codex` evidence.
+and must not claim KAB `native_codex` evidence. In workflow-managed runs it must leave `kah_completion_claimed` false when KAH start fails, `expected_start_revision` is stale, required outputs are missing, KAH complete fails, or `workflow_phase_projection_validation` evidence is missing at final verification.
 
 Render/copy this template into a KAH run artifact before execution so the exact
 runner content used by the run is preserved with the prompt/output metadata.

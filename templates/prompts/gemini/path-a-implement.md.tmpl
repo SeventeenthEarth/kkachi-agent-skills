@@ -26,6 +26,11 @@ Output format:
 - risks
 - blockers
 
+Strict workflow-managed execution:
+- If a dispatch packet is supplied, do not begin backend/agent work until KAH node start succeeds at `expected_start_revision`.
+- Treat stale `expected_start_revision`, KAH node start failure, missing required outputs, unsafe evidence paths, KAH node complete failure, or missing `workflow_phase_projection_validation` as blockers.
+- Do not claim completion, set completion metadata, pick a fallback backend/agent/workflow, or direct-write KAH state unless KAH node complete succeeds after required outputs exist.
+
 Output policy:
 - Product/backend output must be English.
 - Keep console output compact with: Status, Summary, Files, Verification, Risks/blockers, Detailed artifact, Next action requested.

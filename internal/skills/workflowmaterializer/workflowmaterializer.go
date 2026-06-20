@@ -159,6 +159,10 @@ func MaterializeFromRoute(opts Options) (Result, error) {
 	if len(contracts) == 0 {
 		return fail(result, "blocked_missing_ready_node_contract", "selected bundle has no node contracts.", registry.Path, "node_contracts"), nil
 	}
+	contracts, err = runLocalContracts(opts.RunID, contracts)
+	if err != nil {
+		return fail(result, "unsafe_run_local_artifact_path", err.Error(), registry.Path, "node_contracts"), nil
+	}
 
 	base := filepath.ToSlash(filepath.Join(".kkachi", "runs", opts.RunID, "workflow"))
 	paths := map[string]string{
@@ -177,7 +181,10 @@ func MaterializeFromRoute(opts Options) (Result, error) {
 		}
 	}
 
-	workflowContent := renderWorkflowDAG(workflowID, contracts)
+	workflowContent, err := renderWorkflowDAG(workflowID, opts.RunID, contracts)
+	if err != nil {
+		return fail(result, "unsafe_run_local_artifact_path", err.Error(), registry.Path, "node_contracts.expected_artifacts"), nil
+	}
 	bundle := contractBundle{SchemaVersion: workflowregistry.NodeContractsVersion, Ref: "run-local:" + opts.RunID + ":" + workflowID, Contracts: contracts}
 	contractBytes, _ := json.MarshalIndent(bundle, "", "  ")
 	contractBytes = append(contractBytes, '\n')
@@ -296,6 +303,12 @@ func MaterializeFromCustomPacket(opts Options) (Result, error) {
 		if contract.WorkflowID != workflowID {
 			return fail(result, "custom_node_contract_workflow_mismatch", "custom node contract workflow_id does not match approved workflow id.", opts.CustomWorkflowPacket, "machine_packet.node_contracts.workflow_id"), nil
 		}
+	}
+	if err := validateCustomWorkflowDAGRunLocalOutputs(opts.RunID, dag.Content); err != nil {
+		return fail(result, "custom_workflow_run_local_path_required", err.Error(), opts.CustomWorkflowPacket, "machine_packet.generated_content.workflow_dag.required_outputs"), nil
+	}
+	if err := validateContractsRunLocal(opts.RunID, contracts); err != nil {
+		return fail(result, "custom_workflow_run_local_path_required", err.Error(), opts.CustomWorkflowPacket, "machine_packet.node_contracts"), nil
 	}
 
 	base := filepath.ToSlash(filepath.Join(".kkachi", "runs", opts.RunID, "workflow"))
@@ -419,7 +432,7 @@ func findWorkflow(workflows []workflowregistry.Workflow, workflowID string) (wor
 	return workflowregistry.Workflow{}, false
 }
 
-func renderWorkflowDAG(workflowID string, contracts []workflowregistry.NodeContract) string {
+func renderWorkflowDAG(workflowID string, runID string, contracts []workflowregistry.NodeContract) (string, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "workflow_id: %s\nschema_version: task-dag/v1\nnodes:\n", workflowID)
 	previous := ""
@@ -432,12 +445,131 @@ func renderWorkflowDAG(workflowID string, contracts []workflowregistry.NodeContr
 		}
 		b.WriteString("    join: all_of\n")
 		b.WriteString("    required_outputs:\n")
-		for _, artifact := range normalized(contract.ExpectedArtifacts) {
+		outputs, err := runLocalOutputs(runID, contract.ExpectedArtifacts)
+		if err != nil {
+			return "", err
+		}
+		for _, artifact := range outputs {
 			fmt.Fprintf(&b, "      - %s\n", artifact)
 		}
 		previous = contract.NodeID
 	}
-	return b.String()
+	return b.String(), nil
+}
+
+func runLocalOutputs(runID string, artifacts []string) ([]string, error) {
+	outputs := []string{}
+	for _, artifact := range normalized(artifacts) {
+		output, err := runLocalOutput(runID, artifact)
+		if err != nil {
+			return nil, err
+		}
+		outputs = append(outputs, output)
+	}
+	return normalized(outputs), nil
+}
+
+func runLocalOutput(runID string, artifact string) (string, error) {
+	artifact = filepath.ToSlash(strings.TrimSpace(artifact))
+	prefix := filepath.ToSlash(filepath.Join(".kkachi", "runs", runID))
+	if strings.HasPrefix(artifact, prefix+"/") {
+		if !safeRelPath(artifact) {
+			return "", fmt.Errorf("run-local artifact path %q is unsafe", artifact)
+		}
+		return artifact, nil
+	}
+	if strings.HasPrefix(artifact, ".kkachi/runs/") {
+		return "", fmt.Errorf("run-local artifact path %q must stay under %s", artifact, prefix)
+	}
+	if !safeRelPath(artifact) {
+		return "", fmt.Errorf("artifact path %q is not safe for run-local materialization", artifact)
+	}
+	output := filepath.ToSlash(filepath.Join(prefix, artifact))
+	if !strings.HasPrefix(output, prefix+"/") || !safeRelPath(output) {
+		return "", fmt.Errorf("artifact path %q does not resolve under %s", artifact, prefix)
+	}
+	return output, nil
+}
+
+func runLocalContracts(runID string, contracts []workflowregistry.NodeContract) ([]workflowregistry.NodeContract, error) {
+	out := make([]workflowregistry.NodeContract, 0, len(contracts))
+	for _, contract := range contracts {
+		var err error
+		contract.RequiredInputs, err = runLocalOutputs(runID, contract.RequiredInputs)
+		if err != nil {
+			return nil, err
+		}
+		contract.ExpectedArtifacts, err = runLocalOutputs(runID, contract.ExpectedArtifacts)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, contract)
+	}
+	return out, nil
+}
+
+func validateContractsRunLocal(runID string, contracts []workflowregistry.NodeContract) error {
+	prefix := filepath.ToSlash(filepath.Join(".kkachi", "runs", runID)) + "/"
+	for _, contract := range contracts {
+		for _, path := range append(append([]string{}, contract.RequiredInputs...), contract.ExpectedArtifacts...) {
+			path = filepath.ToSlash(strings.TrimSpace(path))
+			if !strings.HasPrefix(path, prefix) || !safeRelPath(path) {
+				return fmt.Errorf("custom workflow contract path %q must be run-local under %s", path, strings.TrimSuffix(prefix, "/"))
+			}
+		}
+	}
+	return nil
+}
+
+func validateCustomWorkflowDAGRunLocalOutputs(runID string, content string) error {
+	prefix := filepath.ToSlash(filepath.Join(".kkachi", "runs", runID)) + "/"
+	inRequiredOutputs := false
+	validate := func(path string) error {
+		path = filepath.ToSlash(strings.Trim(strings.TrimSpace(path), `"'`))
+		if path == "" {
+			return nil
+		}
+		if !strings.HasPrefix(path, prefix) || !safeRelPath(path) {
+			return fmt.Errorf("custom workflow required output %q must be run-local under %s", path, strings.TrimSuffix(prefix, "/"))
+		}
+		return nil
+	}
+	for _, raw := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(raw)
+		if strings.HasPrefix(trimmed, "required_outputs:") {
+			remainder := strings.TrimSpace(strings.TrimPrefix(trimmed, "required_outputs:"))
+			if remainder == "" {
+				inRequiredOutputs = true
+				continue
+			}
+			if strings.HasPrefix(remainder, "[") && strings.HasSuffix(remainder, "]") {
+				for _, path := range strings.Split(strings.TrimSuffix(strings.TrimPrefix(remainder, "["), "]"), ",") {
+					if err := validate(path); err != nil {
+						return err
+					}
+				}
+				inRequiredOutputs = false
+				continue
+			}
+			return fmt.Errorf("custom workflow required_outputs must use an explicit block list or inline list under %s", strings.TrimSuffix(prefix, "/"))
+		}
+		if !inRequiredOutputs {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "- ") {
+			if err := validate(strings.TrimPrefix(trimmed, "- ")); err != nil {
+				return err
+			}
+			continue
+		}
+		if trimmed == "" {
+			continue
+		}
+		if !strings.HasPrefix(raw, " ") && !strings.HasPrefix(raw, "	") {
+			inRequiredOutputs = false
+		}
+	}
+	return nil
 }
 
 func approvedPlanHash(approval string) (string, bool) {

@@ -128,7 +128,7 @@ The trigger fails closed unless the effective `kkachi-agent-helper` supports all
 - `kkachi-agent-helper capabilities --json`
 - `kkachi-agent-helper workflow --help`
 - workflow subcommands: `validate`, `explain`, `create`, `show`, `ready`, and `node`
-- capability flags: `task_dag_schema_validation` and `workflow_instance_state`; in `--workflow-managed` mode also require `workflow_strict_transition_ledger` and `workflow_transition_order_verification`
+- capability flags: `task_dag_schema_validation` and `workflow_instance_state`; in `--workflow-managed` mode also require `workflow_strict_transition_ledger`, `workflow_transition_order_verification`, and `workflow_phase_projection_validation`
 
 Missing workflow capability returns `ok:false`,
 `status: blocked_missing_kah_workflow_capability` in ordinary mode or
@@ -140,8 +140,8 @@ artifacts.
 
 Recovery for `strict_workflow_missing_kah_capability`: verify the effective
 repo-selected KAH binary exposes `task_dag_schema_validation`,
-`workflow_instance_state`, `workflow_strict_transition_ledger`, and
-`workflow_transition_order_verification` before rerunning the same route-backed
+`workflow_instance_state`, `workflow_strict_transition_ledger`,
+`workflow_transition_order_verification`, and `workflow_phase_projection_validation` before rerunning the same route-backed
 workflow-managed trigger. Recovery for
 `strict_workflow_expected_start_revision_missing`: inspect KAH `workflow show`
 and `workflow ready` JSON for a positive `instance.revision`; repair/recreate
@@ -172,7 +172,7 @@ Explicit WFLOW-002 mode accepts only this JSON bundle shape:
 }
 ```
 
-Every KAH-ready node must have exactly one matching contract by `workflow_id` and `node_id`. A missing matching contract fails closed with `status: blocked_missing_ready_node_contract` and no partial packets.
+Every KAH-ready node must have exactly one matching contract by `workflow_id` and `node_id`. A missing matching contract fails closed with `status: blocked_missing_ready_node_contract` and no partial packets. The JSON example above is valid for explicit/persistent workflow mode; run-local materialization must keep process evidence under `.kkachi/runs/<run_id>/...` rather than project-root paths.
 
 ## Selector Registry
 
@@ -201,7 +201,7 @@ The trigger:
 6. returns `ok:true/status:no_ready_nodes` when KAH has no ready nodes;
 7. always reports `direct_kah_state_write:false`, `completion_authority:kah_only`, `fallback_policy:none_fail_closed`, and `stage1_direct_codex_is_kab_native_codex:false`.
 
-Dispatch packets are instructions for the declared lane only. This skill does not start, complete, block, retry, or roll back KAH nodes.
+Dispatch packets are instructions for the declared lane only. This skill does not start, complete, block, retry, or roll back KAH nodes. The declared lane must treat `expected_start_revision` as mandatory start admission: a stale revision, KAH start rejection, missing required outputs, or KAH complete rejection is a fail-closed blocker and must not become a completion claim or fallback dispatch.
 
 For classified workflow-managed KAS/KAH runs, step 1 is narrowed by STRICT-003:
 the trigger must consume a successful `workflow-route` result
@@ -215,7 +215,12 @@ order, phase-plan text, or the old default development spine.
 Run-local materialization records the selected bundle, task class,
 classification reason or approved one-off packet evidence, source
 registry/taxonomy checksums or approval hash/packet checksum, run-local
-posture, `persistent_promotion:false`, and `no_promotion:true`. It must not write `.kkachi-workflow.yaml`,
+posture, `persistent_promotion:false`, and `no_promotion:true`. It rewrites
+route-backed `workflow.yaml` required outputs and `node-contracts.json`
+required inputs/expected artifacts under `.kkachi/runs/<run_id>/...`; unsafe
+artifact paths fail closed before any writes. Approved custom packets are
+hash-bound and must already declare `.kkachi/runs/<run_id>/...` evidence paths,
+or the trigger fails closed with no materialized files. It must not write `.kkachi-workflow.yaml`,
 `.kkachi/workflow-catalog.yaml`, `.kkachi/workflows/*`, profiles, providers,
 gateways, auth, tokens, models, or KAB runtime state.
 

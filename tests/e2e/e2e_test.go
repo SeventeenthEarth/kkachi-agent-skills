@@ -71,6 +71,30 @@ func TestRootInstalledBinaryVersion(t *testing.T) {
 	}
 }
 
+func TestSTRICT007E2EGoldenGuidanceReadback(t *testing.T) {
+	root := repoRoot(t)
+	paths := []string{
+		"docs/sot/strict-workflow-execution-contract.md",
+		"docs/roadmap.md",
+		"registries/phase-contracts.yaml",
+		"skills/kkachi-orchestrate/SKILL.md",
+		"templates/run-artifacts/workflow-dispatch-packet.yaml.tmpl",
+	}
+	for _, rel := range paths {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		content := string(data)
+		if !strings.Contains(content, "workflow_phase_projection_validation") {
+			t.Fatalf("STRICT-007 golden guidance %s missing workflow_phase_projection_validation", rel)
+		}
+		if !strings.Contains(content, "required outputs") && !strings.Contains(content, "required_outputs") {
+			t.Fatalf("STRICT-007 golden guidance %s missing required output wording", rel)
+		}
+	}
+}
+
 func TestRootBinaryUpdateAgentInstructionsDryRun(t *testing.T) {
 	binary := buildRootBinary(t)
 	repo := t.TempDir()

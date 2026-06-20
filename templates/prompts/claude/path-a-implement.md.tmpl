@@ -23,6 +23,11 @@ Preserve every acceptance criterion, constraint, and non-goal from `task-contrac
 5. Report files changed, rationale, tests run or proposed, risks, and blockers.
 </steps>
 
+Strict workflow-managed execution:
+- If a dispatch packet is supplied, do not begin backend/agent work until KAH node start succeeds at `expected_start_revision`.
+- Treat stale `expected_start_revision`, KAH node start failure, missing required outputs, unsafe evidence paths, KAH node complete failure, or missing `workflow_phase_projection_validation` as blockers.
+- Do not claim completion, set completion metadata, pick a fallback backend/agent/workflow, or direct-write KAH state unless KAH node complete succeeds after required outputs exist.
+
 <output_policy>
 Product/backend output must be English. Keep console output compact using exactly this schema:
 Status: <pass|fail|blocked|in_progress|not_applicable>
