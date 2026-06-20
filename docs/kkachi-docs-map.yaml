@@ -13,6 +13,7 @@ sot_docs:
   - "docs/sot/task-dag-workflow-contract.md"
   - "docs/sot/token-economy-and-agent-instruction-contract.md"
   - "docs/sot/multi-agent-review-policy.md"
+  - "docs/sot/mar-task-loop-contract.md"
   - "docs/sot/policy-promotion-governance-contract.md"
   - "docs/sot/strict-workflow-execution-contract.md"
 compatibility_registries:

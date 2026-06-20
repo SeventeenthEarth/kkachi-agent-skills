@@ -58,7 +58,8 @@ INITDOC-003
   -> KASROLE-001..004
   -> WFLOW-002..009 paired with KAH DAGSM-001..006 (WFLOW-001 planning SOT already completed)
   -> STRICT-001..007 shared across KAS and KAH after the WFLOW/DAGSM baseline
-  -> MAR-001..005 paired with KAH MAREV-001..003 when MAR repository promotion is selected
+  -> MARTL-001..002 KAS-only MAR task-loop alignment after STRICT and the existing MAR/MAREV substrate
+  -> MAR-001..006 paired with KAH MAREV-001..003 when MAR repository promotion is selected
   -> POLPR-001..008 shared across KAS and KAH
 ```
 
@@ -272,6 +273,21 @@ WFLOW deferrals unless separately approved: dynamic node generation during execu
 | STRICT-007 | Adopt strict flow in active KAS orchestration skills/templates/e2e | Completed | Active KAS orchestration, phase skills, backend prompt templates, final verification guidance, and e2e/golden fixtures require strict route -> trigger -> ready -> start -> work -> required outputs -> complete flow for workflow-managed runs, including KAH `workflow_phase_projection_validation` evidence after `STRICT-006`. | Completed source-side after KAH `STRICT-006` source completion at `f9d82b7`; this STRICT-007 source commit adds strict route/trigger/start/complete guidance, prompt/e2e/docs-contract coverage, run-local `required_outputs` materialization, custom packet inline-list rejection, KAH readback run-local validation, stale wording fixes, `make test` PASS, `git diff --check` PASS, root evidence leak scan PASS, KAH verification/review/final gates PASS for `run-20260620T023133Z-53f1e8aefd20`, and Red/Orange/Gray MAR PASS. Push/install/release/runtime activation remain separate approvals. |
 
 STRICT deferrals unless separately approved: realtime alerting/watchers, automatic rollback/checkpoint behavior, dynamic node generation, retry automation, fallback agent/backend selection, KAB runtime activation, profile/provider/gateway/auth/token/model mutation, push/release/install, or claiming strict runtime behavior before implementation/effective-binary evidence exists.
+
+### EPIC: MARTL — MAR task loop alignment under STRICT
+
+> Goal: make the already-defined MAR review -> Blue/Red disposition -> implementer fix -> refreshed MAR review loop explicit and evidence-bound inside KAS STRICT workflow-managed runs, without inventing a new KAH reviewer system or replacing Blue/Red authority.
+>
+> Source of truth: `docs/sot/mar-task-loop-contract.md`. Related existing authority: `docs/sot/multi-agent-review-policy.md`, KAH `docs/sot/multi-agent-review-evidence-gates.md`, and `docs/sot/strict-workflow-execution-contract.md`.
+>
+> Scope and dependency note: MARTL is KAS-only by default. Existing KAH MAR evidence gate/schema support and STRICT transition/order/projection support are the expected deterministic substrate; a KAH PR is opened only if implementation evidence proves that substrate cannot validate the needed KAS evidence.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| MARTL-001 | Register MAR task-loop SOT and roadmap sequence | Completed | `docs/sot/mar-task-loop-contract.md` defines MARTL as the existing MAR review/fix/re-review operating loop, records terminal/non-terminal statuses, KAS/KAH/KAB/Blue/Red boundaries, and registers the two-task KAS-only sequence. KAS roadmap, docs index, and docs map register the SOT. | Completed after docs readback, docs-map YAML parse, `git diff --check`, repository test gate, and Red/Orange/Gray color review. No runner, registry behavior, provider execution, KAH gate, install, release, or runtime activation claim is authorized by this docs task. |
+| MARTL-002 | Align MARTL workflow/runner/adoption surfaces | Planned | KAS workflow registry/phase contracts/skills/templates and, only if needed, `scripts/mar.py` wrapper behavior make MAR `REQUEST_CHANGES` non-terminal, route accepted fixes back to the selected implementer lane, require post-fix verification, and require refreshed MAR/Blue/Red disposition before final completion. | Focused registry/skill/script/docs-contract/e2e evidence, existing KAH `multi-agent-review/status.json` gate readback where applicable, Red/Orange/Gray review, MAR only if implementation scope requires it, final verification, and commit approval. KAH code changes remain deferred unless an evidenced deterministic validation gap is found. |
+
+MARTL deferrals unless separately approved: new KAH behavior, KAB runtime activation, automatic source mutation by reviewers, automatic retry-until-pass without Blue/Red disposition, undeclared tertiary or premium provider fallback, profile/provider/gateway/auth/token/model mutation, install/release/push, and treating provider wording or model voting as final approval authority.
 
 ### EPIC: TOKEN — KAS token economy and English operator surfaces
 
