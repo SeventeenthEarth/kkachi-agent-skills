@@ -157,6 +157,14 @@ def parse_json_review_payload(raw):
                 candidates.append("\n".join(lines[1:-1]).strip())
         return candidates
 
+    for candidate in content_candidates(raw):
+        if candidate == raw:
+            continue
+        try:
+            return json.loads(candidate), None
+        except json.JSONDecodeError:
+            continue
+
     for line in raw.splitlines():
         stripped = line.strip()
         if not stripped:
@@ -257,16 +265,24 @@ def load_provider_registry(path):
         raise ValueError("provider registry schema_version must be mar.role_lanes.v1")
     if not isinstance(data.get("required_roles"), list):
         raise ValueError("provider registry required_roles must be a list")
+    optional_roles = data.get("optional_roles", [])
+    if not isinstance(optional_roles, list):
+        raise ValueError("provider registry optional_roles must be a list")
     if not isinstance(data.get("roles"), dict):
         raise ValueError("provider registry roles must be an object")
     if not isinstance(data.get("providers"), dict):
         raise ValueError("provider registry providers must be an object")
-    for role_id in data["required_roles"]:
+    all_declared_roles = list(data["required_roles"]) + list(optional_roles)
+    for role_id in all_declared_roles:
         if role_id not in data["roles"]:
-            raise ValueError(f"required role {role_id} missing role config")
+            raise ValueError(f"declared role {role_id} missing role config")
         role = data["roles"][role_id]
         if not isinstance(role, dict):
             raise ValueError(f"role {role_id} must be an object")
+        if role_id in data["required_roles"] and role.get("required") is False:
+            raise ValueError(f"required role {role_id} cannot be marked optional")
+        if role_id in optional_roles and role.get("required") is not False:
+            raise ValueError(f"optional role {role_id} must be marked required=false")
         for key in ("primary_provider", "secondary_provider"):
             provider_id = role.get(key)
             if not provider_id or provider_id not in data["providers"]:
@@ -515,16 +531,67 @@ def parse_csv_arg(value):
     return items or None
 
 
+def changed_surface_tokens(value):
+    tokens = parse_csv_arg(value) or []
+    return [token.lower() for token in tokens]
+
+
+def triggered_optional_roles(registry, changed_surfaces):
+    surfaces = set(changed_surface_tokens(changed_surfaces))
+    if not surfaces:
+        return []
+    triggered = []
+    for role_id in registry.get("optional_roles", []):
+        role = registry.get("roles", {}).get(role_id, {})
+        triggers = [
+            str(item).lower()
+            for item in role.get("triggered_required_when", [])
+            if isinstance(item, str)
+        ]
+        if surfaces.intersection(triggers):
+            triggered.append(role_id)
+    return triggered
+
+
 def selected_roles_or_blocked(args, registry):
     required_roles = list(registry.get("required_roles", []))
+    triggered_roles = triggered_optional_roles(
+        registry,
+        getattr(args, "changed_surfaces", None),
+    )
     requested = parse_csv_arg(getattr(args, "roles", None))
     if not requested:
-        return required_roles, None
+        selected = required_roles + [
+            role_id for role_id in triggered_roles if role_id not in required_roles
+        ]
+        if selected != required_roles and not getattr(args, "pre_scoped_evidence", None):
+            return selected, structured_failure(
+                "BLOCKED",
+                "pre_scoped_evidence_required",
+                required_roles=required_roles,
+                triggered_optional_roles=triggered_roles,
+                requested_roles=selected,
+                no_provider_execution=True,
+            )
+        return selected, None
+    valid_roles = set(required_roles) | set(registry.get("optional_roles", []))
+    unknown_roles = [role_id for role_id in requested if role_id not in valid_roles]
+    if unknown_roles:
+        return requested, structured_failure(
+            "FAILED",
+            "unknown_requested_role",
+            required_roles=required_roles,
+            optional_roles=registry.get("optional_roles", []),
+            requested_roles=requested,
+            unknown_roles=unknown_roles,
+            no_provider_execution=True,
+        )
     if requested != required_roles and not getattr(args, "pre_scoped_evidence", None):
         return requested, structured_failure(
             "BLOCKED",
             "pre_scoped_evidence_required",
             required_roles=required_roles,
+            triggered_optional_roles=triggered_roles,
             requested_roles=requested,
             no_provider_execution=True,
         )
@@ -1008,6 +1075,14 @@ def cmd_provider_preflight(args):
         "reason": reason,
         "schema_version": "mar.provider_preflight.v1",
         "required_roles": registry.get("required_roles", []),
+        "optional_roles": registry.get("optional_roles", []),
+        "triggered_optional_roles": triggered_optional_roles(
+            registry,
+            getattr(args, "changed_surfaces", None),
+        ),
+        "changed_surfaces": changed_surface_tokens(
+            getattr(args, "changed_surfaces", None),
+        ),
         "requested_roles": roles,
         "provider_failure_reasons": reasons,
         "attempts": attempts,
@@ -1095,6 +1170,33 @@ def attempt_severities(attempt):
     return severities
 
 
+def clamp_confidence_score(score):
+    return min(1.0, max(0.0, float(score)))
+
+
+def confidence_score(value):
+    if value is None:
+        return 1.0
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        return clamp_confidence_score(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        named = {
+            "high": 1.0,
+            "medium": 0.75,
+            "low": 0.5,
+        }
+        if normalized in named:
+            return named[normalized]
+        try:
+            return clamp_confidence_score(normalized)
+        except ValueError:
+            return 1.0
+    return 1.0
+
+
 def red_trigger_summary(unresolved, attempts):
     triggers = []
     if unresolved:
@@ -1102,7 +1204,7 @@ def red_trigger_summary(unresolved, attempts):
     statuses = [attempt.get("terminal_status") for attempt in attempts]
     if "REQUEST_CHANGES" in statuses:
         triggers.append("request_changes_findings")
-    if any(attempt.get("confidence", 1.0) < 0.75 for attempt in attempts):
+    if any(confidence_score(attempt.get("confidence")) < 0.75 for attempt in attempts):
         triggers.append("low_confidence")
     severities = []
     for attempt in attempts:
@@ -1364,6 +1466,7 @@ def build_parser():
     merge_pack.add_argument("--provider-coverage", action="store_true")
     merge_pack.add_argument("--registry", default=DEFAULT_PROVIDER_REGISTRY)
     merge_pack.add_argument("--roles")
+    merge_pack.add_argument("--changed-surfaces")
     merge_pack.add_argument("--pre-scoped-evidence")
     merge_pack.set_defaults(func=cmd_merge_pack, guarded=True)
 
@@ -1387,6 +1490,7 @@ def build_parser():
     provider_preflight.add_argument("--registry", default=DEFAULT_PROVIDER_REGISTRY)
     provider_preflight.add_argument("--toolchain", default=DEFAULT_TOOLCHAIN)
     provider_preflight.add_argument("--roles")
+    provider_preflight.add_argument("--changed-surfaces")
     provider_preflight.add_argument("--pre-scoped-evidence")
     provider_preflight.add_argument("--run-id")
     provider_preflight.add_argument("--task-id")

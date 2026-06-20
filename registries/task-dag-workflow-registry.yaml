@@ -177,9 +177,35 @@ node_contracts:
     owner_role: implementer_backend
     execution_lane: stage1_direct_codex_app_server
     required_inputs: [feedback-1.md]
-    expected_artifacts: [feedback-triage-1.md, handle-feedback-1.md]
+    expected_artifacts: [feedback-triage-1.md, handle-feedback-1.md, post-feedback-verification.md]
     prompt_ref: skills/kkachi-handle-feedback/SKILL.md
     approval_required: true
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: mar_review
+    task_class: development
+    owner_role: mar_reviewers
+    execution_lane: mar_role_first_review
+    required_inputs: [diff.patch, handle-feedback-1.md, post-feedback-verification.md]
+    expected_artifacts: [mar-review.md, mar-merge-pack.md, mar-blue-disposition.md]
+    prompt_ref: skills/kkachi-review/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: second_color_review
+    task_class: development
+    owner_role: color_reviewers
+    execution_lane: durable_kanban_color_review
+    required_inputs: [mar-review.md, mar-blue-disposition.md, post-feedback-verification.md]
+    expected_artifacts: [second-color-review.md, post-mar-feedback-triage.md]
+    prompt_ref: skills/kkachi-review/SKILL.md
+    approval_required: false
     fallback_policy: none_fail_closed
     verification_gate: kah_workflow_node_evidence
     completion_authority: kah_only
@@ -189,7 +215,7 @@ node_contracts:
     task_class: development
     owner_role: hermes
     execution_lane: direct_kas_skill
-    required_inputs: [checklist.md, diff.patch, test-log.md]
+    required_inputs: [checklist.md, diff.patch, test-log.md, mar-review.md, mar-merge-pack.md, mar-blue-disposition.md, second-color-review.md]
     expected_artifacts: [verification.md, final-report.md]
     prompt_ref: skills/kkachi-final-verify/SKILL.md
     approval_required: false

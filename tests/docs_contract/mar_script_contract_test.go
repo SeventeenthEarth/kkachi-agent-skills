@@ -151,6 +151,29 @@ func TestMAR005ValidateParsesKimiStreamJSONAssistantContent(t *testing.T) {
 	}
 }
 
+func TestMAR005ValidateParsesDirectFencedJSONProviderOutput(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fenced-provider-output.txt")
+	raw := "```json\n{\"status\":\"PASS\",\"summary\":\"direct fenced parsed\",\"confidence\":\"high\",\"findings\":[],\"role_scoped_acceptance_criteria_verdicts\":[]}\n```\n"
+	if err := os.WriteFile(path, []byte(raw), 0644); err != nil {
+		t.Fatalf("write direct fenced fixture: %v", err)
+	}
+
+	output := runMARCommand(t,
+		"validate",
+		"--input", path,
+	)
+	var result struct {
+		Status  string `json:"status"`
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse validate output: %v\n%s", err, output)
+	}
+	if result.Status != "PASS" || result.Summary != "direct fenced parsed" {
+		t.Fatalf("direct fenced provider output must parse as review JSON\n%s", output)
+	}
+}
+
 func TestMAR003DoctorAcceptsFixtureEvidenceWithoutProviderExecution(t *testing.T) {
 	output := runMARCommand(t,
 		"doctor",
@@ -265,6 +288,7 @@ func TestMAR005RoleLaneRegistryReadbackIsFailClosed(t *testing.T) {
 		Status        string   `json:"status"`
 		SchemaVersion string   `json:"schema_version"`
 		RequiredRoles []string `json:"required_roles"`
+		OptionalRoles []string `json:"optional_roles"`
 		Roles         map[string]struct {
 			PrimaryProvider   string `json:"primary_provider"`
 			SecondaryProvider string `json:"secondary_provider"`
@@ -292,23 +316,34 @@ func TestMAR005RoleLaneRegistryReadbackIsFailClosed(t *testing.T) {
 	if strings.Join(result.RequiredRoles, ",") != strings.Join(wantRoles, ",") {
 		t.Fatalf("required roles = %v, want %v", result.RequiredRoles, wantRoles)
 	}
+	if strings.Join(result.OptionalRoles, ",") != "vision" {
+		t.Fatalf("optional roles = %v, want [vision]", result.OptionalRoles)
+	}
+	wantMatrix := map[string][2]string{
+		"logic":         {"zcode_glm_5_2", "kimi_default"},
+		"security":      {"antigravity_gemini", "zcode_glm_5_2"},
+		"arch":          {"zcode_glm_5_2", "kimi_default"},
+		"cve":           {"antigravity_gemini", "zcode_glm_5_2"},
+		"test_adequacy": {"kimi_default", "zcode_glm_5_2"},
+	}
 	for _, roleID := range wantRoles {
 		role := result.Roles[roleID]
-		if role.PrimaryProvider != "zcode_glm_5_2" || role.SecondaryProvider != "kimi_default" || role.Description == "" {
+		want := wantMatrix[roleID]
+		if role.PrimaryProvider != want[0] || role.SecondaryProvider != want[1] || role.Description == "" {
 			t.Fatalf("role %s has wrong provider candidates: %+v", roleID, role)
 		}
 	}
 	zcode := result.Providers["zcode_glm_5_2"]
 	zcodeArgs := strings.Join(zcode.CommandArgs, "\x00")
-	if !zcode.DefaultRequired || !containsString(zcode.CommandArgs, "--prompt") || !containsString(zcode.CommandArgs, "--mode") || !containsString(zcode.CommandArgs, "plan") {
-		t.Fatalf("zcode_glm_5_2 must use zcode headless prompt plan mode: %+v", zcode)
+	if !zcode.DefaultRequired || !containsString(zcode.CommandArgs, "--prompt-file") || !containsString(zcode.CommandArgs, "{prompt_path}") {
+		t.Fatalf("zcode_glm_5_2 must use adapter prompt-file mode: %+v", zcode)
 	}
 	if zcode.TimeoutSeconds < 1800 {
 		t.Fatalf("zcode_glm_5_2 must allow a 30 minute MAR review timeout, got %d", zcode.TimeoutSeconds)
 	}
-	for _, forbidden := range []string{"--model", "--prompt-file"} {
+	for _, forbidden := range []string{"--model", "{prompt_text}"} {
 		if strings.Contains(zcodeArgs, forbidden) {
-			t.Fatalf("zcode_glm_5_2 command_args use unsupported zcode option %q: %v", forbidden, zcode.CommandArgs)
+			t.Fatalf("zcode_glm_5_2 command_args use unsupported option/data %q: %v", forbidden, zcode.CommandArgs)
 		}
 	}
 	kimi := result.Providers["kimi_default"]
@@ -316,20 +351,20 @@ func TestMAR005RoleLaneRegistryReadbackIsFailClosed(t *testing.T) {
 	if !kimi.DefaultRequired || kimi.SelectedModel != nil || kimi.SelectedModelRequired == nil || *kimi.SelectedModelRequired || kimi.ModelSelection != "cli_default_latest" {
 		t.Fatalf("kimi_default must use CLI default/latest without explicit selected_model: %+v", kimi)
 	}
-	if !containsString(kimi.CommandArgs, "--output-format") || !containsString(kimi.CommandArgs, "stream-json") || !containsString(kimi.CommandArgs, "--prompt") || !containsString(kimi.CommandArgs, "{prompt_text}") {
-		t.Fatalf("kimi_default must pass prompt text through Kimi stream-json prompt mode: %+v", kimi)
+	if !containsString(kimi.CommandArgs, "--prompt-file") || !containsString(kimi.CommandArgs, "{prompt_path}") {
+		t.Fatalf("kimi_default must pass prompt by adapter prompt-file mode: %+v", kimi)
 	}
-	for _, forbidden := range []string{"--model", "--prompt-file"} {
+	for _, forbidden := range []string{"--model", "{prompt_text}"} {
 		if strings.Contains(kimiArgs, forbidden) {
-			t.Fatalf("kimi_default command_args use unsupported explicit model/file option %q: %v", forbidden, kimi.CommandArgs)
+			t.Fatalf("kimi_default command_args use unsupported explicit model/text option %q: %v", forbidden, kimi.CommandArgs)
 		}
 	}
 	agy := result.Providers["antigravity_gemini"]
-	if agy.DefaultRequired || agy.SelectedModel != nil || agy.DegradedPosture == "" {
-		t.Fatalf("antigravity_gemini must be explicit degraded non-default metadata: %+v", agy)
+	if agy.DefaultRequired || agy.SelectedModel == nil || *agy.SelectedModel != "Gemini 3.5 Flash (High)" || agy.SelectedModelRequired == nil || *agy.SelectedModelRequired || agy.DegradedPosture == "" {
+		t.Fatalf("antigravity_gemini must pin selected model and remain explicit non-default metadata: %+v", agy)
 	}
-	if strings.Contains(strings.Join(agy.CommandArgs, "\x00"), "read-only") {
-		t.Fatalf("antigravity command_args must not pass a value to --sandbox: %v", agy.CommandArgs)
+	if strings.Contains(strings.Join(agy.CommandArgs, "\x00"), "read-only") || !containsString(agy.CommandArgs, "--prompt-file") {
+		t.Fatalf("antigravity command_args must use adapter prompt-file and must not pass a value to --sandbox: %v", agy.CommandArgs)
 	}
 	for _, reason := range []string{"cli_missing", "model_unavailable", "mutation_detected", "unknown_provider_failure"} {
 		if !containsString(result.ProviderFailureReasons, reason) {
@@ -667,6 +702,29 @@ func TestMAR005RedTriggerDetectionAndTestAdequacyCoverage(t *testing.T) {
 	}
 }
 
+func TestMARConfidenceStringsDoNotCrashRedTriggerSummary(t *testing.T) {
+	paths := writeTempAttemptFixtures(t, []map[string]any{
+		providerAttemptFixture("logic-primary", "logic", "zcode_glm_5_2", "primary", "PASS", map[string]any{
+			"confidence": "high",
+		}),
+		providerAttemptFixture("security-primary", "security", "zcode_glm_5_2", "primary", "PASS", map[string]any{
+			"confidence": "low",
+		}),
+	})
+	args := append([]string{"merge-pack", "--provider-coverage", "--roles", "logic,security", "--pre-scoped-evidence", "string-confidence-test"}, paths...)
+	output := runMARCommand(t, args...)
+	var result roleMergeResult
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse string confidence merge-pack output: %v\n%s", err, output)
+	}
+	if result.Status != "PASS" || !containsString(result.BlueMatrixInputs.CoveredRoles, "logic") || !containsString(result.BlueMatrixInputs.CoveredRoles, "security") {
+		t.Fatalf("string confidence role attempts should still cover roles\n%s", output)
+	}
+	if !result.RedTriggerSummary.RedAdjudicationRequired || !containsString(result.RedTriggerSummary.Triggers, "low_confidence") {
+		t.Fatalf("string low confidence must trigger Red summary without crashing\n%s", output)
+	}
+}
+
 func TestMAR005RoleMergePackDegradesPartialRequiredCoverage(t *testing.T) {
 	paths := writeTempAttemptFixtures(t, []map[string]any{
 		providerAttemptFixture("logic-primary", "logic", "zcode_glm_5_2", "primary", "PASS", nil),
@@ -684,6 +742,170 @@ func TestMAR005RoleMergePackDegradesPartialRequiredCoverage(t *testing.T) {
 	}
 	if !strings.Contains(result.OperatorReportText, "security") {
 		t.Fatalf("partial role coverage must report unresolved security role\n%s", output)
+	}
+}
+
+func TestMARTL002ProviderAdaptersRoleMatrixAndVisionMetadata(t *testing.T) {
+	output := runMARCommand(t, "role-lanes")
+	var result struct {
+		Status        string   `json:"status"`
+		RequiredRoles []string `json:"required_roles"`
+		OptionalRoles []string `json:"optional_roles"`
+		Roles         map[string]struct {
+			Required                 bool     `json:"required"`
+			PrimaryProvider          string   `json:"primary_provider"`
+			SecondaryProvider        string   `json:"secondary_provider"`
+			TriggeredRequiredWhen    []string `json:"triggered_required_when"`
+			VisionCoverageLimitation string   `json:"vision_coverage_limitation"`
+		} `json:"roles"`
+		Providers map[string]struct {
+			SelectedModel         *string  `json:"selected_model"`
+			SelectedModelRequired *bool    `json:"selected_model_required"`
+			CommandArgs           []string `json:"command_args"`
+			AdapterScript         string   `json:"adapter_script"`
+			Validated             bool     `json:"validated"`
+		} `json:"providers"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse role-lanes output: %v\n%s", err, output)
+	}
+	if result.Status != "PASS" {
+		t.Fatalf("role-lanes status = %q\n%s", result.Status, output)
+	}
+	if strings.Join(result.RequiredRoles, ",") != "logic,security,arch,cve,test_adequacy" {
+		t.Fatalf("required roles changed unexpectedly: %v", result.RequiredRoles)
+	}
+	if strings.Join(result.OptionalRoles, ",") != "vision" {
+		t.Fatalf("optional roles = %v, want [vision]", result.OptionalRoles)
+	}
+	wantMatrix := map[string][2]string{
+		"logic":         {"zcode_glm_5_2", "kimi_default"},
+		"security":      {"antigravity_gemini", "zcode_glm_5_2"},
+		"arch":          {"zcode_glm_5_2", "kimi_default"},
+		"cve":           {"antigravity_gemini", "zcode_glm_5_2"},
+		"test_adequacy": {"kimi_default", "zcode_glm_5_2"},
+		"vision":        {"antigravity_gemini", "zcode_glm_5_2"},
+	}
+	for roleID, want := range wantMatrix {
+		role, ok := result.Roles[roleID]
+		if !ok {
+			t.Fatalf("missing role %s in role-lanes output", roleID)
+		}
+		if role.PrimaryProvider != want[0] || role.SecondaryProvider != want[1] {
+			t.Fatalf("role %s providers = %s/%s, want %s/%s", roleID, role.PrimaryProvider, role.SecondaryProvider, want[0], want[1])
+		}
+	}
+	vision := result.Roles["vision"]
+	if vision.Required || len(vision.TriggeredRequiredWhen) == 0 || !containsString(vision.TriggeredRequiredWhen, "ui") || vision.VisionCoverageLimitation == "" {
+		t.Fatalf("vision role must be optional with trigger metadata and fallback limitation: %+v", vision)
+	}
+	for providerID, script := range map[string]string{
+		"zcode_glm_5_2":      "scripts/mar_adapters/mar-zcode.sh",
+		"kimi_default":       "scripts/mar_adapters/mar-kimi.sh",
+		"antigravity_gemini": "scripts/mar_adapters/mar-agy.sh",
+	} {
+		provider := result.Providers[providerID]
+		if provider.AdapterScript != script {
+			t.Fatalf("provider %s adapter_script = %q, want %q", providerID, provider.AdapterScript, script)
+		}
+		if !containsString(provider.CommandArgs, "--prompt-file") || !containsString(provider.CommandArgs, "{prompt_path}") {
+			t.Fatalf("provider %s must use prompt-file adapter transport: %+v", providerID, provider.CommandArgs)
+		}
+		if containsString(provider.CommandArgs, "{prompt_text}") || containsString(provider.CommandArgs, "--prompt") {
+			t.Fatalf("provider %s must not pass giant prompt text argv: %+v", providerID, provider.CommandArgs)
+		}
+		scriptPath := filepath.Join(repoRoot(t), script)
+		if _, err := os.Stat(scriptPath); err != nil {
+			t.Fatalf("provider %s adapter script missing at %s: %v", providerID, script, err)
+		}
+		scriptBytes, err := os.ReadFile(scriptPath)
+		if err != nil {
+			t.Fatalf("read provider %s adapter script %s: %v", providerID, script, err)
+		}
+		if !strings.Contains(string(scriptBytes), "HOME=/Users/draccoon") {
+			t.Fatalf("provider %s adapter script must pin Hermes auth HOME before CLI execution", providerID)
+		}
+		scriptText := string(scriptBytes)
+		switch providerID {
+		case "zcode_glm_5_2":
+			if !strings.Contains(scriptText, "cd /Applications/ZCode.app/Contents/Resources/glm") || !strings.Contains(scriptText, "--prompt") {
+				t.Fatalf("zcode adapter must execute from packaged glm cwd and use prompt mode")
+			}
+		case "kimi_default":
+			if !strings.Contains(scriptText, "--prompt") {
+				t.Fatalf("kimi adapter must use prompt mode when requesting stream-json output")
+			}
+		}
+	}
+	agy := result.Providers["antigravity_gemini"]
+	if agy.SelectedModel == nil || *agy.SelectedModel != "Gemini 3.5 Flash (High)" || agy.SelectedModelRequired == nil || *agy.SelectedModelRequired {
+		t.Fatalf("agy provider must pin Gemini 3.5 Flash (High) without selected_model_required: %+v", agy)
+	}
+
+	preflightOutput := runMARCommand(t, "provider-preflight")
+	var preflight struct {
+		Attempts []struct {
+			ProviderID      string   `json:"provider_id"`
+			RedactedCommand []string `json:"redacted_command"`
+		} `json:"attempts"`
+	}
+	if err := json.Unmarshal(preflightOutput, &preflight); err != nil {
+		t.Fatalf("parse provider-preflight output: %v\n%s", err, preflightOutput)
+	}
+	adapterHeadByProvider := map[string]string{
+		"zcode_glm_5_2":      "scripts/mar_adapters/mar-zcode.sh",
+		"kimi_default":       "scripts/mar_adapters/mar-kimi.sh",
+		"antigravity_gemini": "scripts/mar_adapters/mar-agy.sh",
+	}
+	for _, attempt := range preflight.Attempts {
+		wantHead, ok := adapterHeadByProvider[attempt.ProviderID]
+		if !ok || len(attempt.RedactedCommand) == 0 {
+			t.Fatalf("unexpected preflight attempt command metadata: %+v", attempt)
+		}
+		if attempt.RedactedCommand[0] != wantHead {
+			t.Fatalf("provider %s must execute adapter head %q, got %v", attempt.ProviderID, wantHead, attempt.RedactedCommand)
+		}
+	}
+}
+
+func TestMARTL002VisionTriggerSelectionIsExplicitAndFailClosed(t *testing.T) {
+	defaultOutput := runMARCommand(t, "provider-preflight")
+	var defaultResult struct {
+		RequestedRoles []string `json:"requested_roles"`
+	}
+	if err := json.Unmarshal(defaultOutput, &defaultResult); err != nil {
+		t.Fatalf("parse default provider-preflight output: %v\n%s", err, defaultOutput)
+	}
+	if containsString(defaultResult.RequestedRoles, "vision") {
+		t.Fatalf("default MAR must not include optional vision role\n%s", defaultOutput)
+	}
+
+	triggeredOutput := runMARCommand(t, "provider-preflight", "--changed-surfaces", "ui,css", "--pre-scoped-evidence", "ui-change-evidence")
+	var triggeredResult struct {
+		RequestedRoles []string `json:"requested_roles"`
+	}
+	if err := json.Unmarshal(triggeredOutput, &triggeredResult); err != nil {
+		t.Fatalf("parse triggered provider-preflight output: %v\n%s", err, triggeredOutput)
+	}
+	if !containsString(triggeredResult.RequestedRoles, "vision") {
+		t.Fatalf("UI/visual trigger must include optional vision role\n%s", triggeredOutput)
+	}
+
+	paths := writeTempAttemptFixtures(t, []map[string]any{
+		providerAttemptFixture("logic-primary", "logic", "zcode_glm_5_2", "primary", "PASS", nil),
+		providerAttemptFixture("security-primary", "security", "antigravity_gemini", "primary", "PASS", nil),
+		providerAttemptFixture("arch-primary", "arch", "zcode_glm_5_2", "primary", "PASS", nil),
+		providerAttemptFixture("cve-primary", "cve", "antigravity_gemini", "primary", "PASS", nil),
+		providerAttemptFixture("test-primary", "test_adequacy", "kimi_default", "primary", "PASS", nil),
+	})
+	args := append([]string{"merge-pack", "--provider-coverage", "--changed-surfaces", "ui", "--pre-scoped-evidence", "ui-change-evidence"}, paths...)
+	mergeOutput := runMARCommand(t, args...)
+	var mergeResult roleMergeResult
+	if err := json.Unmarshal(mergeOutput, &mergeResult); err != nil {
+		t.Fatalf("parse triggered merge-pack output: %v\n%s", err, mergeOutput)
+	}
+	if mergeResult.Status != "DEGRADED" || !containsString(mergeResult.UnresolvedRequiredRoles, "vision") {
+		t.Fatalf("triggered vision must be required for that run and fail closed when uncovered\n%s", mergeOutput)
 	}
 }
 

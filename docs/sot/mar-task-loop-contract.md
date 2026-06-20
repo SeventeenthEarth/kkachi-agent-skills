@@ -90,7 +90,7 @@ MARTL is intentionally KAS-only unless implementation evidence proves a KAH dete
 | Task ID | Repo | Title | Status | Completion claim allowed |
 |---|---|---|---|---|
 | `MARTL-001` | KAS | Register MAR task-loop SOT and roadmap sequence | Completed | KAS has the MARTL SOT, roadmap rows, docs index/map registration, and explicit KAS-only scope. No runner, registry behavior, provider execution, KAH gate, install, release, or runtime activation claim. |
-| `MARTL-002` | KAS | Align MARTL workflow/runner/adoption surfaces | Planned | KAS aligns workflow registry/phase guidance/skills/templates and, if needed, `scripts/mar.py` orchestration so MAR requested-change rounds are artifacted, routed, verified, and re-reviewed before final completion. KAH code remains unchanged unless a separately approved evidence-backed follow-up is opened. |
+| `MARTL-002` | KAS | Align MARTL workflow/runner/adoption surfaces | Completed | KAS aligns workflow registry/phase guidance/skills/templates and, if needed, `scripts/mar.py` orchestration so MAR requested-change rounds are artifacted, routed, verified, and re-reviewed before final completion. KAH code remains unchanged unless a separately approved evidence-backed follow-up is opened. |
 
 ## Acceptance criteria for MARTL-001
 
@@ -122,4 +122,4 @@ MARTL-002 should be limited to KAS alignment and adoption:
 
 ## Next action
 
-Proceed to `MARTL-002` only after 주군 selects/approves that implementation task. MARTL-002 remains the first task that may align workflow registry, phase guidance, skills/templates, and runner/wrapper surfaces; it must provide its own implementation evidence and review gates before any runtime/adoption claim.
+MARTL-002 is source-side complete in KAS after implementation evidence, MAR coverage, focused Red/Orange/Gray review, KAH final gate, and local source commit closure. Install, release, push, downstream runtime adoption, and effective-runtime claims remain separate approvals.

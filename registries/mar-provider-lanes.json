@@ -7,6 +7,9 @@
     "cve",
     "test_adequacy"
   ],
+  "optional_roles": [
+    "vision"
+  ],
   "roles": {
     "logic": {
       "required": true,
@@ -18,9 +21,9 @@
     "security": {
       "required": true,
       "description": "Security-sensitive behavior, secrets/auth boundaries, unsafe mutation, and fail-closed risk review.",
-      "primary_provider": "zcode_glm_5_2",
-      "secondary_provider": "kimi_default",
-      "provider_selection_rationale": "zcode_glm_5_2 is the default primary; Kimi CLI default/latest remains the declared secondary."
+      "primary_provider": "antigravity_gemini",
+      "secondary_provider": "zcode_glm_5_2",
+      "provider_selection_rationale": "antigravity_gemini is primary for security review; zcode_glm_5_2 is the fail-closed secondary."
     },
     "arch": {
       "required": true,
@@ -32,29 +35,43 @@
     "cve": {
       "required": true,
       "description": "Known-vulnerability, dependency-risk, exploitability, and security-advisory relevance review from provided evidence.",
-      "primary_provider": "zcode_glm_5_2",
-      "secondary_provider": "kimi_default",
-      "provider_selection_rationale": "zcode_glm_5_2 is the default primary; no documented role-specific Kimi superiority exists for CVE review."
+      "primary_provider": "antigravity_gemini",
+      "secondary_provider": "zcode_glm_5_2",
+      "provider_selection_rationale": "antigravity_gemini is primary for CVE review; zcode_glm_5_2 is the fail-closed secondary."
     },
     "test_adequacy": {
       "required": true,
       "description": "Test and verification adequacy against the task contract and acceptance criteria.",
-      "primary_provider": "zcode_glm_5_2",
-      "secondary_provider": "kimi_default",
-      "provider_selection_rationale": "zcode_glm_5_2 is the default primary; Kimi CLI default/latest remains the declared secondary for independent adequacy review."
+      "primary_provider": "kimi_default",
+      "secondary_provider": "zcode_glm_5_2",
+      "provider_selection_rationale": "kimi_default is primary for test adequacy review; zcode_glm_5_2 is the fail-closed secondary."
+    },
+    "vision": {
+      "required": false,
+      "description": "UI, visual, screenshot, CSS, and rendered-state review when changed surfaces require visual coverage.",
+      "primary_provider": "antigravity_gemini",
+      "secondary_provider": "zcode_glm_5_2",
+      "provider_selection_rationale": "antigravity_gemini is primary for optional visual review; zcode_glm_5_2 is text-only fallback coverage.",
+      "triggered_required_when": [
+        "ui",
+        "visual",
+        "css",
+        "screenshot",
+        "frontend"
+      ],
+      "vision_coverage_limitation": "zcode_glm_5_2 secondary coverage is fail-closed textual fallback only and does not replace screenshot/render evidence."
     }
   },
   "providers": {
     "zcode_glm_5_2": {
       "command_lane": "zcode",
-      "executable": "zcode",
+      "executable": "scripts/mar_adapters/mar-zcode.sh",
+      "adapter_script": "scripts/mar_adapters/mar-zcode.sh",
       "selected_model": "glm-5.2",
       "prompt_template": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
       "command_args": [
-        "--mode",
-        "plan",
-        "--prompt",
-        "{prompt_text}"
+        "--prompt-file",
+        "{prompt_path}"
       ],
       "timeout_seconds": 1800,
       "validated": false,
@@ -63,14 +80,13 @@
     },
     "kimi_default": {
       "command_lane": "kimi",
-      "executable": "kimi",
+      "executable": "scripts/mar_adapters/mar-kimi.sh",
+      "adapter_script": "scripts/mar_adapters/mar-kimi.sh",
       "selected_model": null,
       "prompt_template": "templates/prompts/mar/kimi-default-reviewer-request.md.tmpl",
       "command_args": [
-        "--output-format",
-        "stream-json",
-        "--prompt",
-        "{prompt_text}"
+        "--prompt-file",
+        "{prompt_path}"
       ],
       "timeout_seconds": 120,
       "validated": false,
@@ -82,24 +98,20 @@
     },
     "antigravity_gemini": {
       "command_lane": "agy",
-      "executable": "agy",
-      "selected_model": null,
+      "executable": "scripts/mar_adapters/mar-agy.sh",
+      "adapter_script": "scripts/mar_adapters/mar-agy.sh",
+      "selected_model": "Gemini 3.5 Flash (High)",
       "prompt_template": "templates/prompts/mar/antigravity-gemini-reviewer-request.md.tmpl",
       "command_args": [
-        "--print",
-        "--model",
-        "{model}",
-        "--prompt",
-        "{prompt_text}",
-        "--print-timeout",
-        "{timeout_seconds}s",
-        "--sandbox"
+        "--prompt-file",
+        "{prompt_path}"
       ],
       "timeout_seconds": 120,
       "validated": false,
       "validation_required_before_success_coverage": true,
       "default_required": false,
-      "degraded_posture": "explicit_non_default_until_agy_selected_model_and_health_evidence_is_fixed"
+      "selected_model_required": false,
+      "degraded_posture": "explicit_optional_or_triggered_role_lane"
     }
   }
 }

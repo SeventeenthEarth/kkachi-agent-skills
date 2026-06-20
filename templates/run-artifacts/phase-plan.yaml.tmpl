@@ -40,6 +40,16 @@ roles:
       - optimize
       - update_docs
       - handle_feedback
+  mar_reviewers:
+    backend: "{{ mar_backend_or_provider_lanes }}"
+    session_id: "{{ mar_session_id }}"
+    phases:
+      - mar_review
+  color_reviewers:
+    backend: "{{ color_review_backend_or_kanban }}"
+    session_id: "{{ color_review_session_ids }}"
+    phases:
+      - second_color_review
   feedback_backend:
     backend: "{{ feedback_backend }}"
     session_id: "{{ feedback_session_id }}"
@@ -153,6 +163,16 @@ feedback_loop:
   max_rounds: 5
   planned_rounds: "{{ planned_feedback_rounds }}"
   round_decision_reason: "{{ feedback_round_decision_reason }}"
+
+mar_task_loop:
+  contract_version: "martl.v1"
+  applicability: "{{ mar_task_loop_applicability }}"
+  required_roles: [logic, security, arch, cve, test_adequacy]
+  terminal_candidate_statuses: [PASS, PASS_WITH_FINDINGS]
+  non_terminal_statuses: [REQUEST_CHANGES, BLOCKED, DEGRADED, FAILED]
+  request_changes_rule: "Accepted REQUEST_CHANGES findings require selected implementer-lane mutation, affected verification, refreshed MAR evidence, and post-MAR color review before final_verify."
+  pass_with_findings_rule: "PASS_WITH_FINDINGS is terminal-candidate only after Blue disposition and any triggered Red adjudication."
+  waiver_or_replacement_evidence: "{{ mar_waiver_or_replacement_evidence }}"
 
 codegraph:
   required: "{{ codegraph_required }}"
@@ -311,8 +331,31 @@ phases:
     evidence:
       - feedback-triage-1.md
       - handle-feedback-1.md
-    check: "Valid feedback handled; no actionable feedback recorded when applicable."
+      - post-feedback-verification.md
+    check: "Valid feedback handled; no actionable feedback recorded when applicable; affected verification rerun after changes."
     skip_reason: ""
+  - phase: mar_review
+    applicability: "{{ mar_task_loop_applicability }}"
+    state: pending
+    owner_role: mar_reviewers
+    backend_or_session: "{{ mar_session_id_or_provider_lanes }}"
+    evidence:
+      - mar-review.md
+      - mar-merge-pack.md
+      - mar-blue-disposition.md
+      - refreshed-mar-review-after-accepted-fix-when-needed
+    check: "Required MAR roles covered; Blue disposition recorded; non-terminal statuses fail closed; accepted fixes verified and re-reviewed."
+    skip_reason: "{{ mar_skip_or_waiver_reason }}"
+  - phase: second_color_review
+    applicability: "{{ second_color_review_applicability }}"
+    state: pending
+    owner_role: color_reviewers
+    backend_or_session: "{{ color_review_session_ids }}"
+    evidence:
+      - second-color-review.md
+      - post-mar-feedback-triage.md
+    check: "Red/Orange/Gray verify MAR disposition, requested-change routing, post-fix verification, and refreshed MAR evidence when needed."
+    skip_reason: "{{ second_color_review_skip_or_waiver_reason }}"
   - phase: request_feedback_2
     applicability: conditional
     state: skipped
@@ -398,9 +441,13 @@ phases:
       - verification.md
       - final-report.md
       - checklist.md
+      - mar-review.md
+      - mar-merge-pack.md
+      - mar-blue-disposition.md
+      - second-color-review.md
       - run-summary.yaml
       - phase-packets/<phase>.yaml
-    check: "kkachi-agent-helper gate final {{ run_id }} --json"
+    check: "kkachi-agent-helper gate final {{ run_id }} --json; for development, verify MARTL role coverage/disposition/non-terminal handling/post-fix re-review before completion."
     skip_reason: ""
   - phase: improve
     applicability: conditional

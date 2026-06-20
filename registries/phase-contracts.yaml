@@ -24,6 +24,8 @@ canonical_spine:
   - update_docs
   - request_feedback
   - handle_feedback
+  - mar_review
+  - second_color_review
   - final_verify
   - improve
 
@@ -47,6 +49,14 @@ role_model:
       - optimize
       - update_docs
       - handle_feedback
+  mar_reviewers:
+    phases:
+      - mar_review
+    write_permission: read_only_review_only
+  color_reviewers:
+    phases:
+      - second_color_review
+    write_permission: read_only_review_only
   feedback_backend:
     phases:
       - request_feedback
@@ -92,7 +102,7 @@ task_classification_policy:
     - "Simple report/status, investigation/research evidence, and docs-only paths must not inherit implementation, enhance_test, optimize, or broad review loops unless the task contract records a classification change and reason."
   default_spines:
     development_full:
-      phases: [codegraph_refresh, plan, ask, implement, enhance_test, optimize, update_docs, request_feedback, handle_feedback, final_verify, improve]
+      phases: [codegraph_refresh, plan, ask, implement, enhance_test, optimize, update_docs, request_feedback, handle_feedback, mar_review, second_color_review, final_verify, improve]
     research_evidence_light:
       phases: [task_contract, evidence_collection, source_citation, final_verify]
     docs_only_light:
@@ -457,6 +467,42 @@ feedback_loop_policy:
   additional_rounds: "Hermes decides when optional request-feedback/handle-feedback continuation rounds 2..5 are useful; additional rounds are not mandatory."
   no_actionable_feedback: "Still run handle-feedback and record 'no actionable feedback'."
 
+mar_task_loop_policy:
+  contract_version: "martl.v1"
+  sot: docs/sot/mar-task-loop-contract.md
+  required_for_task_classes:
+    - development
+  required_after:
+    - handle_feedback
+  required_before:
+    - second_color_review
+    - final_verify
+  required_roles:
+    - logic
+    - security
+    - arch
+    - cve
+    - test_adequacy
+  required_artifacts:
+    - mar-review.md
+    - mar-merge-pack.md
+    - mar-blue-disposition.md
+  terminal_candidate_statuses:
+    - PASS
+    - PASS_WITH_FINDINGS
+  non_terminal_statuses:
+    - REQUEST_CHANGES
+    - BLOCKED
+    - DEGRADED
+    - FAILED
+  request_changes_rule: "REQUEST_CHANGES is non-terminal: Blue/Red disposition must route accepted findings to the selected implementer lane, affected verification must rerun, and refreshed MAR evidence plus post-MAR color review are required before final_verify."
+  pass_with_findings_rule: "PASS_WITH_FINDINGS is terminal-candidate only after Blue disposition records every finding as fixed, non-blocking, rejected with rationale, or deferred with accepted risk; Red adjudication is required when triggered."
+  boundary_rules:
+    - "KAS owns reviewer/provider selection policy, merge pack, Blue disposition, requested-change routing, and loop closure semantics."
+    - "KAH validates recorded deterministic evidence only and must not choose reviewers, adjudicate findings, mutate source, approve waivers, or convert degraded coverage to warning-only pass."
+    - "Provider availability, prompt rendering, dispatch success, model wording, or model voting is not review completion authority."
+    - "No automatic source mutation or retry-until-pass without Blue/Red disposition and verification."
+
 implementation_approval_policy:
   low_risk_default: auto_approve_after_plan_and_ask
   user_notice_required_before_auto_start: true
@@ -522,6 +568,8 @@ phase_plan_contract:
     - "Skipped or not_applicable entries require a reason."
     - "request_feedback_1 and handle_feedback_1 are required for every KHS run."
     - "request_feedback_2..5 and handle_feedback_2..5 are conditional continuation rounds and must not exceed round 5."
+    - "Development runs require mar_review after feedback handling and before second_color_review/final_verify unless a recorded user waiver/replacement exists."
+    - "MARTL REQUEST_CHANGES/BLOCKED/DEGRADED/FAILED statuses are non-terminal; accepted fixes require implementer-lane mutation, affected verification, refreshed MAR evidence, and post-MAR color review before final_verify."
     - "Code-change runs include optimize as conditional_recommended; skipping requires a reason."
     - "final_verify checks phase_plan and checklist.md before final report."
 
@@ -716,6 +764,33 @@ phases:
       - "If feedback has no actionable items, record 'no actionable feedback'."
       - "When feedback changes code/docs, rerun affected verification."
     gate: feedback_handling_gate
+  mar_review:
+    intent: "Run role-first MAR on the current post-feedback review surface and produce merge-pack plus Blue disposition evidence before final completion."
+    owner_role: mar_reviewers
+    applicability: required_for_development_unless_recorded_user_waiver
+    expected_outputs:
+      - mar-review.md
+      - mar-merge-pack.md
+      - mar-blue-disposition.md
+      - refreshed_mar_review_after_accepted_fix_when_needed
+    rules:
+      - "Required roles are logic, security, arch, cve, and test_adequacy unless reviewed task policy changes them."
+      - "Provider availability, prompt rendering, dispatch success, model wording, or model voting is not review completion authority."
+      - "PASS and PASS_WITH_FINDINGS are terminal candidates only after role coverage and Blue/Red disposition are complete."
+      - "REQUEST_CHANGES, BLOCKED, DEGRADED, and FAILED are non-terminal unless 주군 explicitly records a waiver/stop decision with accepted residual risk."
+      - "Accepted requested changes route to the selected implementer lane; affected verification and refreshed MAR evidence are required before second_color_review and final_verify."
+    gate: mar_task_loop_gate
+  second_color_review:
+    intent: "Run focused post-MAR Red/Orange/Gray review after MAR disposition and any accepted fixes are verified."
+    owner_role: color_reviewers
+    applicability: required_for_development_unless_recorded_user_waiver
+    expected_outputs:
+      - second-color-review.md
+      - post-mar-feedback-triage.md
+    rules:
+      - "Second color review checks MAR role coverage, Blue disposition, requested-change routing, post-fix verification, and refreshed MAR evidence when fixes changed the reviewed surface."
+      - "If second color review requests changes, route them to the selected implementer lane, rerun affected verification, refresh MAR when the reviewed surface changed, and rerun focused second color review."
+    gate: post_mar_color_review_gate
   final_verify:
     intent: "Hermes proves the run is complete from phase_plan, checklist.md, artifacts, KAH gates, KAB evidence, CodeGraph evidence, repo state, required reviews, reversible packet/run-summary indexes when present, and user-facing report readiness before commit."
     owner_role: hermes
@@ -727,6 +802,7 @@ phases:
       - phase-packets/<phase>.yaml_when_present
     rules:
       - "When compact summaries are present, verify packet_validity, artifact paths, checksums, retrieval instructions, invalidation behavior, and compression-forbidden direct references before relying on them."
+      - "For development runs, verify MARTL evidence: role coverage, merge pack, Blue disposition, non-terminal status handling, requested-change routing, post-fix verification, refreshed MAR evidence when the surface changed, and second color review."
     gate: final_gate
   improve:
     intent: "Capture project-local improvement candidates and decide whether shared KHS promotion is warranted."

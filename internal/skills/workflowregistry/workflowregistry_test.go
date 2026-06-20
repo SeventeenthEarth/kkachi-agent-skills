@@ -8,7 +8,7 @@ import (
 )
 
 var standardBundleNodeIDs = map[string][]string{
-	"development_full":        {"codegraph_refresh", "plan", "ask", "implement", "enhance_test", "optimize", "update_docs", "request_feedback", "handle_feedback", "final_verify", "improve"},
+	"development_full":        {"codegraph_refresh", "plan", "ask", "implement", "enhance_test", "optimize", "update_docs", "request_feedback", "handle_feedback", "mar_review", "second_color_review", "final_verify", "improve"},
 	"docs_only_light":         {"task_contract", "plan", "update_docs", "docs_validation", "final_verify"},
 	"research_evidence_light": {"task_contract", "evidence_collection", "source_citation", "final_verify"},
 	"review_light":            {"task_contract", "review_request", "feedback_evidence", "final_verify"},

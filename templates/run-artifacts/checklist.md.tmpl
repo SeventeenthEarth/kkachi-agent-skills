@@ -47,7 +47,9 @@ KAB does not own this file. KAB supplies the backend-authored plan text and sour
 | optimize | conditional | pending | implementer | TBD | `optimize-log.md`, `diff.patch` update if changed, selected verification profile/gate log artifact | selected regression gate | Strongly recommended when code changed; remove duplication, unnecessary abstraction, and avoidable algorithmic/structural waste. |
 | update_docs | conditional | pending | implementer | TBD | `docs-update.md`, `roadmap-update.md` | docs decision | Update docs and roadmap completion state when evidence supports it, or record no-change reason. |
 | request_feedback_1 | yes | pending | feedback | TBD | `feedback-request.md`, `feedback-1.md` | feedback evidence | Minimum one feedback request for every KHS run. |
-| handle_feedback_1 | yes | pending | implementer + Hermes | TBD | `feedback-triage-1.md`, `handle-feedback-1.md` | feedback handling | Record no actionable feedback if applicable. |
+| handle_feedback_1 | yes | pending | implementer + Hermes | TBD | `feedback-triage-1.md`, `handle-feedback-1.md`, `post-feedback-verification.md` | feedback handling | Record no actionable feedback if applicable; rerun affected verification when feedback changed files. |
+| mar_review | yes for development | pending | MAR reviewers + Blue | MAR/provider lanes + local disposition | `mar-review.md`, `mar-merge-pack.md`, `mar-blue-disposition.md` | MARTL role-first review gate | REQUEST_CHANGES/BLOCKED/DEGRADED/FAILED are non-terminal; accepted fixes require implementer-lane mutation, verification, and refreshed MAR before final completion. |
+| second_color_review | yes for development | pending | Red/Orange/Gray + Blue | Kanban/color review lanes | `second-color-review.md`, `post-mar-feedback-triage.md` | post-MAR color review gate | Required after MAR disposition and after refreshed MAR when accepted fixes changed the surface. |
 | request_feedback_2 | conditional | skipped | feedback | TBD | `feedback-2.md` | feedback evidence | Use only when Hermes judges another round necessary. |
 | handle_feedback_2 | conditional | skipped | implementer + Hermes | TBD | `feedback-triage-2.md`, `handle-feedback-2.md` | feedback handling | Required only if round 2 is requested. |
 | request_feedback_3 | conditional | skipped | feedback | TBD | `feedback-3.md` | feedback evidence | Use only when Hermes judges a third round necessary. |
@@ -80,6 +82,7 @@ Break the approved plan into small, observable work items. Keep each item tied t
 - [ ] Every completed phase links to evidence.
 - [ ] CodeGraph refresh evidence exists for code/process-changing tasks, or an explicit unavailable/degraded reason is recorded.
 - [ ] Feedback rounds are between 1 and 5.
+- [ ] Development runs have MARTL MAR evidence and post-MAR color review, or a recorded 주군 waiver/replacement.
 - [ ] Code-change runs include implementation/test-enhancement/slop-cleanup/optimization evidence for the selected verification profile/gate after the last relevant change, or explicit `not_applicable` reasons.
 - [ ] Change-aware verification matrix evidence exists when changed-path classification affected selected/scoped/skipped verification or final aggregate preservation.
 - [ ] Final aggregate verification is preserved for development tasks, or `not_applicable` has task-contract/responsible-approval evidence with checksums.
