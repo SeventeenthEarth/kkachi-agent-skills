@@ -215,11 +215,17 @@ func readToolchain(workDir string) toolchainSelection {
 	if err != nil {
 		return toolchainSelection{repoRoot: repoRoot, toolchainPath: toolchainPath, readError: err, explicit: true}
 	}
-	values := parseTopLevelYAML(data)
+	values := parseToolchainYAML(data)
 	rawVersion, hasVersion := values["kah_cli"]
+	if !hasVersion {
+		rawVersion, hasVersion = values["kah.cli_version"]
+	}
 	rawVersion = strings.TrimSpace(rawVersion)
 	version := normalizeExpectedVersion(rawVersion)
 	declaredPath := strings.TrimSpace(values["kah_cli_path"])
+	if declaredPath == "" {
+		declaredPath = strings.TrimSpace(values["kah.binary_path"])
+	}
 	invalidVersion := ""
 	if hasVersion && version == "" {
 		invalidVersion = rawVersion
@@ -264,29 +270,59 @@ func findToolchain(workDir string) (string, string) {
 	}
 }
 
-func parseTopLevelYAML(data []byte) map[string]string {
+func parseToolchainYAML(data []byte) map[string]string {
 	values := map[string]string{}
+	var stack []string
 	lines := bytes.Split(data, []byte("\n"))
 	for _, raw := range lines {
-		line := strings.TrimSpace(string(raw))
-		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "-") {
+		line := string(raw)
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "-") || trimmed == "---" {
 			continue
 		}
-		if len(raw) > 0 && (raw[0] == ' ' || raw[0] == '\t') {
+		if strings.Contains(line, "\t") {
 			continue
 		}
-		key, value, ok := strings.Cut(line, ":")
+		indent := leadingSpaces(line)
+		if indent%2 != 0 {
+			continue
+		}
+		level := indent / 2
+		if level > len(stack) {
+			continue
+		}
+		stack = stack[:level]
+		key, value, ok := strings.Cut(trimmed, ":")
 		if !ok {
 			continue
 		}
 		key = strings.TrimSpace(key)
 		value = strings.TrimSpace(stripYAMLComment(value))
-		value = strings.Trim(value, `"'`)
-		if key != "" {
-			values[key] = value
+		if key == "" {
+			continue
+		}
+		path := strings.Join(append(stack, key), ".")
+		if value == "" {
+			stack = append(stack, key)
+			continue
+		}
+		values[path] = strings.Trim(value, `"'`)
+		if level == 0 {
+			values[key] = values[path]
 		}
 	}
 	return values
+}
+
+func leadingSpaces(value string) int {
+	count := 0
+	for _, r := range value {
+		if r != ' ' {
+			return count
+		}
+		count++
+	}
+	return count
 }
 
 func stripYAMLComment(value string) string {

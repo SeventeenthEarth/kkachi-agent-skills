@@ -526,7 +526,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := stdout.String()
-			for _, want := range []string{"list", "install", "update", "doctor", "repair", "uninstall", "version"} {
+			for _, want := range []string{"list", "install", "update", "doctor", "repair", "toolchain", "uninstall", "version"} {
 				if !strings.Contains(out, want) {
 					t.Fatalf("root help did not list public command %s: %q", want, out)
 				}
@@ -539,6 +539,64 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 			}
 			if stderr.Len() != 0 {
 				t.Fatalf("expected root help on stdout only, got stderr=%q", stderr.String())
+			}
+		})
+	}
+}
+
+func TestToolchainHelpExposesStage1Commands(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"toolchain", "--help"}, &stdout, &stderr, map[string]string{})
+	if code != 0 {
+		t.Fatalf("toolchain help failed: code=%d stderr=%s", code, stderr.String())
+	}
+	for _, want := range []string{"Usage of toolchain:", "init", "doctor", "refresh"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected toolchain help to expose %q, got %q", want, stdout.String())
+		}
+	}
+	if strings.Contains(stdout.String(), "import-legacy") || strings.Contains(stdout.String(), "set-stage") {
+		t.Fatalf("TOLMR-003 commands must stay unimplemented in TOLMR-002 help: %q", stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected help on stdout only, got stderr=%q", stderr.String())
+	}
+}
+
+func TestToolchainDoctorCLIJSONFailsClosedWhenMissing(t *testing.T) {
+	projectRoot := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"toolchain", "doctor", "--project-root", projectRoot, "--json"}, &stdout, &stderr, map[string]string{})
+	if code == 0 {
+		t.Fatalf("expected missing toolchain failure, stdout=%s", stdout.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected failure JSON on stderr only, stdout=%s", stdout.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "toolchain_missing")
+	if _, err := os.Stat(filepath.Join(projectRoot, ".kkachi", "toolchain.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("doctor must not create toolchain.yaml, stat err=%v", err)
+	}
+}
+
+func TestToolchainTOLMR003CommandsStayUnavailable(t *testing.T) {
+	for _, command := range []string{"import-legacy", "set-stage"} {
+		t.Run(command, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			var stdout, stderr bytes.Buffer
+			code := Main([]string{"toolchain", command, "--project-root", projectRoot, "--json"}, &stdout, &stderr, map[string]string{})
+			if code == 0 {
+				t.Fatalf("expected unavailable command %q to fail, stdout=%s", command, stdout.String())
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("expected unavailable command failure on stderr only, stdout=%s", stdout.String())
+			}
+			assertCLIErrorCode(t, stderr.Bytes(), "unknown_toolchain_command")
+			if strings.Contains(stderr.String(), "import-legacy") || strings.Contains(stderr.String(), "set-stage") {
+				t.Fatalf("TOLMR-003 command names must not be advertised in behavior output: %q", stderr.String())
+			}
+			if _, err := os.Stat(filepath.Join(projectRoot, ".kkachi", "toolchain.yaml")); !os.IsNotExist(err) {
+				t.Fatalf("unavailable command must not create toolchain.yaml, stat err=%v", err)
 			}
 		})
 	}

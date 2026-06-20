@@ -16,6 +16,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kasstate"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/toolchain"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowcreator"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/workflowpromoter"
@@ -41,7 +42,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, or version command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, toolchain, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, or version command", "", false, "")
 	}
 	if isVersionArg(argv[0]) {
 		return runVersion(argv[1:], stdout, stderr)
@@ -61,6 +62,8 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runDoctor(argv[1:], stdout, stderr, env)
 	case "repair":
 		return runRepair(argv[1:], stdout, stderr, env)
+	case "toolchain":
+		return runToolchain(argv[1:], stdout, stderr, env)
 	case "workflow-create":
 		return runWorkflowCreate(argv[1:], stdout, stderr, env)
 	case "workflow-promote":
@@ -82,7 +85,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 	case "migrate-project-kas":
 		return runMigrateProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, toolchain, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
 	}
 }
 
@@ -555,6 +558,58 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	result.NextAction = publicRepairNextAction(result, approval != "")
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return projectinstall.RenderHumanProjectAction(result)
+	})
+}
+
+func runToolchain(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	if len(argv) == 0 || hasHelpArg(argv[:1]) {
+		printToolchainHelp(stdout)
+		return 0
+	}
+	switch argv[0] {
+	case "init":
+		return runToolchainAction("init", argv[1:], stdout, stderr)
+	case "doctor":
+		return runToolchainAction("doctor", argv[1:], stdout, stderr)
+	case "refresh":
+		return runToolchainAction("refresh", argv[1:], stdout, stderr)
+	default:
+		return emitError(stderr, "unknown_toolchain_command", "toolchain supports init, doctor, and refresh.", "toolchain", wantsJSON(argv), "")
+	}
+}
+
+func runToolchainAction(action string, argv []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("toolchain "+action, flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	projectRoot := fs.String("project-root", "", "project root for .kkachi/toolchain.yaml")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "toolchain "+action+" does not accept positional arguments.", "toolchain "+action, *jsonOutput, "")
+	}
+	if *projectRoot == "" {
+		return emitError(stderr, "project_root_required", "toolchain "+action+" requires --project-root <path>.", "toolchain "+action, *jsonOutput, "")
+	}
+	opts := toolchain.Options{ProjectRoot: *projectRoot}
+	var result toolchain.Result
+	switch action {
+	case "init":
+		result = toolchain.Init(opts)
+	case "doctor":
+		result = toolchain.Doctor(opts)
+	case "refresh":
+		result = toolchain.Refresh(opts)
+	}
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return toolchain.RenderHuman(result)
 	})
 }
 
@@ -1210,6 +1265,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  update   Classify project KAS updates, or update agent-instructions")
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
 	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
+	fmt.Fprintln(w, "  toolchain  Generate and validate ignored .kkachi/toolchain.yaml")
 	fmt.Fprintln(w, "  workflow-create   Plan custom task-DAG workflow candidates without writing")
 	fmt.Fprintln(w, "  workflow-promote  Propose run-local workflow promotion without writing")
 	fmt.Fprintln(w, "  workflow-route    Route classified tasks to one standard bundle without KAH calls")
@@ -1221,6 +1277,18 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  sync-project-kas, install-project-kas, repair-project-kas, migrate-project-kas")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Use \"kkachi-agent-skills <command> --help\" for command options.")
+}
+
+func printToolchainHelp(w io.Writer) {
+	fmt.Fprintln(w, "Usage of toolchain:")
+	fmt.Fprintln(w, "  kkachi-agent-skills toolchain init --project-root <path> --json")
+	fmt.Fprintln(w, "  kkachi-agent-skills toolchain doctor --project-root <path> --json")
+	fmt.Fprintln(w, "  kkachi-agent-skills toolchain refresh --project-root <path> --json")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Commands:")
+	fmt.Fprintln(w, "  init     Create .kkachi/toolchain.yaml from KAS facts and KAH probe facts")
+	fmt.Fprintln(w, "  doctor   Validate existing .kkachi/toolchain.yaml without writing")
+	fmt.Fprintln(w, "  refresh  Update observed facts while preserving stage approval and policy fields")
 }
 
 func emitError(w io.Writer, code string, message string, command string, jsonOutput bool, nextAction string) int {

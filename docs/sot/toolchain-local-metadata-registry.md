@@ -70,7 +70,7 @@ kah:
   binary_path: "<absolute-path>"
   selection_source: "KKACHI_KAH_BIN|toolchain|repo_bin|PATH"
   project_initialized: true
-  doctor_status: "PASS|WARN|FAIL|UNKNOWN"
+  doctor_status: "PASS"
 kab:
   adoption_stage:
     numeric: 1
@@ -92,7 +92,7 @@ evidence_posture:
   missing_or_invalid_fails_closed: true
 ```
 
-Additional fields are allowed only when they are deterministic, non-secret, local to the project/operator state, and do not weaken fail-closed behavior.
+Additional fields are allowed only when they are deterministic, non-secret, local to the project/operator state, and do not weaken fail-closed behavior. TOLMR-002 generated and stored v1 metadata is valid only when the current KAH probe reports an initialized project and `doctor.status=PASS`.
 
 ## 5. Forbidden fields and storage
 
@@ -144,7 +144,7 @@ TOLMR uses shared logical task ids across KAS and KAH. Each task may produce KAS
 | Task ID | Title | Primary repo ownership | Status |
 |---|---|---|---|
 | TOLMR-001 | Schema and KAH probe contract | KAS schema / KAH probe contract | Completed |
-| TOLMR-002 | Generated toolchain init, doctor, and refresh | KAS generation / KAH read-only probe support | Planned |
+| TOLMR-002 | Generated toolchain init, doctor, and refresh | KAS generation / KAH read-only probe support | In Review |
 | TOLMR-003 | Legacy state migration plus Stage/MAR integration | KAS-led, KAH verification only unless a probe gap appears | Planned |
 | TOLMR-004 | Cross-repo rollout, evidence, and release readiness | KAS + KAH repo-local gates and integration evidence | Planned |
 

@@ -88,6 +88,9 @@ kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <projec
 kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
 kkachi-agent-skills repair [--repo <path>] --project <path> --workflow-graph --propose --reason <reason> [--json]
 kkachi-agent-skills repair [--repo <path>] --project <path> --workflow-graph --apply-proposal <proposal-id> --approval <approval-ref> [--json]
+kkachi-agent-skills toolchain init --project-root <path> --json
+kkachi-agent-skills toolchain doctor --project-root <path> --json
+kkachi-agent-skills toolchain refresh --project-root <path> --json
 kkachi-agent-skills workflow-create --project <path> --workflow-id <id> --mode dag_only|thin_trigger|full_trigger --request <json-path> --dry-run [--json]
 kkachi-agent-skills workflow-create --project <path> --workflow-id <id> --mode dag_only|thin_trigger|full_trigger --request <json-path> --apply dry-run:sha256:<hash> [--json]
 kkachi-agent-skills workflow-promote --project <path> --run <run-id> --target-workflow-id <id> --reuse-reason <reason> [--thin-trigger] --dry-run [--json]

@@ -32,6 +32,49 @@ func TestDeclaredKAHCLIPathWinsOverOldAmbientPATH(t *testing.T) {
 	}
 }
 
+func TestV1ToolchainKAHSelectionWinsOverOldAmbientPATH(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell helper fixtures are POSIX-only")
+	}
+	repo := newRepo(t)
+	declared := writeHelper(t, filepath.Join(repo, "toolchains", "kah", "kkachi-agent-helper"), "kkachi-agent-helper 0.2.0")
+	writeToolchain(t, repo, strings.Join([]string{
+		`schema_version: "kkachi.toolchain.v1"`,
+		"kah:",
+		`  cli_version: "0.2.0"`,
+		`  binary_path: "` + declared + `"`,
+		"",
+	}, "\n"))
+	pathDir := t.TempDir()
+	writeHelper(t, filepath.Join(pathDir, helperName), "kkachi-agent-helper 0.1.9")
+	t.Setenv("PATH", pathDir)
+
+	result := Runner{}.Run(repo, "--version")
+	if result.Err != nil {
+		t.Fatalf("runner failed: %v\nstderr=%s", result.Err, result.Stderr)
+	}
+	if got := strings.TrimSpace(string(result.Stdout)); got != "kkachi-agent-helper 0.2.0" {
+		t.Fatalf("runner used %q, want v1 toolchain helper", got)
+	}
+
+	writeHelper(t, declared, "kkachi-agent-helper 0.1.9")
+	result = Runner{}.Run(repo, "--version")
+	if result.Err == nil {
+		t.Fatalf("runner unexpectedly fell back to PATH after v1 declared helper mismatch")
+	}
+	diagnostic := string(result.Stderr)
+	for _, want := range []string{
+		"selected_source: .kkachi/toolchain.yaml",
+		"expected_version: 0.2.0",
+		"expected_path: " + declared,
+		"path_fallback_refused: ambient PATH fallback was refused because repo KAH selection is explicit.",
+	} {
+		if !strings.Contains(diagnostic, want) {
+			t.Fatalf("diagnostic missing %q\n%s", want, diagnostic)
+		}
+	}
+}
+
 func TestDeclaredPathMismatchRefusesPATHWithDiagnostic(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell helper fixtures are POSIX-only")
