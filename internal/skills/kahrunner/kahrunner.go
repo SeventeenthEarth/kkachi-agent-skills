@@ -102,7 +102,7 @@ func Resolve(workDir string) (string, error) {
 }
 
 func resolveInvalidToolchain(selection toolchainSelection, reason string) error {
-	recovery := "Correct kah_cli to an exact semver token such as v0.1.11, or declare kah_cli_path with a matching executable; ambient PATH fallback is intentionally refused for invalid repo KAH selection."
+	recovery := "Correct kah_cli to an exact semver token such as v0.1.12, or declare kah_cli_path with a matching executable; ambient PATH fallback is intentionally refused for invalid repo KAH selection."
 	if selection.readError != nil {
 		recovery = "Fix permissions or syntax for .kkachi/toolchain.yaml, or remove the file only when no repo-local KAH selection is intended; ambient PATH fallback is intentionally refused while the repo toolchain is unreadable."
 	}

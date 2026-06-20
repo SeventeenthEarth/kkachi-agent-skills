@@ -13,8 +13,8 @@ func TestDefaultRunnerUsesRepoToolchainKAH(t *testing.T) {
 		t.Skip("shell helper fixture is POSIX-only")
 	}
 	project := t.TempDir()
-	helper := writeDoctorHelper(t, filepath.Join(project, "toolchain", "kkachi-agent-helper"), "kkachi-agent-helper 0.1.11")
-	writeDoctorToolchain(t, project, "kah_cli: v0.1.11\nkah_cli_path: "+helper+"\n")
+	helper := writeDoctorHelper(t, filepath.Join(project, "toolchain", "kkachi-agent-helper"), "kkachi-agent-helper 0.1.12")
+	writeDoctorToolchain(t, project, "kah_cli: v0.1.12\nkah_cli_path: "+helper+"\n")
 	pathDir := t.TempDir()
 	writeDoctorHelper(t, filepath.Join(pathDir, "kkachi-agent-helper"), "kkachi-agent-helper 0.1.9")
 	t.Setenv("PATH", pathDir)
@@ -23,7 +23,7 @@ func TestDefaultRunnerUsesRepoToolchainKAH(t *testing.T) {
 	if result.Err != nil {
 		t.Fatalf("defaultRunner failed: %v\nstderr=%s", result.Err, result.Stderr)
 	}
-	if got := strings.TrimSpace(string(result.Stdout)); got != "kkachi-agent-helper 0.1.11" {
+	if got := strings.TrimSpace(string(result.Stdout)); got != "kkachi-agent-helper 0.1.12" {
 		t.Fatalf("defaultRunner used %q, want repo toolchain helper", got)
 	}
 }
@@ -33,8 +33,8 @@ func TestProbeKAHUsesProjectToolchainForGlobalProbe(t *testing.T) {
 		t.Skip("shell helper fixture is POSIX-only")
 	}
 	project := t.TempDir()
-	helper := writeDoctorHelper(t, filepath.Join(project, "toolchain", "kkachi-agent-helper"), "kkachi-agent-helper 0.1.11")
-	writeDoctorToolchain(t, project, "kah_cli: v0.1.11\nkah_cli_path: "+helper+"\n")
+	helper := writeDoctorHelper(t, filepath.Join(project, "toolchain", "kkachi-agent-helper"), "kkachi-agent-helper 0.1.12")
+	writeDoctorToolchain(t, project, "kah_cli: v0.1.12\nkah_cli_path: "+helper+"\n")
 	pathDir := t.TempDir()
 	writeDoctorHelper(t, filepath.Join(pathDir, "kkachi-agent-helper"), "kkachi-agent-helper 0.1.9")
 	t.Setenv("KKACHI_KAH_BIN", "")
@@ -53,7 +53,7 @@ func TestProbeKAHUsesProjectToolchainForGlobalProbe(t *testing.T) {
 	if !kah.Available {
 		t.Fatalf("probeKAH did not find repo toolchain KAH")
 	}
-	if kah.Version != "kkachi-agent-helper 0.1.11" {
+	if kah.Version != "kkachi-agent-helper 0.1.12" {
 		t.Fatalf("probeKAH version = %q, want repo toolchain helper", kah.Version)
 	}
 }

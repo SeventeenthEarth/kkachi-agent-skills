@@ -13,8 +13,8 @@ func TestDeclaredKAHCLIPathWinsOverOldAmbientPATH(t *testing.T) {
 		t.Skip("shell helper fixtures are POSIX-only")
 	}
 	repo := newRepo(t)
-	declared := writeHelper(t, filepath.Join(repo, "toolchains", "kah", "kkachi-agent-helper"), "kkachi-agent-helper 0.1.11")
-	writeToolchain(t, repo, "kah_cli: v0.1.11\nkah_cli_path: "+declared+"\n")
+	declared := writeHelper(t, filepath.Join(repo, "toolchains", "kah", "kkachi-agent-helper"), "kkachi-agent-helper 0.1.12")
+	writeToolchain(t, repo, "kah_cli: v0.1.12\nkah_cli_path: "+declared+"\n")
 	pathDir := t.TempDir()
 	writeHelper(t, filepath.Join(pathDir, helperName), "kkachi-agent-helper 0.1.9")
 	t.Setenv("PATH", pathDir)
@@ -27,7 +27,7 @@ func TestDeclaredKAHCLIPathWinsOverOldAmbientPATH(t *testing.T) {
 	if result.Err != nil {
 		t.Fatalf("runner failed: %v\nstderr=%s", result.Err, result.Stderr)
 	}
-	if got := strings.TrimSpace(string(result.Stdout)); got != "kkachi-agent-helper 0.1.11" {
+	if got := strings.TrimSpace(string(result.Stdout)); got != "kkachi-agent-helper 0.1.12" {
 		t.Fatalf("runner used %q, want declared helper", got)
 	}
 }
@@ -38,9 +38,9 @@ func TestDeclaredPathMismatchRefusesPATHWithDiagnostic(t *testing.T) {
 	}
 	repo := newRepo(t)
 	declared := writeHelper(t, filepath.Join(repo, "toolchains", "kah", "kkachi-agent-helper"), "kkachi-agent-helper 0.1.10")
-	writeToolchain(t, repo, "kah_cli: v0.1.11\nkah_cli_path: "+declared+"\n")
+	writeToolchain(t, repo, "kah_cli: v0.1.12\nkah_cli_path: "+declared+"\n")
 	pathDir := t.TempDir()
-	writeHelper(t, filepath.Join(pathDir, helperName), "kkachi-agent-helper 0.1.11")
+	writeHelper(t, filepath.Join(pathDir, helperName), "kkachi-agent-helper 0.1.12")
 	t.Setenv("PATH", pathDir)
 
 	result := Runner{}.Run(repo, "--version")
@@ -50,7 +50,7 @@ func TestDeclaredPathMismatchRefusesPATHWithDiagnostic(t *testing.T) {
 	diagnostic := string(result.Stderr)
 	for _, want := range []string{
 		"selected_source: .kkachi/toolchain.yaml",
-		"expected_version: 0.1.11",
+		"expected_version: 0.1.12",
 		"expected_path: " + declared,
 		"resolved_binary_path: " + declared,
 		"actual_version_output: kkachi-agent-helper 0.1.10",
@@ -83,7 +83,7 @@ func TestInvalidDeclaredKAHCLIRefusesPATHWithDiagnostic(t *testing.T) {
 		"selected_source: .kkachi/toolchain.yaml",
 		"expected_version: definitely-not-semver",
 		"path_fallback_refused: ambient PATH fallback was refused because repo KAH selection is explicit.",
-		"preferred_durable_recovery: Correct kah_cli to an exact semver token such as v0.1.11, or declare kah_cli_path with a matching executable; ambient PATH fallback is intentionally refused for invalid repo KAH selection.",
+		"preferred_durable_recovery: Correct kah_cli to an exact semver token such as v0.1.12, or declare kah_cli_path with a matching executable; ambient PATH fallback is intentionally refused for invalid repo KAH selection.",
 	} {
 		if !strings.Contains(diagnostic, want) {
 			t.Fatalf("diagnostic missing %q\n%s", want, diagnostic)
@@ -93,7 +93,7 @@ func TestInvalidDeclaredKAHCLIRefusesPATHWithDiagnostic(t *testing.T) {
 
 func TestNonAbsoluteKKACHI_KAH_BINFailsClosed(t *testing.T) {
 	repo := newRepo(t)
-	writeToolchain(t, repo, "kah_cli: v0.1.11\n")
+	writeToolchain(t, repo, "kah_cli: v0.1.12\n")
 	t.Setenv("KKACHI_KAH_BIN", helperName)
 
 	result := Runner{}.Run(repo, "--version")
@@ -114,21 +114,21 @@ func TestNonAbsoluteKKACHI_KAH_BINFailsClosed(t *testing.T) {
 
 func TestExactSemverTokenMatchingRejectsFalseSubstrings(t *testing.T) {
 	for _, output := range []string{
-		"kkachi-agent-helper 0.1.110",
-		"kkachi-agent-helper 10.1.11",
+		"kkachi-agent-helper 0.1.120",
+		"kkachi-agent-helper 10.1.12",
 		"wrapper output has no parsed helper version",
-		"kkachi-agent-helper 0.1.11-source",
+		"kkachi-agent-helper 0.1.12-source",
 	} {
-		if versionMatches("v0.1.11", output) {
+		if versionMatches("v0.1.12", output) {
 			t.Fatalf("versionMatches accepted false output %q", output)
 		}
 	}
 	for _, output := range []string{
-		"kkachi-agent-helper 0.1.11",
-		"kkachi-agent-helper v0.1.11\n",
-		"(0.1.11)",
+		"kkachi-agent-helper 0.1.12",
+		"kkachi-agent-helper v0.1.12\n",
+		"(0.1.12)",
 	} {
-		if !versionMatches("v0.1.11", output) {
+		if !versionMatches("v0.1.12", output) {
 			t.Fatalf("versionMatches rejected valid output %q", output)
 		}
 	}
@@ -139,8 +139,8 @@ func TestDeclaredKAHCLIWithoutPathUsesRepoBinAndRefusesPATHOnMismatch(t *testing
 		t.Skip("shell helper fixtures are POSIX-only")
 	}
 	repo := newRepo(t)
-	writeToolchain(t, repo, "kah_cli: v0.1.11\n")
-	repoBin := writeHelper(t, filepath.Join(repo, ".kkachi", "bin", helperName), "kkachi-agent-helper 0.1.11")
+	writeToolchain(t, repo, "kah_cli: v0.1.12\n")
+	repoBin := writeHelper(t, filepath.Join(repo, ".kkachi", "bin", helperName), "kkachi-agent-helper 0.1.12")
 	pathDir := t.TempDir()
 	writeHelper(t, filepath.Join(pathDir, helperName), "kkachi-agent-helper 0.1.9")
 	t.Setenv("PATH", pathDir)
@@ -149,7 +149,7 @@ func TestDeclaredKAHCLIWithoutPathUsesRepoBinAndRefusesPATHOnMismatch(t *testing
 	if result.Err != nil {
 		t.Fatalf("runner failed: %v\nstderr=%s", result.Err, result.Stderr)
 	}
-	if got := strings.TrimSpace(string(result.Stdout)); got != "kkachi-agent-helper 0.1.11" {
+	if got := strings.TrimSpace(string(result.Stdout)); got != "kkachi-agent-helper 0.1.12" {
 		t.Fatalf("runner used %q, want repo bin %s", got, repoBin)
 	}
 
@@ -161,7 +161,7 @@ func TestDeclaredKAHCLIWithoutPathUsesRepoBinAndRefusesPATHOnMismatch(t *testing
 	diagnostic := string(result.Stderr)
 	for _, want := range []string{
 		"selected_source: .kkachi/toolchain.yaml kah_cli via .kkachi/bin",
-		"expected_version: 0.1.11",
+		"expected_version: 0.1.12",
 		"resolved_binary_path: " + repoBin,
 		"actual_version_output: kkachi-agent-helper 0.1.10",
 		"path_fallback_refused: ambient PATH fallback was refused because repo KAH selection is explicit.",
@@ -174,9 +174,9 @@ func TestDeclaredKAHCLIWithoutPathUsesRepoBinAndRefusesPATHOnMismatch(t *testing
 
 func TestDeclaredKAHCLIWithoutPathRefusesPATHWhenRepoBinMissing(t *testing.T) {
 	repo := newRepo(t)
-	writeToolchain(t, repo, "kah_cli: v0.1.11\n")
+	writeToolchain(t, repo, "kah_cli: v0.1.12\n")
 	pathDir := t.TempDir()
-	writeHelper(t, filepath.Join(pathDir, helperName), "kkachi-agent-helper 0.1.11")
+	writeHelper(t, filepath.Join(pathDir, helperName), "kkachi-agent-helper 0.1.12")
 	t.Setenv("PATH", pathDir)
 
 	result := Runner{}.Run(repo, "--version")

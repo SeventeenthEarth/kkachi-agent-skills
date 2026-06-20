@@ -13,8 +13,8 @@ func TestCommandRunnerUsesRepoToolchainKAH(t *testing.T) {
 		t.Skip("shell helper fixture is POSIX-only")
 	}
 	project := t.TempDir()
-	helper := writeWorkflowPromoterHelper(t, filepath.Join(project, "toolchain", "kkachi-agent-helper"), "kkachi-agent-helper 0.1.11")
-	writeWorkflowPromoterToolchain(t, project, "kah_cli: v0.1.11\nkah_cli_path: "+helper+"\n")
+	helper := writeWorkflowPromoterHelper(t, filepath.Join(project, "toolchain", "kkachi-agent-helper"), "kkachi-agent-helper 0.1.12")
+	writeWorkflowPromoterToolchain(t, project, "kah_cli: v0.1.12\nkah_cli_path: "+helper+"\n")
 	pathDir := t.TempDir()
 	writeWorkflowPromoterHelper(t, filepath.Join(pathDir, "kkachi-agent-helper"), "kkachi-agent-helper 0.1.9")
 	t.Setenv("PATH", pathDir)
@@ -23,7 +23,7 @@ func TestCommandRunnerUsesRepoToolchainKAH(t *testing.T) {
 	if result.Err != nil {
 		t.Fatalf("commandRunner failed: %v\nstderr=%s", result.Err, result.Stderr)
 	}
-	if got := strings.TrimSpace(string(result.Stdout)); got != "kkachi-agent-helper 0.1.11" {
+	if got := strings.TrimSpace(string(result.Stdout)); got != "kkachi-agent-helper 0.1.12" {
 		t.Fatalf("commandRunner used %q, want repo toolchain helper", got)
 	}
 }

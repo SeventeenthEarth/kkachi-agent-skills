@@ -381,8 +381,8 @@ func TestMAR005ProviderToolchainOverlayResolvesExplicitArgv(t *testing.T) {
 		"alias_backed":     providerPayload("zcode", "definitely-missing-shell-alias", "glm-5.2", []string{"--version"}, false),
 		"secondary_backed": providerPayload("kimi", "python3", "fixture-kimi-default", []string{"--version"}, true),
 	}, map[string]any{"logic": rolePayload("alias_backed", "secondary_backed")}))
-	toolchain := writeTempToolchain(t, `kas_cli: v0.1.5
-kah_cli: v0.1.11
+	toolchain := writeTempToolchain(t, `kas_cli: v0.1.6
+kah_cli: v0.1.12
 mar_provider_tools:
   schema_version: mar.provider_tools.v1
   providers:
