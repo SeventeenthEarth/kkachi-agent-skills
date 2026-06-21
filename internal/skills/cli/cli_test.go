@@ -555,13 +555,46 @@ func TestToolchainHelpExposesTOLMRCommandSurface(t *testing.T) {
 			t.Fatalf("expected toolchain help to expose %q, got %q", want, stdout.String())
 		}
 	}
-	for _, want := range []string{"import-legacy", "set-stage", "--approval-evidence"} {
+	for _, want := range []string{"import-legacy", "set-stage", "--approval-evidence", "install-launchers", "--bin-dir"} {
 		if !strings.Contains(stdout.String(), want) {
-			t.Fatalf("expected TOLMR-003 toolchain help to expose %q, got %q", want, stdout.String())
+			t.Fatalf("expected TOLMR-003/toolchain launcher help to expose %q, got %q", want, stdout.String())
 		}
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected help on stdout only, got stderr=%q", stderr.String())
+	}
+}
+
+func TestToolchainInstallLaunchersCLIWritesEmbeddedWrappers(t *testing.T) {
+	binDir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"toolchain", "install-launchers", "--bin-dir", binDir, "--json"}, &stdout, &stderr, map[string]string{})
+	if code != 0 {
+		t.Fatalf("install-launchers failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected JSON success on stdout only, got stderr=%q", stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["command"] != "toolchain install-launchers" || payload["wrote"] != true {
+		t.Fatalf("unexpected payload: %+v", payload)
+	}
+	launchers, ok := payload["launchers"].([]any)
+	if !ok || len(launchers) != 2 {
+		t.Fatalf("expected two launchers: %+v", payload)
+	}
+	for _, name := range []string{"kkachi-agent-skills-toolchain", "kkachi-agent-helper-toolchain"} {
+		path := filepath.Join(binDir, name)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("missing installed launcher %s: %v", name, err)
+		}
+		if !strings.Contains(string(data), "kkachi.toolchain.v1") || !strings.Contains(string(data), "--toolchain-status") {
+			t.Fatalf("launcher %s missing v1/status support:\n%s", name, string(data))
+		}
 	}
 }
 

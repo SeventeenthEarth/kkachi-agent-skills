@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -352,6 +353,125 @@ func TestDoctorFailsClosedForUnhealthyStoredV1KAHMetadataAndDoesNotWrite(t *test
 				t.Fatalf("doctor wrote toolchain metadata:\nbefore:\n%s\nafter:\n%s", modified, after)
 			}
 		})
+	}
+}
+
+func TestInstallLaunchersWritesEmbeddedV1OnlyWrappers(t *testing.T) {
+	binDir := t.TempDir()
+	result := InstallLaunchers(Options{LauncherBinDir: binDir})
+	if !result.OK || !result.Wrote {
+		t.Fatalf("install-launchers failed: %+v", result)
+	}
+	if len(result.Launchers) != 2 {
+		t.Fatalf("expected two launcher records, got %+v", result.Launchers)
+	}
+	for _, name := range []string{"kkachi-agent-skills-toolchain", "kkachi-agent-helper-toolchain"} {
+		path := filepath.Join(binDir, name)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("launcher %s not written: %v", name, err)
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm()&0111 == 0 {
+			t.Fatalf("launcher %s is not executable: %v", name, info.Mode().Perm())
+		}
+		text := string(data)
+		for _, want := range []string{"kkachi.toolchain.v1", "kas.cli_version", "kah.cli_version", "kah.binary_path", "--toolchain-status"} {
+			if !strings.Contains(text, want) {
+				t.Fatalf("launcher %s missing %q:\n%s", name, want, text)
+			}
+		}
+		for _, legacy := range []string{"read_toolchain_value", "kas_cli:", "kah_cli:", "kah_cli_path"} {
+			if strings.Contains(text, legacy) {
+				t.Fatalf("launcher %s retained legacy top-level compatibility token %q:\n%s", name, legacy, text)
+			}
+		}
+	}
+}
+
+func TestInstallLaunchersRejectsUnsafeBinDir(t *testing.T) {
+	result := InstallLaunchers(Options{LauncherBinDir: ""})
+	if result.OK || result.Wrote || firstCode(result.Diagnostics) != "launcher_bin_dir_required" {
+		t.Fatalf("expected missing bin dir fail-closed result, got %+v", result)
+	}
+}
+
+func TestGeneratedLaunchersResolveV1MetadataAndFailClosed(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is required to execute generated launcher wrappers")
+	}
+	binDir := t.TempDir()
+	install := InstallLaunchers(Options{LauncherBinDir: binDir})
+	if !install.OK {
+		t.Fatalf("install launchers failed: %+v", install)
+	}
+	projectRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".kkachi"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	toolchainRoot := t.TempDir()
+	kasBin := filepath.Join(toolchainRoot, "kas", "v0.1.7", "bin", "kkachi-agent-skills")
+	kahBin := filepath.Join(toolchainRoot, "kah", "v0.1.13", "bin", "kkachi-agent-helper")
+	writeFakeVersionBinary(t, kasBin, "kkachi-agent-skills 0.1.7")
+	writeFakeVersionBinary(t, kahBin, "kkachi-agent-helper 0.1.13")
+	writeLauncherToolchain(t, projectRoot, "0.1.7", "0.1.13", kahBin)
+
+	status := exec.Command(filepath.Join(binDir, "kkachi-agent-skills-toolchain"), "--toolchain-status")
+	status.Dir = projectRoot
+	status.Env = append(os.Environ(), "KKACHI_TOOLCHAIN_ROOT="+toolchainRoot)
+	output, err := status.CombinedOutput()
+	if err != nil {
+		t.Fatalf("status failed: %v\n%s", err, string(output))
+	}
+	for _, want := range []string{"schema_version=kkachi.toolchain.v1", "kas_cli_version=v0.1.7", "kah_cli_version=v0.1.13", "kas_version_output=kkachi-agent-skills 0.1.7", "kah_version_output=kkachi-agent-helper 0.1.13"} {
+		if !strings.Contains(string(output), want) {
+			t.Fatalf("status output missing %q:\n%s", want, string(output))
+		}
+	}
+
+	writeFile(t, filepath.Join(projectRoot, ".kkachi", "toolchain.yaml"), "kas_cli: v0.1.7\nkah_cli: v0.1.13\n")
+	legacy := exec.Command(filepath.Join(binDir, "kkachi-agent-skills-toolchain"), "--toolchain-status")
+	legacy.Dir = projectRoot
+	legacy.Env = append(os.Environ(), "KKACHI_TOOLCHAIN_ROOT="+toolchainRoot)
+	legacyOutput, err := legacy.CombinedOutput()
+	if err == nil || !strings.Contains(string(legacyOutput), "missing or unsupported schema_version") {
+		t.Fatalf("expected legacy metadata to fail closed, err=%v output=%s", err, string(legacyOutput))
+	}
+
+	writeLauncherToolchain(t, projectRoot, "0.1.7", "0.1.14", kahBin)
+	mismatch := exec.Command(filepath.Join(binDir, "kkachi-agent-skills-toolchain"), "--toolchain-status")
+	mismatch.Dir = projectRoot
+	mismatch.Env = append(os.Environ(), "KKACHI_TOOLCHAIN_ROOT="+toolchainRoot)
+	mismatchOutput, err := mismatch.CombinedOutput()
+	if err == nil || !strings.Contains(string(mismatchOutput), "KAH binary version mismatch") {
+		t.Fatalf("expected mismatched KAH metadata to fail closed, err=%v output=%s", err, string(mismatchOutput))
+	}
+}
+
+func writeFakeVersionBinary(t *testing.T, path string, version string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	script := "#!/bin/sh\ncase \"$1\" in\n  --version) echo \"" + version + "\" ;;\n  *) echo unexpected >&2; exit 9 ;;\nesac\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeLauncherToolchain(t *testing.T, projectRoot string, kasVersion string, kahVersion string, kahBin string) {
+	t.Helper()
+	content := "schema_version: \"kkachi.toolchain.v1\"\nkas:\n  cli_version: \"" + kasVersion + "\"\nkah:\n  cli_version: \"" + kahVersion + "\"\n  binary_path: \"" + kahBin + "\"\n"
+	writeFile(t, filepath.Join(projectRoot, ".kkachi", "toolchain.yaml"), content)
+}
+
+func writeFile(t *testing.T, path string, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -117,6 +117,7 @@ kkachi-agent-skills toolchain doctor --project-root <path> --json
 kkachi-agent-skills toolchain refresh --project-root <path> --json
 kkachi-agent-skills toolchain import-legacy --project-root <path> --profile <profile> --project <id> --json
 kkachi-agent-skills toolchain set-stage --project-root <path> --stage <stage> --approval-evidence <ref> --json
+kkachi-agent-skills toolchain install-launchers [--bin-dir <path>] [--json]
 ```
 
 Behavior rules:
@@ -126,6 +127,7 @@ Behavior rules:
 3. `refresh` updates observed facts only; it must not silently change stage, approval evidence, or policy fields.
 4. `import-legacy` reads profile-skill-local `kas-project-state.yaml` and `kab-adoption-stage.md` for migration from explicit `--profile` and `--project` inputs. Missing, invalid, ambiguous, or conflicting legacy facts fail closed. Existing `.kkachi/toolchain.yaml` content is never silently overwritten.
 5. `set-stage` is the only KAS-owned ordinary path for changing the KAB adoption stage and requires approval evidence. Stage 1 may be recorded without claiming KAB execution. Stage 2 requires deterministic KAB `native_codex` capability proof before use; when that proof surface is unavailable, KAS must fail closed with a stable diagnostic. Stage 3 is reserved and unauthorized.
+6. `install-launchers` installs embedded KAS-owned `kkachi-agent-skills-toolchain` and `kkachi-agent-helper-toolchain` wrappers into `--bin-dir` or the default user `~/.local/bin`. The wrappers read only the nested `kkachi.toolchain.v1` schema, resolve effective KAS/KAH binary paths, expose `--toolchain-status`, and fail closed on missing, malformed, unsupported, non-executable, or version-mismatched metadata. They do not accept legacy top-level launcher metadata as compatibility input.
 
 ## 7. Stage and MAR semantics
 
@@ -152,7 +154,7 @@ TOLMR uses shared logical task ids across KAS and KAH. Each task may produce KAS
 
 Before TOLMR completion claims, evidence must include:
 
-- KAS repo tests for schema validation, no-secret scanning, init/doctor/refresh, legacy import, Stage fail-closed handling, MAR provider proof parsing, and compatibility read of existing `kah_cli`/`kah_cli_path` toolchain keys.
+- KAS repo tests for schema validation, no-secret scanning, init/doctor/refresh, legacy import, Stage fail-closed handling, MAR provider proof parsing, compatibility read of existing `kah_cli` / `kah_cli_path` toolchain keys where the KAS metadata doctor still accepts them, and embedded launcher installation/status/fail-closed behavior for `kkachi.toolchain.v1` wrappers.
 - KAH repo tests for read-only probe JSON, initialized/uninitialized project cases, no-write proof, and stable error output.
 - Cross-repo evidence that a source-built or otherwise selected KAS binary calls the matching KAH probe, generates `.kkachi/toolchain.yaml`, validates it, and snapshots readback into run-local evidence.
 - Separate KAS and KAH enhance-test results.

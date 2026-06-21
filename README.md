@@ -91,6 +91,7 @@ kkachi-agent-skills repair [--repo <path>] --project <path> --workflow-graph --a
 kkachi-agent-skills toolchain init --project-root <path> --json
 kkachi-agent-skills toolchain doctor --project-root <path> --json
 kkachi-agent-skills toolchain refresh --project-root <path> --json
+kkachi-agent-skills toolchain install-launchers [--bin-dir <path>] [--json]
 kkachi-agent-skills workflow-create --project <path> --workflow-id <id> --mode dag_only|thin_trigger|full_trigger --request <json-path> --dry-run [--json]
 kkachi-agent-skills workflow-create --project <path> --workflow-id <id> --mode dag_only|thin_trigger|full_trigger --request <json-path> --apply dry-run:sha256:<hash> [--json]
 kkachi-agent-skills workflow-promote --project <path> --run <run-id> --target-workflow-id <id> --reuse-reason <reason> [--thin-trigger] --dry-run [--json]
@@ -102,6 +103,13 @@ kkachi-agent-skills uninstall --profile <profile> --project <project> --apply dr
 `--version` / `version` prints the CLI release before any profile or source-repo
 discovery. `version --json` also reports Go build metadata such as module version,
 VCS revision, and dirty-state evidence when available from the binary.
+
+`toolchain install-launchers` installs KAS-owned embedded local wrappers
+`kkachi-agent-skills-toolchain` and `kkachi-agent-helper-toolchain` into
+`--bin-dir` or the default user `~/.local/bin`. The wrappers read only
+`.kkachi/toolchain.yaml` schema `kkachi.toolchain.v1`, resolve effective KAS/KAH
+binaries, print paths and versions with `--toolchain-status`, and fail closed on
+missing, malformed, unsupported, non-executable, or version-mismatched metadata.
 
 `list` discovers source KAS packs from `skills/`, reports direct-layout packs
 as category `core`, supports future `skills/<category>/<skill>/SKILL.md`

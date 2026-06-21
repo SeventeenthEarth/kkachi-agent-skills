@@ -2,6 +2,7 @@ package toolchain
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,6 +25,9 @@ const (
 	kahProbeSchema = "kah.toolchain_probe.v1"
 )
 
+//go:embed templates/kkachi-agent-toolchain.py.tmpl
+var launcherTemplates embed.FS
+
 var semverPattern = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+$`)
 
 type Runner func(workDir string, args ...string) CommandResult
@@ -41,18 +45,25 @@ type Options struct {
 	ProfileRoot      string
 	Stage            string
 	ApprovalEvidence string
+	LauncherBinDir   string
 	Runner           Runner
 	Now              func() time.Time
 }
 
 type Result struct {
-	OK            bool         `json:"ok"`
-	Command       string       `json:"command"`
-	ProjectRoot   string       `json:"project_root"`
-	ToolchainPath string       `json:"toolchain_path"`
-	Wrote         bool         `json:"wrote"`
-	Diagnostics   []Diagnostic `json:"diagnostics"`
-	NextAction    string       `json:"next_action,omitempty"`
+	OK            bool             `json:"ok"`
+	Command       string           `json:"command"`
+	ProjectRoot   string           `json:"project_root"`
+	ToolchainPath string           `json:"toolchain_path,omitempty"`
+	Wrote         bool             `json:"wrote"`
+	Launchers     []LauncherRecord `json:"launchers,omitempty"`
+	Diagnostics   []Diagnostic     `json:"diagnostics"`
+	NextAction    string           `json:"next_action,omitempty"`
+}
+
+type LauncherRecord struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
 }
 
 type Diagnostic struct {
@@ -271,6 +282,50 @@ func SetStage(opts Options) Result {
 		return failResult(result)
 	}
 	result.Wrote = true
+	return result
+}
+
+func InstallLaunchers(opts Options) Result {
+	opts = normalizeOptions(opts)
+	result := baseResult("toolchain install-launchers", opts.ProjectRoot)
+	result.ToolchainPath = ""
+	binDir := strings.TrimSpace(opts.LauncherBinDir)
+	if binDir == "" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "launcher_bin_dir_required", "toolchain install-launchers requires --bin-dir <path>", "", "bin_dir"))
+		return failResult(result)
+	}
+	absBinDir, err := filepath.Abs(binDir)
+	if err != nil {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "launcher_bin_dir_invalid", err.Error(), binDir, "bin_dir"))
+		return failResult(result)
+	}
+	absBinDir = filepath.Clean(absBinDir)
+	if err := os.MkdirAll(absBinDir, 0o755); err != nil {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "launcher_bin_dir_create_failed", err.Error(), absBinDir, "bin_dir"))
+		return failResult(result)
+	}
+	templateData, err := launcherTemplates.ReadFile("templates/kkachi-agent-toolchain.py.tmpl")
+	if err != nil {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "launcher_template_missing", err.Error(), "templates/kkachi-agent-toolchain.py.tmpl", ""))
+		return failResult(result)
+	}
+	for _, launcher := range []struct {
+		kind string
+		name string
+	}{
+		{kind: "kas", name: "kkachi-agent-skills-toolchain"},
+		{kind: "kah", name: "kkachi-agent-helper-toolchain"},
+	} {
+		content := strings.ReplaceAll(string(templateData), `{{KIND}}`, launcher.kind)
+		path := filepath.Join(absBinDir, launcher.name)
+		if err := writeExecutableAtomic(path, []byte(content)); err != nil {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "launcher_write_failed", err.Error(), path, ""))
+			return failResult(result)
+		}
+		result.Launchers = append(result.Launchers, LauncherRecord{Name: launcher.name, Path: path})
+	}
+	result.Wrote = true
+	result.NextAction = "Run kkachi-agent-skills-toolchain --toolchain-status from a project with kkachi.toolchain.v1 metadata."
 	return result
 }
 
@@ -813,6 +868,42 @@ func writeAtomic(path string, data []byte) error {
 		return err
 	}
 	if err := os.Rename(tmpName, path); err != nil {
+		return err
+	}
+	if dirHandle, err := os.Open(dir); err == nil {
+		_ = dirHandle.Sync()
+		_ = dirHandle.Close()
+	}
+	return nil
+}
+
+func writeExecutableAtomic(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".kkachi-launcher.tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o755); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return err
+	}
+	if err := os.Chmod(path, 0o755); err != nil {
 		return err
 	}
 	if dirHandle, err := os.Open(dir); err == nil {

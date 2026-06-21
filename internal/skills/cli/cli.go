@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/agentinstructions"
@@ -577,8 +578,10 @@ func runToolchain(argv []string, stdout io.Writer, stderr io.Writer, env map[str
 		return runToolchainImportLegacy(argv[1:], stdout, stderr)
 	case "set-stage":
 		return runToolchainSetStage(argv[1:], stdout, stderr)
+	case "install-launchers":
+		return runToolchainInstallLaunchers(argv[1:], stdout, stderr)
 	default:
-		return emitError(stderr, "unknown_toolchain_command", "toolchain supports init, doctor, refresh, import-legacy, and set-stage.", "toolchain", wantsJSON(argv), "")
+		return emitError(stderr, "unknown_toolchain_command", "toolchain supports init, doctor, refresh, import-legacy, set-stage, and install-launchers.", "toolchain", wantsJSON(argv), "")
 	}
 }
 
@@ -668,6 +671,29 @@ func runToolchainSetStage(argv []string, stdout io.Writer, stderr io.Writer) int
 		return emitError(stderr, "project_root_required", "toolchain set-stage requires --project-root <path>.", "toolchain set-stage", *jsonOutput, "")
 	}
 	result := toolchain.SetStage(toolchain.Options{ProjectRoot: *projectRoot, Stage: *stage, ApprovalEvidence: *approvalEvidence})
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return toolchain.RenderHuman(result)
+	})
+}
+
+func runToolchainInstallLaunchers(argv []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("toolchain install-launchers", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	binDir := fs.String("bin-dir", defaultLauncherBinDir(), "directory where kkachi-agent-*-toolchain launchers are installed")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "toolchain install-launchers does not accept positional arguments.", "toolchain install-launchers", *jsonOutput, "")
+	}
+	result := toolchain.InstallLaunchers(toolchain.Options{LauncherBinDir: *binDir})
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return toolchain.RenderHuman(result)
 	})
@@ -1346,13 +1372,45 @@ func printToolchainHelp(w io.Writer) {
 	fmt.Fprintln(w, "  kkachi-agent-skills toolchain refresh --project-root <path> --json")
 	fmt.Fprintln(w, "  kkachi-agent-skills toolchain import-legacy --project-root <path> --profile <profile> --project <id> --json")
 	fmt.Fprintln(w, "  kkachi-agent-skills toolchain set-stage --project-root <path> --stage <stage> --approval-evidence <ref> --json")
+	fmt.Fprintln(w, "  kkachi-agent-skills toolchain install-launchers --bin-dir <path> --json")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands:")
-	fmt.Fprintln(w, "  init           Create .kkachi/toolchain.yaml from KAS facts and KAH probe facts")
-	fmt.Fprintln(w, "  doctor         Validate existing .kkachi/toolchain.yaml without writing")
-	fmt.Fprintln(w, "  refresh        Update observed facts while preserving stage approval and policy fields")
-	fmt.Fprintln(w, "  import-legacy  Import explicit legacy profile/project state without overwriting conflicts")
-	fmt.Fprintln(w, "  set-stage      Record approved Stage 1 metadata; fail closed for unauthorized stages")
+	fmt.Fprintln(w, "  init               Create .kkachi/toolchain.yaml from KAS facts and KAH probe facts")
+	fmt.Fprintln(w, "  doctor             Validate existing .kkachi/toolchain.yaml without writing")
+	fmt.Fprintln(w, "  refresh            Update observed facts while preserving stage approval and policy fields")
+	fmt.Fprintln(w, "  import-legacy      Import explicit legacy profile/project state without overwriting conflicts")
+	fmt.Fprintln(w, "  set-stage          Record approved Stage 1 metadata; fail closed for unauthorized stages")
+	fmt.Fprintln(w, "  install-launchers  Install embedded kkachi-agent-*-toolchain wrappers")
+}
+
+func defaultLauncherBinDir() string {
+	home := defaultUserHome()
+	if strings.TrimSpace(home) == "" {
+		return ""
+	}
+	return filepath.Join(home, ".local", "bin")
+}
+
+func defaultUserHome() string {
+	home, err := os.UserHomeDir()
+	if err == nil && strings.TrimSpace(home) != "" && !strings.Contains(home, string(filepath.Separator)+".hermes"+string(filepath.Separator)+"profiles"+string(filepath.Separator)) {
+		return home
+	}
+	user := strings.TrimSpace(os.Getenv("USER"))
+	if user == "" {
+		user = strings.TrimSpace(os.Getenv("LOGNAME"))
+	}
+	if user != "" {
+		for _, candidate := range []string{filepath.Join("/Users", user), filepath.Join("/home", user)} {
+			if st, err := os.Stat(candidate); err == nil && st.IsDir() {
+				return candidate
+			}
+		}
+	}
+	if err == nil {
+		return home
+	}
+	return ""
 }
 
 func emitError(w io.Writer, code string, message string, command string, jsonOutput bool, nextAction string) int {
