@@ -428,6 +428,151 @@ mar_provider_tools:
 	}
 }
 
+func TestMAR005ProviderToolchainOverlayAcceptsNestedMARProviderTools(t *testing.T) {
+	registry := writeTempProviderRegistry(t, roleRegistryPayload([]string{"logic"}, map[string]any{
+		"alias_backed":     providerPayload("zcode", "definitely-missing-shell-alias", "glm-5.2", []string{"--version"}, false),
+		"secondary_backed": providerPayload("kimi", "python3", "fixture-kimi-default", []string{"--version"}, true),
+	}, map[string]any{"logic": rolePayload("alias_backed", "secondary_backed")}))
+	toolchain := writeTempToolchain(t, `schema_version: "kkachi.toolchain.v1"
+mar:
+  provider_tools:
+    schema_version: mar.provider_tools.v1
+    providers:
+      alias_backed:
+        command_lane: zcode
+        resolved_argv:
+          - python3
+        selected_model: glm-5.2
+        version: 3.x
+        validated: true
+        adapter_proof_evidence: .kkachi/runs/run-test/mar/provider-proof-alias_backed.json
+`)
+
+	output := runMARCommand(t, "provider-preflight", "--registry", registry, "--toolchain", toolchain)
+	var result struct {
+		Status   string `json:"status"`
+		Reason   string `json:"reason"`
+		Attempts []struct {
+			ProviderID            string   `json:"provider_id"`
+			TerminalStatus        string   `json:"terminal_status"`
+			ProviderFailureReason *string  `json:"provider_failure_reason"`
+			RedactedCommand       []string `json:"redacted_command"`
+		} `json:"attempts"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse nested provider-preflight output: %v\n%s", err, output)
+	}
+	if result.Status != "PASS" || result.Reason != "provider_preflight_passed" || len(result.Attempts) != 1 {
+		t.Fatalf("nested mar.provider_tools overlay did not pass\n%s", output)
+	}
+	attempt := result.Attempts[0]
+	if attempt.ProviderID != "alias_backed" || attempt.TerminalStatus != "PASS" || attempt.ProviderFailureReason != nil {
+		t.Fatalf("nested overlay attempt mismatch: %+v\n%s", attempt, output)
+	}
+	if strings.Join(attempt.RedactedCommand, " ") != "python3 --version" {
+		t.Fatalf("nested overlay resolved_argv must replace missing registry executable, got %v\n%s", attempt.RedactedCommand, output)
+	}
+}
+
+func TestMAR005MaterializedProjectScriptResolvesProjectRootRegistry(t *testing.T) {
+	projectRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".kkachi", "scripts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".kkachi", "registries"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	scriptData, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "mar.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, ".kkachi", "scripts", "mar.py"), scriptData, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	registryPayload := roleRegistryPayload([]string{"logic"}, map[string]any{
+		"alias_backed": providerPayload("zcode", "definitely-missing-shell-alias", "glm-5.2", []string{"--version"}, false),
+	}, map[string]any{"logic": rolePayload("alias_backed", "alias_backed")})
+	registryData, err := json.MarshalIndent(registryPayload, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, ".kkachi", "registries", "mar-provider-lanes.json"), registryData, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	toolchain := `schema_version: "kkachi.toolchain.v1"
+mar:
+  provider_tools:
+    schema_version: mar.provider_tools.v1
+    providers:
+      alias_backed:
+        command_lane: zcode
+        resolved_argv:
+          - python3
+        selected_model: glm-5.2
+        version: 3.x
+        validated: true
+        adapter_proof_evidence: .kkachi/runs/run-test/mar/provider-proof-alias_backed.json
+`
+	if err := os.WriteFile(filepath.Join(projectRoot, ".kkachi", "toolchain.yaml"), []byte(toolchain), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("python3", ".kkachi/scripts/mar.py", "provider-preflight", "--registry", ".kkachi/registries/mar-provider-lanes.json", "--toolchain", ".kkachi/toolchain.yaml")
+	cmd.Dir = projectRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("materialized project MAR preflight failed: %v\n%s", err, output)
+	}
+	var result struct {
+		Status string `json:"status"`
+		Reason string `json:"reason"`
+		Detail string `json:"detail"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse materialized project MAR preflight output: %v\n%s", err, output)
+	}
+	if result.Status != "PASS" || result.Reason != "provider_preflight_passed" || strings.Contains(result.Detail, ".kkachi/.kkachi") {
+		t.Fatalf("materialized MAR script must resolve registry/toolchain from project root, got %+v\n%s", result, output)
+	}
+}
+
+func TestMAR005ProviderToolchainOverlayAcceptsEmptyNestedProviderMap(t *testing.T) {
+	registry := writeTempProviderRegistry(t, roleRegistryPayload([]string{"logic"}, map[string]any{
+		"unvalidated": providerPayload("zcode", "python3", "glm-5.2", []string{"--version"}, false),
+	}, map[string]any{"logic": rolePayload("unvalidated", "unvalidated")}))
+	toolchain := writeTempToolchain(t, `schema_version: "kkachi.toolchain.v1"
+mar:
+  provider_tools:
+    schema_version: mar.provider_tools.v1
+    providers: {}
+`)
+
+	output := runMARCommand(t, "provider-preflight", "--registry", registry, "--toolchain", toolchain)
+	var result struct {
+		Status   string `json:"status"`
+		Reason   string `json:"reason"`
+		Detail   string `json:"detail"`
+		Attempts []struct {
+			ProviderID             string  `json:"provider_id"`
+			TerminalStatus         string  `json:"terminal_status"`
+			ProviderFailureReason  *string `json:"provider_failure_reason"`
+			PreflightEvidencePath  *string `json:"preflight_evidence_path"`
+		} `json:"attempts"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse empty nested provider map preflight output: %v\n%s", err, output)
+	}
+	if result.Reason == "provider_registry_failure" || result.Detail != "" {
+		t.Fatalf("empty nested providers map must not be treated as a registry parse failure\n%s", output)
+	}
+	if result.Status != "FAILED" || result.Reason != "all_provider_preflight_failed" || len(result.Attempts) == 0 {
+		t.Fatalf("empty nested providers map should preserve fail-closed provider preflight semantics\n%s", output)
+	}
+	attempt := result.Attempts[0]
+	if attempt.ProviderID != "unvalidated" || attempt.TerminalStatus != "BLOCKED" || attempt.ProviderFailureReason == nil || *attempt.ProviderFailureReason != "adapter_proof_required" {
+		t.Fatalf("empty nested providers map attempt mismatch: %+v\n%s", attempt, output)
+	}
+}
+
 func TestMAR005ProviderSafetyAndPreflightFailures(t *testing.T) {
 	registry := writeTempProviderRegistry(t, roleRegistryPayload([]string{"logic"}, map[string]any{
 		"missing_cli":       providerPayload("missing", "definitely-missing-mar-cli", "glm-5.2", []string{"--model", "{model}"}, false),

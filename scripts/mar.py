@@ -127,7 +127,12 @@ def utc_now():
 
 
 def repo_root():
-    return Path(__file__).resolve().parents[1]
+    script_path = Path(__file__).resolve()
+    # Source checkout layout: <repo>/scripts/mar.py.
+    # Project-local materialized layout: <project>/.kkachi/scripts/mar.py.
+    if script_path.parent.name == "scripts" and script_path.parent.parent.name == ".kkachi":
+        return script_path.parents[2]
+    return script_path.parents[1]
 
 
 def resolve_repo_path(path):
@@ -315,14 +320,36 @@ def parse_minimal_toolchain_yaml(raw):
     constructs are ignored rather than treated as executable shell snippets.
     """
     data = {}
+    mar_section = None
     mar_tools = None
+    mar_tools_indent = None
     providers = None
     shell_probe = None
     current_provider = None
     current_list_key = None
+    in_mar_section = False
     in_mar_tools = False
     in_providers = False
     in_shell_probe = False
+
+    def reset_provider_context():
+        nonlocal providers, shell_probe, current_provider, current_list_key
+        nonlocal in_providers, in_shell_probe
+        providers = None
+        shell_probe = None
+        current_provider = None
+        current_list_key = None
+        in_providers = False
+        in_shell_probe = False
+
+    def start_mar_tools(indent, target):
+        nonlocal mar_tools, mar_tools_indent, in_mar_tools
+        mar_tools = {}
+        mar_tools_indent = indent
+        target["provider_tools"] = mar_tools
+        data["mar_provider_tools"] = mar_tools
+        in_mar_tools = True
+        reset_provider_context()
 
     for raw_line in raw.splitlines():
         line_without_comment = raw_line.split("#", 1)[0].rstrip()
@@ -332,36 +359,47 @@ def parse_minimal_toolchain_yaml(raw):
         line = line_without_comment.strip()
 
         if indent == 0:
+            in_mar_section = False
             in_mar_tools = False
-            in_providers = False
-            in_shell_probe = False
-            current_provider = None
-            current_list_key = None
-            if line in ("mar_provider_tools:", "provider_tools:"):
-                mar_tools = {}
-                data["mar_provider_tools"] = mar_tools
-                in_mar_tools = True
+            mar_tools_indent = None
+            reset_provider_context()
+            if line == "mar:":
+                mar_section = {}
+                data["mar"] = mar_section
+                in_mar_section = True
+            elif line in ("mar_provider_tools:", "provider_tools:"):
+                start_mar_tools(0, data)
             else:
                 if ":" in line:
                     key, value = line.split(":", 1)
                     data[key.strip()] = parse_toolchain_scalar(value)
             continue
 
-        if not in_mar_tools or mar_tools is None:
+        if in_mar_section and not in_mar_tools and indent == 2 and line in (
+            "provider_tools:",
+            "mar_provider_tools:",
+        ):
+            start_mar_tools(2, mar_section)
             continue
 
-        if indent == 2 and ":" in line:
+        if not in_mar_tools or mar_tools is None or mar_tools_indent is None:
+            continue
+
+        relative_indent = indent - mar_tools_indent
+        if relative_indent <= 0:
+            in_mar_tools = False
+            reset_provider_context()
+            continue
+
+        if relative_indent == 2 and ":" in line:
             key, value = line.split(":", 1)
             key = key.strip()
             value = value.strip()
-            in_providers = False
-            in_shell_probe = False
-            current_provider = None
-            current_list_key = None
-            if key == "providers" and value == "":
+            reset_provider_context()
+            if key == "providers" and value in ("", "{}"):
                 providers = {}
                 mar_tools["providers"] = providers
-                in_providers = True
+                in_providers = value == ""
             elif key == "shell_probe" and value == "":
                 shell_probe = {}
                 mar_tools["shell_probe"] = shell_probe
@@ -370,18 +408,18 @@ def parse_minimal_toolchain_yaml(raw):
                 mar_tools[key] = parse_toolchain_scalar(value)
             continue
 
-        if in_shell_probe and shell_probe is not None and indent == 4 and ":" in line:
+        if in_shell_probe and shell_probe is not None and relative_indent == 4 and ":" in line:
             key, value = line.split(":", 1)
             shell_probe[key.strip()] = parse_toolchain_scalar(value)
             continue
 
         if in_providers and providers is not None:
-            if indent == 4 and line.endswith(":"):
+            if relative_indent == 4 and line.endswith(":"):
                 current_provider = line[:-1].strip()
                 providers[current_provider] = {}
                 current_list_key = None
                 continue
-            if current_provider and indent == 6 and ":" in line:
+            if current_provider and relative_indent == 6 and ":" in line:
                 key, value = line.split(":", 1)
                 key = key.strip()
                 value = value.strip()
@@ -395,7 +433,7 @@ def parse_minimal_toolchain_yaml(raw):
             if (
                 current_provider
                 and current_list_key
-                and indent == 8
+                and relative_indent == 8
                 and line.startswith("- ")
                 and isinstance(providers[current_provider].get(current_list_key), list)
             ):

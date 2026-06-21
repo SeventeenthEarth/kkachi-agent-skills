@@ -496,7 +496,10 @@ func TestInitWritesToolchainAtomicallyAfterDeterministicKAHProbe(t *testing.T) {
 		`generator: "kkachi-agent-skills toolchain init"`,
 		`canonical: "stage1_direct_codex_app_server_baseline"`,
 		`stage2_activation: false`,
-		`providers: {}`,
+		filepath.Join(root, ".kkachi", "scripts", "mar_adapters", "mar-zcode.sh"),
+		filepath.Join(root, ".kkachi", "scripts", "mar_adapters", "mar-kimi.sh"),
+		filepath.Join(root, ".kkachi", "scripts", "mar_adapters", "mar-agy.sh"),
+		`adapter_proof_evidence: ".kkachi/mar/provider-toolchain-proof.json"`,
 		`no_secrets: true`,
 	} {
 		if !strings.Contains(text, want) {
@@ -510,6 +513,61 @@ func TestInitWritesToolchainAtomicallyAfterDeterministicKAHProbe(t *testing.T) {
 	}
 	if leftovers, _ := filepath.Glob(filepath.Join(root, ".kkachi", ".toolchain.yaml.tmp-*")); len(leftovers) != 0 {
 		t.Fatalf("atomic temp files left behind: %v", leftovers)
+	}
+	assertMaterializedMARScripts(t, root)
+}
+
+func TestDoctorFailsClosedWhenProjectMARScriptsAreMissing(t *testing.T) {
+	root := t.TempDir()
+	var calls [][]string
+	init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if !init.OK {
+		t.Fatalf("init failed: %+v", init.Diagnostics)
+	}
+	missing := filepath.Join(root, ".kkachi", "scripts", "mar_adapters", "mar-zcode.sh")
+	if err := os.Remove(missing); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshotFiles(t, root)
+	result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	after := snapshotFiles(t, root)
+	if !reflect.DeepEqual(before, after) {
+		t.Fatalf("doctor wrote files while checking missing MAR script: before=%v after=%v", before, after)
+	}
+	if result.OK || firstCode(result.Diagnostics) != "mar_script_missing" {
+		t.Fatalf("expected mar_script_missing, got %+v", result)
+	}
+}
+
+func assertMaterializedMARScripts(t *testing.T, root string) {
+	t.Helper()
+	for _, rel := range []string{
+		filepath.Join(".kkachi", "scripts", "mar.py"),
+		filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-zcode.sh"),
+		filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-kimi.sh"),
+		filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-agy.sh"),
+		filepath.Join(".kkachi", "registries", "mar-provider-lanes.json"),
+		filepath.Join(".kkachi", "templates", "prompts", "mar", "zcode-glm-5-2-reviewer-request.md.tmpl"),
+	} {
+		path := filepath.Join(root, rel)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("expected materialized MAR script %s: %v", path, err)
+		}
+		if info.IsDir() || info.Size() == 0 {
+			t.Fatalf("materialized MAR script must be a non-empty file: %s", path)
+		}
+		if strings.HasSuffix(path, ".sh") && info.Mode().Perm()&0111 == 0 {
+			t.Fatalf("materialized MAR adapter must be executable: %s mode=%s", path, info.Mode())
+		}
+	}
+	proof := filepath.Join(root, ".kkachi", "mar", "provider-toolchain-proof.json")
+	data, err := os.ReadFile(proof)
+	if err != nil {
+		t.Fatalf("expected MAR provider proof %s: %v", proof, err)
+	}
+	if !strings.Contains(string(data), `"contains_secrets": false`) || !strings.Contains(string(data), `"metadata_only": true`) {
+		t.Fatalf("MAR provider proof must be non-secret metadata: %s", data)
 	}
 }
 
@@ -810,14 +868,14 @@ func TestDoctorFailsClosedForMalformedOrSecretMARProviderProof(t *testing.T) {
 		{
 			name: "malformed_boolean",
 			mutate: func(text string) string {
-				return strings.ReplaceAll(text, "    providers: {}", "    providers:\n      zcode_glm_5_2:\n        validated: maybe")
+				return strings.Replace(text, "        validated: true", "        validated: maybe", 1)
 			},
 			code: "toolchain_mar_provider_tools_invalid",
 		},
 		{
 			name: "secret_like_value",
 			mutate: func(text string) string {
-				return strings.ReplaceAll(text, "    providers: {}", "    providers:\n      zcode_glm_5_2:\n        adapter_proof_evidence: \"sk-live-secret\"")
+				return strings.Replace(text, "adapter_proof_evidence:", `adapter_proof_evidence: "sk-live-secret" #`, 1)
 			},
 			code: "toolchain_secret_detected",
 		},
