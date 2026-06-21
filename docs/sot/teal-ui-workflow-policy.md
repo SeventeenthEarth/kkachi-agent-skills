@@ -1,0 +1,66 @@
+# DESIGN Teal UI workflow policy for KAS
+
+Status: planning SOT for the `DESIGN` shared KAS/KAH epic; not implementation evidence
+Owner: KAS workflow/policy layer
+Source evidence: `/Users/draccoon/Workspace/Hermes/17thHermes/40_outputs/projects/kkachi/2026-06-21-kas-kah-teal-ui-workflow-sot.md`
+Paired KAH SOT: `kkachi-agent-helper/docs/sot/teal-ui-evidence-gates.md`
+
+## Purpose
+
+This document registers the KAS-owned side of the `DESIGN` epic. The epic promotes the accepted candidate Teal UI workflow direction into KAS/KAH source planning without claiming implemented behavior.
+
+KAS owns workflow policy, trigger semantics, role contracts, node contracts, selector/materializer behavior, skill guidance, and agent-facing expectations. KAS does not own KAH schema/gate validation, and KAS must not substitute Blue, Red, Orange, Gray, MAR, backend agents, or temporary helpers for official Teal verdicts when Teal is required.
+
+## Applicability rule
+
+KAS derives `teal_required` from declared project/task facts:
+
+```yaml
+project_has_teal_lane: true|false
+ui_ux_change: true|false
+teal_required: project_has_teal_lane && ui_ux_change
+```
+
+When either input is false, KAS must preserve a concrete `teal_skip_reason` instead of injecting design workflow steps.
+
+For Kkachi KAS/KAH/KAB source work, the default is:
+
+```yaml
+project_has_teal_lane: false
+ui_ux_change: false
+teal_required: false
+teal_skip_reason: "No UI/UX surface in this project/task."
+```
+
+For UI-bearing Sudal or Doksuri work, the project Teal designer or Goong as Teal Team Lead is routed according to project registration and explicit task scope.
+
+## KAS policy surfaces
+
+KAS implementation tasks must add or update support for:
+
+- project workflow metadata for Teal availability;
+- task-level `ui_ux_change` classification;
+- derived `teal_required`, explicit skip reasons, and waiver policy;
+- `DESIGN_PLAN_GATE` before implementation authorization;
+- `DESIGN_FIDELITY_REVIEW` before final acceptance;
+- optional Teal participation in general color review when UI changed;
+- node contracts and skill guidance that keep design planning, design fidelity review, and ordinary color review separate;
+- fail-closed no-substitution language when required Teal verdict/evidence is missing.
+
+## Sequential task order
+
+주군 selected a sequential seven-task roadmap. Do not parallelize these tasks. Execute by task id order:
+
+1. `DESIGN-001` — KAS docs/SOT adoption and shared roadmap registration.
+2. `DESIGN-002` — KAS Teal applicability and node contract semantics.
+3. `DESIGN-003` — KAS workflow selector/materializer and skill guidance.
+4. `DESIGN-004` — KAH design evidence schema and artifact bootstrap.
+5. `DESIGN-005` — KAH fail-closed gate and diagnostics support.
+6. `DESIGN-006` — Cross-repo compatibility examples and proof fixtures.
+7. `DESIGN-007` — Full verification, docs map, Red/Orange/Gray/Teal review, and Blue closeout.
+
+KAS/KAH remain separated by ownership. A KAS task may make a small KAH compatibility note or fixture-name alignment only when needed, and a KAH task may make a small KAS reference update only when needed. Any new command, schema, gate, selector, materializer, or independent acceptance criteria in the other repository must become its own planned work rather than a hidden cross-edit.
+
+## Boundaries
+
+This planning SOT does not authorize code behavior, installed profile skill updates, runtime/provider/auth/token/gateway/model mutation, KAB activation, release, push, or applying Teal to non-UI Kkachi repository work. Implementation status requires task-specific source changes, tests, KAH evidence where applicable, and official review gates.

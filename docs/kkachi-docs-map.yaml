@@ -3,6 +3,7 @@ project: "kkachi-agent-skills"
 roadmap: "docs/roadmap.md"
 sot_docs:
   - "docs/sot/interface-contract.md"
+  - "docs/sot/teal-ui-workflow-policy.md"
   - "docs/sot/khs-architecture-and-integration.md"
   - "docs/sot/stage1-direct-codex-sdk-appserver-runner.md"
   - "docs/sot/kas-cli-contract.md"

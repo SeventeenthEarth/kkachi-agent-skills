@@ -6,7 +6,7 @@ Confirming role: Responsible approver / governance evidence record; INITDOC post
 Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced, KAH v0.1.10 workflow catalog promotion substrate released, KASROLE is the KAS v0.1.3 release baseline, and WFLOW epic completion is the KAS v0.1.4 release baseline
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/role-aware-project-suite-contract.md`, `sot/project-kas-sync-state.md`, `sot/toolchain-local-metadata-registry.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/multi-agent-review-policy.md`, `sot/policy-promotion-governance-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/role-aware-project-suite-contract.md`, `sot/project-kas-sync-state.md`, `sot/toolchain-local-metadata-registry.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/multi-agent-review-policy.md`, `sot/policy-promotion-governance-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`, `sot/teal-ui-workflow-policy.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -62,6 +62,7 @@ INITDOC-003
   -> MAR-001..006 paired with KAH MAREV-001..003 when MAR repository promotion is selected
   -> TOLMR-001..004 shared across KAS and KAH for generated `.kkachi/toolchain.yaml` local state
   -> POLPR-001..008 shared across KAS and KAH
+  -> DESIGN-001..007 shared across KAS and KAH, sequential by task id only
 ```
 
 INITDOC is closed before implementation begins so the temporary transition SOT does not become new legacy. `BOOTSTRAP` should happen first because it gives later KAS work a deterministic KAH project state and doctor evidence. `STALECLEAN` may run in parallel with late CLIMVP/GRAPHMVP tasks only when the touched surfaces do not overlap.
@@ -360,6 +361,26 @@ TOLMR deferrals unless separately approved: tracked project-doc copies of local 
 | POLPR-008 | Mirror accepted policy, stale-scan, and close rollout | Completed | Mirror accepted source policy into KAS skills/profile guidance, perform stale wording scans, verify docs-update impact-map/project-Gray guidance, and collect final review evidence. | Completed with final stale scan disposition, docs-update impact map, Red/Orange/project-Gray review closure, focused evidence re-review, required-role MAR evidence, post-MAR final color review, and Blue final synthesis. |
 
 POLPR deferrals unless separately approved: profile skill installation, KAB activation, provider/gateway/auth/token/model mutation, push/release tagging, automatic review comments, automatic code mutation by reviewers, model voting as authority, warning-only MAR gate states, and universal forced workflow graphs.
+
+### EPIC: DESIGN — Teal UI workflow support for UI-bearing KAS/KAH projects
+
+> Goal: promote the accepted Teal UI workflow candidate SOT into KAS/KAH source support for UI-bearing projects only. KAS owns project/task-triggered Teal policy, node contracts, selector/materializer semantics, and skill guidance. KAH owns deterministic evidence fields, artifact/schema/gate/diagnostic support, and must not make design judgments.
+>
+> Source of truth: `docs/sot/teal-ui-workflow-policy.md`. Paired KAH companion SOT: KAH `docs/sot/teal-ui-evidence-gates.md`. Candidate-source evidence: `/Users/draccoon/Workspace/Hermes/17thHermes/40_outputs/projects/kkachi/2026-06-21-kas-kah-teal-ui-workflow-sot.md`.
+>
+> Sequential execution rule: 주군 explicitly selected no parallel development. Execute `DESIGN-001 -> DESIGN-002 -> DESIGN-003 -> DESIGN-004 -> DESIGN-005 -> DESIGN-006 -> DESIGN-007` in task-id order.
+
+| Task ID | Owner | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|---|
+| DESIGN-001 | KAS-led docs/SOT | Register Teal UI workflow policy and shared roadmap sequence | Completed | Add KAS planning SOT, paired KAH companion SOT, both roadmaps, docs indexes, and docs maps. Record that DESIGN is UI-bearing-project support only, not default Teal for Kkachi source work. | Docs readback, docs-map YAML parse in both repos, `git diff --check`, repository test gates or explicit blockers, and official review before marking Completed. No code/runtime/profile mutation. |
+| DESIGN-002 | KAS | Define Teal applicability and node contract semantics | Planned | KAS defines `project_has_teal_lane`, `ui_ux_change`, derived `teal_required`, skip/waiver/no-substitution policy, `DESIGN_PLAN_GATE`, `DESIGN_FIDELITY_REVIEW`, and Teal color-review separation. | KAS docs/registry/contract tests, fail-closed no-substitution checks, Red/Orange/Gray/Teal review as applicable. Small KAH field-name fixture alignment only if needed. |
+| DESIGN-003 | KAS | Add workflow selector/materializer and skill guidance | Planned | KAS workflow/skill surfaces conditionally inject Teal gates only for UI-bearing projects with a Teal lane; non-UI Kkachi source work records skip reason and does not receive design workflow steps. | KAS source tests/docs-contract, skill/template readback, no-universal-Teal search, review gates. Small KAH compatibility note only if needed. |
+| DESIGN-004 | KAH | Add design evidence schema and artifact bootstrap | Planned | KAH adds deterministic artifact/schema/bootstrap support for Teal/UI evidence fields without judging design quality or selecting Teal owners. | KAH schema/artifact tests, docs/specs/compatibility updates, capability evidence only after implementation. Small KAS reference update only if needed. |
+| DESIGN-005 | KAH | Add fail-closed Teal gate and diagnostics support | Planned | KAH gates/diagnostics fail when `teal_required=true` lacks required plan verdict, design spec, screenshot/fidelity refs, verification verdict, or valid waiver evidence; `teal_required=false` requires skip/waiver evidence. | KAH gate/diagnostic/final-gate tests, negative malformed/missing evidence fixtures, docs readback, review gates. |
+| DESIGN-006 | KAS+KAH | Add cross-repo compatibility examples and proof fixtures | Planned | Add golden examples for Kkachi non-UI skip, Sudal UI Teal required, and Doksuri UI Teal required; prove KAS declarations match KAH evidence/gate expectations. | Both repo test gates, cross-repo smoke/readback, compatibility docs update, no hidden fallback or authority substitution. |
+| DESIGN-007 | KAS+KAH review/closeout | Complete verification, docs maps, color/Teal review, and Blue closeout | Planned | Run final KAS/KAH verification, update docs maps/status, preserve evidence package, complete Red/Orange/Gray plus applicable Teal Lead review, and record Blue synthesis. | Official Kanban review evidence, final verification outputs, docs impact map, and explicit remaining deferrals before completion. |
+
+DESIGN deferrals unless separately approved: applying Teal to non-UI Kkachi repository work, appointing a Kkachi field Teal member, replacing Teal design verification with ordinary color review, generated images as implementation truth without accepted plan evidence, KAB activation, profile/provider/auth/token/gateway/model mutation, push/release/install, or warning-only behavior when required Teal evidence is missing.
 
 ## Deferred / non-MVP work
 
