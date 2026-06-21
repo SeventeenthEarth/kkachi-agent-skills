@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kahrunner"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
 )
@@ -34,9 +35,14 @@ type CommandResult struct {
 }
 
 type Options struct {
-	ProjectRoot string
-	Runner      Runner
-	Now         func() time.Time
+	ProjectRoot      string
+	Profile          string
+	Project          string
+	ProfileRoot      string
+	Stage            string
+	ApprovalEvidence string
+	Runner           Runner
+	Now              func() time.Time
 }
 
 type Result struct {
@@ -81,6 +87,8 @@ type probePayload struct {
 }
 
 type documentPolicy struct {
+	stageNumeric        int
+	stageCanonical      string
 	stageSelectedAt     string
 	approvalEvidence    string
 	stage2Activation    bool
@@ -146,6 +154,113 @@ func Refresh(opts Options) Result {
 	}
 	policy := policyFromDocument(doc, opts.nowString())
 	data := renderDocument("refresh", opts, probe, policy)
+	if secret := secretDiagnostic([]byte(data), result.ToolchainPath); secret != nil {
+		secret.Code = "toolchain_generated_secret_detected"
+		result.Diagnostics = append(result.Diagnostics, *secret)
+		return failResult(result)
+	}
+	if err := writeAtomic(result.ToolchainPath, []byte(data)); err != nil {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_write_failed", err.Error(), result.ToolchainPath, ""))
+		return failResult(result)
+	}
+	result.Wrote = true
+	return result
+}
+
+func ImportLegacy(opts Options) Result {
+	opts = normalizeOptions(opts)
+	result := baseResult("toolchain import-legacy", opts.ProjectRoot)
+	if strings.TrimSpace(opts.Profile) == "" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "profile_required", "toolchain import-legacy requires --profile <profile>", "", "profile"))
+		return failResult(result)
+	}
+	if strings.TrimSpace(opts.Project) == "" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "project_required", "toolchain import-legacy requires --project <id>", "", "project"))
+		return failResult(result)
+	}
+	if _, err := os.Stat(result.ToolchainPath); err == nil {
+		if _, ok := readAndValidate(result.ToolchainPath, &result); ok {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_import_existing_toolchain_conflict", "existing .kkachi/toolchain.yaml is present; legacy import will not overwrite it", result.ToolchainPath, ""))
+		}
+		return failResult(result)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_unreadable", err.Error(), result.ToolchainPath, ""))
+		return failResult(result)
+	}
+	legacy, ok := readLegacyState(opts, &result)
+	if !ok {
+		return failResult(result)
+	}
+	probe, ok := runProbe(opts, &result)
+	if !ok {
+		return failResult(result)
+	}
+	policy := defaultPolicy(opts.nowString())
+	policy.stageNumeric = legacy.stageNumeric
+	policy.stageCanonical = legacy.stageCanonical
+	policy.stageSelectedAt = legacy.selectedAt
+	policy.approvalEvidence = legacy.approvalEvidence
+	policy.stage2Activation = legacy.stage2Activation
+	data := renderDocument("import-legacy", opts, probe, policy)
+	if secret := secretDiagnostic([]byte(data), result.ToolchainPath); secret != nil {
+		secret.Code = "toolchain_generated_secret_detected"
+		result.Diagnostics = append(result.Diagnostics, *secret)
+		return failResult(result)
+	}
+	if err := os.MkdirAll(filepath.Join(opts.ProjectRoot, ".kkachi"), 0o755); err != nil {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "kkachi_dir_create_failed", err.Error(), filepath.Join(opts.ProjectRoot, ".kkachi"), ""))
+		return failResult(result)
+	}
+	if err := writeAtomic(result.ToolchainPath, []byte(data)); err != nil {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_write_failed", err.Error(), result.ToolchainPath, ""))
+		return failResult(result)
+	}
+	result.Wrote = true
+	return result
+}
+
+func SetStage(opts Options) Result {
+	opts = normalizeOptions(opts)
+	result := baseResult("toolchain set-stage", opts.ProjectRoot)
+	doc, ok := readAndValidate(result.ToolchainPath, &result)
+	if !ok {
+		return failResult(result)
+	}
+	if strings.TrimSpace(opts.Stage) == "" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "stage_required", "toolchain set-stage requires --stage <stage>", "", "kab.adoption_stage"))
+		return failResult(result)
+	}
+	stage, ok := resolveStage(opts.Stage, &result)
+	if !ok {
+		return failResult(result)
+	}
+	if strings.TrimSpace(opts.ApprovalEvidence) == "" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "stage_approval_evidence_required", "toolchain set-stage requires --approval-evidence <ref>", "", "kab.adoption_stage.approval_evidence"))
+		return failResult(result)
+	}
+	if containsSecretLike(opts.ApprovalEvidence) {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_secret_detected", "approval evidence contains a secret-like value", "", "kab.adoption_stage.approval_evidence"))
+		return failResult(result)
+	}
+	if stage.Numeric == 3 {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_stage3_reserved", "KAB Stage 3 is reserved and unauthorized for toolchain set-stage", result.ToolchainPath, "kab.adoption_stage"))
+		return failResult(result)
+	}
+	if stage.Numeric == 2 {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_stage2_capability_proof_missing", "Stage 2 requires deterministic KAB native_codex capability proof; this repository does not expose that proof surface", result.ToolchainPath, "kab.adoption_stage"))
+		return failResult(result)
+	}
+	probe, ok := runProbe(opts, &result)
+	if !ok {
+		return failResult(result)
+	}
+	policy := policyFromDocument(doc, opts.nowString())
+	policy.stageNumeric = stage.Numeric
+	policy.stageCanonical = stage.Canonical
+	policy.stageSelectedAt = opts.nowString()
+	policy.approvalEvidence = opts.ApprovalEvidence
+	policy.stage2Activation = false
+	data := renderDocument("set-stage", opts, probe, policy)
 	if secret := secretDiagnostic([]byte(data), result.ToolchainPath); secret != nil {
 		secret.Code = "toolchain_generated_secret_detected"
 		result.Diagnostics = append(result.Diagnostics, *secret)
@@ -384,6 +499,9 @@ func readAndValidate(path string, result *Result) (map[string]string, bool) {
 			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_evidence_posture_invalid", "toolchain evidence_posture must preserve no_secrets and fail-closed assertions", path, "evidence_posture"))
 			return nil, false
 		}
+		if !validateMARProviderTools(doc, path, result) {
+			return nil, false
+		}
 	}
 	return doc, true
 }
@@ -422,6 +540,9 @@ func renderDocument(action string, opts Options, probe probePayload, policy docu
 	kahBinaryPath := probe.KAH.BinaryPath
 	selectionSource := selectionSource(opts.ProjectRoot, kahBinaryPath)
 	projectID := filepath.Base(opts.ProjectRoot)
+	if strings.TrimSpace(opts.Project) != "" {
+		projectID = strings.TrimSpace(opts.Project)
+	}
 	lines := []string{
 		`schema_version: "` + SchemaVersion + `"`,
 		"generated_by:",
@@ -447,8 +568,8 @@ func renderDocument(action string, opts Options, probe probePayload, policy docu
 		`  doctor_status: "` + yamlEscape(statusOrUnknown(probe.Doctor.Status)) + `"`,
 		"kab:",
 		"  adoption_stage:",
-		"    numeric: 1",
-		`    canonical: "stage1_direct_codex_app_server_baseline"`,
+		"    numeric: " + strconv.Itoa(policy.stageNumeric),
+		`    canonical: "` + yamlEscape(policy.stageCanonical) + `"`,
 		`    selected_at: "` + yamlEscape(policy.stageSelectedAt) + `"`,
 		`    approval_evidence: "` + yamlEscape(policy.approvalEvidence) + `"`,
 		`    stage2_activation: ` + strconv.FormatBool(policy.stage2Activation),
@@ -470,6 +591,8 @@ func renderDocument(action string, opts Options, probe probePayload, policy docu
 
 func defaultPolicy(now string) documentPolicy {
 	return documentPolicy{
+		stageNumeric:        1,
+		stageCanonical:      install.KABStage1Canonical,
 		stageSelectedAt:     now,
 		approvalEvidence:    "not_applicable",
 		stage2Activation:    false,
@@ -489,6 +612,14 @@ func policyFromDocument(doc map[string]string, fallbackNow string) documentPolic
 	if value := doc["kab.adoption_stage.stage2_activation"]; value != "" {
 		policy.stage2Activation = strings.EqualFold(value, "true")
 	}
+	if value := doc["kab.adoption_stage.numeric"]; value != "" {
+		if numeric, err := strconv.Atoi(value); err == nil {
+			policy.stageNumeric = numeric
+		}
+	}
+	if value := doc["kab.adoption_stage.canonical"]; value != "" {
+		policy.stageCanonical = value
+	}
 	if value := doc["mar.role_policy.required_roles"]; value != "" {
 		policy.requiredRoles = splitInlineList(value)
 	}
@@ -499,6 +630,167 @@ func policyFromDocument(doc map[string]string, fallbackNow string) documentPolic
 		policy.providerToolsSchema = value
 	}
 	return policy
+}
+
+type legacyState struct {
+	stageNumeric     int
+	stageCanonical   string
+	selectedAt       string
+	approvalEvidence string
+	stage2Activation bool
+}
+
+func readLegacyState(opts Options, result *Result) (legacyState, bool) {
+	statePath := legacyStatePath(opts)
+	stateData, err := os.ReadFile(statePath)
+	if err != nil {
+		code := "legacy_state_missing"
+		if !errors.Is(err, os.ErrNotExist) {
+			code = "legacy_state_unreadable"
+		}
+		result.Diagnostics = append(result.Diagnostics, diag("error", code, err.Error(), statePath, ""))
+		return legacyState{}, false
+	}
+	if secret := secretDiagnostic(stateData, statePath); secret != nil {
+		result.Diagnostics = append(result.Diagnostics, *secret)
+		return legacyState{}, false
+	}
+	stateDoc, err := parseYAMLScalars(stateData)
+	if err != nil {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "legacy_state_invalid", err.Error(), statePath, ""))
+		return legacyState{}, false
+	}
+	if stateDoc["version"] != "0.1" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "legacy_state_invalid", "legacy kas-project-state.yaml version is unsupported", statePath, "version"))
+		return legacyState{}, false
+	}
+	if stateDoc["project.id"] != opts.Project || stateDoc["project.kas_suite"] != opts.Project || stateDoc["project.profile"] != opts.Profile {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "legacy_state_conflict", "legacy project/profile facts do not match explicit import inputs", statePath, "project"))
+		return legacyState{}, false
+	}
+	stage, ok := resolveStage(stateDoc["kab_adoption_stage.numeric"], result)
+	if !ok {
+		result.Diagnostics[len(result.Diagnostics)-1].Code = "legacy_state_invalid"
+		result.Diagnostics[len(result.Diagnostics)-1].Path = statePath
+		result.Diagnostics[len(result.Diagnostics)-1].Field = "kab_adoption_stage.numeric"
+		return legacyState{}, false
+	}
+	if canonical := stateDoc["kab_adoption_stage.canonical"]; canonical == "" || canonical != stage.Canonical {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "legacy_state_conflict", "legacy KAB stage numeric/canonical facts conflict", statePath, "kab_adoption_stage"))
+		return legacyState{}, false
+	}
+	legacy := legacyState{
+		stageNumeric:     stage.Numeric,
+		stageCanonical:   stage.Canonical,
+		selectedAt:       stateDoc["kab_adoption_stage.selected_at"],
+		approvalEvidence: stateDoc["kab_adoption_stage.approval_evidence"],
+		stage2Activation: strings.EqualFold(stateDoc["kab_adoption_stage.stage2_activation"], "true"),
+	}
+	if legacy.selectedAt == "" || legacy.approvalEvidence == "" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "legacy_state_invalid", "legacy KAB stage selected_at and approval_evidence are required", statePath, "kab_adoption_stage"))
+		return legacyState{}, false
+	}
+	if legacy.stageNumeric != 1 || legacy.stage2Activation {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "legacy_state_conflict", "legacy import only accepts non-activated Stage 1 metadata in Stage 1 direct implementation", statePath, "kab_adoption_stage"))
+		return legacyState{}, false
+	}
+	markerPath := filepath.Join(filepath.Dir(statePath), "kab-adoption-stage.md")
+	markerData, err := os.ReadFile(markerPath)
+	if err != nil {
+		code := "legacy_stage_marker_missing"
+		if !errors.Is(err, os.ErrNotExist) {
+			code = "legacy_stage_marker_unreadable"
+		}
+		result.Diagnostics = append(result.Diagnostics, diag("error", code, err.Error(), markerPath, ""))
+		return legacyState{}, false
+	}
+	if secret := secretDiagnostic(markerData, markerPath); secret != nil {
+		result.Diagnostics = append(result.Diagnostics, *secret)
+		return legacyState{}, false
+	}
+	markerStage, parsed := install.ParseKABAdoptionStageMarker(markerData)
+	if !parsed {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "legacy_stage_marker_invalid", "legacy kab-adoption-stage.md is missing parseable stage facts", markerPath, "kab_adoption_stage"))
+		return legacyState{}, false
+	}
+	if markerStage.Numeric != legacy.stageNumeric || markerStage.Canonical != legacy.stageCanonical {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "legacy_stage_marker_conflict", "legacy marker stage conflicts with kas-project-state.yaml", markerPath, "kab_adoption_stage"))
+		return legacyState{}, false
+	}
+	return legacy, true
+}
+
+func legacyStatePath(opts Options) string {
+	root := strings.TrimSpace(opts.ProfileRoot)
+	if root == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = "."
+		}
+		root = filepath.Join(home, ".hermes", "profiles", opts.Profile)
+	}
+	return filepath.Join(root, "skills", opts.Project, opts.Project+"-kas", "references", "kas-project-state.yaml")
+}
+
+func resolveStage(raw string, result *Result) (install.KABAdoptionStage, bool) {
+	raw = strings.TrimSpace(raw)
+	canonical := ""
+	numeric := raw
+	switch raw {
+	case install.KABStage1Canonical, install.KABStage2Canonical, "stage3_kab_backend_selected":
+		canonical = raw
+		numeric = ""
+	}
+	if raw == "3" || raw == "stage3_kab_backend_selected" {
+		return install.KABAdoptionStage{Applicable: true, Numeric: 3, Canonical: "stage3_kab_backend_selected"}, true
+	}
+	stage, err := install.ResolveKABAdoptionStage(install.StageSelectionInput{Numeric: numeric, Canonical: canonical, Source: "toolchain_set_stage"})
+	if err != nil {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_stage_invalid", err.Error(), result.ToolchainPath, "kab.adoption_stage"))
+		return install.KABAdoptionStage{}, false
+	}
+	return stage, true
+}
+
+func validateMARProviderTools(doc map[string]string, path string, result *Result) bool {
+	if doc["mar.provider_tools.schema_version"] != "mar.provider_tools.v1" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_invalid", "mar.provider_tools.schema_version must be mar.provider_tools.v1", path, "mar.provider_tools.schema_version"))
+		return false
+	}
+	if value := doc["mar.provider_tools.providers"]; value != "" && value != "{}" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_invalid", "mar.provider_tools.providers must be a mapping, not a scalar", path, "mar.provider_tools.providers"))
+		return false
+	}
+	allowed := map[string]bool{
+		"resolved_argv": true, "command_lane": true, "selected_model": true, "selected_model_required": true,
+		"model_selection": true, "model_selection_note": true, "validated": true, "version": true,
+		"reason": true, "validation_evidence": true, "adapter_proof_evidence": true,
+	}
+	for key, value := range doc {
+		const prefix = "mar.provider_tools.providers."
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		rest := strings.TrimPrefix(key, prefix)
+		parts := strings.Split(rest, ".")
+		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || !allowed[parts[1]] {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_invalid", "mar.provider_tools contains an unsupported provider proof field", path, key))
+			return false
+		}
+		if containsSecretLike(value) {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_secret_detected", "MAR provider proof contains a secret-like value", path, key))
+			return false
+		}
+		if (parts[1] == "validated" || parts[1] == "selected_model_required") && value != "true" && value != "false" {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_invalid", "MAR provider proof boolean fields must be true or false", path, key))
+			return false
+		}
+		if parts[1] == "resolved_argv" && len(splitInlineList(value)) == 0 {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_invalid", "MAR provider resolved_argv must be a non-empty inline string list", path, key))
+			return false
+		}
+	}
+	return true
 }
 
 func writeAtomic(path string, data []byte) error {

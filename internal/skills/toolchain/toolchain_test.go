@@ -7,9 +7,12 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 )
 
 func fixedNow() time.Time {
@@ -448,7 +451,6 @@ func TestRefreshUpdatesObservedFactsAndPreservesPolicyFields(t *testing.T) {
 	text := strings.ReplaceAll(string(data), `selected_at: "2026-06-20T12:34:56Z"`, `selected_at: "approved-time"`)
 	text = strings.ReplaceAll(text, `approval_evidence: "not_applicable"`, `approval_evidence: "ticket-123"`)
 	text = strings.ReplaceAll(text, `required_roles: ["logic", "security", "arch", "cve", "test_adequacy"]`, `required_roles: ["logic", "test_adequacy"]`)
-	text = strings.ReplaceAll(text, `schema_version: "mar.provider_tools.v1"`, `schema_version: "mar.provider_tools.custom.v1"`)
 	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -470,11 +472,304 @@ func TestRefreshUpdatesObservedFactsAndPreservesPolicyFields(t *testing.T) {
 		`approval_evidence: "ticket-123"`,
 		`schema_version: "mar.role_lanes.v1"`,
 		`required_roles: ["logic", "test_adequacy"]`,
-		`schema_version: "mar.provider_tools.custom.v1"`,
+		`schema_version: "mar.provider_tools.v1"`,
 	} {
 		if !strings.Contains(updatedText, want) {
 			t.Fatalf("refreshed toolchain missing %q:\n%s", want, updatedText)
 		}
+	}
+}
+
+func TestImportLegacyWritesStage1ToolchainFromExplicitProfileProject(t *testing.T) {
+	root := t.TempDir()
+	profileRoot := t.TempDir()
+	writeLegacyState(t, profileRoot, stage1LegacyFixture("kan-plugin"))
+	var calls [][]string
+	result := ImportLegacy(Options{ProjectRoot: root, Profile: "hwangchung", Project: "kan-plugin", ProfileRoot: profileRoot, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if !result.OK || !result.Wrote {
+		t.Fatalf("import-legacy failed: %+v", result)
+	}
+	text := readFile(t, filepath.Join(root, ".kkachi", "toolchain.yaml"))
+	for _, want := range []string{
+		`generator: "kkachi-agent-skills toolchain import-legacy"`,
+		`id: "kan-plugin"`,
+		`canonical: "stage1_direct_codex_app_server_baseline"`,
+		`selected_at: "2026-06-06T00:00:00Z"`,
+		`approval_evidence: "legacy-ticket-1"`,
+		`stage2_activation: false`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("imported toolchain missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestImportLegacyFailsClosedOnExistingToolchainConflict(t *testing.T) {
+	root := t.TempDir()
+	profileRoot := t.TempDir()
+	writeLegacyState(t, profileRoot, stage1LegacyFixture("kan-plugin"))
+	var calls [][]string
+	init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if !init.OK {
+		t.Fatalf("init failed: %+v", init.Diagnostics)
+	}
+	before := readFile(t, filepath.Join(root, ".kkachi", "toolchain.yaml"))
+	result := ImportLegacy(Options{ProjectRoot: root, Profile: "hwangchung", Project: "kan-plugin", ProfileRoot: profileRoot, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if result.OK || firstCode(result.Diagnostics) != "toolchain_import_existing_toolchain_conflict" {
+		t.Fatalf("expected existing toolchain conflict, got %+v", result)
+	}
+	if after := readFile(t, filepath.Join(root, ".kkachi", "toolchain.yaml")); after != before {
+		t.Fatalf("import-legacy overwrote existing toolchain:\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+}
+
+func TestImportLegacyFailsClosedWhenLegacyStateMissing(t *testing.T) {
+	root := t.TempDir()
+	result := ImportLegacy(Options{ProjectRoot: root, Profile: "hwangchung", Project: "kan-plugin", ProfileRoot: t.TempDir(), Runner: fakeProbeRunner(t, &[][]string{}, "0.2.0"), Now: fixedNow})
+	if result.OK || firstCode(result.Diagnostics) != "legacy_state_missing" {
+		t.Fatalf("expected missing legacy state, got %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".kkachi", "toolchain.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("missing legacy state must not write toolchain.yaml, stat err=%v", err)
+	}
+}
+
+func TestImportLegacyFailsClosedOnConflictingLegacyFacts(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		setup    func(t *testing.T, profileRoot string)
+		profile  string
+		project  string
+		wantCode string
+	}{
+		{
+			name: "explicit_project_mismatch",
+			setup: func(t *testing.T, profileRoot string) {
+				fixture := stage1LegacyFixture("other-project")
+				fixture.StateProjectID = "kan-plugin"
+				fixture.StateKASSuite = "kan-plugin"
+				writeLegacyState(t, profileRoot, fixture)
+			},
+			profile:  "hwangchung",
+			project:  "other-project",
+			wantCode: "legacy_state_conflict",
+		},
+		{
+			name: "state_profile_mismatch",
+			setup: func(t *testing.T, profileRoot string) {
+				writeLegacyState(t, profileRoot, stage1LegacyFixture("kan-plugin"))
+			},
+			profile:  "other-profile",
+			project:  "kan-plugin",
+			wantCode: "legacy_state_conflict",
+		},
+		{
+			name: "marker_stage_conflict",
+			setup: func(t *testing.T, profileRoot string) {
+				writeLegacyState(t, profileRoot, stage1LegacyFixture("kan-plugin"))
+				stage2, err := install.ResolveKABAdoptionStage(install.StageSelectionInput{Numeric: "2"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				markerPath := filepath.Join(profileRoot, "skills", "kan-plugin", "kan-plugin-kas", "references", "kab-adoption-stage.md")
+				if err := os.WriteFile(markerPath, []byte(install.KABAdoptionStageMarkerContent(stage2)), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			profile:  "hwangchung",
+			project:  "kan-plugin",
+			wantCode: "legacy_stage_marker_conflict",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			profileRoot := t.TempDir()
+			tc.setup(t, profileRoot)
+			result := ImportLegacy(Options{ProjectRoot: root, Profile: tc.profile, Project: tc.project, ProfileRoot: profileRoot, Runner: fakeProbeRunner(t, &[][]string{}, "0.2.0"), Now: fixedNow})
+			if result.OK || firstCode(result.Diagnostics) != tc.wantCode {
+				t.Fatalf("expected %s, got %+v", tc.wantCode, result)
+			}
+			if _, err := os.Stat(filepath.Join(root, ".kkachi", "toolchain.yaml")); !os.IsNotExist(err) {
+				t.Fatalf("conflicting legacy facts must not write toolchain.yaml, stat err=%v", err)
+			}
+		})
+	}
+}
+
+func TestSetStageStage1RecordsApprovalWithoutKABClaim(t *testing.T) {
+	root := t.TempDir()
+	var calls [][]string
+	init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if !init.OK {
+		t.Fatalf("init failed: %+v", init.Diagnostics)
+	}
+	result := SetStage(Options{ProjectRoot: root, Stage: "1", ApprovalEvidence: "approval:t-123", Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: func() time.Time {
+		return fixedNow().Add(time.Hour)
+	}})
+	if !result.OK || !result.Wrote {
+		t.Fatalf("set-stage Stage 1 failed: %+v", result)
+	}
+	text := readFile(t, filepath.Join(root, ".kkachi", "toolchain.yaml"))
+	for _, want := range []string{
+		`generator: "kkachi-agent-skills toolchain set-stage"`,
+		`numeric: 1`,
+		`approval_evidence: "approval:t-123"`,
+		`stage2_activation: false`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("Stage 1 set-stage output missing %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "native_codex") || strings.Contains(text, `stage2_activation: true`) {
+		t.Fatalf("Stage 1 metadata must not claim KAB native_codex execution:\n%s", text)
+	}
+}
+
+func TestSetStageStage2AndStage3FailClosed(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		stage            string
+		approvalEvidence string
+		code             string
+	}{
+		{name: "stage2_missing_approval", stage: "2", code: "stage_approval_evidence_required"},
+		{name: "stage2_missing_capability", stage: "2", approvalEvidence: "approval:t-2", code: "toolchain_stage2_capability_proof_missing"},
+		{name: "stage3_reserved", stage: "3", approvalEvidence: "approval:t-3", code: "toolchain_stage3_reserved"},
+		{name: "stage1_secret_approval", stage: "1", approvalEvidence: "sk-live-secret", code: "toolchain_secret_detected"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			var calls [][]string
+			init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+			if !init.OK {
+				t.Fatalf("init failed: %+v", init.Diagnostics)
+			}
+			path := filepath.Join(root, ".kkachi", "toolchain.yaml")
+			before := readFile(t, path)
+			result := SetStage(Options{ProjectRoot: root, Stage: tc.stage, ApprovalEvidence: tc.approvalEvidence, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+			if result.OK || firstCode(result.Diagnostics) != tc.code {
+				t.Fatalf("expected %s, got %+v", tc.code, result)
+			}
+			if after := readFile(t, path); after != before {
+				t.Fatalf("failed set-stage changed toolchain:\nbefore:\n%s\nafter:\n%s", before, after)
+			}
+		})
+	}
+}
+
+func TestDoctorAcceptsBoundedNonSecretMARProviderProof(t *testing.T) {
+	root := t.TempDir()
+	var calls [][]string
+	init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if !init.OK {
+		t.Fatalf("init failed: %+v", init.Diagnostics)
+	}
+	path := filepath.Join(root, ".kkachi", "toolchain.yaml")
+	text := strings.ReplaceAll(readFile(t, path), "    providers: {}", `    providers:
+      zcode_glm_5_2:
+        resolved_argv: ["scripts/mar_adapters/mar-zcode.sh", "--prompt-file"]
+        command_lane: "zcode"
+        selected_model: "glm-5.2"
+        validated: true
+        adapter_proof_evidence: "local-proof:t-123"`)
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if !result.OK {
+		t.Fatalf("expected bounded non-secret MAR provider proof to validate, got %+v", result.Diagnostics)
+	}
+}
+
+func TestDoctorFailsClosedForMalformedOrSecretMARProviderProof(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(string) string
+		code   string
+	}{
+		{
+			name: "malformed_boolean",
+			mutate: func(text string) string {
+				return strings.ReplaceAll(text, "    providers: {}", "    providers:\n      zcode_glm_5_2:\n        validated: maybe")
+			},
+			code: "toolchain_mar_provider_tools_invalid",
+		},
+		{
+			name: "secret_like_value",
+			mutate: func(text string) string {
+				return strings.ReplaceAll(text, "    providers: {}", "    providers:\n      zcode_glm_5_2:\n        adapter_proof_evidence: \"sk-live-secret\"")
+			},
+			code: "toolchain_secret_detected",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			var calls [][]string
+			init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+			if !init.OK {
+				t.Fatalf("init failed: %+v", init.Diagnostics)
+			}
+			path := filepath.Join(root, ".kkachi", "toolchain.yaml")
+			if err := os.WriteFile(path, []byte(tc.mutate(readFile(t, path))), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+			if result.OK || firstCode(result.Diagnostics) != tc.code {
+				t.Fatalf("expected %s, got %+v", tc.code, result)
+			}
+		})
+	}
+}
+
+type legacyStateFixture struct {
+	Profile        string
+	PathProject    string
+	StateProjectID string
+	StateKASSuite  string
+	StageNumeric   int
+	StageCanonical string
+}
+
+func stage1LegacyFixture(project string) legacyStateFixture {
+	return legacyStateFixture{
+		Profile:        "hwangchung",
+		PathProject:    project,
+		StateProjectID: project,
+		StateKASSuite:  project,
+		StageNumeric:   1,
+		StageCanonical: "stage1_direct_codex_app_server_baseline",
+	}
+}
+
+func writeLegacyState(t *testing.T, profileRoot string, fixture legacyStateFixture) {
+	t.Helper()
+	dir := filepath.Join(profileRoot, "skills", fixture.PathProject, fixture.PathProject+"-kas", "references")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	state := `version: "0.1"
+project:
+  id: "` + fixture.StateProjectID + `"
+  repo: "` + fixture.StateProjectID + `"
+  kas_suite: "` + fixture.StateKASSuite + `"
+  profile: "` + fixture.Profile + `"
+kab_adoption_stage:
+  numeric: ` + strconv.Itoa(fixture.StageNumeric) + `
+  canonical: "` + fixture.StageCanonical + `"
+  selection_source: "approved_project_policy"
+  selected_at: "2026-06-06T00:00:00Z"
+  approval_evidence: "legacy-ticket-1"
+  stage2_activation: false
+`
+	if err := os.WriteFile(filepath.Join(dir, "kas-project-state.yaml"), []byte(state), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stage, err := install.ResolveKABAdoptionStage(install.StageSelectionInput{Numeric: strconv.Itoa(fixture.StageNumeric), Canonical: fixture.StageCanonical})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "kab-adoption-stage.md"), []byte(install.KABAdoptionStageMarkerContent(stage)), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

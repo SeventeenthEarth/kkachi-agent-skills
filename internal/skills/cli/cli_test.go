@@ -544,7 +544,7 @@ func TestRootHelpExitsZeroAndPrintsCommands(t *testing.T) {
 	}
 }
 
-func TestToolchainHelpExposesStage1Commands(t *testing.T) {
+func TestToolchainHelpExposesTOLMRCommandSurface(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := Main([]string{"toolchain", "--help"}, &stdout, &stderr, map[string]string{})
 	if code != 0 {
@@ -555,8 +555,10 @@ func TestToolchainHelpExposesStage1Commands(t *testing.T) {
 			t.Fatalf("expected toolchain help to expose %q, got %q", want, stdout.String())
 		}
 	}
-	if strings.Contains(stdout.String(), "import-legacy") || strings.Contains(stdout.String(), "set-stage") {
-		t.Fatalf("TOLMR-003 commands must stay unimplemented in TOLMR-002 help: %q", stdout.String())
+	for _, want := range []string{"import-legacy", "set-stage", "--approval-evidence"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected TOLMR-003 toolchain help to expose %q, got %q", want, stdout.String())
+		}
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("expected help on stdout only, got stderr=%q", stderr.String())
@@ -579,27 +581,38 @@ func TestToolchainDoctorCLIJSONFailsClosedWhenMissing(t *testing.T) {
 	}
 }
 
-func TestToolchainTOLMR003CommandsStayUnavailable(t *testing.T) {
-	for _, command := range []string{"import-legacy", "set-stage"} {
-		t.Run(command, func(t *testing.T) {
-			projectRoot := t.TempDir()
-			var stdout, stderr bytes.Buffer
-			code := Main([]string{"toolchain", command, "--project-root", projectRoot, "--json"}, &stdout, &stderr, map[string]string{})
-			if code == 0 {
-				t.Fatalf("expected unavailable command %q to fail, stdout=%s", command, stdout.String())
-			}
-			if stdout.Len() != 0 {
-				t.Fatalf("expected unavailable command failure on stderr only, stdout=%s", stdout.String())
-			}
-			assertCLIErrorCode(t, stderr.Bytes(), "unknown_toolchain_command")
-			if strings.Contains(stderr.String(), "import-legacy") || strings.Contains(stderr.String(), "set-stage") {
-				t.Fatalf("TOLMR-003 command names must not be advertised in behavior output: %q", stderr.String())
-			}
-			if _, err := os.Stat(filepath.Join(projectRoot, ".kkachi", "toolchain.yaml")); !os.IsNotExist(err) {
-				t.Fatalf("unavailable command must not create toolchain.yaml, stat err=%v", err)
-			}
-		})
-	}
+func TestToolchainTOLMR003CommandsDispatchAndFailClosed(t *testing.T) {
+	t.Run("import_legacy_requires_profile", func(t *testing.T) {
+		projectRoot := t.TempDir()
+		var stdout, stderr bytes.Buffer
+		code := Main([]string{"toolchain", "import-legacy", "--project-root", projectRoot, "--project", "kan-plugin", "--json"}, &stdout, &stderr, map[string]string{})
+		if code == 0 {
+			t.Fatalf("expected import-legacy validation failure, stdout=%s", stdout.String())
+		}
+		if stdout.Len() != 0 {
+			t.Fatalf("expected import-legacy failure on stderr only, stdout=%s", stdout.String())
+		}
+		assertCLIErrorCode(t, stderr.Bytes(), "profile_required")
+		if _, err := os.Stat(filepath.Join(projectRoot, ".kkachi", "toolchain.yaml")); !os.IsNotExist(err) {
+			t.Fatalf("import-legacy validation failure must not create toolchain.yaml, stat err=%v", err)
+		}
+	})
+
+	t.Run("set_stage_requires_existing_toolchain", func(t *testing.T) {
+		projectRoot := t.TempDir()
+		var stdout, stderr bytes.Buffer
+		code := Main([]string{"toolchain", "set-stage", "--project-root", projectRoot, "--stage", "1", "--approval-evidence", "approval:t-1", "--json"}, &stdout, &stderr, map[string]string{})
+		if code == 0 {
+			t.Fatalf("expected set-stage fail-closed result, stdout=%s", stdout.String())
+		}
+		if stdout.Len() != 0 {
+			t.Fatalf("expected set-stage failure on stderr only, stdout=%s", stdout.String())
+		}
+		assertCLIErrorCode(t, stderr.Bytes(), "toolchain_missing")
+		if _, err := os.Stat(filepath.Join(projectRoot, ".kkachi", "toolchain.yaml")); !os.IsNotExist(err) {
+			t.Fatalf("set-stage missing-toolchain failure must not create toolchain.yaml, stat err=%v", err)
+		}
+	})
 }
 
 func TestUpdateAgentInstructionsHelpAndDryRunAreRepoLocal(t *testing.T) {

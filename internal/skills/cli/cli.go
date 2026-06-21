@@ -573,8 +573,12 @@ func runToolchain(argv []string, stdout io.Writer, stderr io.Writer, env map[str
 		return runToolchainAction("doctor", argv[1:], stdout, stderr)
 	case "refresh":
 		return runToolchainAction("refresh", argv[1:], stdout, stderr)
+	case "import-legacy":
+		return runToolchainImportLegacy(argv[1:], stdout, stderr)
+	case "set-stage":
+		return runToolchainSetStage(argv[1:], stdout, stderr)
 	default:
-		return emitError(stderr, "unknown_toolchain_command", "toolchain supports init, doctor, and refresh.", "toolchain", wantsJSON(argv), "")
+		return emitError(stderr, "unknown_toolchain_command", "toolchain supports init, doctor, refresh, import-legacy, and set-stage.", "toolchain", wantsJSON(argv), "")
 	}
 }
 
@@ -608,6 +612,62 @@ func runToolchainAction(action string, argv []string, stdout io.Writer, stderr i
 	case "refresh":
 		result = toolchain.Refresh(opts)
 	}
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return toolchain.RenderHuman(result)
+	})
+}
+
+func runToolchainImportLegacy(argv []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("toolchain import-legacy", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	projectRoot := fs.String("project-root", "", "project root for .kkachi/toolchain.yaml")
+	profile := fs.String("profile", "", "Hermes target profile name")
+	project := fs.String("project", "", "project-specific KAS id")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "toolchain import-legacy does not accept positional arguments.", "toolchain import-legacy", *jsonOutput, "")
+	}
+	if *projectRoot == "" {
+		return emitError(stderr, "project_root_required", "toolchain import-legacy requires --project-root <path>.", "toolchain import-legacy", *jsonOutput, "")
+	}
+	result := toolchain.ImportLegacy(toolchain.Options{ProjectRoot: *projectRoot, Profile: *profile, Project: *project})
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return toolchain.RenderHuman(result)
+	})
+}
+
+func runToolchainSetStage(argv []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("toolchain set-stage", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	projectRoot := fs.String("project-root", "", "project root for .kkachi/toolchain.yaml")
+	stage := fs.String("stage", "", "KAB adoption stage numeric or canonical selector")
+	approvalEvidence := fs.String("approval-evidence", "", "approval evidence reference for the stage selection")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "toolchain set-stage does not accept positional arguments.", "toolchain set-stage", *jsonOutput, "")
+	}
+	if *projectRoot == "" {
+		return emitError(stderr, "project_root_required", "toolchain set-stage requires --project-root <path>.", "toolchain set-stage", *jsonOutput, "")
+	}
+	result := toolchain.SetStage(toolchain.Options{ProjectRoot: *projectRoot, Stage: *stage, ApprovalEvidence: *approvalEvidence})
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return toolchain.RenderHuman(result)
 	})
@@ -1284,11 +1344,15 @@ func printToolchainHelp(w io.Writer) {
 	fmt.Fprintln(w, "  kkachi-agent-skills toolchain init --project-root <path> --json")
 	fmt.Fprintln(w, "  kkachi-agent-skills toolchain doctor --project-root <path> --json")
 	fmt.Fprintln(w, "  kkachi-agent-skills toolchain refresh --project-root <path> --json")
+	fmt.Fprintln(w, "  kkachi-agent-skills toolchain import-legacy --project-root <path> --profile <profile> --project <id> --json")
+	fmt.Fprintln(w, "  kkachi-agent-skills toolchain set-stage --project-root <path> --stage <stage> --approval-evidence <ref> --json")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands:")
-	fmt.Fprintln(w, "  init     Create .kkachi/toolchain.yaml from KAS facts and KAH probe facts")
-	fmt.Fprintln(w, "  doctor   Validate existing .kkachi/toolchain.yaml without writing")
-	fmt.Fprintln(w, "  refresh  Update observed facts while preserving stage approval and policy fields")
+	fmt.Fprintln(w, "  init           Create .kkachi/toolchain.yaml from KAS facts and KAH probe facts")
+	fmt.Fprintln(w, "  doctor         Validate existing .kkachi/toolchain.yaml without writing")
+	fmt.Fprintln(w, "  refresh        Update observed facts while preserving stage approval and policy fields")
+	fmt.Fprintln(w, "  import-legacy  Import explicit legacy profile/project state without overwriting conflicts")
+	fmt.Fprintln(w, "  set-stage      Record approved Stage 1 metadata; fail closed for unauthorized stages")
 }
 
 func emitError(w io.Writer, code string, message string, command string, jsonOutput bool, nextAction string) int {

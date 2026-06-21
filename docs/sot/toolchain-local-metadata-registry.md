@@ -3,7 +3,7 @@
 Date: 2026-06-20
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record
-Status: planning SOT / implementation not authorized by this document alone
+Status: implementation in review / completion not authorized by this document alone
 Authority level: SOT for KAS-owned `.kkachi/toolchain.yaml` schema, generation policy, Stage/MAR integration, and legacy project-state migration
 Scope: KAS source behavior in `kkachi-hermes-skills`; paired KAH fact-probe contract is defined in `kkachi-agent-helper/docs/sot/toolchain-probe-contract.md`
 Related docs: `docs/roadmap.md`, `docs/sot/project-kas-sync-state.md`, `docs/sot/multi-agent-review-policy.md`, `docs/sot/kas-cli-contract.md`, KAH `docs/sot/toolchain-probe-contract.md`
@@ -54,7 +54,7 @@ generated_by:
   kas_cli_version: "<semver-or-source-version>"
   kah_cli_version: "<semver-or-source-version>"
   generated_at: "<rfc3339>"
-  generator: "kkachi-agent-skills toolchain <init|refresh>"
+  generator: "kkachi-agent-skills toolchain <init|refresh|import-legacy|set-stage>"
 project:
   id: "<project-id>"
   root: "<absolute-project-root>"
@@ -107,9 +107,9 @@ Additional fields are allowed only when they are deterministic, non-secret, loca
 
 Per-run artifacts may snapshot the generated toolchain and store runtime evidence under `.kkachi/runs/<run_id>/...`.
 
-## 6. Command surface plan
+## 6. Command surface
 
-TOLMR implementation should add KAS-owned commands or approved equivalents:
+TOLMR implementation uses these KAS-owned commands or approved equivalents:
 
 ```bash
 kkachi-agent-skills toolchain init --project-root <path> --json
@@ -124,8 +124,8 @@ Behavior rules:
 1. `init` creates `.kkachi/` if needed, gathers KAS facts, calls the KAH read-only probe, and writes `.kkachi/toolchain.yaml` atomically.
 2. `doctor` validates schema, stage, KAS/KAH facts, MAR provider proof shape, no-secret rules, and KAH probe availability without writing.
 3. `refresh` updates observed facts only; it must not silently change stage, approval evidence, or policy fields.
-4. `import-legacy` reads profile-skill-local `kas-project-state.yaml` and `kab-adoption-stage.md` for migration. Existing toolchain conflicts fail closed unless 주군 approves an explicit resolution.
-5. `set-stage` is the only KAS-owned ordinary path for changing the KAB adoption stage and requires approval evidence. Stage 2 requires KAB `native_codex` capability evidence before use.
+4. `import-legacy` reads profile-skill-local `kas-project-state.yaml` and `kab-adoption-stage.md` for migration from explicit `--profile` and `--project` inputs. Missing, invalid, ambiguous, or conflicting legacy facts fail closed. Existing `.kkachi/toolchain.yaml` content is never silently overwritten.
+5. `set-stage` is the only KAS-owned ordinary path for changing the KAB adoption stage and requires approval evidence. Stage 1 may be recorded without claiming KAB execution. Stage 2 requires deterministic KAB `native_codex` capability proof before use; when that proof surface is unavailable, KAS must fail closed with a stable diagnostic. Stage 3 is reserved and unauthorized.
 
 ## 7. Stage and MAR semantics
 
@@ -135,7 +135,7 @@ Stage semantics remain unchanged:
 - Stage 2 is KAB Codex-first through `native_codex`; direct Codex fallback is break-glass only and requires recorded approval, rationale, and scope.
 - Stage 3 remains reserved until separately authorized.
 
-MAR semantics remain role-first and fail-closed. Provider availability, prompt rendering, or dispatch success is not review completion. Toolchain provider proof only records non-secret provider command/model/proof metadata and cannot replace per-run MAR attempt artifacts, Blue disposition, Red adjudication, or KAH MAR gates.
+MAR semantics remain role-first and fail-closed. Provider availability, prompt rendering, or dispatch success is not review completion. Toolchain provider proof only records bounded, non-secret provider command/model/proof metadata and cannot replace per-run MAR attempt artifacts, Blue disposition, Red adjudication, or KAH MAR gates. Malformed or secret-like provider proof fails the toolchain doctor.
 
 ## 8. Shared task sequence
 
@@ -145,7 +145,7 @@ TOLMR uses shared logical task ids across KAS and KAH. Each task may produce KAS
 |---|---|---|---|
 | TOLMR-001 | Schema and KAH probe contract | KAS schema / KAH probe contract | Completed |
 | TOLMR-002 | Generated toolchain init, doctor, and refresh | KAS generation / KAH read-only probe support | In Review |
-| TOLMR-003 | Legacy state migration plus Stage/MAR integration | KAS-led, KAH verification only unless a probe gap appears | Planned |
+| TOLMR-003 | Legacy state migration plus Stage/MAR integration | KAS-led, KAH verification only unless a probe gap appears | In Review |
 | TOLMR-004 | Cross-repo rollout, evidence, and release readiness | KAS + KAH repo-local gates and integration evidence | Planned |
 
 ## 9. Verification gates
