@@ -826,6 +826,13 @@ func runWorkflowRoute(argv []string, stdout io.Writer, stderr io.Writer, env map
 	taskClass := fs.String("task-class", "", "already-classified task class")
 	classificationReason := fs.String("classification-reason", "", "classification reason from the task contract or classifier artifact")
 	selectedSpine := fs.String("selected-spine", "", "optional expected selected bundle/spine")
+	projectHasTealLane := fs.String("project-has-teal-lane", "", "explicit Teal lane fact: true or false")
+	uiUXChange := fs.String("ui-ux-change", "", "explicit UI/UX change fact: true or false")
+	tealSkipReason := fs.String("teal-skip-reason", "", "concrete skip reason when Teal is not required")
+	tealWaiverApproved := fs.Bool("teal-waiver-approved", false, "record bounded Teal waiver approval expectation")
+	tealWaiverApprovalRef := fs.String("teal-waiver-approval-ref", "", "bounded Teal waiver approval reference")
+	tealWaiverScope := fs.String("teal-waiver-scope", "", "bounded Teal waiver scope")
+	tealWaiverExpiresAt := fs.String("teal-waiver-expires-at", "", "bounded Teal waiver expiry")
 	labels := fs.String("labels", "", "selector labels, comma-separated")
 	changedSurfaces := fs.String("changed-surfaces", "", "selector changed surfaces, comma-separated")
 	risk := fs.String("risk", "", "selector risk level")
@@ -844,17 +851,32 @@ func runWorkflowRoute(argv []string, stdout io.Writer, stderr io.Writer, env map
 	if fs.NArg() != 0 {
 		return emitError(stderr, "unexpected_argument", "workflow-route does not accept positional arguments", "workflow-route", *jsonOutput, "Rerun with workflow-route --taxonomy <path> --selector-registry <path> --task-class <class> --classification-reason <reason> --json.")
 	}
+	projectHasTealLaneValue, ok := parseOptionalBoolFlag(*projectHasTealLane)
+	if !ok {
+		return emitError(stderr, "teal_applicability_invalid", "--project-has-teal-lane must be true or false when supplied.", "workflow-route", *jsonOutput, "")
+	}
+	uiUXChangeValue, ok := parseOptionalBoolFlag(*uiUXChange)
+	if !ok {
+		return emitError(stderr, "teal_applicability_invalid", "--ui-ux-change must be true or false when supplied.", "workflow-route", *jsonOutput, "")
+	}
 	result, err := workflowrouting.Route(workflowrouting.Options{
-		TaxonomyPath:         *taxonomy,
-		SelectorRegistryPath: *selectorRegistry,
-		TaskClass:            *taskClass,
-		ClassificationReason: *classificationReason,
-		SelectedSpine:        *selectedSpine,
-		Labels:               splitFlagList(*labels),
-		ChangedSurfaces:      splitFlagList(*changedSurfaces),
-		Risk:                 *risk,
-		RequiredAgents:       splitFlagList(*requiredAgent),
-		RequiredCapabilities: splitFlagList(*requiredCapability),
+		TaxonomyPath:          *taxonomy,
+		SelectorRegistryPath:  *selectorRegistry,
+		TaskClass:             *taskClass,
+		ClassificationReason:  *classificationReason,
+		SelectedSpine:         *selectedSpine,
+		ProjectHasTealLane:    projectHasTealLaneValue,
+		UIUXChange:            uiUXChangeValue,
+		TealSkipReason:        *tealSkipReason,
+		TealWaiverApproved:    *tealWaiverApproved,
+		TealWaiverApprovalRef: *tealWaiverApprovalRef,
+		TealWaiverScope:       *tealWaiverScope,
+		TealWaiverExpiresAt:   *tealWaiverExpiresAt,
+		Labels:                splitFlagList(*labels),
+		ChangedSurfaces:       splitFlagList(*changedSurfaces),
+		Risk:                  *risk,
+		RequiredAgents:        splitFlagList(*requiredAgent),
+		RequiredCapabilities:  splitFlagList(*requiredCapability),
 	})
 	if err != nil {
 		return emitError(stderr, "workflow_route_failed", err.Error(), "workflow-route", *jsonOutput, "")
@@ -862,6 +884,23 @@ func runWorkflowRoute(argv []string, stdout io.Writer, stderr io.Writer, env map
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return workflowrouting.RenderHuman(result)
 	})
+}
+
+func parseOptionalBoolFlag(value string) (*bool, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, true
+	}
+	switch value {
+	case "true":
+		v := true
+		return &v, true
+	case "false":
+		v := false
+		return &v, true
+	default:
+		return nil, false
+	}
 }
 
 func runWorkflowCreate(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {

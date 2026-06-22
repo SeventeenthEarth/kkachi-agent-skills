@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -90,6 +91,176 @@ func TestMaterializeFromRouteWritesOnlyRunLocalWorkflowArtifacts(t *testing.T) {
 				t.Fatalf("run-local node contract expected_artifacts must not target project root: %+v", contract.ExpectedArtifacts)
 			}
 		}
+	}
+}
+
+func TestMaterializeFromRouteInjectsTealNodesOnlyWhenRequired(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeDesignMaterializerRegistry(t, project)
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routePath := writeRouteResultWithTeal(t, project, registry, "development_full", map[string]any{
+		"contract_version":               "design003.v1",
+		"project_has_teal_lane":          true,
+		"ui_ux_change":                   true,
+		"teal_required":                  true,
+		"derivation":                     "project_has_teal_lane && ui_ux_change",
+		"teal_skip_reason":               "",
+		"teal_waiver_approved":           false,
+		"teal_waiver_approval_ref":       "",
+		"teal_waiver_scope":              "",
+		"teal_waiver_expires_at":         "",
+		"required_when_teal_required":    []string{"DESIGN_PLAN_GATE", "DESIGN_FIDELITY_REVIEW"},
+		"missing_required_status":        "required_teal_verdict_missing",
+		"ordinary_review_is_substitute":  false,
+		"mar_review_is_substitute":       false,
+		"backend_evidence_is_substitute": false,
+		"helper_notes_are_substitute":    false,
+	})
+
+	result, err := MaterializeFromRoute(Options{Project: project, RunID: "run-20260616T105614Z-4b0ebe11b67d", RouteResult: routePath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || !result.TealApplicability.TealRequired {
+		t.Fatalf("expected Teal-required materialization, got %+v", result)
+	}
+	contractsBytes, err := os.ReadFile(filepath.Join(project, filepath.FromSlash(result.NodeContractSource)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var contracts struct {
+		Contracts []workflowregistry.NodeContract `json:"contracts"`
+	}
+	if err := json.Unmarshal(contractsBytes, &contracts); err != nil {
+		t.Fatal(err)
+	}
+	nodeIDs := []string{}
+	for _, contract := range contracts.Contracts {
+		nodeIDs = append(nodeIDs, contract.NodeID)
+		if strings.HasPrefix(contract.NodeID, "design_") {
+			if contract.FallbackPolicy != workflowregistry.NoFallbackPolicy || contract.CompletionAuthority != workflowregistry.KAHOnlyAuthority || contract.DirectKAHStateWrite == nil || *contract.DirectKAHStateWrite {
+				t.Fatalf("design node authority drift: %+v", contract)
+			}
+		}
+	}
+	wantOrder := []string{"plan", "design_plan_gate", "implement", "design_fidelity_review", "final_verify"}
+	if !reflect.DeepEqual(nodeIDs, wantOrder) {
+		t.Fatalf("unexpected Teal node order: got %v want %v", nodeIDs, wantOrder)
+	}
+	if !strings.Contains(string(contractsBytes), "DESIGN_PLAN_GATE") || !strings.Contains(string(contractsBytes), "DESIGN_FIDELITY_REVIEW") {
+		t.Fatalf("materialized contracts missing Teal verdict semantics:\n%s", string(contractsBytes))
+	}
+
+	workflowBytes, err := os.ReadFile(filepath.Join(project, filepath.FromSlash(result.WorkflowFile)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(workflowBytes)
+	if !strings.Contains(workflow, "  - id: design_plan_gate") || !strings.Contains(workflow, "    depends_on: [plan]") ||
+		!strings.Contains(workflow, "  - id: design_fidelity_review") || !strings.Contains(workflow, "    depends_on: [implement]") {
+		t.Fatalf("workflow.yaml missing Teal boundary nodes:\n%s", workflow)
+	}
+}
+
+func TestMaterializeFromRouteFailsClosedWhenTealRequiredAnchorsAreMissing(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		missing  string
+		anchorID string
+	}{
+		{name: "missing implement", missing: "implement", anchorID: "implement"},
+		{name: "missing final verify", missing: "final_verify", anchorID: "final_verify"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			project := t.TempDir()
+			registryPath := writeDesignMaterializerRegistry(t, project)
+			removeDesignRegistryNode(t, registryPath, tc.missing)
+			registry, err := workflowregistry.Load(registryPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			routePath := writeRouteResultWithTeal(t, project, registry, "development_full", map[string]any{
+				"contract_version":               "design003.v1",
+				"project_has_teal_lane":          true,
+				"ui_ux_change":                   true,
+				"teal_required":                  true,
+				"derivation":                     "project_has_teal_lane && ui_ux_change",
+				"teal_skip_reason":               "",
+				"required_when_teal_required":    []string{"DESIGN_PLAN_GATE", "DESIGN_FIDELITY_REVIEW"},
+				"missing_required_status":        "required_teal_verdict_missing",
+				"ordinary_review_is_substitute":  false,
+				"mar_review_is_substitute":       false,
+				"backend_evidence_is_substitute": false,
+				"helper_notes_are_substitute":    false,
+			})
+
+			result, err := MaterializeFromRoute(Options{Project: project, RunID: "run-20260616T105614Z-4b0ebe11b67d", RouteResult: routePath})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.OK || result.Status != "route_result_teal_anchor_missing" || len(result.WrittenPaths) != 0 {
+				t.Fatalf("expected missing %s anchor blocker with no writes, got %+v", tc.anchorID, result)
+			}
+			if len(result.Diagnostics) == 0 || !strings.Contains(result.Diagnostics[0].Message, tc.anchorID) {
+				t.Fatalf("expected diagnostic to name missing %s anchor, got %+v", tc.anchorID, result.Diagnostics)
+			}
+			if _, err := os.Stat(filepath.Join(project, ".kkachi", "runs", "run-20260616T105614Z-4b0ebe11b67d", "workflow")); !os.IsNotExist(err) {
+				t.Fatalf("missing anchor path must not write workflow artifacts: %v", err)
+			}
+		})
+	}
+}
+
+func TestMaterializeFromRouteSkipsTealNodesForNonUIAndRequiresApplicability(t *testing.T) {
+	project := t.TempDir()
+	registryPath := writeDesignMaterializerRegistry(t, project)
+	registry, err := workflowregistry.Load(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routePath := writeRouteResultWithoutTeal(t, project, registry, "development_full")
+	result, err := MaterializeFromRoute(Options{Project: project, RunID: "run-20260616T105614Z-4b0ebe11b67d", RouteResult: routePath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Status != "route_result_teal_applicability_required" || len(result.WrittenPaths) != 0 {
+		t.Fatalf("expected missing Teal applicability blocker with no writes, got %+v", result)
+	}
+
+	skipRoute := writeRouteResultWithTeal(t, project, registry, "development_full", map[string]any{
+		"contract_version":               "design003.v1",
+		"project_has_teal_lane":          false,
+		"ui_ux_change":                   false,
+		"teal_required":                  false,
+		"derivation":                     "project_has_teal_lane && ui_ux_change",
+		"teal_skip_reason":               "No UI/UX surface in this project/task.",
+		"teal_waiver_approved":           false,
+		"teal_waiver_approval_ref":       "",
+		"teal_waiver_scope":              "",
+		"teal_waiver_expires_at":         "",
+		"required_when_teal_required":    []string{"DESIGN_PLAN_GATE", "DESIGN_FIDELITY_REVIEW"},
+		"missing_required_status":        "required_teal_verdict_missing",
+		"ordinary_review_is_substitute":  false,
+		"mar_review_is_substitute":       false,
+		"backend_evidence_is_substitute": false,
+		"helper_notes_are_substitute":    false,
+	})
+	result, err = MaterializeFromRoute(Options{Project: project, RunID: "run-20260616T105614Z-4b0ebe11b67d", RouteResult: skipRoute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.TealApplicability.TealRequired || result.TealApplicability.TealSkipReason == "" {
+		t.Fatalf("expected non-UI Teal skip evidence, got %+v", result)
+	}
+	contractsBytes, err := os.ReadFile(filepath.Join(project, filepath.FromSlash(result.NodeContractSource)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(contractsBytes), "design_plan_gate") || strings.Contains(string(contractsBytes), "DESIGN_PLAN_GATE") || strings.Contains(string(contractsBytes), "design_fidelity_review") {
+		t.Fatalf("non-UI source work must not receive Teal nodes:\n%s", string(contractsBytes))
 	}
 }
 
@@ -411,6 +582,118 @@ node_contracts:
 	return path
 }
 
+func writeDesignMaterializerRegistry(t *testing.T, dir string) string {
+	t.Helper()
+	path := filepath.Join(dir, "workflow-registry-design.yaml")
+	content := `version: kas-task-dag-workflow-registry/v1
+workflows:
+  - workflow_id: development_full
+    workflow_path: .kkachi/workflows/development_full.yaml
+    selector:
+      task_classes: [development]
+      labels_any: []
+      labels_all: []
+      changed_surfaces_any: []
+      risk_levels: []
+      required_agents_all: []
+      required_capabilities_all: [task_dag_schema_validation, workflow_instance_state]
+    fallback_policy: none_fail_closed
+node_contracts:
+  - workflow_id: development_full
+    node_id: plan
+    task_class: development
+    owner_role: planner_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [task-contract.yaml]
+    expected_artifacts: [plan.md]
+    prompt_ref: skills/kkachi-plan/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: implement
+    task_class: development
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [plan.md]
+    expected_artifacts: [diff.patch]
+    prompt_ref: skills/kkachi-implement/SKILL.md
+    approval_required: true
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+  - workflow_id: development_full
+    node_id: final_verify
+    task_class: development
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [diff.patch]
+    expected_artifacts: [verification.md]
+    prompt_ref: skills/kkachi-final-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func removeDesignRegistryNode(t *testing.T, path string, nodeID string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks := map[string]string{
+		"implement": `  - workflow_id: development_full
+    node_id: implement
+    task_class: development
+    owner_role: implementer_backend
+    execution_lane: stage1_direct_codex_app_server
+    required_inputs: [plan.md]
+    expected_artifacts: [diff.patch]
+    prompt_ref: skills/kkachi-implement/SKILL.md
+    approval_required: true
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+`,
+		"final_verify": `  - workflow_id: development_full
+    node_id: final_verify
+    task_class: development
+    owner_role: hermes
+    execution_lane: direct_kas_skill
+    required_inputs: [diff.patch]
+    expected_artifacts: [verification.md]
+    prompt_ref: skills/kkachi-final-verify/SKILL.md
+    approval_required: false
+    fallback_policy: none_fail_closed
+    verification_gate: kah_workflow_node_evidence
+    completion_authority: kah_only
+    direct_kah_state_write: false
+`,
+	}
+	block := blocks[nodeID]
+	if block == "" {
+		t.Fatalf("unknown node id %q", nodeID)
+	}
+	updated := strings.Replace(string(data), block, "", 1)
+	if updated == string(data) {
+		t.Fatalf("node %s block was not removed", nodeID)
+	}
+	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func writeCustomWorkflowPacket(t *testing.T, dir string, workflowID string) (string, string) {
 	return writeCustomWorkflowPacketWithArtifact(t, dir, workflowID, ".kkachi/runs/run-20260616T105614Z-4b0ebe11b67d/artifacts/plan.md")
 }
@@ -526,6 +809,31 @@ func writeCustomWorkflowPacketWithArtifact(t *testing.T, dir string, workflowID 
 }
 
 func writeRouteResult(t *testing.T, dir string, registry workflowregistry.Registry, workflowID string) string {
+	return writeRouteResultWithTeal(t, dir, registry, workflowID, map[string]any{
+		"contract_version":               "design003.v1",
+		"project_has_teal_lane":          false,
+		"ui_ux_change":                   false,
+		"teal_required":                  false,
+		"derivation":                     "project_has_teal_lane && ui_ux_change",
+		"teal_skip_reason":               "No UI/UX surface in this project/task.",
+		"teal_waiver_approved":           false,
+		"teal_waiver_approval_ref":       "",
+		"teal_waiver_scope":              "",
+		"teal_waiver_expires_at":         "",
+		"required_when_teal_required":    []string{"DESIGN_PLAN_GATE", "DESIGN_FIDELITY_REVIEW"},
+		"missing_required_status":        "required_teal_verdict_missing",
+		"ordinary_review_is_substitute":  false,
+		"mar_review_is_substitute":       false,
+		"backend_evidence_is_substitute": false,
+		"helper_notes_are_substitute":    false,
+	})
+}
+
+func writeRouteResultWithoutTeal(t *testing.T, dir string, registry workflowregistry.Registry, workflowID string) string {
+	return writeRouteResultWithTeal(t, dir, registry, workflowID, nil)
+}
+
+func writeRouteResultWithTeal(t *testing.T, dir string, registry workflowregistry.Registry, workflowID string, teal map[string]any) string {
 	t.Helper()
 	path := filepath.Join(dir, "route-result.json")
 	payload := map[string]any{
@@ -548,6 +856,9 @@ func writeRouteResult(t *testing.T, dir string, registry workflowregistry.Regist
 			"checksum": registry.Checksum,
 		},
 		"direct_kah_state_write": false,
+	}
+	if teal != nil {
+		payload["teal_applicability"] = teal
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {

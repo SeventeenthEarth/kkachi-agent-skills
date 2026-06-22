@@ -18,16 +18,23 @@ const (
 )
 
 type Options struct {
-	TaxonomyPath         string
-	SelectorRegistryPath string
-	TaskClass            string
-	ClassificationReason string
-	SelectedSpine        string
-	Labels               []string
-	ChangedSurfaces      []string
-	Risk                 string
-	RequiredAgents       []string
-	RequiredCapabilities []string
+	TaxonomyPath          string
+	SelectorRegistryPath  string
+	TaskClass             string
+	ClassificationReason  string
+	SelectedSpine         string
+	ProjectHasTealLane    *bool
+	UIUXChange            *bool
+	TealSkipReason        string
+	TealWaiverApproved    bool
+	TealWaiverApprovalRef string
+	TealWaiverScope       string
+	TealWaiverExpiresAt   string
+	Labels                []string
+	ChangedSurfaces       []string
+	Risk                  string
+	RequiredAgents        []string
+	RequiredCapabilities  []string
 }
 
 type Result struct {
@@ -52,6 +59,7 @@ type Result struct {
 	Labels               []string          `json:"labels,omitempty"`
 	ChangedSurfaces      []string          `json:"changed_surfaces,omitempty"`
 	SelectorMatch        SelectorEvidence  `json:"selector_match,omitempty"`
+	TealApplicability    TealApplicability `json:"teal_applicability,omitempty"`
 	Taxonomy             SourceEvidence    `json:"taxonomy"`
 	SelectorRegistry     SourceEvidence    `json:"selector_registry"`
 	Diagnostics          []Diagnostic      `json:"diagnostics"`
@@ -77,6 +85,25 @@ type SelectorEvidence struct {
 	Status       string   `json:"status,omitempty"`
 	WorkflowID   string   `json:"workflow_id,omitempty"`
 	CandidateIDs []string `json:"candidate_ids,omitempty"`
+}
+
+type TealApplicability struct {
+	ContractVersion             string   `json:"contract_version,omitempty"`
+	ProjectHasTealLane          bool     `json:"project_has_teal_lane"`
+	UIUXChange                  bool     `json:"ui_ux_change"`
+	TealRequired                bool     `json:"teal_required"`
+	Derivation                  string   `json:"derivation,omitempty"`
+	TealSkipReason              string   `json:"teal_skip_reason,omitempty"`
+	TealWaiverApproved          bool     `json:"teal_waiver_approved"`
+	TealWaiverApprovalRef       string   `json:"teal_waiver_approval_ref,omitempty"`
+	TealWaiverScope             string   `json:"teal_waiver_scope,omitempty"`
+	TealWaiverExpiresAt         string   `json:"teal_waiver_expires_at,omitempty"`
+	RequiredWhenTealRequired    []string `json:"required_when_teal_required,omitempty"`
+	MissingRequiredStatus       string   `json:"missing_required_status,omitempty"`
+	OrdinaryReviewIsSubstitute  bool     `json:"ordinary_review_is_substitute"`
+	MARReviewIsSubstitute       bool     `json:"mar_review_is_substitute"`
+	BackendEvidenceIsSubstitute bool     `json:"backend_evidence_is_substitute"`
+	HelperNotesAreSubstitute    bool     `json:"helper_notes_are_substitute"`
 }
 
 type Diagnostic struct {
@@ -123,6 +150,11 @@ func Route(opts Options) (Result, error) {
 	if opts.ClassificationReason == "" {
 		return failField(result, "classification_reason_missing", "classification_reason is required.", "classification_reason"), nil
 	}
+	teal, tealStatus, tealMessage, tealField := deriveTealApplicability(opts)
+	if tealStatus != "" {
+		return failField(result, tealStatus, tealMessage, tealField), nil
+	}
+	result.TealApplicability = teal
 
 	taxonomy, err := LoadTaxonomy(opts.TaxonomyPath)
 	if err != nil {
@@ -243,6 +275,10 @@ func normalizeOptions(opts Options) Options {
 	opts.TaskClass = normalizeAtom(opts.TaskClass)
 	opts.ClassificationReason = strings.TrimSpace(opts.ClassificationReason)
 	opts.SelectedSpine = normalizeAtom(opts.SelectedSpine)
+	opts.TealSkipReason = strings.TrimSpace(opts.TealSkipReason)
+	opts.TealWaiverApprovalRef = strings.TrimSpace(opts.TealWaiverApprovalRef)
+	opts.TealWaiverScope = strings.TrimSpace(opts.TealWaiverScope)
+	opts.TealWaiverExpiresAt = strings.TrimSpace(opts.TealWaiverExpiresAt)
 	opts.Risk = normalizeAtom(opts.Risk)
 	opts.Labels = workflowregistry.NormalizeSelectorValues(opts.Labels)
 	opts.ChangedSurfaces = workflowregistry.NormalizeSelectorValues(opts.ChangedSurfaces)
@@ -256,6 +292,36 @@ func normalizeOptions(opts Options) Options {
 
 func standardBundleRequiredCapabilities() []string {
 	return []string{"task_dag_schema_validation", "workflow_instance_state"}
+}
+
+func deriveTealApplicability(opts Options) (TealApplicability, string, string, string) {
+	if opts.ProjectHasTealLane == nil || opts.UIUXChange == nil {
+		return TealApplicability{}, "teal_applicability_required", "workflow-route requires explicit --project-has-teal-lane and --ui-ux-change facts.", "teal_applicability"
+	}
+	projectHasTealLane := *opts.ProjectHasTealLane
+	uiUXChange := *opts.UIUXChange
+	tealRequired := projectHasTealLane && uiUXChange
+	if !tealRequired && strings.TrimSpace(opts.TealSkipReason) == "" {
+		return TealApplicability{}, "teal_skip_reason_required", "workflow-route requires --teal-skip-reason when Teal is not required.", "teal_skip_reason"
+	}
+	return TealApplicability{
+		ContractVersion:             "design003.v1",
+		ProjectHasTealLane:          projectHasTealLane,
+		UIUXChange:                  uiUXChange,
+		TealRequired:                tealRequired,
+		Derivation:                  "project_has_teal_lane && ui_ux_change",
+		TealSkipReason:              opts.TealSkipReason,
+		TealWaiverApproved:          opts.TealWaiverApproved,
+		TealWaiverApprovalRef:       opts.TealWaiverApprovalRef,
+		TealWaiverScope:             opts.TealWaiverScope,
+		TealWaiverExpiresAt:         opts.TealWaiverExpiresAt,
+		RequiredWhenTealRequired:    []string{"DESIGN_PLAN_GATE", "DESIGN_FIDELITY_REVIEW"},
+		MissingRequiredStatus:       "required_teal_verdict_missing",
+		OrdinaryReviewIsSubstitute:  false,
+		MARReviewIsSubstitute:       false,
+		BackendEvidenceIsSubstitute: false,
+		HelperNotesAreSubstitute:    false,
+	}, "", "", ""
 }
 
 func newResult(opts Options) Result {

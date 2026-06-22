@@ -122,6 +122,14 @@ workflow path, work path/mode, execution mode, skipped-phase reasons, required
 capabilities, taxonomy checksum, registry checksum, diagnostics, and
 `direct_kah_state_write:false`.
 
+DESIGN-003 extends WFLOW-007 route evidence with explicit
+`teal_applicability`. `workflow-route` records `teal_applicability` by deriving
+`teal_required` from `project_has_teal_lane && ui_ux_change`. Missing explicit
+Teal facts fail closed with `teal_applicability_required`; a false derivation
+requires a concrete `teal_skip_reason`. Route output may record required Teal
+verdict expectations, but it remains route-only and must not create design
+workflow nodes.
+
 Route diagnostics are deterministic and non-ranking:
 
 | Diagnostic | Meaning |
@@ -129,6 +137,8 @@ Route diagnostics are deterministic and non-ranking:
 | `classification_required_input_missing` | No task class was supplied |
 | `classification_reason_missing` | Classification reason was not supplied |
 | `classification_class_unsupported` | Task class or alias is not declared by the taxonomy |
+| `teal_applicability_required` | Explicit project_has_teal_lane and ui_ux_change facts were not supplied |
+| `teal_skip_reason_required` | Teal is not required but the concrete skip reason is absent |
 | `taxonomy_required` / `taxonomy_unreadable` / `taxonomy_schema_unsupported` | Taxonomy path, read, or schema validation failed |
 | `bundle_registry_required` / `bundle_registry_unreadable` / `bundle_registry_schema_unsupported` | Bundle registry path, read, or schema validation failed |
 | `bundle_default_spine_missing` | Taxonomy class does not declare a default bundle spine |
@@ -157,6 +167,19 @@ hash algorithm. KAS preflights effective KAH workflow capability before non-dry-
 Installed KAH `0.1.9` lacks the workflow command group. If the installed helper
 lacks the `workflow` command group, KAS fails closed with
 `blocked_missing_kah_workflow_capability` before writing run-local artifacts.
+
+DESIGN-003 route-result materialization consumes and validates
+`teal_applicability` from `workflow-route`. Missing or invalid route
+applicability fails closed with `route_result_teal_applicability_required` or a
+specific invalid-applicability status before run-local writes. `workflow-trigger` route-backed materialization injects Teal nodes only when `teal_required=true`:
+`DESIGN_PLAN_GATE` is inserted before implementation authorization and
+`DESIGN_FIDELITY_REVIEW` before final acceptance. Non-UI Kkachi source work
+with `teal_required=false` and a concrete `teal_skip_reason` receives no design
+nodes. These conditional run-local materialized nodes are not universal nodes in `registries/task-dag-workflow-registry.yaml`.
+
+Ordinary Red/Orange/Gray/Blue review, MAR, backend evidence, helper notes, and
+temporary subagents remain separate evidence lanes and are not substitutes for
+required Teal verdicts.
 
 The WFLOW-008 run-local layout is:
 

@@ -45,6 +45,7 @@ type Result struct {
 	SelectedBundle           string            `json:"selected_bundle,omitempty"`
 	TaskClass                string            `json:"task_class,omitempty"`
 	ClassificationReason     string            `json:"classification_reason,omitempty"`
+	TealApplicability        TealApplicability `json:"teal_applicability,omitempty"`
 	RunLocalPosture          string            `json:"run_local_posture"`
 	NoPromotion              bool              `json:"no_promotion"`
 	PersistentPromotion      bool              `json:"persistent_promotion"`
@@ -92,7 +93,27 @@ type routeResult struct {
 	SkippedPhaseReasons  map[string]string    `json:"skipped_phase_reasons"`
 	Taxonomy             sourceResultEvidence `json:"taxonomy"`
 	SelectorRegistry     sourceResultEvidence `json:"selector_registry"`
+	TealApplicability    TealApplicability    `json:"teal_applicability"`
 	DirectKAHStateWrite  bool                 `json:"direct_kah_state_write"`
+}
+
+type TealApplicability struct {
+	ContractVersion             string   `json:"contract_version,omitempty"`
+	ProjectHasTealLane          bool     `json:"project_has_teal_lane"`
+	UIUXChange                  bool     `json:"ui_ux_change"`
+	TealRequired                bool     `json:"teal_required"`
+	Derivation                  string   `json:"derivation,omitempty"`
+	TealSkipReason              string   `json:"teal_skip_reason,omitempty"`
+	TealWaiverApproved          bool     `json:"teal_waiver_approved"`
+	TealWaiverApprovalRef       string   `json:"teal_waiver_approval_ref,omitempty"`
+	TealWaiverScope             string   `json:"teal_waiver_scope,omitempty"`
+	TealWaiverExpiresAt         string   `json:"teal_waiver_expires_at,omitempty"`
+	RequiredWhenTealRequired    []string `json:"required_when_teal_required,omitempty"`
+	MissingRequiredStatus       string   `json:"missing_required_status,omitempty"`
+	OrdinaryReviewIsSubstitute  bool     `json:"ordinary_review_is_substitute"`
+	MARReviewIsSubstitute       bool     `json:"mar_review_is_substitute"`
+	BackendEvidenceIsSubstitute bool     `json:"backend_evidence_is_substitute"`
+	HelperNotesAreSubstitute    bool     `json:"helper_notes_are_substitute"`
 }
 
 type sourceResultEvidence struct {
@@ -137,6 +158,9 @@ func MaterializeFromRoute(opts Options) (Result, error) {
 	if route.DirectKAHStateWrite {
 		return fail(result, "route_result_direct_kah_state_write_true", "route result must preserve direct_kah_state_write:false.", opts.RouteResult, "direct_kah_state_write"), nil
 	}
+	if code, message := validateTealApplicability(route.TealApplicability); code != "" {
+		return fail(result, code, message, opts.RouteResult, "teal_applicability"), nil
+	}
 	workflowID := firstNonEmpty(route.WorkflowID, route.SelectedBundle, route.SelectedSpine)
 	if !safeID(workflowID) {
 		return fail(result, "workflow_id_invalid", "route result selected workflow id is not file-safe.", opts.RouteResult, "workflow_id"), nil
@@ -158,6 +182,10 @@ func MaterializeFromRoute(opts Options) (Result, error) {
 	contracts := workflowregistry.ContractsForWorkflow(registry.NodeContracts, workflowID)
 	if len(contracts) == 0 {
 		return fail(result, "blocked_missing_ready_node_contract", "selected bundle has no node contracts.", registry.Path, "node_contracts"), nil
+	}
+	contracts, code, message := injectTealContracts(contracts, route.TealApplicability)
+	if code != "" {
+		return fail(result, code, message, registry.Path, "node_contracts"), nil
 	}
 	contracts, err = runLocalContracts(opts.RunID, contracts)
 	if err != nil {
@@ -200,6 +228,7 @@ func MaterializeFromRoute(opts Options) (Result, error) {
 	result.SelectedBundle = route.SelectedBundle
 	result.TaskClass = route.TaskClass
 	result.ClassificationReason = route.ClassificationReason
+	result.TealApplicability = route.TealApplicability
 	result.SourceEvidence = SourceEvidence{
 		RouteResultPath:          filepath.ToSlash(opts.RouteResult),
 		RouteResultChecksum:      checksumBytes(routeBytes),
@@ -430,6 +459,116 @@ func findWorkflow(workflows []workflowregistry.Workflow, workflowID string) (wor
 		}
 	}
 	return workflowregistry.Workflow{}, false
+}
+
+func validateTealApplicability(teal TealApplicability) (string, string) {
+	if teal.ContractVersion == "" {
+		return "route_result_teal_applicability_required", "route result must include teal_applicability from workflow-route."
+	}
+	if teal.ContractVersion != "design003.v1" {
+		return "route_result_teal_applicability_unsupported", "route result teal_applicability contract_version is unsupported."
+	}
+	if teal.Derivation != "project_has_teal_lane && ui_ux_change" {
+		return "route_result_teal_applicability_invalid", "route result teal_applicability must derive teal_required from project_has_teal_lane && ui_ux_change."
+	}
+	if teal.TealRequired != (teal.ProjectHasTealLane && teal.UIUXChange) {
+		return "route_result_teal_applicability_invalid", "route result teal_required does not match project_has_teal_lane && ui_ux_change."
+	}
+	if !teal.TealRequired && strings.TrimSpace(teal.TealSkipReason) == "" {
+		return "route_result_teal_skip_reason_required", "route result must include teal_skip_reason when teal_required is false."
+	}
+	if teal.TealRequired && !containsAll(teal.RequiredWhenTealRequired, []string{"DESIGN_PLAN_GATE", "DESIGN_FIDELITY_REVIEW"}) {
+		return "route_result_teal_applicability_invalid", "route result teal_applicability must require DESIGN_PLAN_GATE and DESIGN_FIDELITY_REVIEW when Teal is required."
+	}
+	if teal.OrdinaryReviewIsSubstitute || teal.MARReviewIsSubstitute || teal.BackendEvidenceIsSubstitute || teal.HelperNotesAreSubstitute {
+		return "route_result_teal_substitution_invalid", "route result teal_applicability must preserve no-substitution for required Teal verdicts."
+	}
+	return "", ""
+}
+
+func injectTealContracts(contracts []workflowregistry.NodeContract, teal TealApplicability) ([]workflowregistry.NodeContract, string, string) {
+	if !teal.TealRequired {
+		return contracts, "", ""
+	}
+	workflowID := ""
+	taskClass := ""
+	if len(contracts) > 0 {
+		workflowID = contracts[0].WorkflowID
+		taskClass = contracts[0].TaskClass
+	}
+	out, ok := insertBeforeNode(contracts, designPlanGateContract(workflowID, taskClass), "implement")
+	if !ok {
+		return nil, "route_result_teal_anchor_missing", "Teal-required materialization requires an implement anchor for DESIGN_PLAN_GATE."
+	}
+	out, ok = insertBeforeNode(out, designFidelityReviewContract(workflowID, taskClass), "final_verify")
+	if !ok {
+		return nil, "route_result_teal_anchor_missing", "Teal-required materialization requires a final_verify anchor for DESIGN_FIDELITY_REVIEW."
+	}
+	return out, "", ""
+}
+
+func designPlanGateContract(workflowID string, taskClass string) workflowregistry.NodeContract {
+	directKAHStateWrite := false
+	return workflowregistry.NodeContract{
+		WorkflowID:          workflowID,
+		NodeID:              "design_plan_gate",
+		TaskClass:           taskClass,
+		OwnerRole:           "teal_reviewer",
+		ExecutionLane:       "teal_design_review",
+		RequiredInputs:      []string{"plan.md"},
+		ExpectedArtifacts:   []string{"DESIGN_PLAN_GATE.md"},
+		PromptRef:           "skills/kkachi-review/SKILL.md",
+		ApprovalRequired:    false,
+		FallbackPolicy:      workflowregistry.NoFallbackPolicy,
+		VerificationGate:    "required_teal_verdict_missing",
+		CompletionAuthority: workflowregistry.KAHOnlyAuthority,
+		DirectKAHStateWrite: &directKAHStateWrite,
+	}
+}
+
+func designFidelityReviewContract(workflowID string, taskClass string) workflowregistry.NodeContract {
+	directKAHStateWrite := false
+	return workflowregistry.NodeContract{
+		WorkflowID:          workflowID,
+		NodeID:              "design_fidelity_review",
+		TaskClass:           taskClass,
+		OwnerRole:           "teal_reviewer",
+		ExecutionLane:       "teal_design_review",
+		RequiredInputs:      []string{"diff.patch"},
+		ExpectedArtifacts:   []string{"DESIGN_FIDELITY_REVIEW.md"},
+		PromptRef:           "skills/kkachi-review/SKILL.md",
+		ApprovalRequired:    false,
+		FallbackPolicy:      workflowregistry.NoFallbackPolicy,
+		VerificationGate:    "required_teal_verdict_missing",
+		CompletionAuthority: workflowregistry.KAHOnlyAuthority,
+		DirectKAHStateWrite: &directKAHStateWrite,
+	}
+}
+
+func insertBeforeNode(contracts []workflowregistry.NodeContract, insert workflowregistry.NodeContract, before string) ([]workflowregistry.NodeContract, bool) {
+	out := make([]workflowregistry.NodeContract, 0, len(contracts)+1)
+	inserted := false
+	for _, contract := range contracts {
+		if !inserted && contract.NodeID == before {
+			out = append(out, insert)
+			inserted = true
+		}
+		out = append(out, contract)
+	}
+	return out, inserted
+}
+
+func containsAll(values []string, required []string) bool {
+	seen := map[string]bool{}
+	for _, value := range values {
+		seen[value] = true
+	}
+	for _, value := range required {
+		if !seen[value] {
+			return false
+		}
+	}
+	return true
 }
 
 func renderWorkflowDAG(workflowID string, runID string, contracts []workflowregistry.NodeContract) (string, error) {

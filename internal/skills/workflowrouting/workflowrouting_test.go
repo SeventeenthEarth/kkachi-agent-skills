@@ -15,6 +15,9 @@ func TestRouteShippedDevelopmentClassificationToBundle(t *testing.T) {
 		TaskClass:            "development",
 		ClassificationReason: "KAH classified WFLOW-007 as development.",
 		SelectedSpine:        "development_full",
+		ProjectHasTealLane:   boolPtr(false),
+		UIUXChange:           boolPtr(false),
+		TealSkipReason:       "No UI/UX surface in this project/task.",
 		RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"},
 	})
 	if err != nil {
@@ -46,6 +49,9 @@ func TestRouteAliasAndSkippedPhaseReasons(t *testing.T) {
 		SelectorRegistryPath: shippedRegistryPath(t),
 		TaskClass:            "investigation",
 		ClassificationReason: "Read-only evidence collection.",
+		ProjectHasTealLane:   boolPtr(false),
+		UIUXChange:           boolPtr(false),
+		TealSkipReason:       "No UI/UX surface in this project/task.",
 		RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"},
 	})
 	if err != nil {
@@ -65,6 +71,9 @@ func TestRouteUsesStandardBundleCapabilityDefaults(t *testing.T) {
 		SelectorRegistryPath: shippedRegistryPath(t),
 		TaskClass:            "development",
 		ClassificationReason: "Classified metadata omitted explicit capability flags.",
+		ProjectHasTealLane:   boolPtr(false),
+		UIUXChange:           boolPtr(false),
+		TealSkipReason:       "No UI/UX surface in this project/task.",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +83,82 @@ func TestRouteUsesStandardBundleCapabilityDefaults(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result.RequiredCapabilities, []string{"task_dag_schema_validation", "workflow_instance_state"}) {
 		t.Fatalf("required capability defaults = %+v", result.RequiredCapabilities)
+	}
+}
+
+func TestRouteDerivesTealApplicabilityFromExplicitFacts(t *testing.T) {
+	result, err := Route(Options{
+		TaxonomyPath:         shippedTaxonomyPath(t),
+		SelectorRegistryPath: shippedRegistryPath(t),
+		TaskClass:            "development",
+		ClassificationReason: "UI-bearing project work changes a registered Teal surface.",
+		SelectedSpine:        "development_full",
+		ProjectHasTealLane:   boolPtr(true),
+		UIUXChange:           boolPtr(true),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || !result.TealApplicability.TealRequired {
+		t.Fatalf("expected derived teal_required=true route, got %+v", result)
+	}
+	if !result.TealApplicability.ProjectHasTealLane || !result.TealApplicability.UIUXChange {
+		t.Fatalf("route did not preserve Teal input facts: %+v", result.TealApplicability)
+	}
+	if result.TealApplicability.Derivation != "project_has_teal_lane && ui_ux_change" {
+		t.Fatalf("missing derivation evidence: %+v", result.TealApplicability)
+	}
+	if len(result.TealApplicability.RequiredWhenTealRequired) != 2 ||
+		result.TealApplicability.RequiredWhenTealRequired[0] != "DESIGN_PLAN_GATE" ||
+		result.TealApplicability.RequiredWhenTealRequired[1] != "DESIGN_FIDELITY_REVIEW" {
+		t.Fatalf("missing required Teal verdict evidence: %+v", result.TealApplicability)
+	}
+}
+
+func TestRouteRecordsNonUITealSkipAndFailsClosedForMissingFacts(t *testing.T) {
+	result, err := Route(Options{
+		TaxonomyPath:         shippedTaxonomyPath(t),
+		SelectorRegistryPath: shippedRegistryPath(t),
+		TaskClass:            "development",
+		ClassificationReason: "Kkachi source work has no UI surface.",
+		SelectedSpine:        "development_full",
+		ProjectHasTealLane:   boolPtr(false),
+		UIUXChange:           boolPtr(false),
+		TealSkipReason:       "No UI/UX surface in this project/task.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.TealApplicability.TealRequired || result.TealApplicability.TealSkipReason == "" {
+		t.Fatalf("expected non-UI skip route, got %+v", result)
+	}
+
+	missingFacts, err := Route(Options{
+		TaxonomyPath:         shippedTaxonomyPath(t),
+		SelectorRegistryPath: shippedRegistryPath(t),
+		TaskClass:            "development",
+		ClassificationReason: "missing Teal facts must fail closed.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missingFacts.OK || missingFacts.Status != "teal_applicability_required" {
+		t.Fatalf("expected missing Teal facts blocker, got %+v", missingFacts)
+	}
+
+	missingSkip, err := Route(Options{
+		TaxonomyPath:         shippedTaxonomyPath(t),
+		SelectorRegistryPath: shippedRegistryPath(t),
+		TaskClass:            "development",
+		ClassificationReason: "false Teal input without skip reason must fail closed.",
+		ProjectHasTealLane:   boolPtr(false),
+		UIUXChange:           boolPtr(true),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missingSkip.OK || missingSkip.Status != "teal_skip_reason_required" {
+		t.Fatalf("expected missing skip reason blocker, got %+v", missingSkip)
 	}
 }
 
@@ -94,6 +179,9 @@ func TestRouteFailsClosedForMissingAndUnsupportedClassification(t *testing.T) {
 			SelectorRegistryPath: shippedRegistryPath(t),
 			TaskClass:            "security",
 			ClassificationReason: "reason",
+			ProjectHasTealLane:   boolPtr(false),
+			UIUXChange:           boolPtr(false),
+			TealSkipReason:       "No UI/UX surface in this project/task.",
 		},
 	}
 	want := map[string]string{
@@ -135,19 +223,19 @@ task_classes:
 		want string
 	}{
 		"taxonomy unreadable": {
-			opts: Options{TaxonomyPath: filepath.Join(dir, "missing-taxonomy.yaml"), SelectorRegistryPath: shippedRegistryPath(t), TaskClass: "development", ClassificationReason: "reason"},
+			opts: withNonUITeal(Options{TaxonomyPath: filepath.Join(dir, "missing-taxonomy.yaml"), SelectorRegistryPath: shippedRegistryPath(t), TaskClass: "development", ClassificationReason: "reason"}),
 			want: "taxonomy_unreadable",
 		},
 		"taxonomy unsupported": {
-			opts: Options{TaxonomyPath: unsupportedTaxonomy, SelectorRegistryPath: shippedRegistryPath(t), TaskClass: "development", ClassificationReason: "reason"},
+			opts: withNonUITeal(Options{TaxonomyPath: unsupportedTaxonomy, SelectorRegistryPath: shippedRegistryPath(t), TaskClass: "development", ClassificationReason: "reason"}),
 			want: "taxonomy_schema_unsupported",
 		},
 		"registry unreadable": {
-			opts: Options{TaxonomyPath: shippedTaxonomyPath(t), SelectorRegistryPath: filepath.Join(dir, "missing-registry.yaml"), TaskClass: "development", ClassificationReason: "reason"},
+			opts: withNonUITeal(Options{TaxonomyPath: shippedTaxonomyPath(t), SelectorRegistryPath: filepath.Join(dir, "missing-registry.yaml"), TaskClass: "development", ClassificationReason: "reason"}),
 			want: "bundle_registry_unreadable",
 		},
 		"registry unsupported": {
-			opts: Options{TaxonomyPath: shippedTaxonomyPath(t), SelectorRegistryPath: unsupportedRegistry, TaskClass: "development", ClassificationReason: "reason"},
+			opts: withNonUITeal(Options{TaxonomyPath: shippedTaxonomyPath(t), SelectorRegistryPath: unsupportedRegistry, TaskClass: "development", ClassificationReason: "reason"}),
 			want: "bundle_registry_schema_unsupported",
 		},
 	}
@@ -185,7 +273,7 @@ task_classes:
 `)
 	registryDir := t.TempDir()
 	noMatchRegistry := writeFile(t, registryDir, "no-match.yaml", validRouteRegistry("docs_only_light", "docs_only"))
-	result, err := Route(Options{TaxonomyPath: taxonomy, SelectorRegistryPath: noMatchRegistry, TaskClass: "development", ClassificationReason: "reason", RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}})
+	result, err := Route(withNonUITeal(Options{TaxonomyPath: taxonomy, SelectorRegistryPath: noMatchRegistry, TaskClass: "development", ClassificationReason: "reason", RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +282,7 @@ task_classes:
 	}
 
 	ambiguousRegistry := writeFile(t, registryDir, "ambiguous.yaml", validRouteRegistry("development_full", "development")+strings.ReplaceAll(validRouteRegistry("development_alt", "development"), "version: kas-task-dag-workflow-registry/v1\n", ""))
-	result, err = Route(Options{TaxonomyPath: taxonomy, SelectorRegistryPath: ambiguousRegistry, TaskClass: "development", ClassificationReason: "reason", RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}})
+	result, err = Route(withNonUITeal(Options{TaxonomyPath: taxonomy, SelectorRegistryPath: ambiguousRegistry, TaskClass: "development", ClassificationReason: "reason", RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +290,7 @@ task_classes:
 		t.Fatalf("expected ambiguity, got %+v", result)
 	}
 
-	result, err = Route(Options{TaxonomyPath: taxonomy, SelectorRegistryPath: ambiguousRegistry, TaskClass: "docs_only", ClassificationReason: "reason", SelectedSpine: "development_full", RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}})
+	result, err = Route(withNonUITeal(Options{TaxonomyPath: taxonomy, SelectorRegistryPath: ambiguousRegistry, TaskClass: "docs_only", ClassificationReason: "reason", SelectedSpine: "development_full", RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +299,7 @@ task_classes:
 	}
 
 	singleRegistry := writeFile(t, registryDir, "single.yaml", validRouteRegistry("development_full", "development"))
-	result, err = Route(Options{TaxonomyPath: taxonomy, SelectorRegistryPath: singleRegistry, TaskClass: "development", ClassificationReason: "reason", SelectedSpine: "other_bundle", RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}})
+	result, err = Route(withNonUITeal(Options{TaxonomyPath: taxonomy, SelectorRegistryPath: singleRegistry, TaskClass: "development", ClassificationReason: "reason", SelectedSpine: "other_bundle", RequiredCapabilities: []string{"task_dag_schema_validation", "workflow_instance_state"}}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,4 +374,15 @@ node_contracts:
     completion_authority: kah_only
     direct_kah_state_write: false
 `
+}
+
+func boolPtr(value bool) *bool {
+	return &value
+}
+
+func withNonUITeal(opts Options) Options {
+	opts.ProjectHasTealLane = boolPtr(false)
+	opts.UIUXChange = boolPtr(false)
+	opts.TealSkipReason = "No UI/UX surface in this project/task."
+	return opts
 }

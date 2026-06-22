@@ -1108,6 +1108,20 @@ func writeTriggerRouteResult(t *testing.T, dir string, registry workflowregistry
 			"version":  registry.Version,
 			"checksum": registry.Checksum,
 		},
+		"teal_applicability": map[string]any{
+			"contract_version":               "design003.v1",
+			"project_has_teal_lane":          false,
+			"ui_ux_change":                   false,
+			"teal_required":                  false,
+			"derivation":                     "project_has_teal_lane && ui_ux_change",
+			"teal_skip_reason":               "No UI/UX surface in this project/task.",
+			"required_when_teal_required":    []string{"DESIGN_PLAN_GATE", "DESIGN_FIDELITY_REVIEW"},
+			"missing_required_status":        "required_teal_verdict_missing",
+			"ordinary_review_is_substitute":  false,
+			"mar_review_is_substitute":       false,
+			"backend_evidence_is_substitute": false,
+			"helper_notes_are_substitute":    false,
+		},
 		"direct_kah_state_write": false,
 	}
 	data, err := json.Marshal(payload)

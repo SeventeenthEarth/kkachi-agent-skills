@@ -476,6 +476,20 @@ func writeCLIWorkflowRouteResult(t *testing.T, dir string, registry workflowregi
 			"version":  registry.Version,
 			"checksum": registry.Checksum,
 		},
+		"teal_applicability": map[string]any{
+			"contract_version":               "design003.v1",
+			"project_has_teal_lane":          false,
+			"ui_ux_change":                   false,
+			"teal_required":                  false,
+			"derivation":                     "project_has_teal_lane && ui_ux_change",
+			"teal_skip_reason":               "No UI/UX surface in this project/task.",
+			"required_when_teal_required":    []string{"DESIGN_PLAN_GATE", "DESIGN_FIDELITY_REVIEW"},
+			"missing_required_status":        "required_teal_verdict_missing",
+			"ordinary_review_is_substitute":  false,
+			"mar_review_is_substitute":       false,
+			"backend_evidence_is_substitute": false,
+			"helper_notes_are_substitute":    false,
+		},
 		"direct_kah_state_write": false,
 	}
 	data, err := json.Marshal(payload)
@@ -1108,7 +1122,7 @@ func TestWorkflowRouteCLIRoutesClassifiedTaskWithoutKAH(t *testing.T) {
 	registry := filepath.Join(root, "registries", "task-dag-workflow-registry.yaml")
 
 	var stdout, stderr bytes.Buffer
-	code := Main([]string{"workflow-route", "--taxonomy", taxonomy, "--selector-registry", registry, "--task-class", "development", "--classification-reason", "KAH classified WFLOW-007 as development.", "--selected-spine", "development_full", "--required-capability", "task_dag_schema_validation,workflow_instance_state", "--json"}, &stdout, &stderr, nil)
+	code := Main([]string{"workflow-route", "--taxonomy", taxonomy, "--selector-registry", registry, "--task-class", "development", "--classification-reason", "KAH classified WFLOW-007 as development.", "--selected-spine", "development_full", "--project-has-teal-lane", "false", "--ui-ux-change", "false", "--teal-skip-reason", "No UI/UX surface in this project/task.", "--required-capability", "task_dag_schema_validation,workflow_instance_state", "--json"}, &stdout, &stderr, nil)
 	if code != 0 {
 		t.Fatalf("workflow-route failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
 	}
@@ -1124,6 +1138,10 @@ func TestWorkflowRouteCLIRoutesClassifiedTaskWithoutKAH(t *testing.T) {
 	}
 	if _, ok := payload["dispatch_packets"]; ok {
 		t.Fatalf("workflow-route must not render dispatch packets: %+v", payload)
+	}
+	teal := payload["teal_applicability"].(map[string]any)
+	if teal["teal_required"] != false || teal["teal_skip_reason"] != "No UI/UX surface in this project/task." {
+		t.Fatalf("workflow-route must preserve non-UI Teal skip evidence: %+v", teal)
 	}
 }
 

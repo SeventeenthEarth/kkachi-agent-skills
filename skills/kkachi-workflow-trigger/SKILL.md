@@ -100,7 +100,17 @@ Rules:
 - Selector mode uses deterministic registry predicates. Exactly one workflow may proceed; zero matches return `selector_no_match`, multiple matches return `selector_ambiguous`, and mixed explicit/selector inputs return `selector_explicit_mode_conflict`.
 - In run-local mode, the route result must already be `ok:true` with
   `status: bundle_route_matched`; `workflow-trigger` does not reroute raw task
-  metadata or infer a task class. It produces route-backed run-local materialization evidence before workflow-managed dispatch.
+  metadata or infer a task class. It also requires route result
+  `teal_applicability`; missing applicability fails closed with
+  `route_result_teal_applicability_required`. It produces route-backed run-local materialization evidence before workflow-managed dispatch.
+- DESIGN-003 route-backed materialization injects `DESIGN_PLAN_GATE` before
+  implementation authorization and `DESIGN_FIDELITY_REVIEW` before final
+  acceptance only when `teal_required=true`. Non-UI Kkachi source work with
+  `teal_required=false` and a concrete `teal_skip_reason` receives no design
+  workflow nodes; the materializer does not inject Teal nodes when `teal_required=false`.
+- Required Teal verdicts cannot be substituted by ordinary Red/Orange/Gray/Blue
+  review, MAR, backend evidence, helper notes, or temporary subagents.
+  Missing a required Teal verdict remains a fail-closed blocker.
 - In approved one-off custom packet mode, the packet must be the existing
   `workflow-create` dry-run machine packet shape, `--approval` must be exactly
   `dry-run:sha256:<hash>`, and the hash is recomputed with WFLOW-004 canonical
@@ -215,7 +225,8 @@ order, phase-plan text, or the old default development spine.
 Run-local materialization records the selected bundle, task class,
 classification reason or approved one-off packet evidence, source
 registry/taxonomy checksums or approval hash/packet checksum, run-local
-posture, `persistent_promotion:false`, and `no_promotion:true`. It rewrites
+posture, Teal applicability evidence for route-result sources,
+`persistent_promotion:false`, and `no_promotion:true`. It rewrites
 route-backed `workflow.yaml` required outputs and `node-contracts.json`
 required inputs/expected artifacts under `.kkachi/runs/<run_id>/...`; unsafe
 artifact paths fail closed before any writes. Approved custom packets are

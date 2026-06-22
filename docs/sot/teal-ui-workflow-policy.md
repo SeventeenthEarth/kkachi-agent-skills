@@ -1,15 +1,17 @@
 # DESIGN Teal UI workflow policy for KAS
 
-Status: planning SOT for the `DESIGN` shared KAS/KAH epic; not implementation evidence
+Status: planning SOT plus DESIGN-003 KAS selector/materializer source contract for the `DESIGN` shared KAS/KAH epic; KAH gates remain deferred
 Owner: KAS workflow/policy layer
 Source evidence: `/Users/draccoon/Workspace/Hermes/17thHermes/40_outputs/projects/kkachi/2026-06-21-kas-kah-teal-ui-workflow-sot.md`
 Paired KAH SOT: `kkachi-agent-helper/docs/sot/teal-ui-evidence-gates.md`
 
 ## Purpose
 
-This document registers the KAS-owned side of the `DESIGN` epic. The epic promotes the accepted candidate Teal UI workflow direction into KAS/KAH source planning without claiming implemented behavior.
+This document registers the KAS-owned side of the `DESIGN` epic. The epic promotes the accepted candidate Teal UI workflow direction into KAS/KAH source planning and records the implemented DESIGN-003 KAS selector/materializer contract without claiming KAH DESIGN-004/005 behavior.
 
 KAS owns workflow policy, trigger semantics, role contracts, node contracts, selector/materializer behavior, skill guidance, and agent-facing expectations. KAS does not own KAH schema/gate validation, and KAS must not substitute Blue, Red, Orange, Gray, MAR, backend agents, or temporary helpers for official Teal verdicts when Teal is required.
+
+DESIGN-003 implements the KAS selector/materializer portion. `workflow-route` derives and records `teal_required` from explicit `project_has_teal_lane` and `ui_ux_change` facts, and `workflow-trigger` route-backed materialization inserts design gates only for `teal_required=true`. KAH schema and gate enforcement remain DESIGN-004 and DESIGN-005.
 
 ## Applicability rule
 
