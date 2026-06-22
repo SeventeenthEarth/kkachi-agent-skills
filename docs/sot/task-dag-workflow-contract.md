@@ -235,6 +235,25 @@ Each KAS node contract must declare at least:
 - fallback policy, normally `none_fail_closed`;
 - verification and completion gate reference.
 
+DESIGN-002 adds KAS-owned Teal node-contract semantics without adding universal
+Teal nodes to the standard Kkachi source-work bundle. The applicability fields
+are `project_has_teal_lane`, `ui_ux_change`, derived
+`teal_required = project_has_teal_lane && ui_ux_change`, `teal_skip_reason`
+when either input is false, and bounded waiver evidence fields when a required
+Teal gate is approved as waived. A skip reason is not waiver evidence; waiver
+evidence is not clean completion when the task still lacks the recorded
+approval fields.
+
+When `teal_required=true`, `DESIGN_PLAN_GATE` is the Teal design planning gate
+before implementation authorization, and `DESIGN_FIDELITY_REVIEW` is the Teal
+fidelity review gate before final acceptance. These are distinct node-contract
+semantics from normal implementation, verification, and review nodes. The
+ordinary Red/Orange/Gray/Blue color review remains separate, MAR remains separate,
+and backend implementation evidence remains separate. They must not
+be represented as substitutes for required Teal verdicts. Missing required Teal
+evidence uses `required_teal_verdict_missing` and the existing
+`none_fail_closed` posture.
+
 KAS must not mark a node complete. Node completion is a KAH state transition backed by the required artifacts/evidence.
 
 WFLOW-003 registry node contracts require the WFLOW-002 core fields plus

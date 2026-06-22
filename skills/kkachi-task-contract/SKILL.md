@@ -16,6 +16,15 @@ The task contract is backend-neutral. Do not include Claude, Codex, Gemini, GLM,
 
 Task contracts must record output-policy and phase-gating facts without turning them into backend style. Use the registry aliases `simple_report`/`simple_command_report`, `investigation`/`research_evidence`, `review`/`collaboration_review`, and `docs_only`/`docs_only`; non-development classes must include skipped-phase reasons for implementation, enhance-test, optimize, and broad review loops unless classification changes. Record that Stage 1 direct Codex SDK/app-server runner and KAB-mediated backend product output is English, compact (`Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, `Next action requested`), and artifact-first, with detailed phase paths such as `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md`. When Stage 1 is selected, the contract must point to `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` (`openai_codex` -> SDK-managed `codex app-server --listen stdio://`) and reject `codex exec`, generic `openai` SDK output, raw app-server transport, or KAB `native_codex` evidence as Stage 1 proof.
 
+For DESIGN Teal policy, task contracts must record `project_has_teal_lane`,
+`ui_ux_change`, derived `teal_required`, and `teal_skip_reason` when either
+input is false. Kkachi source-work defaults to `project_has_teal_lane:false`,
+`ui_ux_change:false`, `teal_required:false`, and skip reason `No UI/UX surface
+in this project/task.` A skip reason is not waiver evidence. When Teal is
+required, record `DESIGN_PLAN_GATE` before implementation authorization and
+`DESIGN_FIDELITY_REVIEW` before final acceptance, plus any bounded waiver
+fields. Ordinary color review, MAR, backend evidence, or helper notes must not substitute for a required Teal verdict.
+
 ## Inputs
 
 - master request
@@ -35,11 +44,12 @@ Task contracts must record output-policy and phase-gating facts without turning 
 4. Record the classification reason, selected spine, KAB/KAH/CodeGraph defaults, and explicit skip reasons for development-only phases when the task is not a development task.
 5. For state-investigation-to-spec/roadmap work, record whether the current stage is read-only `research_evidence` or durable `docs_only + Path B shaping`; do not silently promote it to `development` unless executable behavior or execution policy changes.
 6. Record desired state, acceptance criteria, constraints, non-goals, context sources, required capabilities, graph capability requirements when graph-managed workflow is selected, and verification evidence.
-7. Record graph workflow authority explicitly: `.kkachi-workflow.yaml` is project-level graph state only after capability-checked KAH graph evidence, `phase-plan.yaml` is run-local execution state/evidence, and KAH metadata is helper classification only.
-8. Preserve user backend preference only as selection metadata; do not let it bypass capability gates.
-9. Render from `templates/run-artifacts/task-contract.yaml.tmpl` as a KHS supplemental run artifact.
-10. Also summarize the same contract in KAH canonical `task-brief.md` or `context-pack.md` so current KAH artifact gates can see the run authority.
-11. Record a compact event with `kkachi-agent-helper event append artifact.updated --run <run_id> --payload '{"path":"task-contract.yaml","phase":"task-contract"}' --json` when useful.
+7. Record Teal applicability from project/task facts: `project_has_teal_lane`, `ui_ux_change`, derived `teal_required`, concrete `teal_skip_reason` for false inputs, and waiver fields only when Teal was required and a bounded approval exists.
+8. Record graph workflow authority explicitly: `.kkachi-workflow.yaml` is project-level graph state only after capability-checked KAH graph evidence, `phase-plan.yaml` is run-local execution state/evidence, and KAH metadata is helper classification only.
+9. Preserve user backend preference only as selection metadata; do not let it bypass capability gates.
+10. Render from `templates/run-artifacts/task-contract.yaml.tmpl` as a KHS supplemental run artifact.
+11. Also summarize the same contract in KAH canonical `task-brief.md` or `context-pack.md` so current KAH artifact gates can see the run authority.
+12. Record a compact event with `kkachi-agent-helper event append artifact.updated --run <run_id> --payload '{"path":"task-contract.yaml","phase":"task-contract"}' --json` when useful.
 
 ## Output
 

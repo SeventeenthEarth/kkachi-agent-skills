@@ -26,6 +26,14 @@ MAR review is independent of these planning stages. It remains the default KAS r
 
 Plan drafts for active KAS/KAH roadmap policy, workflow, template, test, or shared skill mirror work must include a fallback audit note before Blue+Red+Orange plan review. Resolve Red/Orange plan-vet reviewers from the project/team role registry when applicable. Ask the planner to identify any fallback paths it proposes, remove unnecessary fallback behavior, and prefer fail-closed handling when capability, evidence, approval, or safe state is missing. Allow a fallback only when no safe direct handling exists, the fallback is tightly bounded/evidenced, and the required code/docs delta is genuinely small. If the only viable fallback would add broad code, new state machinery, or unclear policy, stop and report options to 주군 instead of letting the planner quietly add it.
 
+For DESIGN Teal work, plans must carry `project_has_teal_lane`,
+`ui_ux_change`, derived `teal_required`, and `teal_skip_reason` for false
+inputs. `DESIGN_PLAN_GATE` is required before implementation authorization
+when Teal is required, and `DESIGN_FIDELITY_REVIEW` is required before final
+acceptance. A waiver must identify approval ref, scope, and expiry. Ordinary
+Red/Orange/Gray/Blue color review, MAR, backend implementation evidence, and
+temporary helpers must not substitute for a required Teal verdict.
+
 Before backend planning for a code-changing or process-changing task, refresh CodeGraph evidence for the target repository. If `.codegraph/` already exists, run `codegraph index <repo>` and preserve `codegraph status <repo>` output. If CodeGraph is due for first initialization after the first completed task and `.codegraph/` is missing, run `codegraph init -i <repo>` and preserve status evidence. If CodeGraph is unavailable, record the missing capability as a blocker or degraded-evidence reason instead of silently planning from stale code context.
 
 ## KASREL provenance/dependency evidence gate

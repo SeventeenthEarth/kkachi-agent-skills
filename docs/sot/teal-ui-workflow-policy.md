@@ -23,6 +23,13 @@ teal_required: project_has_teal_lane && ui_ux_change
 
 When either input is false, KAS must preserve a concrete `teal_skip_reason` instead of injecting design workflow steps.
 
+Teal waiver evidence is not a skip reason. A skip records why Teal did not
+apply from project/task facts. A waiver records that Teal did apply but a
+responsible approval intentionally waived one or more required Teal evidence
+items for a bounded scope. KAS records waiver metadata only as policy/evidence
+expectations; KAH schema and gate validation for those fields belongs to
+`DESIGN-004` and `DESIGN-005`.
+
 For Kkachi KAS/KAH/KAB source work, the default is:
 
 ```yaml
@@ -30,9 +37,34 @@ project_has_teal_lane: false
 ui_ux_change: false
 teal_required: false
 teal_skip_reason: "No UI/UX surface in this project/task."
+teal_waiver_approved: false
+teal_waiver_approval_ref: ""
+teal_waiver_scope: ""
+teal_waiver_expires_at: ""
 ```
 
 For UI-bearing Sudal or Doksuri work, the project Teal designer or Goong as Teal Team Lead is routed according to project registration and explicit task scope.
+
+When `teal_required=true`, KAS must require the design gate records before the
+ordinary implementation and final-acceptance claims they protect:
+
+```yaml
+design_plan_gate: DESIGN_PLAN_GATE
+design_fidelity_review: DESIGN_FIDELITY_REVIEW
+missing_required_status: required_teal_verdict_missing
+```
+
+`DESIGN_PLAN_GATE` is the Teal planning verdict before implementation
+authorization. `DESIGN_FIDELITY_REVIEW` is the Teal fidelity verdict before
+final acceptance. Ordinary Red/Orange/Gray/Blue color review, MAR role review,
+backend implementation evidence, temporary subagents, and helper notes remain
+separate evidence lanes; they must not substitute Blue, Red, Orange, Gray, MAR,
+backend agents, or temporary helpers for official Teal verdicts when Teal is
+required.
+
+If `teal_required=false`, KAS must not inject Teal workflow nodes into Kkachi
+source-work runs. It records the false inputs and concrete `teal_skip_reason`
+instead.
 
 ## KAS policy surfaces
 

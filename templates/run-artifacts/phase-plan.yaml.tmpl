@@ -143,6 +143,29 @@ task_class_gating:
     docs_only: docs_only
   rule: "Simple report/status, investigation/research evidence, and docs-only paths do not inherit implementation, enhance_test, optimize, or broad review loops unless the task contract records a classification change and reason."
 
+design_teal_policy:
+  contract_version: "design002.v1"
+  applicability_source: "task-contract.yaml#teal_applicability"
+  derivation: "teal_required = project_has_teal_lane && ui_ux_change"
+  kkachi_source_default:
+    project_has_teal_lane: false
+    ui_ux_change: false
+    teal_required: false
+    teal_skip_reason: "No UI/UX surface in this project/task."
+  skip_reason_rule: "When either input is false, preserve teal_skip_reason; do not treat it as waiver evidence."
+  waiver_rule: "Waiver evidence requires teal_waiver_approved, teal_waiver_approval_ref, teal_waiver_scope, and teal_waiver_expires_at."
+  design_plan_gate: "DESIGN_PLAN_GATE"
+  design_plan_gate_position: "before implementation authorization"
+  design_fidelity_review: "DESIGN_FIDELITY_REVIEW"
+  design_fidelity_review_position: "before final acceptance"
+  missing_required_status: "required_teal_verdict_missing"
+  no_substitution:
+    ordinary_color_review_is_substitute: false
+    mar_review_is_substitute: false
+    backend_evidence_is_substitute: false
+    temporary_helper_notes_are_substitute: false
+  kah_boundary: "KAH schema/gate/artifact bootstrap remains DESIGN-004/005; DESIGN-002 records KAS policy and contract semantics only."
+
 kab_adoption_stage:
   selected_stage: "{{ kab_adoption_stage }}"
   marker_path: "{{ kab_adoption_marker_path }}"

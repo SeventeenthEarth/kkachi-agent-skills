@@ -25,6 +25,24 @@ task_classification:
     enhance_test: "{{ enhance_test_skip_reason }}"
     optimize: "{{ optimize_skip_reason }}"
 
+teal_applicability:
+  contract_version: "design002.v1"
+  project_has_teal_lane: {{ project_has_teal_lane }}
+  ui_ux_change: {{ ui_ux_change }}
+  teal_required: {{ derived_teal_required }}
+  derivation: "project_has_teal_lane && ui_ux_change"
+  teal_skip_reason: "{{ teal_skip_reason }}"
+  teal_waiver_approved: {{ teal_waiver_approved }}
+  teal_waiver_approval_ref: "{{ teal_waiver_approval_ref }}"
+  teal_waiver_scope: "{{ teal_waiver_scope }}"
+  teal_waiver_expires_at: "{{ teal_waiver_expires_at }}"
+  kkachi_source_default_skip_reason: "No UI/UX surface in this project/task."
+  required_when_teal_required:
+    - DESIGN_PLAN_GATE
+    - DESIGN_FIDELITY_REVIEW
+  missing_required_status: "required_teal_verdict_missing"
+  no_substitution_rule: "Ordinary Red/Orange/Gray/Blue color review, MAR, backend evidence, and temporary helpers are not substitutes for required Teal verdicts."
+
 workflow_authority:
   project_graph_artifact: ".kkachi-workflow.yaml"
   run_local_phase_artifact: "phase-plan.yaml"
