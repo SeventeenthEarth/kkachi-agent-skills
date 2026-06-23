@@ -1145,6 +1145,56 @@ func TestWorkflowRouteCLIRoutesClassifiedTaskWithoutKAH(t *testing.T) {
 	}
 }
 
+func TestWorkflowRouteCLIMatchesDesign006GoldenScenarios(t *testing.T) {
+	root := cliRepoRoot(t)
+	taxonomy := filepath.Join(root, "registries", "task-taxonomy.yaml")
+	registry := filepath.Join(root, "registries", "task-dag-workflow-registry.yaml")
+	scenarios := readDesign006CLIScenarios(t, filepath.Join(root, "docs", "examples", "design006-teal-compatibility-scenarios.json"))
+
+	for _, scenario := range scenarios {
+		scenario := scenario
+		t.Run(scenario.ID, func(t *testing.T) {
+			args := []string{
+				"workflow-route",
+				"--taxonomy", taxonomy,
+				"--selector-registry", registry,
+				"--task-class", "development",
+				"--classification-reason", "DESIGN-006 golden compatibility scenario.",
+				"--selected-spine", "development_full",
+				"--project-has-teal-lane", boolArg(scenario.ProjectHasTealLane),
+				"--ui-ux-change", boolArg(scenario.UIUXChange),
+				"--required-capability", "task_dag_schema_validation,workflow_instance_state",
+				"--json",
+			}
+			if scenario.TealSkipReason != "" {
+				args = append(args[:len(args)-1], "--teal-skip-reason", scenario.TealSkipReason, "--json")
+			}
+
+			var stdout, stderr bytes.Buffer
+			code := Main(args, &stdout, &stderr, nil)
+			if code != 0 {
+				t.Fatalf("workflow-route failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+				t.Fatal(err)
+			}
+			teal := payload["teal_applicability"].(map[string]any)
+			if teal["teal_required"] != scenario.TealRequired {
+				t.Fatalf("teal_applicability = %+v, want teal_required=%t", teal, scenario.TealRequired)
+			}
+			if !scenario.TealRequired && teal["teal_skip_reason"] != scenario.TealSkipReason {
+				t.Fatalf("teal_applicability = %+v, want skip reason %q", teal, scenario.TealSkipReason)
+			}
+			for _, field := range []string{"ordinary_review_is_substitute", "mar_review_is_substitute", "backend_evidence_is_substitute", "helper_notes_are_substitute"} {
+				if teal[field] != false {
+					t.Fatalf("teal_applicability = %+v, want %s=false", teal, field)
+				}
+			}
+		})
+	}
+}
+
 func TestWorkflowRouteCLIFailsClosed(t *testing.T) {
 	root := cliRepoRoot(t)
 	taxonomy := filepath.Join(root, "registries", "task-taxonomy.yaml")
@@ -1168,6 +1218,40 @@ func TestWorkflowRouteCLIFailsClosed(t *testing.T) {
 	if _, ok := payload["dispatch_packets"]; ok {
 		t.Fatalf("workflow-route failure must not include dispatch packets: %+v", payload)
 	}
+}
+
+type design006CLIScenario struct {
+	ID                 string `json:"id"`
+	ProjectHasTealLane bool   `json:"project_has_teal_lane"`
+	UIUXChange         bool   `json:"ui_ux_change"`
+	TealRequired       bool   `json:"teal_required"`
+	TealSkipReason     string `json:"teal_skip_reason"`
+}
+
+func readDesign006CLIScenarios(t *testing.T, path string) []design006CLIScenario {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read DESIGN-006 scenarios: %v", err)
+	}
+	var payload struct {
+		Version   string                 `json:"version"`
+		Scenarios []design006CLIScenario `json:"scenarios"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("decode DESIGN-006 scenarios: %v", err)
+	}
+	if payload.Version != "design006.v1" {
+		t.Fatalf("version = %q, want design006.v1", payload.Version)
+	}
+	return payload.Scenarios
+}
+
+func boolArg(value bool) string {
+	if value {
+		return "true"
+	}
+	return "false"
 }
 
 func TestWorkflowTriggerCLIRunLocalMaterialization(t *testing.T) {

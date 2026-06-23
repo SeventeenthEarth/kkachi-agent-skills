@@ -1,0 +1,84 @@
+{
+  "version": "design006.v1",
+  "purpose": "Golden KAS Teal applicability declarations used by DESIGN-006 cross-repo readback against KAH design-evidence validation.",
+  "scenarios": [
+    {
+      "id": "kkachi_non_ui_skip",
+      "project": "kkachi",
+      "project_context": "KAS/KAH/KAB source-side helper, workflow, documentation, or fixture work that does not change a UI/UX surface.",
+      "project_has_teal_lane": false,
+      "ui_ux_change": false,
+      "teal_required": false,
+      "teal_skip_reason": "Kkachi source fixture work does not change a UI/UX surface.",
+      "required_when_teal_required": [
+        "DESIGN_PLAN_GATE",
+        "DESIGN_FIDELITY_REVIEW"
+      ],
+      "expected_materialized_nodes": [],
+      "ordinary_review_is_substitute": false,
+      "mar_review_is_substitute": false,
+      "backend_evidence_is_substitute": false,
+      "helper_notes_are_substitute": false
+    },
+    {
+      "id": "kkachi_teal_lane_non_ui_skip",
+      "project": "kkachi",
+      "project_context": "Kkachi source-side task in an environment that can declare a Teal lane, but this task does not change a UI/UX surface.",
+      "project_has_teal_lane": true,
+      "ui_ux_change": false,
+      "teal_required": false,
+      "teal_skip_reason": "Kkachi task has no UI/UX change even though a Teal lane is declared.",
+      "required_when_teal_required": [
+        "DESIGN_PLAN_GATE",
+        "DESIGN_FIDELITY_REVIEW"
+      ],
+      "expected_materialized_nodes": [],
+      "ordinary_review_is_substitute": false,
+      "mar_review_is_substitute": false,
+      "backend_evidence_is_substitute": false,
+      "helper_notes_are_substitute": false
+    },
+    {
+      "id": "sudal_ui_required",
+      "project": "sudal",
+      "project_context": "Sudal task that changes a UI/UX surface in a project with a Teal lane.",
+      "project_has_teal_lane": true,
+      "ui_ux_change": true,
+      "teal_required": true,
+      "teal_skip_reason": "",
+      "required_when_teal_required": [
+        "DESIGN_PLAN_GATE",
+        "DESIGN_FIDELITY_REVIEW"
+      ],
+      "expected_materialized_nodes": [
+        "DESIGN_PLAN_GATE",
+        "DESIGN_FIDELITY_REVIEW"
+      ],
+      "ordinary_review_is_substitute": false,
+      "mar_review_is_substitute": false,
+      "backend_evidence_is_substitute": false,
+      "helper_notes_are_substitute": false
+    },
+    {
+      "id": "doksuri_ui_required",
+      "project": "doksuri",
+      "project_context": "Doksuri task that changes a UI/UX surface in a project with a Teal lane.",
+      "project_has_teal_lane": true,
+      "ui_ux_change": true,
+      "teal_required": true,
+      "teal_skip_reason": "",
+      "required_when_teal_required": [
+        "DESIGN_PLAN_GATE",
+        "DESIGN_FIDELITY_REVIEW"
+      ],
+      "expected_materialized_nodes": [
+        "DESIGN_PLAN_GATE",
+        "DESIGN_FIDELITY_REVIEW"
+      ],
+      "ordinary_review_is_substitute": false,
+      "mar_review_is_substitute": false,
+      "backend_evidence_is_substitute": false,
+      "helper_notes_are_substitute": false
+    }
+  ]
+}

@@ -177,6 +177,8 @@ specific invalid-applicability status before run-local writes. `workflow-trigger
 with `teal_required=false` and a concrete `teal_skip_reason` receives no design
 nodes. These conditional run-local materialized nodes are not universal nodes in `registries/task-dag-workflow-registry.yaml`.
 
+DESIGN-006 compatibility examples are recorded at `docs/examples/design006-teal-compatibility-scenarios.json` and cover source-side readback scenarios: `kkachi_non_ui_skip`, `kkachi_teal_lane_non_ui_skip`, `sudal_ui_required`, and `doksuri_ui_required`. They are KAS declarations used for KAH deterministic `design-evidence` validation readback; they are not downstream Sudal/Doksuri UI implementation or Teal owner assignment.
+
 Ordinary Red/Orange/Gray/Blue review, MAR, backend evidence, helper notes, and
 temporary subagents remain separate evidence lanes and are not substitutes for
 required Teal verdicts.
