@@ -552,10 +552,10 @@ mar:
 		Reason   string `json:"reason"`
 		Detail   string `json:"detail"`
 		Attempts []struct {
-			ProviderID             string  `json:"provider_id"`
-			TerminalStatus         string  `json:"terminal_status"`
-			ProviderFailureReason  *string `json:"provider_failure_reason"`
-			PreflightEvidencePath  *string `json:"preflight_evidence_path"`
+			ProviderID            string  `json:"provider_id"`
+			TerminalStatus        string  `json:"terminal_status"`
+			ProviderFailureReason *string `json:"provider_failure_reason"`
+			PreflightEvidencePath *string `json:"preflight_evidence_path"`
 		} `json:"attempts"`
 	}
 	if err := json.Unmarshal(output, &result); err != nil {
