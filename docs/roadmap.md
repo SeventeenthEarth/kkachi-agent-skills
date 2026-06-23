@@ -6,7 +6,7 @@ Confirming role: Responsible approver / governance evidence record; INITDOC post
 Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced, KAH v0.1.10 workflow catalog promotion substrate released, KASROLE is the KAS v0.1.3 release baseline, and WFLOW epic completion is the KAS v0.1.4 release baseline
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
-Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/role-aware-project-suite-contract.md`, `sot/project-kas-sync-state.md`, `sot/toolchain-local-metadata-registry.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/multi-agent-review-policy.md`, `sot/policy-promotion-governance-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`, `sot/teal-ui-workflow-policy.md`
+Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/role-aware-project-suite-contract.md`, `sot/project-kas-sync-state.md`, `sot/skill-plugin-wrapper-overlay-contract.md`, `sot/toolchain-local-metadata-registry.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/multi-agent-review-policy.md`, `sot/policy-promotion-governance-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`, `sot/teal-ui-workflow-policy.md`
 Evidence/source paths:
 - Governance evidence record in kanban task `t_2fb00394`
 - Blue final synthesis in kanban task `t_3e6d8b89` and Gray docs task `t_1af0dc98`
@@ -52,6 +52,7 @@ INITDOC-003
   -> CODEXSDK-001..003
   -> KASUPD-001..004
   -> KASREL-001..004
+  -> SKILL-001..006
   -> KASPROJ-001..006
   -> TOKEN-001..010
   -> GRSYNC-001..003
@@ -184,6 +185,23 @@ KASUPD deferrals unless separately approved: broad write-capable sync across mul
 KASREL-001 closure boundary phrase preserved for the accepted docs/spec-only contract: KASREL-002 through KASREL-004 remain `Planned` at KASREL-001 acceptance. Current task rows supersede that historical status only after their own implementation evidence and review gates.
 
 KASREL deferrals unless separately approved: automatic profile repair, binary rebuild/install execution, write-capable install approval, broad project-specific KAS sync, KAB Stage 2/Stage 3 activation, auth/token/gateway/provider/model mutation, and any fallback path for removed Hermes bundle skills.
+
+### EPIC: SKILL — plugin base, thin wrappers, and project overlays
+
+> Goal: replace copied profile-local KAS base suites as the target steady state with Hermes plugin base skills, thin color wrappers, and profile-local project overlays. This epic preserves project-specific optimization without forking the base skill pack.
+>
+> Source of truth: `docs/sot/skill-plugin-wrapper-overlay-contract.md`. This epic is planning-first and does not authorize profile cleanup, plugin installation into live profiles, auth/token/gateway/provider/model mutation, KAH state mutation, or KAB runtime activation by itself.
+
+| Task ID | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|
+| SKILL-001 | Accept plugin-wrapper-overlay SOT | Completed | `docs/sot/skill-plugin-wrapper-overlay-contract.md` defines KAS plugin base, Blue/Red/Orange/Gray role manifests, thin profile wrappers, project overlay layout/frontmatter, guide-skill requirements, composition semantics, doctor diagnostics, migration classes, and no-runtime/no-cleanup boundaries. `docs/README.md`, `docs/kkachi-docs-map.yaml`, and this roadmap register the SOT. | Completed with docs readback, docs-map YAML parse, `git diff --check`, focused docs verification, Red/Orange/Gray review, responsible approval, and no profile mutation or cleanup. |
+| SKILL-002 | Implement Hermes plugin package, role manifests, and plugin update surface | Planned | KAS source exposes canonical base skills through Hermes plugin registration and plugin-qualified loads, plus deterministic role manifests for Blue full set, Red review/verify, Orange review, and Gray review/final-verify. `kkachi-agent-skills update plugin --dry-run --json` reports official plugin-package changes only and never writes profile wrappers, project overlays, copied legacy suites, KAH state, KAB runtime state, or auth/token/gateway/provider/model config. | Requires non-mutating plugin load smoke, update-plugin dry-run/readback evidence, source-role manifest tests, no-copy proof, docs updates, and color review. |
+| SKILL-003 | Add thin wrapper templates and overlay guide skills | Planned | Add wrapper templates and KAS guide skills for project overlay authoring, overlay composition, and overlay doctor diagnostics. Wrapper content must remain thin and must not duplicate base skill bodies. | Requires template/readback evidence, guide skill validation, no full-base-copy scan, and review gates. |
+| SKILL-004 | Implement read-only SKILL doctor diagnostics | Planned | Doctor distinguishes plugin base, wrapper, project overlay, legacy copy, personal skill, and unknown source classes; reports missing plugin/role/wrapper, invalid overlays, shadowing, stale base versions, plugin update readiness, ambiguous update command surfaces, KAH-boundary violations, and copied base suites without writes. | Requires unit/CLI/e2e no-write tests, invalid fixture coverage, update-surface diagnostics, KAH-boundary diagnostics, and docs updates. |
+| SKILL-005 | Implement migration dry-run classifier | Planned | Existing copied KAS/KAH-like profile skills are classified as `base_identical`, `base_with_local_delta`, `project_overlay_candidate`, `role_wrapper_candidate`, `unknown_personal_skill`, or `kah_companion_surface`; output includes semantic extraction packets and no-spillover evidence without deletion. | Requires dry-run hash/evidence, fixture coverage for hwangchung/hahuyeon/yeomong/jingung-like inventories, and no-write proof. |
+| SKILL-006 | Pilot one approved profile/project migration | Planned | One exact 주군-approved profile/project target migrates from copied base material to plugin base + wrapper + project overlays with backup, no-spillover scan, recovery plan, and post-apply doctor evidence. | Requires explicit operational approval, backup/vault path, no-spillover evidence, rollback/recovery instructions, Red/Orange/Gray review, and final Blue synthesis. |
+
+SKILL deferrals unless separately approved: broad cleanup of existing profile-local KAS/KAH copies, automatic conversion of all project suites, KAH companion implementation, KAB activation, profile/gateway/provider/auth/model mutation, and promotion of project overlays into KAS base without review.
 
 
 ### EPIC: KASPROJ — project-specific KAS install suites per Hermes profile

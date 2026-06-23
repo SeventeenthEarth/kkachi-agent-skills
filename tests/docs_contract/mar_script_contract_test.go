@@ -987,7 +987,10 @@ func TestMARTL002ProviderAdaptersRoleMatrixAndVisionMetadata(t *testing.T) {
 		t.Fatalf("agy provider must pin Gemini 3.5 Flash (High) without selected_model_required: %+v", agy)
 	}
 
-	preflightOutput := runMARCommand(t, "provider-preflight")
+	// This check validates the portable source registry contract. Disable the
+	// local .kkachi toolchain overlay so developer-local resolved_argv does not
+	// rewrite adapter heads during docs-contract verification.
+	preflightOutput := runMARCommand(t, "provider-preflight", "--toolchain", "")
 	var preflight struct {
 		Attempts []struct {
 			ProviderID      string   `json:"provider_id"`

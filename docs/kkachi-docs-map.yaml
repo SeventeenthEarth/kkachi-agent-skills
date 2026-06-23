@@ -10,6 +10,7 @@ sot_docs:
   - "docs/sot/project-specific-kas-install-contract.md"
   - "docs/sot/role-aware-project-suite-contract.md"
   - "docs/sot/project-kas-sync-state.md"
+  - "docs/sot/skill-plugin-wrapper-overlay-contract.md"
   - "docs/sot/graph-workflow-sync-compatibility.md"
   - "docs/sot/task-dag-workflow-contract.md"
   - "docs/sot/token-economy-and-agent-instruction-contract.md"
