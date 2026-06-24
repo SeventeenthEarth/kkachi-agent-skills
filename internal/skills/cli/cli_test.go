@@ -171,6 +171,31 @@ func assertNoWriteEvidence(t *testing.T, payload map[string]any) {
 	}
 }
 
+func assertPluginNoWriteEvidence(t *testing.T, payload map[string]any) {
+	t.Helper()
+	noWrite, ok := payload["no_write_evidence"].(map[string]any)
+	if !ok {
+		t.Fatalf("payload missing plugin no_write_evidence: %+v", payload)
+	}
+	if noWrite["guaranteed"] != true {
+		t.Fatalf("expected guaranteed plugin no-write evidence: %+v", noWrite)
+	}
+	for _, key := range []string{
+		"profile_wrapper_write_count",
+		"project_overlay_write_count",
+		"copied_legacy_suite_write_count",
+		"kah_state_write_count",
+		"kab_runtime_mutation_count",
+		"hermes_runtime_mutation_count",
+		"auth_provider_config_write_count",
+		"profile_activation_count",
+	} {
+		if noWrite[key] != float64(0) {
+			t.Fatalf("expected %s=0 in plugin no-write evidence: %+v", key, noWrite)
+		}
+	}
+}
+
 func installCLITestFakeKAH(t *testing.T) {
 	t.Helper()
 	binDir := t.TempDir()
@@ -2374,11 +2399,118 @@ func TestUpdateDryRunLifecycleJSONAndNoWrite(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
+	code = Main([]string{"update", "project-suite", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--dry-run", "--json", "--repo", repo, "--project-root", projectRoot}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("update project-suite dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	payload = map[string]any{}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["command"] != "update" || payload["mode"] != "project_update_dry_run" || payload["dry_run"] != true {
+		t.Fatalf("unexpected update project-suite payload: %+v", payload)
+	}
+	assertNoWriteEvidence(t, payload)
+
+	stdout.Reset()
+	stderr.Reset()
 	code = Main([]string{"update", "--profile", "hwangchung", "--project", "kan-plugin", "--state", statePath, "--json"}, &stdout, &stderr, nil)
 	if code != 2 {
 		t.Fatalf("expected missing dry-run failure, got %d", code)
 	}
 	assertCLIErrorCode(t, stderr.Bytes(), "update_requires_dry_run_or_apply")
+}
+
+func TestUpdatePluginDryRunNoWrites(t *testing.T) {
+	repo := t.TempDir()
+	writeCLIPluginUpdateFixture(t, repo)
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	if err := os.MkdirAll(profileRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	beforeEntries := countRegularFiles(t, profileRoot)
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"update", "plugin", "--repo", repo, "--dry-run", "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 0 {
+		t.Fatalf("update plugin dry-run failed: code=%d stderr=%s", code, stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"namespace", "current_version", "current_source", "proposed_version", "proposed_source", "planned_changed_paths", "role_manifest_impact", "guide_skill_impact", "no_write_evidence", "suggested_doctor_command"} {
+		if _, ok := payload[field]; !ok {
+			t.Fatalf("missing required field %s in %+v", field, payload)
+		}
+	}
+	if payload["command"] != "update plugin" || payload["mode"] != "plugin_update_dry_run" || payload["dry_run"] != true {
+		t.Fatalf("unexpected update plugin payload: %+v", payload)
+	}
+	assertPluginNoWriteEvidence(t, payload)
+	if got := countRegularFiles(t, profileRoot); got != beforeEntries {
+		t.Fatalf("dry-run wrote profile files: before=%d after=%d", beforeEntries, got)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"update", "plugin", "--repo", repo, "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected non-dry-run plugin update to fail closed, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "plugin_update_requires_dry_run")
+}
+
+func writeCLIPluginUpdateFixture(t *testing.T, repo string) {
+	t.Helper()
+	skills := []string{"kkachi-final-verify", "kkachi-plan", "kkachi-review", "kkachi-verify"}
+	for _, skill := range skills {
+		writeCLITestSkill(t, filepath.Join(repo, "skills", skill), skill)
+	}
+	if err := os.MkdirAll(filepath.Join(repo, "roles"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "name: kkachi-agent-skills\nversion: 0.1.0\nplugin:\n  namespace: kkachi-agent-skills\n  package_manifest: skill-pack.yaml\n  load_policy: plugin_qualified_fail_closed\nroles:\n  blue: roles/blue.yaml\n  red: roles/red.yaml\n  orange: roles/orange.yaml\n  gray: roles/gray.yaml\nguides:\n  - kkachi-install-guide\nskills:\n"
+	for _, skill := range skills {
+		content += "  - " + skill + "\n"
+	}
+	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, role := range []struct {
+		name   string
+		skills []string
+	}{
+		{name: "blue", skills: skills},
+		{name: "red", skills: []string{"kkachi-review", "kkachi-verify"}},
+		{name: "orange", skills: []string{"kkachi-review"}},
+		{name: "gray", skills: []string{"kkachi-final-verify", "kkachi-review"}},
+	} {
+		roleContent := "version: kas-plugin-role-manifest/v1\nrole: " + role.name + "\nskills:\n"
+		for _, skill := range role.skills {
+			roleContent += "  - " + skill + "\n"
+		}
+		if err := os.WriteFile(filepath.Join(repo, "roles", role.name+".yaml"), []byte(roleContent), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func countRegularFiles(t *testing.T, root string) int {
+	t.Helper()
+	count := 0
+	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			count++
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return count
 }
 
 func TestUninstallDryRunPlansManifestTrackedOnly(t *testing.T) {

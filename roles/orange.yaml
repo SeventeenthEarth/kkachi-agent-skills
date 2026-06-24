@@ -1,0 +1,5 @@
+version: kas-plugin-role-manifest/v1
+role: orange
+description: Orange operator workflow reviewer KAS base subset.
+skills:
+  - kkachi-review

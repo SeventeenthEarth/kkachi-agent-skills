@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -257,5 +258,368 @@ func TestListRejectsNonNormalizedManifestTargetPaths(t *testing.T) {
 	}
 	if states["alpha"] != "conflict" || states["beta"] != "conflict" {
 		t.Fatalf("unexpected states: %+v", states)
+	}
+}
+
+func TestPluginQualifiedLoadSmoke(t *testing.T) {
+	repo := t.TempDir()
+	writeSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan", "Plan work")
+	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(`name: kkachi-agent-skills
+version: 0.1.0
+plugin:
+  namespace: kkachi-agent-skills
+  package_manifest: skill-pack.yaml
+  load_policy: plugin_qualified_fail_closed
+skills:
+  - kkachi-plan
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	readback, err := BuildPluginQualifiedSkillReadback(repo, "kkachi-agent-skills:plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if readback.Namespace != "kkachi-agent-skills" || readback.RequestedName != "plan" || readback.CanonicalSkillID != "kkachi-plan" || readback.PluginQualifiedName != "kkachi-agent-skills:kkachi-plan" || readback.SourcePackagePath != "skill-pack.yaml" {
+		t.Fatalf("unexpected plugin readback: %+v", readback)
+	}
+	if readback.ResolvedSkillPath != "skills/kkachi-plan/SKILL.md" || readback.PackageVersion != "0.1.0" {
+		t.Fatalf("unexpected resolved path/version: %+v", readback)
+	}
+	if readback.ProfileWrapperSource || readback.FallbackUsed {
+		t.Fatalf("plugin load must not use profile wrappers or fallback: %+v", readback)
+	}
+}
+
+func TestPluginQualifiedLoadFailsClosedWithoutPluginBase(t *testing.T) {
+	repo := t.TempDir()
+	writeSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan", "Plan work")
+	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(`name: kkachi-agent-skills
+version: 0.1.0
+plugin:
+  namespace: kkachi-agent-skills
+  package_manifest: skill-pack.yaml
+  load_policy: plugin_qualified_fail_closed
+skills:
+  - kkachi-review
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := BuildPluginQualifiedSkillReadback(repo, "kkachi-agent-skills:kkachi-plan"); err == nil || !strings.Contains(err.Error(), "official plugin base skill not registered") {
+		t.Fatalf("expected fail-closed missing base error, got %v", err)
+	}
+}
+
+func TestPluginPackageManifestValidationFailsClosed(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{
+			name: "missing plugin block",
+			content: `name: kkachi-agent-skills
+version: 0.1.0
+skills:
+  - kkachi-plan
+`,
+			want: "plugin.namespace missing",
+		},
+		{
+			name: "invalid load policy",
+			content: `name: kkachi-agent-skills
+version: 0.1.0
+plugin:
+  namespace: kkachi-agent-skills
+  package_manifest: skill-pack.yaml
+  load_policy: profile_fallback
+skills:
+  - kkachi-plan
+`,
+			want: "plugin.load_policy",
+		},
+		{
+			name: "namespace mismatch",
+			content: `name: kkachi-agent-skills
+version: 0.1.0
+plugin:
+  namespace: other-plugin
+  package_manifest: skill-pack.yaml
+  load_policy: plugin_qualified_fail_closed
+skills:
+  - kkachi-plan
+`,
+			want: "does not match top-level name",
+		},
+		{
+			name: "package manifest mismatch",
+			content: `name: kkachi-agent-skills
+version: 0.1.0
+plugin:
+  namespace: kkachi-agent-skills
+  package_manifest: other.yaml
+  load_policy: plugin_qualified_fail_closed
+skills:
+  - kkachi-plan
+`,
+			want: "plugin.package_manifest",
+		},
+		{
+			name: "unsafe skill id",
+			content: `name: kkachi-agent-skills
+version: 0.1.0
+plugin:
+  namespace: kkachi-agent-skills
+  package_manifest: skill-pack.yaml
+  load_policy: plugin_qualified_fail_closed
+skills:
+  - ../escape
+`,
+			want: "invalid plugin skill id",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(repo, "skills"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(tc.content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := LoadPluginPackage(repo); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("LoadPluginPackage error = %v, want containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestPluginQualifiedMalformedNamesFailClosed(t *testing.T) {
+	repo := t.TempDir()
+	writeSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan", "Plan work")
+	writePluginManifest(t, repo, []string{"kkachi-plan"})
+
+	for _, qualified := range []string{
+		"kkachi-agent-skills",
+		"kkachi-agent-skills:",
+		":kkachi-plan",
+		"kkachi-agent-skills:../kkachi-plan",
+		"kkachi-agent-skills:kkachi-plan:extra",
+		"kkachi-agent-skills: kkachi-plan",
+	} {
+		if _, err := BuildPluginQualifiedSkillReadback(repo, qualified); err == nil {
+			t.Fatalf("expected malformed qualified name %q to fail closed", qualified)
+		}
+	}
+}
+
+func TestSourceRoleManifestReadback(t *testing.T) {
+	repo := t.TempDir()
+	writePluginRoleFixture(t, repo)
+
+	readback, err := BuildSourceRoleManifestReadback(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if readback.Namespace != "kkachi-agent-skills" || readback.PackageVersion != "0.1.0" {
+		t.Fatalf("unexpected package readback: %+v", readback)
+	}
+	if got := readback.Roles[0].Role; got != "blue" {
+		t.Fatalf("roles not deterministic, first role = %s", got)
+	}
+	for _, role := range readback.Roles {
+		if role.SourceControlledPath == "" || role.PackageSource != "skill-pack.yaml" {
+			t.Fatalf("role missing source readback: %+v", role)
+		}
+		if !sort.StringsAreSorted(role.SkillIDs) {
+			t.Fatalf("role skills not sorted: %+v", role)
+		}
+	}
+}
+
+func TestKASRoleManifestMappings(t *testing.T) {
+	repo := t.TempDir()
+	writePluginRoleFixture(t, repo)
+
+	readback, err := BuildSourceRoleManifestReadback(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roles := map[string][]string{}
+	for _, role := range readback.Roles {
+		roles[role.Role] = role.SkillIDs
+	}
+	assertStringSlice(t, roles["blue"], []string{"kkachi-final-verify", "kkachi-plan", "kkachi-review", "kkachi-verify"})
+	assertStringSlice(t, roles["red"], []string{"kkachi-review", "kkachi-verify"})
+	assertStringSlice(t, roles["orange"], []string{"kkachi-review"})
+	assertStringSlice(t, roles["gray"], []string{"kkachi-final-verify", "kkachi-review"})
+}
+
+func TestNoProfileFallbackForPluginReadback(t *testing.T) {
+	repo := t.TempDir()
+	writeSkill(t, filepath.Join(repo, "skills", "kkachi-review"), "kkachi-review", "Review work")
+	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(`name: kkachi-agent-skills
+version: 0.1.0
+plugin:
+  namespace: kkachi-agent-skills
+  package_manifest: skill-pack.yaml
+  load_policy: plugin_qualified_fail_closed
+skills:
+  - kkachi-review
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeSkill(t, filepath.Join(profileRoot, "skills", "kkachi-plan"), "kkachi-plan", "stale copied profile skill")
+	t.Setenv("HOME", filepath.Dir(profileRoot))
+
+	if _, err := BuildPluginQualifiedSkillReadback(repo, "kkachi-agent-skills:kkachi-plan"); err == nil {
+		t.Fatal("expected official plugin base lookup to fail instead of using profile copy")
+	}
+}
+
+func TestRoleManifestValidationFailsClosed(t *testing.T) {
+	cases := []struct {
+		name       string
+		version    string
+		role       string
+		roleSkills []string
+		want       string
+	}{
+		{name: "invalid version", version: "kas-plugin-role-manifest/v0", role: "blue", roleSkills: []string{"kkachi-plan"}, want: "unsupported role manifest version"},
+		{name: "unregistered skill", version: PluginRoleManifestVersion, role: "blue", roleSkills: []string{"kkachi-unknown"}, want: "unregistered plugin skill"},
+		{name: "role mismatch", version: PluginRoleManifestVersion, role: "red", roleSkills: []string{"kkachi-plan"}, want: "declares role"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			writeSkill(t, filepath.Join(repo, "skills", "kkachi-plan"), "kkachi-plan", "Plan work")
+			writePluginManifestWithRoles(t, repo, []string{"kkachi-plan"}, map[string]string{"blue": "roles/blue.yaml"})
+			if err := os.MkdirAll(filepath.Join(repo, "roles"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			writeRoleManifestContent(t, repo, "blue", tc.version, tc.role, tc.roleSkills)
+			if _, err := BuildSourceRoleManifestReadback(repo); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("BuildSourceRoleManifestReadback error = %v, want containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCommittedPluginPackageAndRoleManifestsConsistent(t *testing.T) {
+	root := discoveryRepoRoot(t)
+	pkg, err := LoadPluginPackage(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pkg.Namespace != "kkachi-agent-skills" || pkg.TopLevelName != pkg.Namespace || pkg.LoadPolicy != PluginLoadPolicy || pkg.PackageManifest != PluginPackageManifestPath {
+		t.Fatalf("unexpected committed package metadata: %+v", pkg)
+	}
+	readback, err := BuildPluginQualifiedSkillReadback(root, "kkachi-agent-skills:plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if readback.RequestedName != "plan" || readback.CanonicalSkillID != "kkachi-plan" || readback.PluginQualifiedName != "kkachi-agent-skills:kkachi-plan" {
+		t.Fatalf("unexpected committed normalized readback: %+v", readback)
+	}
+	roles, err := BuildSourceRoleManifestReadback(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roleSkills := map[string][]string{}
+	for _, role := range roles.Roles {
+		roleSkills[role.Role] = role.SkillIDs
+	}
+	assertStringSlice(t, roleSkills["blue"], pkg.Skills)
+	assertStringSlice(t, roleSkills["red"], []string{"kkachi-review", "kkachi-verify"})
+	assertStringSlice(t, roleSkills["orange"], []string{"kkachi-review"})
+	assertStringSlice(t, roleSkills["gray"], []string{"kkachi-final-verify", "kkachi-review"})
+}
+
+func writePluginRoleFixture(t *testing.T, repo string) {
+	t.Helper()
+	skills := []string{"kkachi-final-verify", "kkachi-plan", "kkachi-review", "kkachi-verify"}
+	for _, skill := range skills {
+		writeSkill(t, filepath.Join(repo, "skills", skill), skill, skill)
+	}
+	writePluginManifestWithRoles(t, repo, skills, map[string]string{
+		"blue":   "roles/blue.yaml",
+		"red":    "roles/red.yaml",
+		"orange": "roles/orange.yaml",
+		"gray":   "roles/gray.yaml",
+	})
+	writeRoleManifest(t, repo, "blue", skills)
+	writeRoleManifest(t, repo, "red", []string{"kkachi-review", "kkachi-verify"})
+	writeRoleManifest(t, repo, "orange", []string{"kkachi-review"})
+	writeRoleManifest(t, repo, "gray", []string{"kkachi-final-verify", "kkachi-review"})
+}
+
+func writePluginManifest(t *testing.T, repo string, skills []string) {
+	t.Helper()
+	writePluginManifestWithRoles(t, repo, skills, nil)
+}
+
+func writePluginManifestWithRoles(t *testing.T, repo string, skills []string, roles map[string]string) {
+	t.Helper()
+	content := "name: kkachi-agent-skills\nversion: 0.1.0\nplugin:\n  namespace: kkachi-agent-skills\n  package_manifest: skill-pack.yaml\n  load_policy: plugin_qualified_fail_closed\n"
+	if len(roles) > 0 {
+		content += "roles:\n"
+		names := make([]string, 0, len(roles))
+		for role := range roles {
+			names = append(names, role)
+		}
+		sort.Strings(names)
+		for _, role := range names {
+			content += "  " + role + ": " + roles[role] + "\n"
+		}
+	}
+	content += "skills:\n"
+	for _, skill := range skills {
+		content += "  - " + skill + "\n"
+	}
+	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeRoleManifest(t *testing.T, repo string, role string, skills []string) {
+	t.Helper()
+	writeRoleManifestContent(t, repo, role, PluginRoleManifestVersion, role, skills)
+}
+
+func writeRoleManifestContent(t *testing.T, repo string, fileRole string, version string, role string, skills []string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(repo, "roles"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "version: " + version + "\nrole: " + role + "\nskills:\n"
+	for _, skill := range skills {
+		content += "  - " + skill + "\n"
+	}
+	if err := os.WriteFile(filepath.Join(repo, "roles", fileRole+".yaml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func discoveryRepoRoot(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
+}
+
+func assertStringSlice(t *testing.T, got []string, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	}
 }

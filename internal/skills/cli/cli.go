@@ -16,6 +16,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/graphsync"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kasstate"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/pluginupdate"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/toolchain"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
@@ -294,6 +295,12 @@ func runUpdate(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	if len(argv) > 0 && argv[0] == "agent-instructions" {
 		return runUpdateAgentInstructions(argv[1:], stdout, stderr)
 	}
+	if len(argv) > 0 && argv[0] == "plugin" {
+		return runUpdatePlugin(argv[1:], stdout, stderr)
+	}
+	if len(argv) > 0 && argv[0] == "project-suite" {
+		return runUpdate(argv[1:], stdout, stderr, env)
+	}
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	profile := fs.String("profile", "", "Hermes target profile name")
@@ -335,6 +342,36 @@ func runUpdate(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	}
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return kasstate.RenderHumanLifecycleUpdate(result)
+	})
+}
+
+func runUpdatePlugin(argv []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("update plugin", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	repo := fs.String("repo", "", "source KAS repo path")
+	dryRun := fs.Bool("dry-run", false, "report official plugin package changes without writing")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "update plugin does not accept positional arguments after the subcommand.", "update plugin", *jsonOutput, "")
+	}
+	if !*dryRun {
+		return emitError(stderr, "plugin_update_requires_dry_run", "update plugin currently supports only --dry-run; apply/write behavior is outside SKILL-002.", "update plugin", *jsonOutput, "Rerun with update plugin --dry-run --json.")
+	}
+	result, err := pluginupdate.BuildDryRun(pluginupdate.Options{Repo: *repo, DryRun: true})
+	if err != nil {
+		return emitError(stderr, "plugin_update_planner_failed", err.Error(), "update plugin", *jsonOutput, "")
+	}
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return fmt.Sprintf("Status: plugin update dry-run ready for %s.\nWrites: dry-run only; wrappers/overlays/KAH/KAB/auth/provider/model writes 0.\nNext: %s", result.Namespace, result.NextAction)
 	})
 }
 

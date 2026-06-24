@@ -1,0 +1,27 @@
+version: kas-plugin-role-manifest/v1
+role: blue
+description: Blue commander full KAS base set.
+skills:
+  - kkachi-ask
+  - kkachi-backend-select
+  - kkachi-docs-update
+  - kkachi-enhance-test
+  - kkachi-final-verify
+  - kkachi-handle-feedback
+  - kkachi-implement
+  - kkachi-improve
+  - kkachi-install-guide
+  - kkachi-multi-agent-review
+  - kkachi-optimize
+  - kkachi-orchestrate
+  - kkachi-phase-state
+  - kkachi-plan
+  - kkachi-prompt-compose
+  - kkachi-request-feedback
+  - kkachi-review
+  - kkachi-task-contract
+  - kkachi-verify
+  - kkachi-workflow-create
+  - kkachi-workflow-promote
+  - kkachi-workflow-route
+  - kkachi-workflow-trigger

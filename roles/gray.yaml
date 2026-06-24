@@ -1,0 +1,6 @@
+version: kas-plugin-role-manifest/v1
+role: gray
+description: Gray evidence trace and final verification support KAS base subset.
+skills:
+  - kkachi-final-verify
+  - kkachi-review

@@ -1,8 +1,19 @@
 name: kkachi-agent-skills
 version: 0.1.0
+plugin:
+  namespace: kkachi-agent-skills
+  package_manifest: skill-pack.yaml
+  load_policy: plugin_qualified_fail_closed
 requires:
   kkachi-agent-helper: "latest"
   kkachi-agent-bridge: "latest-or-project-policy"
+roles:
+  blue: roles/blue.yaml
+  red: roles/red.yaml
+  orange: roles/orange.yaml
+  gray: roles/gray.yaml
+guides:
+  - kkachi-install-guide
 skills:
   - kkachi-orchestrate
   - kkachi-task-contract

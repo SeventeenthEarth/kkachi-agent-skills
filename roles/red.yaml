@@ -1,0 +1,6 @@
+version: kas-plugin-role-manifest/v1
+role: red
+description: Red safety and evidence reviewer KAS base subset.
+skills:
+  - kkachi-review
+  - kkachi-verify
