@@ -72,6 +72,11 @@ Hermes profile skill tree
 
 The exact in-repo plugin package path may be chosen during SKILL-002 implementation, but the implementation must preserve these public contracts:
 
+SKILL-003 source package convention stores guide bodies at `skills/<guide-id>/SKILL.md`.
+`guides:` manifest metadata maps those source skill directories into the plugin
+guide readback surface. The target diagram above names the logical plugin guide
+surface, not a second source loader root.
+
 - KAS base skills are registered as Hermes plugin skills and are loadable through plugin-qualified names.
 - Plugin skill names do not require copying into `~/.hermes/profiles/<profile>/skills/`.
 - Color role manifests are source-controlled and deterministic.

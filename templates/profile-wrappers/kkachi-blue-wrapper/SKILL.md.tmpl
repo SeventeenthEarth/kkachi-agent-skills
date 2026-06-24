@@ -1,0 +1,52 @@
+---
+name: kkachi-blue-wrapper
+description: Thin profile-local wrapper for Blue KAS plugin skills and project overlays.
+metadata:
+  kas:
+    kind: color_wrapper
+    role: blue_commander
+    role_manifest: kkachi-agent-skills:roles/blue.yaml
+    plugin_namespace: kkachi-agent-skills
+    overlay_root: skills/<project>/kas-overlays
+    base_copy_policy: forbidden_by_default
+---
+
+# Blue KAS wrapper
+
+Use this wrapper only as a profile-local discovery and composition entrypoint.
+It points to the official KAS plugin base and project overlays; it is not a
+copy of the base KAS skill pack.
+
+When KAS phase guidance is needed, load the plugin base by qualified name:
+
+```text
+skill_view("kkachi-agent-skills:<base>")
+```
+
+Role manifest: `kkachi-agent-skills:roles/blue.yaml`
+
+Allowed base subset: the Blue commander role may use the full source-controlled
+KAS base subset declared by the role manifest. Do not infer additional
+authority from the profile name.
+
+Overlay lookup:
+
+```text
+skills/<project>/kas-overlays/<project>-blue-<base-skill>-overlay/SKILL.md
+```
+
+For overlay authoring or composition details, load:
+
+```text
+skill_view("kkachi-agent-skills:kas-project-overlay-guide")
+skill_view("kkachi-agent-skills:kas-overlay-compose-guide")
+skill_view("kkachi-agent-skills:kas-overlay-doctor-guide")
+```
+
+If the plugin base, role manifest, or overlay target is missing: stop, report
+the exact missing surface, do not use profile-local copied skills as fallback,
+and request review or approval.
+
+This wrapper does not authorize profile cleanup, wrapper rollout, KAH/KAB
+mutation, runtime/provider/model changes, copied-suite migration, or base-body
+replacement.

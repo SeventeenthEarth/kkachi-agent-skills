@@ -21,8 +21,20 @@ func TestBuildDryRunPopulatesReadbackFields(t *testing.T) {
 	if result.Namespace != "kkachi-agent-skills" || result.CurrentVersion != "0.1.0" || result.CurrentSource != "skill-pack.yaml" || result.ProposedVersion != result.CurrentVersion || result.ProposedSource != result.CurrentSource {
 		t.Fatalf("unexpected package readback: %+v", result)
 	}
-	if len(result.PlannedChangedPaths) == 0 || len(result.RoleManifestImpact) != 2 || len(result.GuideSkillImpact) != 1 {
+	if len(result.PlannedChangedPaths) == 0 || len(result.RoleManifestImpact) != 2 || len(result.GuideSkillImpact) != 3 {
 		t.Fatalf("missing impact fields: %+v", result)
+	}
+	guidePaths := map[string]string{}
+	for _, guide := range result.GuideSkillImpact {
+		guidePaths[guide.SkillID] = guide.Path
+		if guide.SourceClass != "official_plugin_guide" || guide.Impact != metadataReadbackOnly {
+			t.Fatalf("unexpected guide impact: %+v", guide)
+		}
+	}
+	for _, guide := range []string{"kas-project-overlay-guide", "kas-overlay-compose-guide", "kas-overlay-doctor-guide"} {
+		if guidePaths[guide] != "skills/"+guide+"/SKILL.md" {
+			t.Fatalf("missing guide path for %s: %+v", guide, result.GuideSkillImpact)
+		}
 	}
 	if !result.NoWriteEvidence.Guaranteed ||
 		result.NoWriteEvidence.ProfileWrapperWriteCount != 0 ||
@@ -39,7 +51,7 @@ func TestBuildDryRunPopulatesReadbackFields(t *testing.T) {
 		t.Fatalf("missing operator guidance: %+v", result)
 	}
 	if result.Diagnostics != nil {
-		t.Fatalf("SKILL-002 diagnostics should remain empty until SKILL-004, got %+v", result.Diagnostics)
+		t.Fatalf("plugin update diagnostics should remain empty until SKILL-004, got %+v", result.Diagnostics)
 	}
 }
 
@@ -76,6 +88,9 @@ func writePluginUpdateFixture(t *testing.T, repo string) {
 	for _, skill := range []string{"kkachi-plan", "kkachi-review"} {
 		writePluginUpdateSkill(t, filepath.Join(repo, "skills", skill), skill)
 	}
+	for _, guide := range []string{"kas-project-overlay-guide", "kas-overlay-compose-guide", "kas-overlay-doctor-guide"} {
+		writePluginUpdateSkill(t, filepath.Join(repo, "skills", guide), guide)
+	}
 	if err := os.MkdirAll(filepath.Join(repo, "roles"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +104,9 @@ roles:
   blue: roles/blue.yaml
   orange: roles/orange.yaml
 guides:
-  - kkachi-install-guide
+  - kas-project-overlay-guide
+  - kas-overlay-compose-guide
+  - kas-overlay-doctor-guide
 skills:
   - kkachi-plan
   - kkachi-review

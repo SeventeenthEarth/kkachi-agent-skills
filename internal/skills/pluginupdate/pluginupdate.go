@@ -44,8 +44,10 @@ type RoleManifestImpact struct {
 }
 
 type GuideSkillImpact struct {
-	SkillID string `json:"skill_id"`
-	Impact  string `json:"impact"`
+	SkillID     string `json:"skill_id"`
+	Path        string `json:"path"`
+	SourceClass string `json:"source_class"`
+	Impact      string `json:"impact"`
 }
 
 type Result struct {
@@ -70,13 +72,17 @@ type Result struct {
 
 func BuildDryRun(opts Options) (Result, error) {
 	if !opts.DryRun {
-		return Result{}, fmt.Errorf("plugin update supports --dry-run only for SKILL-002")
+		return Result{}, fmt.Errorf("plugin update currently supports --dry-run only; apply/write behavior is outside the implemented SKILL scope")
 	}
 	pkg, err := discovery.LoadPluginPackage(opts.Repo)
 	if err != nil {
 		return Result{}, err
 	}
 	roles, err := discovery.BuildSourceRoleManifestReadback(opts.Repo)
+	if err != nil {
+		return Result{}, err
+	}
+	guides, err := discovery.BuildSourceGuideSkillReadback(opts.Repo)
 	if err != nil {
 		return Result{}, err
 	}
@@ -103,8 +109,14 @@ func BuildDryRun(opts Options) (Result, error) {
 		result.RoleManifestImpact = append(result.RoleManifestImpact, RoleManifestImpact{Role: role.Role, Path: role.SourceControlledPath, Skills: append([]string(nil), role.SkillIDs...)})
 		result.PlannedChangedPaths = append(result.PlannedChangedPaths, PathPlan{Path: role.SourceControlledPath, Action: readbackOnlyAction, Source: "source_role_manifest"})
 	}
-	for _, guide := range pkg.GuideSkills {
-		result.GuideSkillImpact = append(result.GuideSkillImpact, GuideSkillImpact{SkillID: guide, Impact: metadataReadbackOnly})
+	for _, guide := range guides.Guides {
+		result.GuideSkillImpact = append(result.GuideSkillImpact, GuideSkillImpact{
+			SkillID:     guide.SkillID,
+			Path:        guide.SourceControlledPath,
+			SourceClass: guide.SourceClass,
+			Impact:      metadataReadbackOnly,
+		})
+		result.PlannedChangedPaths = append(result.PlannedChangedPaths, PathPlan{Path: guide.SourceControlledPath, Action: readbackOnlyAction, Source: guide.SourceClass})
 	}
 	sort.Slice(result.PlannedChangedPaths, func(i, j int) bool {
 		if result.PlannedChangedPaths[i].Path == result.PlannedChangedPaths[j].Path {

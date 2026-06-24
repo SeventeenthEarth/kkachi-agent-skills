@@ -14,6 +14,9 @@ roles:
   gray: roles/gray.yaml
 guides:
   - kkachi-install-guide
+  - kas-project-overlay-guide
+  - kas-overlay-compose-guide
+  - kas-overlay-doctor-guide
 skills:
   - kkachi-orchestrate
   - kkachi-task-contract

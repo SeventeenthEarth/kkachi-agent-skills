@@ -364,7 +364,7 @@ func runUpdatePlugin(argv []string, stdout io.Writer, stderr io.Writer) int {
 		return emitError(stderr, "unexpected_argument", "update plugin does not accept positional arguments after the subcommand.", "update plugin", *jsonOutput, "")
 	}
 	if !*dryRun {
-		return emitError(stderr, "plugin_update_requires_dry_run", "update plugin currently supports only --dry-run; apply/write behavior is outside SKILL-002.", "update plugin", *jsonOutput, "Rerun with update plugin --dry-run --json.")
+		return emitError(stderr, "plugin_update_requires_dry_run", "update plugin currently supports only --dry-run; apply/write behavior is outside the implemented SKILL scope.", "update plugin", *jsonOutput, "Rerun with update plugin --dry-run --json.")
 	}
 	result, err := pluginupdate.BuildDryRun(pluginupdate.Options{Repo: *repo, DryRun: true})
 	if err != nil {

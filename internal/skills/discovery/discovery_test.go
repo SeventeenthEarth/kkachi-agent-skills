@@ -439,6 +439,47 @@ func TestSourceRoleManifestReadback(t *testing.T) {
 	}
 }
 
+func TestSourceGuideSkillReadback(t *testing.T) {
+	repo := t.TempDir()
+	writePluginRoleFixture(t, repo)
+	writePluginGuide(t, repo, "kas-project-overlay-guide")
+	writePluginManifestWithRolesAndGuides(t, repo, []string{"kkachi-final-verify", "kkachi-plan", "kkachi-review", "kkachi-verify"}, map[string]string{
+		"blue":   "roles/blue.yaml",
+		"red":    "roles/red.yaml",
+		"orange": "roles/orange.yaml",
+		"gray":   "roles/gray.yaml",
+	}, []string{"kas-project-overlay-guide"})
+
+	readback, err := BuildSourceGuideSkillReadback(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if readback.Namespace != "kkachi-agent-skills" || readback.PackageVersion != "0.1.0" {
+		t.Fatalf("unexpected guide package readback: %+v", readback)
+	}
+	assertGuideReadback(t, readback.Guides, map[string]string{
+		"kas-project-overlay-guide": "skills/kas-project-overlay-guide/SKILL.md",
+	})
+	if readback.Guides[0].SourceClass != "official_plugin_guide" {
+		t.Fatalf("unexpected guide source class: %+v", readback.Guides[0])
+	}
+}
+
+func TestSourceGuideSkillReadbackFailsClosedOnMissingGuideFile(t *testing.T) {
+	repo := t.TempDir()
+	writePluginRoleFixture(t, repo)
+	writePluginManifestWithRolesAndGuides(t, repo, []string{"kkachi-final-verify", "kkachi-plan", "kkachi-review", "kkachi-verify"}, map[string]string{
+		"blue":   "roles/blue.yaml",
+		"red":    "roles/red.yaml",
+		"orange": "roles/orange.yaml",
+		"gray":   "roles/gray.yaml",
+	}, []string{"kas-project-overlay-guide"})
+
+	if _, err := BuildSourceGuideSkillReadback(repo); err == nil || !strings.Contains(err.Error(), "official plugin guide skill file missing") {
+		t.Fatalf("expected missing guide file to fail closed, got %v", err)
+	}
+}
+
 func TestKASRoleManifestMappings(t *testing.T) {
 	repo := t.TempDir()
 	writePluginRoleFixture(t, repo)
@@ -455,6 +496,25 @@ func TestKASRoleManifestMappings(t *testing.T) {
 	assertStringSlice(t, roles["red"], []string{"kkachi-review", "kkachi-verify"})
 	assertStringSlice(t, roles["orange"], []string{"kkachi-review"})
 	assertStringSlice(t, roles["gray"], []string{"kkachi-final-verify", "kkachi-review"})
+}
+
+func TestCommittedPluginPackageGuideSkillsConsistent(t *testing.T) {
+	root := discoveryRepoRoot(t)
+	readback, err := BuildSourceGuideSkillReadback(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertGuideReadback(t, readback.Guides, map[string]string{
+		"kas-overlay-compose-guide": "skills/kas-overlay-compose-guide/SKILL.md",
+		"kas-overlay-doctor-guide":  "skills/kas-overlay-doctor-guide/SKILL.md",
+		"kas-project-overlay-guide": "skills/kas-project-overlay-guide/SKILL.md",
+		"kkachi-install-guide":      "skills/kkachi-install-guide/SKILL.md",
+	})
+	for _, guide := range readback.Guides {
+		if guide.SourceClass != "official_plugin_guide" || guide.PackageSource != PluginPackageManifestPath {
+			t.Fatalf("unexpected committed guide metadata: %+v", guide)
+		}
+	}
 }
 
 func TestNoProfileFallbackForPluginReadback(t *testing.T) {
@@ -563,6 +623,11 @@ func writePluginManifest(t *testing.T, repo string, skills []string) {
 
 func writePluginManifestWithRoles(t *testing.T, repo string, skills []string, roles map[string]string) {
 	t.Helper()
+	writePluginManifestWithRolesAndGuides(t, repo, skills, roles, nil)
+}
+
+func writePluginManifestWithRolesAndGuides(t *testing.T, repo string, skills []string, roles map[string]string, guides []string) {
+	t.Helper()
 	content := "name: kkachi-agent-skills\nversion: 0.1.0\nplugin:\n  namespace: kkachi-agent-skills\n  package_manifest: skill-pack.yaml\n  load_policy: plugin_qualified_fail_closed\n"
 	if len(roles) > 0 {
 		content += "roles:\n"
@@ -575,6 +640,12 @@ func writePluginManifestWithRoles(t *testing.T, repo string, skills []string, ro
 			content += "  " + role + ": " + roles[role] + "\n"
 		}
 	}
+	if len(guides) > 0 {
+		content += "guides:\n"
+		for _, guide := range guides {
+			content += "  - " + guide + "\n"
+		}
+	}
 	content += "skills:\n"
 	for _, skill := range skills {
 		content += "  - " + skill + "\n"
@@ -582,6 +653,11 @@ func writePluginManifestWithRoles(t *testing.T, repo string, skills []string, ro
 	if err := os.WriteFile(filepath.Join(repo, "skill-pack.yaml"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func writePluginGuide(t *testing.T, repo string, guide string) {
+	t.Helper()
+	writeSkill(t, filepath.Join(repo, "skills", guide), guide, guide)
 }
 
 func writeRoleManifest(t *testing.T, repo string, role string, skills []string) {
@@ -620,6 +696,18 @@ func assertStringSlice(t *testing.T, got []string, want []string) {
 	for i := range got {
 		if got[i] != want[i] {
 			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}
+
+func assertGuideReadback(t *testing.T, got []GuideSkillReadback, want map[string]string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("got guides %+v, want %v", got, want)
+	}
+	for _, guide := range got {
+		if wantPath, ok := want[guide.SkillID]; !ok || guide.SourceControlledPath != wantPath {
+			t.Fatalf("unexpected guide readback: %+v want %v", guide, want)
 		}
 	}
 }

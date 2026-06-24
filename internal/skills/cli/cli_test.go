@@ -2447,6 +2447,26 @@ func TestUpdatePluginDryRunNoWrites(t *testing.T) {
 	if payload["command"] != "update plugin" || payload["mode"] != "plugin_update_dry_run" || payload["dry_run"] != true {
 		t.Fatalf("unexpected update plugin payload: %+v", payload)
 	}
+	guideImpact, ok := payload["guide_skill_impact"].([]any)
+	if !ok {
+		t.Fatalf("guide_skill_impact missing or wrong type: %+v", payload)
+	}
+	guidePaths := map[string]string{}
+	for _, entry := range guideImpact {
+		guide := entry.(map[string]any)
+		guidePaths[guide["skill_id"].(string)] = guide["path"].(string)
+		if guide["source_class"] != "official_plugin_guide" || guide["impact"] != "metadata_readback_only" {
+			t.Fatalf("unexpected guide impact entry: %+v", guide)
+		}
+	}
+	for _, guide := range []string{"kas-project-overlay-guide", "kas-overlay-compose-guide", "kas-overlay-doctor-guide"} {
+		if guidePaths[guide] != "skills/"+guide+"/SKILL.md" {
+			t.Fatalf("missing guide path for %s in %+v", guide, guideImpact)
+		}
+	}
+	if diagnostics, ok := payload["diagnostics"].([]any); ok && len(diagnostics) != 0 {
+		t.Fatalf("expected diagnostics to remain empty until SKILL-004: %+v", diagnostics)
+	}
 	assertPluginNoWriteEvidence(t, payload)
 	if got := countRegularFiles(t, profileRoot); got != beforeEntries {
 		t.Fatalf("dry-run wrote profile files: before=%d after=%d", beforeEntries, got)
@@ -2467,10 +2487,13 @@ func writeCLIPluginUpdateFixture(t *testing.T, repo string) {
 	for _, skill := range skills {
 		writeCLITestSkill(t, filepath.Join(repo, "skills", skill), skill)
 	}
+	for _, guide := range []string{"kas-project-overlay-guide", "kas-overlay-compose-guide", "kas-overlay-doctor-guide"} {
+		writeCLITestSkill(t, filepath.Join(repo, "skills", guide), guide)
+	}
 	if err := os.MkdirAll(filepath.Join(repo, "roles"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	content := "name: kkachi-agent-skills\nversion: 0.1.0\nplugin:\n  namespace: kkachi-agent-skills\n  package_manifest: skill-pack.yaml\n  load_policy: plugin_qualified_fail_closed\nroles:\n  blue: roles/blue.yaml\n  red: roles/red.yaml\n  orange: roles/orange.yaml\n  gray: roles/gray.yaml\nguides:\n  - kkachi-install-guide\nskills:\n"
+	content := "name: kkachi-agent-skills\nversion: 0.1.0\nplugin:\n  namespace: kkachi-agent-skills\n  package_manifest: skill-pack.yaml\n  load_policy: plugin_qualified_fail_closed\nroles:\n  blue: roles/blue.yaml\n  red: roles/red.yaml\n  orange: roles/orange.yaml\n  gray: roles/gray.yaml\nguides:\n  - kas-project-overlay-guide\n  - kas-overlay-compose-guide\n  - kas-overlay-doctor-guide\nskills:\n"
 	for _, skill := range skills {
 		content += "  - " + skill + "\n"
 	}

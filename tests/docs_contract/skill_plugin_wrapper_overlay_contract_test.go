@@ -1,6 +1,9 @@
 package docscontract
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 const skillPluginWrapperOverlaySOT = "docs/sot/skill-plugin-wrapper-overlay-contract.md"
 
@@ -58,5 +61,79 @@ func TestSKILLDocsRegistrationAndRoadmap(t *testing.T) {
 		"plugin update readiness, ambiguous update command surfaces, KAH-boundary violations",
 		"| SKILL-006 | Pilot one approved profile/project migration | Planned |",
 		"no profile mutation or cleanup",
+	})
+}
+
+func TestSKILL003WrapperTemplatesAndGuidesAreThinAndConcrete(t *testing.T) {
+	wrappers := []string{
+		"templates/profile-wrappers/kkachi-blue-wrapper/SKILL.md.tmpl",
+		"templates/profile-wrappers/kkachi-red-wrapper/SKILL.md.tmpl",
+		"templates/profile-wrappers/kkachi-orange-wrapper/SKILL.md.tmpl",
+		"templates/profile-wrappers/kkachi-gray-wrapper/SKILL.md.tmpl",
+	}
+	for _, wrapper := range wrappers {
+		requireContainsAll(t, wrapper, []string{
+			"kind: color_wrapper",
+			"role_manifest: kkachi-agent-skills:roles/",
+			"plugin_namespace: kkachi-agent-skills",
+			"overlay_root: skills/<project>/kas-overlays",
+			`skill_view("kkachi-agent-skills:<base>")`,
+			"Allowed base subset:",
+			"stop, report",
+			"do not use profile-local copied skills as fallback",
+			"This wrapper does not authorize profile cleanup",
+		})
+		content := readRepoFile(t, wrapper)
+		if strings.Count(content, "# ") > 1 {
+			t.Fatalf("%s looks like a copied base body, heading count too high", wrapper)
+		}
+		if len(content) > 2200 {
+			t.Fatalf("%s is too large for a thin wrapper template: %d bytes", wrapper, len(content))
+		}
+	}
+
+	requireContainsAll(t, "skills/kas-project-overlay-guide/SKILL.md", []string{
+		"skills/<project>/kas-overlays/<project>-<role>-<base-skill>-overlay/SKILL.md",
+		"overlay_for: kkachi-agent-skills:plan",
+		"overlay_for: kkachi-plan",
+		"Stop and request review",
+	})
+	requireContainsAll(t, "skills/kas-overlay-compose-guide/SKILL.md", []string{
+		"current context:",
+		"project overlay:",
+		"wrapper:",
+		"plugin base:",
+		`skill_view("kkachi-agent-skills:plan")`,
+		"Conflict Handling",
+	})
+	requireContainsAll(t, "skills/kas-overlay-doctor-guide/SKILL.md", []string{
+		"non-executing guidance only",
+		"SKILL-004 owns the",
+		"implemented read-only doctor diagnostics",
+		"required plugin base skill missing",
+		"overlay_for is `kkachi-plan`",
+		"profile-local full KAS base copy present",
+	})
+}
+
+func TestSKILL003GuidePackageConventionAndReadbackContract(t *testing.T) {
+	requireContainsAll(t, "skill-pack.yaml", []string{
+		"guides:",
+		"kas-project-overlay-guide",
+		"kas-overlay-compose-guide",
+		"kas-overlay-doctor-guide",
+	})
+	requireContainsAll(t, skillPluginWrapperOverlaySOT, []string{
+		"source package convention stores guide bodies at `skills/<guide-id>/SKILL.md`",
+		"`guides:` manifest metadata maps those source skill directories into the plugin",
+		"guide readback surface",
+	})
+	requireContainsAll(t, "internal/skills/discovery/plugin.go", []string{
+		"official_plugin_guide",
+		"BuildSourceGuideSkillReadback",
+	})
+	requireContainsAll(t, "internal/skills/pluginupdate/pluginupdate.go", []string{
+		"GuideSkillImpact",
+		"SourceClass",
 	})
 }

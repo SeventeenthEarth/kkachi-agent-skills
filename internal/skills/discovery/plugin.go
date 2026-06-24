@@ -46,6 +46,13 @@ type SourceRoleManifestReadback struct {
 	Roles          []RoleManifestReadback `json:"roles"`
 }
 
+type SourceGuideSkillReadback struct {
+	Namespace      string               `json:"namespace"`
+	PackageVersion string               `json:"package_version"`
+	PackageSource  string               `json:"package_source"`
+	Guides         []GuideSkillReadback `json:"guides"`
+}
+
 type RoleManifestReadback struct {
 	Role                 string   `json:"role"`
 	SourceControlledPath string   `json:"source_controlled_path"`
@@ -53,6 +60,14 @@ type RoleManifestReadback struct {
 	PackageSource        string   `json:"package_source"`
 	PackageVersion       string   `json:"package_version"`
 	SkillIDs             []string `json:"skill_ids"`
+}
+
+type GuideSkillReadback struct {
+	SkillID              string `json:"skill_id"`
+	SourceControlledPath string `json:"source_controlled_path"`
+	SourceClass          string `json:"source_class"`
+	PackageSource        string `json:"package_source"`
+	PackageVersion       string `json:"package_version"`
 }
 
 func LoadPluginPackage(repo string) (PluginPackage, error) {
@@ -98,6 +113,11 @@ func LoadPluginPackage(repo string) (PluginPackage, error) {
 	sort.Strings(pkg.Skills)
 	if pkg.RoleManifests == nil {
 		pkg.RoleManifests = map[string]string{}
+	}
+	for _, guideID := range pkg.GuideSkills {
+		if invalidPluginSkillID(guideID) {
+			return PluginPackage{}, fmt.Errorf("invalid plugin guide id in %s: %s", PluginPackageManifestPath, guideID)
+		}
 	}
 	sort.Strings(pkg.GuideSkills)
 	return pkg, nil
@@ -187,6 +207,32 @@ func BuildSourceRoleManifestReadback(repo string) (SourceRoleManifestReadback, e
 			PackageSource:        pkg.ManifestPath,
 			PackageVersion:       pkg.Version,
 			SkillIDs:             manifest.SkillIDs,
+		})
+	}
+	return readback, nil
+}
+
+func BuildSourceGuideSkillReadback(repo string) (SourceGuideSkillReadback, error) {
+	sourceRepo, err := FindSourceRepo(repo)
+	if err != nil {
+		return SourceGuideSkillReadback{}, err
+	}
+	pkg, err := LoadPluginPackage(sourceRepo)
+	if err != nil {
+		return SourceGuideSkillReadback{}, err
+	}
+	readback := SourceGuideSkillReadback{Namespace: pkg.Namespace, PackageVersion: pkg.Version, PackageSource: pkg.ManifestPath}
+	for _, guideID := range pkg.GuideSkills {
+		guidePath := filepath.ToSlash(filepath.Join("skills", guideID, "SKILL.md"))
+		if !isFile(filepath.Join(sourceRepo, filepath.FromSlash(guidePath))) {
+			return SourceGuideSkillReadback{}, fmt.Errorf("official plugin guide skill file missing: %s", guidePath)
+		}
+		readback.Guides = append(readback.Guides, GuideSkillReadback{
+			SkillID:              guideID,
+			SourceControlledPath: guidePath,
+			SourceClass:          "official_plugin_guide",
+			PackageSource:        pkg.ManifestPath,
+			PackageVersion:       pkg.Version,
 		})
 	}
 	return readback, nil
