@@ -2481,6 +2481,203 @@ func TestUpdatePluginDryRunNoWrites(t *testing.T) {
 	assertCLIErrorCode(t, stderr.Bytes(), "plugin_update_requires_dry_run")
 }
 
+func TestDoctorPluginModeJSONHumanAndAmbiguousFlags(t *testing.T) {
+	repo := t.TempDir()
+	writeCLIPluginUpdateFixture(t, repo)
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeCLISkillDoctorWrapper(t, filepath.Join(profileRoot, "skills", "kkachi-blue-wrapper"))
+	writeCLISkillDoctorOverlay(t, filepath.Join(profileRoot, "skills", "doksuri", "kas-overlays", "doksuri-blue-plan-overlay"), "kkachi-agent-skills:plan")
+	before := countRegularFiles(t, profileRoot)
+
+	var stdout, stderr bytes.Buffer
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+	code := Main([]string{"doctor", "--plugin", "--repo", repo, "--profile", "demo", "--profile-root", profileRoot, "--project", "doksuri", "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("doctor --plugin failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["command"] != "doctor" || payload["mode"] != "skill_plugin_overlay_doctor" || payload["ok"] != true {
+		t.Fatalf("unexpected plugin doctor payload: %+v", payload)
+	}
+	if payload["no_write"].(map[string]any)["guaranteed"] != true {
+		t.Fatalf("missing no-write evidence: %+v", payload)
+	}
+	for _, field := range []string{"provenance_contract_version", "source_class_evidence", "dependency_audit", "skill_dependencies", "command_surface_dependencies", "deleted_bundle_reference", "deleted_bundle_diagnostics"} {
+		if _, ok := payload[field]; !ok {
+			t.Fatalf("missing KASREL field %s in %+v", field, payload)
+		}
+	}
+	for _, field := range []string{"source_class_evidence", "skill_dependencies", "command_surface_dependencies", "deleted_bundle_diagnostics"} {
+		if _, ok := payload[field].([]any); !ok {
+			t.Fatalf("KASREL field %s should be an explicit array: %+v", field, payload[field])
+		}
+	}
+	counts := payload["summary"].(map[string]any)["counts_by_source_class"].(map[string]any)
+	for _, sourceClass := range []string{"plugin_base", "color_wrapper", "project_overlay"} {
+		if counts[sourceClass].(float64) == 0 {
+			t.Fatalf("missing source class %s in %+v", sourceClass, counts)
+		}
+	}
+	if got := countRegularFiles(t, profileRoot); got != before {
+		t.Fatalf("doctor --plugin wrote profile files: before=%d after=%d", before, got)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"doctor", "--plugin", "--repo", repo, "--profile", "demo", "--profile-root", profileRoot, "--no-color"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("doctor --plugin human failed: code=%d stderr=%s", code, stderr.String())
+	}
+	for _, want := range []string{"Status:", "SKILL plugin/wrapper/overlay doctor", "Writes:", "Next:"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("human output missing %q: %s", want, stdout.String())
+		}
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"doctor", "--plugin", "--workflow-graph", "--repo", repo, "--project", t.TempDir(), "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected ambiguous mode failure, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "doctor_mode_ambiguous")
+}
+
+func TestDoctorPluginModeFailsClosedOnCopiedBaseFallback(t *testing.T) {
+	repo := t.TempDir()
+	writeCLIPluginUpdateFixture(t, repo)
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeCLITestSkill(t, filepath.Join(profileRoot, "skills", "kkachi-plan"), "kkachi-plan")
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"doctor", "--plugin", "--repo", repo, "--profile", "demo", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 2 {
+		t.Fatalf("expected copied base fallback failure, got code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != false || payload["mode"] != "skill_plugin_overlay_doctor" {
+		t.Fatalf("unexpected failure payload: %+v", payload)
+	}
+	reasons := map[string]bool{}
+	for _, raw := range payload["reason_codes"].([]any) {
+		reasons[raw.(string)] = true
+	}
+	for _, want := range []string{"legacy_copied_base_suite_present", "profile_skill_shadows_plugin_base", "missing_wrapper_evidence"} {
+		if !reasons[want] {
+			t.Fatalf("missing reason code %s in %+v", want, reasons)
+		}
+	}
+	if !strings.Contains(payload["next_action"].(string), "Do not fall back") {
+		t.Fatalf("next_action should forbid fallback: %+v", payload)
+	}
+}
+
+func TestDoctorPluginModeRequiresExplicitRepo(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"doctor", "--plugin", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected missing repo failure, got code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "repo_required_for_plugin_doctor")
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout on missing repo failure, got %q", stdout.String())
+	}
+}
+
+func TestDoctorPluginModeRejectsProfileRootOverrideWithoutHarnessGuard(t *testing.T) {
+	repo := t.TempDir()
+	writeCLIPluginUpdateFixture(t, repo)
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"doctor", "--plugin", "--repo", repo, "--profile", "demo", "--profile-root", filepath.Join(t.TempDir(), "profile"), "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected profile-root guard failure, got code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "profile_root_override_rejected")
+}
+
+func TestDoctorPluginModeFailsClosedOnMissingRegisteredBaseFile(t *testing.T) {
+	repo := t.TempDir()
+	writeCLIPluginUpdateFixture(t, repo)
+	if err := os.Remove(filepath.Join(repo, "skills", "kkachi-plan", "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"doctor", "--plugin", "--repo", repo, "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected missing base file failure, got code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	reasons := map[string]bool{}
+	for _, raw := range payload["reason_codes"].([]any) {
+		reasons[raw.(string)] = true
+	}
+	if !reasons["missing_plugin_base_skill"] {
+		t.Fatalf("missing reason code in %+v", payload)
+	}
+}
+
+func TestDoctorPluginModeFailsClosedOnWrapperMismatchAndOverlayShadowing(t *testing.T) {
+	repo := t.TempDir()
+	writeCLIPluginUpdateFixture(t, repo)
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeCLISkillDoctorMismatchedWrapper(t, filepath.Join(profileRoot, "skills", "kkachi-blue-wrapper"))
+	writeCLISkillDoctorOverlay(t, filepath.Join(profileRoot, "skills", "doksuri", "kas-overlays", "kkachi-plan"), "kkachi-agent-skills:plan")
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"doctor", "--plugin", "--repo", repo, "--profile", "demo", "--profile-root", profileRoot, "--project", "doksuri", "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 2 {
+		t.Fatalf("expected wrapper/overlay failure, got code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	reasons := map[string]bool{}
+	for _, raw := range payload["reason_codes"].([]any) {
+		reasons[raw.(string)] = true
+	}
+	for _, want := range []string{"wrapper_role_manifest_mismatch", "project_overlay_shadows_plugin_base"} {
+		if !reasons[want] {
+			t.Fatalf("missing reason code %s in %+v", want, payload)
+		}
+	}
+}
+
+func TestDoctorPluginModeFailsClosedOnProviderModelOverlayKeys(t *testing.T) {
+	repo := t.TempDir()
+	writeCLIPluginUpdateFixture(t, repo)
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeCLISkillDoctorWrapper(t, filepath.Join(profileRoot, "skills", "kkachi-blue-wrapper"))
+	writeCLISkillDoctorOverlayWithBody(t, filepath.Join(profileRoot, "skills", "doksuri", "kas-overlays", "provider-model-overlay"), "kkachi-agent-skills:plan", "provider: openai\nmodel: gpt-5\n")
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"doctor", "--plugin", "--repo", repo, "--profile", "demo", "--profile-root", profileRoot, "--project", "doksuri", "--json"}, &stdout, &stderr, map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"})
+	if code != 2 {
+		t.Fatalf("expected provider/model overlay failure, got code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	reasons := map[string]bool{}
+	for _, raw := range payload["reason_codes"].([]any) {
+		reasons[raw.(string)] = true
+	}
+	if !reasons["overlay_runtime_config_boundary_violation"] {
+		t.Fatalf("missing runtime boundary reason in %+v", payload)
+	}
+}
+
 func writeCLIPluginUpdateFixture(t *testing.T, repo string) {
 	t.Helper()
 	skills := []string{"kkachi-final-verify", "kkachi-plan", "kkachi-review", "kkachi-verify"}
@@ -2516,6 +2713,78 @@ func writeCLIPluginUpdateFixture(t *testing.T, repo string) {
 		if err := os.WriteFile(filepath.Join(repo, "roles", role.name+".yaml"), []byte(roleContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func writeCLISkillDoctorWrapper(t *testing.T, dir string) {
+	t.Helper()
+	content := `---
+name: kkachi-blue-wrapper
+metadata:
+  kas:
+    kind: color_wrapper
+    role: blue_commander
+    role_manifest: kkachi-agent-skills:roles/blue.yaml
+    plugin_namespace: kkachi-agent-skills
+    overlay_root: skills/<project>/kas-overlays
+---
+# Wrapper
+`
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeCLISkillDoctorMismatchedWrapper(t *testing.T, dir string) {
+	t.Helper()
+	content := `---
+name: kkachi-blue-wrapper
+metadata:
+  kas:
+    kind: color_wrapper
+    role: red_reviewer
+    role_manifest: kkachi-agent-skills:roles/blue.yaml
+    plugin_namespace: kkachi-agent-skills
+    overlay_root: skills/<project>/kas-overlays
+---
+# Wrapper
+`
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeCLISkillDoctorOverlay(t *testing.T, dir string, overlayFor string) {
+	t.Helper()
+	writeCLISkillDoctorOverlayWithBody(t, dir, overlayFor, "")
+}
+
+func writeCLISkillDoctorOverlayWithBody(t *testing.T, dir string, overlayFor string, body string) {
+	t.Helper()
+	content := `---
+name: doksuri-blue-plan-overlay
+metadata:
+  kas:
+    kind: project_overlay
+    project: doksuri
+    role: blue_commander
+    overlay_for: ` + overlayFor + `
+    merge_mode: additive_constraints
+    base_version: "0.1.0"
+---
+# Overlay
+` + body
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -447,6 +447,7 @@ func runDoctor(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	project := fs.String("project", "", "KAH project path to inspect; project suite id when --project-suite is present")
 	projectSuite := fs.Bool("project-suite", false, "interpret --project as a project-specific KAS suite id")
 	workflowGraph := fs.Bool("workflow-graph", false, "inspect project .kkachi-workflow.yaml supportability without writing")
+	pluginDoctor := fs.Bool("plugin", false, "inspect SKILL plugin/wrapper/overlay diagnostics without writing")
 	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
 	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
 	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
@@ -460,6 +461,30 @@ func runDoctor(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	}
 	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
 		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "doctor", *jsonOutput, "")
+	}
+	if *pluginDoctor {
+		if *workflowGraph || *projectSuite {
+			return emitError(stderr, "doctor_mode_ambiguous", "doctor --plugin cannot be combined with --workflow-graph or --project-suite.", "doctor", *jsonOutput, "Rerun with exactly one doctor mode: --plugin, --workflow-graph, --project-suite, or default profile doctor.")
+		}
+		if *repo == "" {
+			return emitError(stderr, "repo_required_for_plugin_doctor", "doctor --plugin requires --repo <kas-repo> so read-only source evidence is explicit and no embedded source cache materialization is needed.", "doctor", *jsonOutput, "Rerun with doctor --plugin --repo <kas-repo> --json.")
+		}
+		result, err := doctor.BuildSkill(*repo, doctor.SkillOptions{Profile: *profile, Project: *project, ProfileRoot: *profileRoot})
+		if err != nil {
+			return emitError(stderr, "doctor_failed", err.Error(), "doctor", *jsonOutput, "")
+		}
+		out := stdout
+		code := 0
+		if !result.OK {
+			out = stderr
+			code = 2
+		}
+		if *jsonOutput {
+			_ = writeJSON(out, result)
+		} else {
+			fmt.Fprintln(out, doctor.RenderHumanSkill(result))
+		}
+		return code
 	}
 	if *workflowGraph {
 		if *projectSuite {

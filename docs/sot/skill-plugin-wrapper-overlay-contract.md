@@ -250,7 +250,9 @@ KAH has no implementation responsibility for `update plugin`. KAH may later reco
 
 ## 11. Doctor, manifest, and diagnostic semantics
 
-KAS doctor must gain a read-only SKILL mode before any cleanup/apply behavior.
+KAS doctor has a read-only SKILL mode exposed as `kkachi-agent-skills doctor --plugin --repo <kas-repo> --json`. This mode is diagnostic-only: it reads explicit source plugin package evidence, role manifests, profile wrappers, project overlays, copied base-suite evidence, personal skills, and unknown profile skills, then reports reason-coded JSON/human diagnostics without writing. `--repo` is required for plugin doctor mode so the source evidence root is explicit and embedded source cache materialization is not part of the no-write claim. It is incompatible with `--workflow-graph` and `--project-suite`; mixed doctor modes fail closed with `doctor_mode_ambiguous` and bounded next-action guidance.
+
+The `doctor --plugin --json` packet includes KASREL readback fields for review readiness checks: `provenance_contract_version`, `source_class_evidence`, `dependency_audit`, `skill_dependencies`, `command_surface_dependencies`, `deleted_bundle_reference`, and `deleted_bundle_diagnostics`. These fields are non-secret readback evidence only; absent evidence is emitted as explicit empty arrays or `null` and does not authorize profile mutation, KAB activation, provider/model configuration, deleted-bundle fallback lookup, or install readiness by assumption.
 
 Minimum diagnostics:
 
@@ -272,7 +274,7 @@ Minimum diagnostics:
 | `update` command surface remains ambiguous | warning before cutover, error after cutover | Operators must be able to distinguish plugin update from project-suite update and agent-instruction update. |
 | KAH appears to own KAS plugin update/install | error | Boundary violation; KAH may preserve evidence refs only. |
 
-Doctor output must distinguish `plugin_base`, `wrapper`, `project_overlay`, `legacy_copy`, `personal_skill`, and `unknown` source classes. It must not delete, rewrite, or adopt profile-local skills without explicit dry-run/apply approval.
+Doctor output must distinguish `plugin_base`, `color_wrapper`, `project_overlay`, `legacy_copied_base_suite`, `personal_skill`, and `unknown_source` source classes. It must not delete, rewrite, or adopt profile-local skills without explicit dry-run/apply approval. Missing plugin, role, wrapper, or overlay evidence must produce diagnostics; profile-local copied suites are never a fallback for missing plugin/wrapper/overlay evidence.
 
 ## 12. Migration policy
 

@@ -24,6 +24,9 @@ func TestSKILLPluginWrapperOverlaySOTDefinesArchitecture(t *testing.T) {
 		"`namespace`, `current_version`, `current_source`, `proposed_version`, `proposed_source`, `planned_changed_paths`, `role_manifest_impact`, `guide_skill_impact`, `no_write_evidence`, and `suggested_doctor_command`",
 		"`suggested_doctor_command` is a non-executing recommendation string only",
 		"`diagnostics` is intentionally empty until SKILL-004",
+		"kkachi-agent-skills doctor --plugin --repo <kas-repo> --json",
+		"`--repo` is required for plugin doctor mode",
+		"`doctor_mode_ambiguous`",
 		"The explicit scoped surface is `update project-suite ...`; the bare `update ...` command remains a backward-compatible legacy alias",
 		"KAH has no implementation responsibility for `update plugin`",
 		"Profile-local full KAS base copy present | warning during migration, error after cutover",
@@ -56,6 +59,8 @@ func TestSKILLDocsRegistrationAndRoadmap(t *testing.T) {
 		"### EPIC: SKILL",
 		"| SKILL-001 | Accept plugin-wrapper-overlay SOT | Completed |",
 		"| SKILL-002 | Implement Hermes plugin package, role manifests, and plugin update surface | In Review |",
+		"| SKILL-004 | Implement read-only SKILL doctor diagnostics | In Review |",
+		"`doctor --plugin --repo <kas-repo>` distinguishes `plugin_base`, `color_wrapper`, `project_overlay`, `legacy_copied_base_suite`, `personal_skill`, and `unknown_source`",
 		"`update project-suite` is the explicit scoped project-suite lifecycle alias",
 		"Do not mark Completed until color review and final KAH gate pass",
 		"plugin update readiness, ambiguous update command surfaces, KAH-boundary violations",
@@ -135,5 +140,30 @@ func TestSKILL003GuidePackageConventionAndReadbackContract(t *testing.T) {
 	requireContainsAll(t, "internal/skills/pluginupdate/pluginupdate.go", []string{
 		"GuideSkillImpact",
 		"SourceClass",
+	})
+}
+
+func TestSKILL004DoctorCommandContract(t *testing.T) {
+	requireContainsAll(t, skillPluginWrapperOverlaySOT, []string{
+		"KAS doctor has a read-only SKILL mode exposed as `kkachi-agent-skills doctor --plugin --repo <kas-repo> --json`",
+		"diagnostic-only",
+		"`--repo` is required for plugin doctor mode",
+		"`provenance_contract_version`, `source_class_evidence`, `dependency_audit`, `skill_dependencies`, `command_surface_dependencies`, `deleted_bundle_reference`, and `deleted_bundle_diagnostics`",
+		"does not authorize profile mutation, KAB activation, provider/model configuration, deleted-bundle fallback lookup, or install readiness by assumption",
+		"without writing",
+		"incompatible with `--workflow-graph` and `--project-suite`",
+		"mixed doctor modes fail closed with `doctor_mode_ambiguous`",
+		"`plugin_base`, `color_wrapper`, `project_overlay`, `legacy_copied_base_suite`, `personal_skill`, and `unknown_source`",
+		"profile-local copied suites are never a fallback",
+	})
+	requireContainsAll(t, "internal/skills/doctor/skill.go", []string{
+		"skill_plugin_overlay_doctor",
+		"legacy_copied_base_suite",
+		"missing_plugin_base_skill",
+		"Do not fall back to copied profile-local KAS suites",
+	})
+	requireContainsAll(t, "internal/skills/cli/cli.go", []string{
+		"doctor --plugin cannot be combined with --workflow-graph or --project-suite",
+		"repo_required_for_plugin_doctor",
 	})
 }

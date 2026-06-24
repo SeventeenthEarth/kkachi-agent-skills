@@ -395,6 +395,38 @@ func TestWorkflowGraphDoctorE2ENoWrite(t *testing.T) {
 	}
 }
 
+func TestSkillPluginDoctorE2ENoWrite(t *testing.T) {
+	root := repoRoot(t)
+	binary := buildRootBinary(t)
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeE2ESkillDoctorWrapper(t, filepath.Join(profileRoot, "skills", "kkachi-blue-wrapper"))
+	writeE2ESkillDoctorOverlay(t, filepath.Join(profileRoot, "skills", "doksuri", "kas-overlays", "doksuri-blue-plan-overlay"), "kkachi-agent-skills:plan")
+	before := treeHash(t, profileRoot)
+
+	cmd := exec.Command(binary, "doctor", "--repo", root, "--plugin", "--profile", "e2e", "--profile-root", profileRoot, "--project", "doksuri", "--json")
+	cmd.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("SKILL plugin doctor failed: %v\n%s", err, out)
+	}
+	if after := treeHash(t, profileRoot); after != before {
+		t.Fatalf("SKILL plugin doctor mutated profile tree: before=%s after=%s", before, after)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["mode"] != "skill_plugin_overlay_doctor" || payload["no_write"].(map[string]any)["guaranteed"] != true {
+		t.Fatalf("unexpected SKILL doctor payload: %+v", payload)
+	}
+	counts := payload["summary"].(map[string]any)["counts_by_source_class"].(map[string]any)
+	for _, sourceClass := range []string{"plugin_base", "color_wrapper", "project_overlay"} {
+		if counts[sourceClass].(float64) == 0 {
+			t.Fatalf("missing source class %s in %+v", sourceClass, counts)
+		}
+	}
+}
+
 func TestWorkflowGraphRepairProposalAndApplyE2E(t *testing.T) {
 	root := repoRoot(t)
 	binary := buildRootBinary(t)
@@ -1079,6 +1111,51 @@ func e2eRunGit(t *testing.T, dir string, args ...string) string {
 		t.Fatalf("git %v failed: %v\n%s", args, err, out)
 	}
 	return string(out)
+}
+
+func writeE2ESkillDoctorWrapper(t *testing.T, dir string) {
+	t.Helper()
+	content := `---
+name: kkachi-blue-wrapper
+metadata:
+  kas:
+    kind: color_wrapper
+    role: blue_commander
+    role_manifest: kkachi-agent-skills:roles/blue.yaml
+    plugin_namespace: kkachi-agent-skills
+    overlay_root: skills/<project>/kas-overlays
+---
+# Wrapper
+`
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeE2ESkillDoctorOverlay(t *testing.T, dir string, overlayFor string) {
+	t.Helper()
+	content := `---
+name: doksuri-blue-plan-overlay
+metadata:
+  kas:
+    kind: project_overlay
+    project: doksuri
+    role: blue_commander
+    overlay_for: ` + overlayFor + `
+    merge_mode: additive_constraints
+    base_version: "0.1.0"
+---
+# Overlay
+`
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func e2eValidKASState() string {
