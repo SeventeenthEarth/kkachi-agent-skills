@@ -167,3 +167,35 @@ func TestSKILL004DoctorCommandContract(t *testing.T) {
 		"repo_required_for_plugin_doctor",
 	})
 }
+
+func TestSKILL005MigrationClassifierCommandContract(t *testing.T) {
+	requireContainsAll(t, skillPluginWrapperOverlaySOT, []string{
+		"`kkachi-agent-skills migrate-profile-skills --repo <kas-repo> --profile <profile> --dry-run --json`",
+		"dry-run/report-only",
+		"`bucket`, hash/provenance evidence, semantic extraction packets, diagnostics, `no_write_evidence`, `no_spillover_evidence`, `forbidden_actions`, `owner`, `review_required`, `recovery_hint`, and `next_action`",
+		"Its default profile root is `~/.hermes/profiles/<profile>`",
+		"has no approve/apply/delete/migrate mode",
+		"Missing or ambiguous profile inventory, hashes, KASREL provenance/dependency evidence, ownership boundaries, unreadable skills, or auth/token/gateway/provider/model/runtime content fails closed",
+	})
+	requireContainsAll(t, "docs/roadmap.md", []string{
+		"| SKILL-005 | Implement migration dry-run classifier | In Review |",
+		"`migrate-profile-skills --dry-run --json` classifies existing copied KAS/KAH-like profile skills",
+		"Do not mark Completed until focused tests, aggregate feasible tests, `git diff --check`, KAH gates, color review/MAR as required, and final KAH gate pass.",
+	})
+	requireContainsAll(t, "internal/skills/cli/cli.go", []string{
+		"migrate-profile-skills",
+		"migration_classifier_requires_dry_run",
+		"migration_classifier_mode_ambiguous",
+	})
+	requireContainsAll(t, "internal/skills/migrationclassifier/migrationclassifier.go", []string{
+		"profile_skill_migration_classifier",
+		"base_identical",
+		"base_with_local_delta",
+		"project_overlay_candidate",
+		"role_wrapper_candidate",
+		"unknown_personal_skill",
+		"kah_companion_surface",
+		"no_write_evidence",
+		"no_spillover_evidence",
+	})
+}

@@ -427,6 +427,105 @@ func TestSkillPluginDoctorE2ENoWrite(t *testing.T) {
 	}
 }
 
+func TestMigrateProfileSkillsE2ENoWrite(t *testing.T) {
+	root := repoRoot(t)
+	binary := buildRootBinary(t)
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	sourcePlan, err := os.ReadFile(filepath.Join(root, "skills", "kkachi-plan", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(profileRoot, "skills", "kkachi-plan"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profileRoot, "skills", "kkachi-plan", "SKILL.md"), sourcePlan, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeE2ESkill(t, filepath.Join(profileRoot, "skills", "kkachi-review"), "kkachi-review", "# kkachi-review\nlocal delta\n")
+	writeE2ESkillDoctorWrapper(t, filepath.Join(profileRoot, "skills", "kkachi-blue-wrapper"))
+	writeE2ESkillDoctorOverlay(t, filepath.Join(profileRoot, "skills", "doksuri", "kas-overlays", "doksuri-blue-plan-overlay"), "kkachi-agent-skills:plan")
+	writeE2ESkill(t, filepath.Join(profileRoot, "skills", "personal-note"), "personal-note", "# personal-note\n")
+	writeE2ESkill(t, filepath.Join(profileRoot, "skills", "kah-companion"), "kah-companion", "# KAH companion\nkkachi-agent-helper handoff\n")
+	before := treeHash(t, profileRoot)
+
+	cmd := exec.Command(binary, "migrate-profile-skills", "--repo", root, "--profile", "hwangchung", "--profile-root", profileRoot, "--project", "doksuri", "--dry-run", "--json")
+	cmd.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("migrate-profile-skills failed: %v\n%s", err, out)
+	}
+	if after := treeHash(t, profileRoot); after != before {
+		t.Fatalf("migrate-profile-skills mutated profile tree: before=%s after=%s", before, after)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatal(err)
+	}
+	noWrite := payload["no_write_evidence"].(map[string]any)
+	noSpillover := payload["no_spillover_evidence"].(map[string]any)
+	if payload["ok"] != true || payload["mode"] != "profile_skill_migration_classifier" || noWrite["guaranteed"] != true {
+		t.Fatalf("unexpected migration classifier payload: %+v", payload)
+	}
+	for _, field := range []string{"profile_skill_write_count", "profile_skill_delete_count", "profile_skill_migration_count", "kah_state_write_count", "kab_runtime_mutation_count", "hermes_runtime_mutation_count", "auth_provider_config_write_count"} {
+		if noWrite[field].(float64) != 0 {
+			t.Fatalf("unexpected no-write counter %s in %+v", field, noWrite)
+		}
+	}
+	if noSpillover["external_project_write_count"].(float64) != 0 || noSpillover["unrequested_profile_touched"].(bool) {
+		t.Fatalf("unexpected no-spillover counters: %+v", noSpillover)
+	}
+	counts := payload["summary"].(map[string]any)["counts_by_bucket"].(map[string]any)
+	for _, bucket := range []string{"base_identical", "base_with_local_delta", "project_overlay_candidate", "role_wrapper_candidate", "unknown_personal_skill", "kah_companion_surface"} {
+		if counts[bucket].(float64) == 0 {
+			t.Fatalf("missing bucket %s in %+v", bucket, counts)
+		}
+	}
+}
+
+func TestMigrateProfileSkillsE2EDefaultHermesProfileRoot(t *testing.T) {
+	root := repoRoot(t)
+	binary := buildRootBinary(t)
+	home := t.TempDir()
+	profile := "yeomong-default"
+	profileRoot := filepath.Join(home, ".hermes", "profiles", profile)
+	sourcePlan, err := os.ReadFile(filepath.Join(root, "skills", "kkachi-plan", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(profileRoot, "skills", "kkachi-plan"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profileRoot, "skills", "kkachi-plan", "SKILL.md"), sourcePlan, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before := treeHash(t, profileRoot)
+
+	cmd := exec.Command(binary, "migrate-profile-skills", "--repo", root, "--profile", profile, "--dry-run", "--json")
+	cmd.Env = append(os.Environ(), "HOME="+home)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("migrate-profile-skills default root failed: %v\n%s", err, out)
+	}
+	if after := treeHash(t, profileRoot); after != before {
+		t.Fatalf("migrate-profile-skills default root mutated profile tree: before=%s after=%s", before, after)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(out, &payload); err != nil {
+		t.Fatal(err)
+	}
+	want, err := filepath.Abs(profileRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := payload["target_profile"].(map[string]any)
+	if target["root"] != want {
+		t.Fatalf("target_profile.root = %q, want %q", target["root"], want)
+	}
+	if payload["ok"] != true || payload["summary"].(map[string]any)["counts_by_bucket"].(map[string]any)["base_identical"].(float64) != 1 {
+		t.Fatalf("unexpected default-root classifier payload: %+v", payload)
+	}
+}
+
 func TestWorkflowGraphRepairProposalAndApplyE2E(t *testing.T) {
 	root := repoRoot(t)
 	binary := buildRootBinary(t)
@@ -1075,6 +1174,11 @@ func writeE2ESkillPack(t *testing.T, dir string, name string, body string) {
 	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func writeE2ESkill(t *testing.T, dir string, name string, body string) {
+	t.Helper()
+	writeE2ESkillPack(t, dir, name, body)
 }
 
 func e2eChecksumFor(t *testing.T, dir string) string {

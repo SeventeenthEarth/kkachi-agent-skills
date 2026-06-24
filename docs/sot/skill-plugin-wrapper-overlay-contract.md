@@ -289,6 +289,8 @@ Migration must be dry-run-first and classify each profile-local KAS-like skill a
 - `unknown_personal_skill`: preserve and request review;
 - `kah_companion_surface`: belongs to KAH or a paired KAS/KAH migration task, not silent KAS-only cleanup.
 
+KAS exposes the SKILL-005 classifier as `kkachi-agent-skills migrate-profile-skills --repo <kas-repo> --profile <profile> --dry-run --json`. The command is dry-run/report-only: it emits per-item `bucket`, hash/provenance evidence, semantic extraction packets, diagnostics, `no_write_evidence`, `no_spillover_evidence`, `forbidden_actions`, `owner`, `review_required`, `recovery_hint`, and `next_action`; human output must state dry-run/report-only, no writes performed, no deletion or migration authorized, and the next approval gate. Its default profile root is `~/.hermes/profiles/<profile>`; `--profile-root` remains a guarded test/harness override. It has no approve/apply/delete/migrate mode. Missing or ambiguous profile inventory, hashes, KASREL provenance/dependency evidence, ownership boundaries, unreadable skills, or auth/token/gateway/provider/model/runtime content fails closed with review-required diagnostics rather than fallback classification.
+
 Apply must require explicit 주군 approval for exact profiles/projects, backup/vault evidence, no-spillover scan, recovery instructions, and post-apply doctor evidence. This SOT alone does not authorize deleting the currently observed copied profile skills.
 
 ## 13. Relationship to existing SOTs

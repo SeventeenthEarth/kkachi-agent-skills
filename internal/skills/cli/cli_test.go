@@ -25,6 +25,16 @@ func writeCLITestSkill(t *testing.T, dir string, name string) {
 	}
 }
 
+func writeCLITestSkillWithBody(t *testing.T, dir string, name string, body string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: "+name+"\n---\n# "+name+"\n"+body+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func cliRepoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
@@ -2675,6 +2685,220 @@ func TestDoctorPluginModeFailsClosedOnProviderModelOverlayKeys(t *testing.T) {
 	}
 	if !reasons["overlay_runtime_config_boundary_violation"] {
 		t.Fatalf("missing runtime boundary reason in %+v", payload)
+	}
+}
+
+func TestMigrateProfileSkillsDryRunJSONHumanAndGuards(t *testing.T) {
+	repo := t.TempDir()
+	writeCLIPluginUpdateFixture(t, repo)
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	writeCLITestSkill(t, filepath.Join(profileRoot, "skills", "kkachi-plan"), "kkachi-plan")
+	writeCLITestSkillWithBody(t, filepath.Join(profileRoot, "skills", "kkachi-review"), "kkachi-review", "local delta")
+	writeCLISkillDoctorWrapper(t, filepath.Join(profileRoot, "skills", "kkachi-blue-wrapper"))
+	writeCLISkillDoctorOverlay(t, filepath.Join(profileRoot, "skills", "doksuri", "kas-overlays", "doksuri-blue-plan-overlay"), "kkachi-agent-skills:plan")
+	writeCLITestSkill(t, filepath.Join(profileRoot, "skills", "personal-note"), "personal-note")
+	writeCLITestSkillWithBody(t, filepath.Join(profileRoot, "skills", "kah-companion"), "kah-companion", "KAH companion surface for kkachi-agent-helper handoff")
+	before := countRegularFiles(t, profileRoot)
+	env := map[string]string{"KAS_ALLOW_PROFILE_ROOT_OVERRIDE": "1"}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"migrate-profile-skills", "--repo", repo, "--profile", "hwangchung", "--profile-root", profileRoot, "--project", "doksuri", "--dry-run", "--json"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("migrate-profile-skills failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["command"] != "migrate-profile-skills" || payload["mode"] != "profile_skill_migration_classifier" || payload["ok"] != true {
+		t.Fatalf("unexpected classifier payload: %+v", payload)
+	}
+	noWrite := payload["no_write_evidence"].(map[string]any)
+	noSpillover := payload["no_spillover_evidence"].(map[string]any)
+	if noWrite["guaranteed"] != true || noSpillover["guaranteed"] != true {
+		t.Fatalf("missing dry-run proof fields: %+v", payload)
+	}
+	for _, field := range []string{"profile_skill_write_count", "profile_skill_delete_count", "profile_skill_migration_count", "kah_state_write_count", "kab_runtime_mutation_count", "hermes_runtime_mutation_count", "auth_provider_config_write_count"} {
+		if noWrite[field].(float64) != 0 {
+			t.Fatalf("unexpected no-write counter %s in %+v", field, noWrite)
+		}
+	}
+	if noSpillover["external_project_write_count"].(float64) != 0 || noSpillover["unrequested_profile_touched"].(bool) {
+		t.Fatalf("unexpected no-spillover counters: %+v", noSpillover)
+	}
+	counts := payload["summary"].(map[string]any)["counts_by_bucket"].(map[string]any)
+	for _, bucket := range []string{"base_identical", "base_with_local_delta", "project_overlay_candidate", "role_wrapper_candidate", "unknown_personal_skill", "kah_companion_surface"} {
+		if counts[bucket].(float64) == 0 {
+			t.Fatalf("missing bucket %s in %+v", bucket, counts)
+		}
+	}
+	items := payload["items"].([]any)
+	first := items[0].(map[string]any)
+	for _, field := range []string{"bucket", "hash_evidence", "provenance_evidence", "semantic_extraction_packet", "diagnostics", "forbidden_actions", "next_action", "owner", "review_required", "recovery_hint"} {
+		if _, ok := first[field]; !ok {
+			t.Fatalf("missing per-item field %s in %+v", field, first)
+		}
+	}
+	for _, field := range []string{"provenance_contract_version", "source_class_evidence", "dependency_audit", "skill_dependencies", "command_surface_dependencies", "deleted_bundle_reference", "deleted_bundle_diagnostics"} {
+		if _, ok := payload[field]; !ok {
+			t.Fatalf("missing KASREL field %s in %+v", field, payload)
+		}
+	}
+	if got := countRegularFiles(t, profileRoot); got != before {
+		t.Fatalf("migrate-profile-skills wrote profile files: before=%d after=%d", before, got)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"migrate-profile-skills", "--repo", repo, "--profile", "hwangchung", "--profile-root", profileRoot, "--dry-run", "--no-color"}, &stdout, &stderr, env)
+	if code != 0 {
+		t.Fatalf("migrate-profile-skills human failed: code=%d stderr=%s", code, stderr.String())
+	}
+	for _, want := range []string{"dry-run/report-only", "no writes performed", "no deletion, migration", "Next approval gate"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("human output missing %q: %s", want, stdout.String())
+		}
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"migrate-profile-skills", "--repo", repo, "--profile", "hwangchung", "--profile-root", profileRoot, "--dry-run", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected profile-root guard failure, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "profile_root_override_rejected")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"migrate-profile-skills", "--repo", repo, "--profile", "hwangchung", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected dry-run required failure, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "migration_classifier_requires_dry_run")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"migrate-profile-skills", "--repo", repo, "--profile", "hwangchung", "--dry-run", "--apply", "dry-run:sha256:abc", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected apply flag rejection, got %d", code)
+	}
+	assertCLIErrorCode(t, stderr.Bytes(), "migration_classifier_mode_ambiguous")
+
+	for _, args := range [][]string{
+		{"migrate-profile-skills", "--repo", repo, "--profile", "hwangchung", "--dry-run", "--delete", "--json"},
+		{"migrate-profile-skills", "--repo", repo, "--profile", "hwangchung", "--dry-run", "--migrate", "--json"},
+	} {
+		stdout.Reset()
+		stderr.Reset()
+		code = Main(args, &stdout, &stderr, nil)
+		if code != 2 {
+			t.Fatalf("expected mode rejection for %v, got %d", args, code)
+		}
+		assertCLIErrorCode(t, stderr.Bytes(), "migration_classifier_mode_ambiguous")
+	}
+}
+
+func TestMigrateProfileSkillsDefaultProfileRootUsesHermesHome(t *testing.T) {
+	repo := t.TempDir()
+	home := t.TempDir()
+	profile := "hahuyeon-default"
+	profileRoot := filepath.Join(home, ".hermes", "profiles", profile)
+	t.Setenv("HOME", home)
+	writeCLIPluginUpdateFixture(t, repo)
+	sourcePlan, err := os.ReadFile(filepath.Join(repo, "skills", "kkachi-plan", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(profileRoot, "skills", "kkachi-plan"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profileRoot, "skills", "kkachi-plan", "SKILL.md"), sourcePlan, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"migrate-profile-skills", "--repo", repo, "--profile", profile, "--dry-run", "--json"}, &stdout, &stderr, nil)
+	if code != 0 {
+		t.Fatalf("migrate-profile-skills default-root failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	want, err := filepath.Abs(profileRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := payload["target_profile"].(map[string]any)
+	if target["root"] != want {
+		t.Fatalf("target_profile.root = %q, want %q", target["root"], want)
+	}
+	counts := payload["summary"].(map[string]any)["counts_by_bucket"].(map[string]any)
+	if counts["base_identical"].(float64) != 1 {
+		t.Fatalf("missing base_identical default-root classification: %+v", payload)
+	}
+}
+
+func TestMigrateProfileSkillsDefaultProfileRootFailsClosedWhenMissing(t *testing.T) {
+	repo := t.TempDir()
+	home := t.TempDir()
+	profile := "missing-default"
+	t.Setenv("HOME", home)
+	writeCLIPluginUpdateFixture(t, repo)
+
+	var stdout, stderr bytes.Buffer
+	code := Main([]string{"migrate-profile-skills", "--repo", repo, "--profile", profile, "--dry-run", "--json"}, &stdout, &stderr, nil)
+	if code != 2 {
+		t.Fatalf("expected missing default-root failure: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	target := payload["target_profile"].(map[string]any)
+	want, err := filepath.Abs(filepath.Join(home, ".hermes", "profiles", profile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != false || target["state"] != "missing" || target["root"] != want {
+		t.Fatalf("unexpected missing default-root payload: %+v", payload)
+	}
+	reasons := map[string]bool{}
+	for _, raw := range payload["reason_codes"].([]any) {
+		reasons[raw.(string)] = true
+	}
+	if !reasons["profile_missing"] || !strings.Contains(target["root"].(string), filepath.Join(".hermes", "profiles")) {
+		t.Fatalf("missing profile_missing default-root evidence: %+v", payload)
+	}
+}
+
+func TestMigrateProfileSkillsRejectsUnsafeProfileNames(t *testing.T) {
+	repo := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeCLIPluginUpdateFixture(t, repo)
+
+	for _, profile := range []string{"..", ".", "team/blue", `team\blue`} {
+		var stdout, stderr bytes.Buffer
+		code := Main([]string{"migrate-profile-skills", "--repo", repo, "--profile", profile, "--dry-run", "--json"}, &stdout, &stderr, nil)
+		if code != 2 {
+			t.Fatalf("expected unsafe profile %q to fail closed: code=%d stdout=%s stderr=%s", profile, code, stdout.String(), stderr.String())
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(stderr.Bytes(), &payload); err != nil {
+			t.Fatal(err)
+		}
+		target := payload["target_profile"].(map[string]any)
+		if payload["ok"] != false || target["state"] != "invalid" || target["root"] != "" {
+			t.Fatalf("unexpected unsafe profile payload for %q: %+v", profile, payload)
+		}
+		reasons := map[string]bool{}
+		for _, raw := range payload["reason_codes"].([]any) {
+			reasons[raw.(string)] = true
+		}
+		if !reasons["profile_invalid"] {
+			t.Fatalf("missing profile_invalid reason for %q: %+v", profile, payload)
+		}
 	}
 }
 

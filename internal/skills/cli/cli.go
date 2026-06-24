@@ -16,6 +16,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/graphsync"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kasstate"
+	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/migrationclassifier"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/pluginupdate"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/toolchain"
@@ -44,7 +45,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, toolchain, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, or version command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, migrate-profile-skills, toolchain, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, or version command", "", false, "")
 	}
 	if isVersionArg(argv[0]) {
 		return runVersion(argv[1:], stdout, stderr)
@@ -64,6 +65,8 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runDoctor(argv[1:], stdout, stderr, env)
 	case "repair":
 		return runRepair(argv[1:], stdout, stderr, env)
+	case "migrate-profile-skills":
+		return runMigrateProfileSkills(argv[1:], stdout, stderr, env)
 	case "toolchain":
 		return runToolchain(argv[1:], stdout, stderr, env)
 	case "workflow-create":
@@ -87,7 +90,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 	case "migrate-project-kas":
 		return runMigrateProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, toolchain, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, migrate-profile-skills, toolchain, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
 	}
 }
 
@@ -621,6 +624,55 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	result.NextAction = publicRepairNextAction(result, approval != "")
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return projectinstall.RenderHumanProjectAction(result)
+	})
+}
+
+func runMigrateProfileSkills(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
+	fs := flag.NewFlagSet("migrate-profile-skills", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	repo := fs.String("repo", "", "source KAS repo path")
+	profile := fs.String("profile", "", "Hermes target profile name")
+	project := fs.String("project", "", "optional project id used only for candidate readback")
+	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
+	dryRun := fs.Bool("dry-run", false, "required; report migration classification without writing")
+	approve := fs.String("approve", "", "unsupported; SKILL-005 has no approval/apply mode")
+	apply := fs.String("apply", "", "unsupported; SKILL-005 has no approval/apply mode")
+	deleteFlag := fs.Bool("delete", false, "unsupported; SKILL-005 never deletes profile skills")
+	migrateFlag := fs.Bool("migrate", false, "unsupported; SKILL-005 never migrates profile skills")
+	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
+	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
+	if hasHelpArg(argv) {
+		fs.SetOutput(stdout)
+		fs.Usage()
+		return 0
+	}
+	if err := fs.Parse(argv); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		return emitError(stderr, "unexpected_argument", "migrate-profile-skills does not accept positional arguments.", "migrate-profile-skills", *jsonOutput, "")
+	}
+	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
+		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "migrate-profile-skills", *jsonOutput, "")
+	}
+	if !*dryRun {
+		return emitError(stderr, "migration_classifier_requires_dry_run", "migrate-profile-skills is report-only for SKILL-005 and requires --dry-run.", "migrate-profile-skills", *jsonOutput, "Rerun with migrate-profile-skills --repo <kas-repo> --profile <profile> --dry-run --json.")
+	}
+	if *approve != "" || *apply != "" || *deleteFlag || *migrateFlag {
+		return emitError(stderr, "migration_classifier_mode_ambiguous", "migrate-profile-skills has no approve/apply/delete/migrate mode; SKILL-005 is dry-run/report-only.", "migrate-profile-skills", *jsonOutput, "Rerun with only --dry-run; use a later approved SKILL-006-like flow for any mutation.")
+	}
+	if *repo == "" {
+		return emitError(stderr, "repo_required", "migrate-profile-skills requires --repo <kas-repo> so source evidence is explicit.", "migrate-profile-skills", *jsonOutput, "")
+	}
+	if *profile == "" {
+		return emitError(stderr, "profile_required", "migrate-profile-skills requires --profile <profile>.", "migrate-profile-skills", *jsonOutput, "")
+	}
+	result, err := migrationclassifier.Build(*repo, migrationclassifier.Options{Profile: *profile, Project: *project, ProfileRoot: *profileRoot})
+	if err != nil {
+		return emitError(stderr, "migration_classifier_failed", err.Error(), "migrate-profile-skills", *jsonOutput, "")
+	}
+	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
+		return migrationclassifier.RenderHuman(result)
 	})
 }
 
@@ -1452,6 +1504,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  update   Classify project KAS updates, or update agent-instructions")
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
 	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
+	fmt.Fprintln(w, "  migrate-profile-skills  Classify copied profile skills without writing")
 	fmt.Fprintln(w, "  toolchain  Generate and validate ignored .kkachi/toolchain.yaml")
 	fmt.Fprintln(w, "  workflow-create   Plan custom task-DAG workflow candidates without writing")
 	fmt.Fprintln(w, "  workflow-promote  Propose run-local workflow promotion without writing")
