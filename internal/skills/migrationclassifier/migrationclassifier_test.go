@@ -146,6 +146,123 @@ func TestBuildDefaultProfileRootUsesHermesProfilesUnderHome(t *testing.T) {
 	}
 }
 
+func TestBuildPreservesNoWriteEvidenceWithDirectorySymlinkInProfileRoot(t *testing.T) {
+	repo := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "hwangchung-profile")
+	targetDir := filepath.Join(t.TempDir(), "uv-archive")
+	writeClassifierRepo(t, repo)
+	writeClassifierSkill(t, filepath.Join(profileRoot, "skills", "kkachi-plan"), "kkachi-plan", "base plan")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "pyvenv.cfg"), []byte("home = /tmp\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	linkDir := filepath.Join(profileRoot, "home", ".cache", "uv", "environments-v2", "a")
+	if err := os.MkdirAll(linkDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(targetDir, filepath.Join(linkDir, "symlink-dir")); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Build(repo, Options{Profile: "hwangchung", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || hasReason(result, "profile_hash_unavailable") {
+		t.Fatalf("directory symlink should not break profile hash evidence: %+v", result)
+	}
+	if !result.NoWriteEvidence.ProfileTreeUnchanged || !result.NoSpilloverEvidence.ProfileTreeHashMatch {
+		t.Fatalf("missing no-write evidence with directory symlink: %+v %+v", result.NoWriteEvidence, result.NoSpilloverEvidence)
+	}
+}
+
+func TestBuildPreservesNoWriteEvidenceWithDirectorySymlinkInSkillsTree(t *testing.T) {
+	repo := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "hwangchung-profile")
+	targetDir := filepath.Join(t.TempDir(), "shared-skill-assets")
+	writeClassifierRepo(t, repo)
+	writeClassifierSkill(t, filepath.Join(profileRoot, "skills", "kkachi-plan"), "kkachi-plan", "base plan")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "README.md"), []byte("shared asset\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	linkDir := filepath.Join(profileRoot, "skills", "kkachi-plan", "references")
+	if err := os.MkdirAll(linkDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(targetDir, filepath.Join(linkDir, "shared-assets")); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Build(repo, Options{Profile: "hwangchung", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || hasReason(result, "profile_hash_unavailable") {
+		t.Fatalf("directory symlink inside skills tree should not break profile hash evidence: %+v", result)
+	}
+	if !result.NoWriteEvidence.ProfileTreeUnchanged || !result.NoSpilloverEvidence.ProfileTreeHashMatch {
+		t.Fatalf("missing no-write evidence with skills-tree directory symlink: %+v %+v", result.NoWriteEvidence, result.NoSpilloverEvidence)
+	}
+}
+
+func TestRuntimeConfigDetectionIgnoresProseModelLabel(t *testing.T) {
+	repo := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "hwangchung-profile")
+	writeClassifierRepo(t, repo)
+	writeClassifierSkill(t, filepath.Join(profileRoot, "skills", "kkachi-plan"), "kkachi-plan", "Do not implement from chat-only instruction. KAS/KAH development uses a staged KAB adoption model: Stage 1 records evidence.\n")
+
+	result, err := Build(repo, Options{Profile: "hwangchung", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || hasReason(result, "runtime_config_boundary_violation") {
+		t.Fatalf("prose model label should not trigger runtime config boundary violation: %+v", result)
+	}
+
+	writeClassifierSkill(t, filepath.Join(profileRoot, "skills", "kkachi-review"), "kkachi-review", "provider: openai\n")
+	result, err = Build(repo, Options{Profile: "hwangchung", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || !hasReason(result, "runtime_config_boundary_violation") {
+		t.Fatalf("actual provider config key should still fail closed: %+v", result)
+	}
+}
+
+func TestNoWriteEvidenceHashesStableSkillsTreeNotVolatileProfileHome(t *testing.T) {
+	repo := t.TempDir()
+	profileRoot := filepath.Join(t.TempDir(), "hwangchung-profile")
+	writeClassifierRepo(t, repo)
+	writeClassifierSkill(t, filepath.Join(profileRoot, "skills", "kkachi-plan"), "kkachi-plan", "base plan")
+	volatileDir := filepath.Join(profileRoot, "home", ".codex")
+	if err := os.MkdirAll(volatileDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(volatileDir, "logs.sqlite-wal"), []byte("volatile runtime state\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	skillsHash, err := treeSHA256(filepath.Join(profileRoot, "skills"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Build(repo, Options{Profile: "hwangchung", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK {
+		t.Fatalf("volatile profile home should not block skill migration classifier: %+v", result)
+	}
+	if result.NoWriteEvidence.ProfileTreeHashBefore != skillsHash || result.NoWriteEvidence.ProfileTreeHashAfter != skillsHash {
+		t.Fatalf("no-write hashes should cover stable skills tree: before=%s after=%s skills=%s", result.NoWriteEvidence.ProfileTreeHashBefore, result.NoWriteEvidence.ProfileTreeHashAfter, skillsHash)
+	}
+}
+
 func TestBuildDefaultProfileRootFailsClosedWhenMissing(t *testing.T) {
 	repo := t.TempDir()
 	home := t.TempDir()

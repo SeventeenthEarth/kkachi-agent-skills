@@ -256,29 +256,35 @@ func Build(repo string, opts Options) (Result, error) {
 		return result, nil
 	}
 
-	before, err := treeSHA256(profileRoot)
+	skillsRoot := filepath.Join(profileRoot, "skills")
+	// No-write proof is intentionally scoped to profile skills. Active Hermes
+	// profile homes contain volatile runtime/cache state (for example Codex WALs
+	// and telemetry) that can change during a dry-run without any skill mutation.
+	// Broader profile/runtime spillover remains covered by explicit mutation
+	// counters and forbidden-surface diagnostics, not this stable tree hash.
+	before, err := treeSHA256(skillsRoot)
 	if err != nil {
-		addDiag(&result, "error", "profile_hash_unavailable", "profile tree hash before classification is unavailable: "+err.Error())
+		addDiag(&result, "error", "profile_hash_unavailable", "profile skills tree hash before classification is unavailable: "+err.Error())
 	}
 	result.NoWriteEvidence.ProfileTreeHashBefore = before
 	result.NoSpilloverEvidence.ProfileTreeHashBefore = before
 	result.NoSpilloverEvidence.ProfileRoot = profileRoot
-	result.NoSpilloverEvidence.SkillsRoot = filepath.Join(profileRoot, "skills")
+	result.NoSpilloverEvidence.SkillsRoot = skillsRoot
 
 	if len(sourcePacks) > 0 && pkg.Namespace != "" {
 		classifyProfile(&result, sourceRepoPath, profileRoot, sourcePacks)
 	}
 
-	after, err := treeSHA256(profileRoot)
+	after, err := treeSHA256(skillsRoot)
 	if err != nil {
-		addDiag(&result, "error", "profile_hash_unavailable", "profile tree hash after classification is unavailable: "+err.Error())
+		addDiag(&result, "error", "profile_hash_unavailable", "profile skills tree hash after classification is unavailable: "+err.Error())
 	}
 	result.NoWriteEvidence.ProfileTreeHashAfter = after
 	result.NoWriteEvidence.ProfileTreeUnchanged = before != "" && before == after
 	result.NoSpilloverEvidence.ProfileTreeHashAfter = after
 	result.NoSpilloverEvidence.ProfileTreeHashMatch = before != "" && before == after
 	if before != "" && after != "" && before != after {
-		addDiag(&result, "error", "no_write_proof_failed", "profile tree hash changed during dry-run classification.")
+		addDiag(&result, "error", "no_write_proof_failed", "profile skills tree hash changed during dry-run classification.")
 	}
 
 	finalize(&result)
@@ -691,13 +697,28 @@ func isKAHCompanionSurface(skill skillFile) bool {
 }
 
 func containsRuntimeConfig(data []byte) bool {
-	text := strings.ToLower(string(data))
-	for _, needle := range []string{"auth_token", "api_key", "gateway:", "provider:", "model:", "runtime:", "token:"} {
-		if strings.Contains(text, needle) {
-			return true
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "-"))
+		for _, key := range []string{"auth_token", "api_key", "gateway", "provider", "model", "runtime", "token"} {
+			if isRuntimeConfigKeyLine(trimmed, key) {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+func isRuntimeConfigKeyLine(line string, key string) bool {
+	lower := strings.ToLower(line)
+	if !strings.HasPrefix(lower, key) {
+		return false
+	}
+	rest := strings.TrimSpace(lower[len(key):])
+	return strings.HasPrefix(rest, ":") || strings.HasPrefix(rest, "=")
 }
 
 func containsOwnershipConflict(data []byte) bool {
@@ -740,6 +761,12 @@ func sha256Hex(data []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// treeSHA256 hashes the directory tree by path plus entry metadata. Symlinks
+// are recorded as link metadata (`readlink` target) and are never followed; the
+// hash proves the selected tree's materialized links did not change, not the
+// contents of external link targets. Non-regular files are represented by mode
+// metadata so dry-runs stay deterministic while unreadable walk/readlink/read
+// errors still fail closed to the caller.
 func treeSHA256(root string) (string, error) {
 	entries := []string{}
 	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -753,12 +780,29 @@ func treeSHA256(root string) (string, error) {
 		if err != nil {
 			return err
 		}
+		rel = filepath.ToSlash(rel)
+		if d.Type()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			entries = append(entries, rel+"\x00symlink\x00"+target)
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			entries = append(entries, rel+"\x00nonregular\x00"+info.Mode().String())
+			return nil
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
 		sum := sha256.Sum256(data)
-		entries = append(entries, filepath.ToSlash(rel)+"\x00"+hex.EncodeToString(sum[:]))
+		entries = append(entries, rel+"\x00"+hex.EncodeToString(sum[:]))
 		return nil
 	}); err != nil {
 		return "", err
