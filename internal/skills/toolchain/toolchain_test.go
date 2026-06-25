@@ -413,11 +413,11 @@ func TestGeneratedLaunchersResolveV1MetadataAndFailClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	toolchainRoot := t.TempDir()
-	kasBin := filepath.Join(toolchainRoot, "kas", "v0.1.8", "bin", "kkachi-agent-skills")
+	kasBin := filepath.Join(toolchainRoot, "kas", "v0.1.9", "bin", "kkachi-agent-skills")
 	kahBin := filepath.Join(toolchainRoot, "kah", "v0.1.14", "bin", "kkachi-agent-helper")
-	writeFakeVersionBinary(t, kasBin, "kkachi-agent-skills 0.1.8")
+	writeFakeVersionBinary(t, kasBin, "kkachi-agent-skills 0.1.9")
 	writeFakeVersionBinary(t, kahBin, "kkachi-agent-helper 0.1.14")
-	writeLauncherToolchain(t, projectRoot, "0.1.8", "0.1.14", kahBin)
+	writeLauncherToolchain(t, projectRoot, "0.1.9", "0.1.14", kahBin)
 
 	status := exec.Command(filepath.Join(binDir, "kkachi-agent-skills-toolchain"), "--toolchain-status")
 	status.Dir = projectRoot
@@ -426,13 +426,13 @@ func TestGeneratedLaunchersResolveV1MetadataAndFailClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("status failed: %v\n%s", err, string(output))
 	}
-	for _, want := range []string{"schema_version=kkachi.toolchain.v1", "kas_cli_version=v0.1.8", "kah_cli_version=v0.1.14", "kas_version_output=kkachi-agent-skills 0.1.8", "kah_version_output=kkachi-agent-helper 0.1.14"} {
+	for _, want := range []string{"schema_version=kkachi.toolchain.v1", "kas_cli_version=v0.1.9", "kah_cli_version=v0.1.14", "kas_version_output=kkachi-agent-skills 0.1.9", "kah_version_output=kkachi-agent-helper 0.1.14"} {
 		if !strings.Contains(string(output), want) {
 			t.Fatalf("status output missing %q:\n%s", want, string(output))
 		}
 	}
 
-	writeFile(t, filepath.Join(projectRoot, ".kkachi", "toolchain.yaml"), "kas_cli: v0.1.8\nkah_cli: v0.1.14\n")
+	writeFile(t, filepath.Join(projectRoot, ".kkachi", "toolchain.yaml"), "kas_cli: v0.1.9\nkah_cli: v0.1.14\n")
 	legacy := exec.Command(filepath.Join(binDir, "kkachi-agent-skills-toolchain"), "--toolchain-status")
 	legacy.Dir = projectRoot
 	legacy.Env = append(os.Environ(), "KKACHI_TOOLCHAIN_ROOT="+toolchainRoot)
@@ -441,7 +441,7 @@ func TestGeneratedLaunchersResolveV1MetadataAndFailClosed(t *testing.T) {
 		t.Fatalf("expected legacy metadata to fail closed, err=%v output=%s", err, string(legacyOutput))
 	}
 
-	writeLauncherToolchain(t, projectRoot, "0.1.8", "0.1.15", kahBin)
+	writeLauncherToolchain(t, projectRoot, "0.1.9", "0.1.15", kahBin)
 	mismatch := exec.Command(filepath.Join(binDir, "kkachi-agent-skills-toolchain"), "--toolchain-status")
 	mismatch.Dir = projectRoot
 	mismatch.Env = append(os.Environ(), "KKACHI_TOOLCHAIN_ROOT="+toolchainRoot)

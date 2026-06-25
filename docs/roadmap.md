@@ -3,7 +3,7 @@
 Date: 2026-05-25
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / governance evidence record; INITDOC post-KAH reset
-Status: post-KAH KAS MVP roadmap; KAH 0.1.4 graph/configurable-feedback substrate evidenced, KAH v0.1.10 workflow catalog promotion substrate released, KASROLE is the KAS v0.1.3 release baseline, and WFLOW epic completion is the KAS v0.1.4 release baseline
+Status: post-KAH KAS MVP roadmap; KAS v0.1.9 is the current local release target, KAH 0.1.4 graph/configurable-feedback substrate evidenced, KAH v0.1.10 workflow catalog promotion substrate released, KASROLE is the KAS v0.1.3 release baseline, and WFLOW epic completion is the KAS v0.1.4 release baseline
 Authority level: KAS roadmap; not implementation authorization by itself
 Scope: KAS docs/skills planning only; no KAH code, KAB docs, runtime configs, profiles, registries, or gateway changes
 Related docs: `README.md`, `sot/khs-architecture-and-integration.md`, `sot/stage1-direct-codex-sdk-appserver-runner.md`, `sot/workflow-graph-integration.md`, `sot/minimum-pilot-cli-lane.md`, `sot/kas-cli-contract.md`, `sot/project-specific-kas-install-contract.md`, `sot/role-aware-project-suite-contract.md`, `sot/project-kas-sync-state.md`, `sot/skill-plugin-wrapper-overlay-contract.md`, `sot/toolchain-local-metadata-registry.md`, `sot/kasrel-hermes-v016-provenance-contract.md`, `sot/task-dag-workflow-contract.md`, KAH `docs/sot/task-dag-state-machine.md`, `sot/token-economy-and-agent-instruction-contract.md`, `sot/multi-agent-review-policy.md`, `sot/policy-promotion-governance-contract.md`, `sot/external-feedback-intake-policy.md`, `sot/phase-orchestration-policy.md`, `sot/interface-contract.md`, `sot/teal-ui-workflow-policy.md`
