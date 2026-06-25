@@ -11,8 +11,8 @@ func TestBuildSkillClassifiesPluginWrapperOverlayPersonalAndNoWrite(t *testing.T
 	repo := t.TempDir()
 	profileRoot := filepath.Join(t.TempDir(), "profile")
 	writeSkillDoctorPluginFixture(t, repo)
-	writeSkillDoctorWrapper(t, filepath.Join(profileRoot, "skills", "kkachi-blue-wrapper"), "blue")
-	writeSkillDoctorOverlay(t, filepath.Join(profileRoot, "skills", "doksuri", "kas-overlays", "doksuri-blue-plan-overlay"), "doksuri", "kkachi-agent-skills:plan", "0.1.0", "")
+	writeSkillDoctorWrapper(t, filepath.Join(profileRoot, "skills", "doksuri", "doksuri-wrapper"), "blue")
+	writeSkillDoctorOverlay(t, filepath.Join(profileRoot, "skills", "doksuri", "doksuri-overlay"), "doksuri", "kkachi-agent-skills:plan", "0.1.0", "")
 	writeSkill(t, filepath.Join(profileRoot, "skills", "personal-note"), "personal-note", "personal")
 	before, err := treeSHA256(profileRoot)
 	if err != nil {
@@ -40,12 +40,12 @@ func TestBuildSkillClassifiesPluginWrapperOverlayPersonalAndNoWrite(t *testing.T
 		t.Fatalf("deleted bundle reference should be explicit nil when absent: %+v", result.DeletedBundleReference)
 	}
 	counts := result.Summary.CountsBySourceClass
-	for _, sourceClass := range []string{"plugin_base", "color_wrapper", "project_overlay", "personal_skill"} {
+	for _, sourceClass := range []string{"plugin_base", "project_wrapper", "project_overlay", "personal_skill"} {
 		if counts[sourceClass] == 0 {
 			t.Fatalf("missing source class %s in %+v", sourceClass, counts)
 		}
 	}
-	if !hasSkillDiag(result, "plugin_update_readiness_readback_only") || !hasSkillDiag(result, "update_surface_legacy_alias_present") {
+	if !hasSkillDiag(result, "plugin_readiness_readback_only") || !hasSkillDiag(result, "update_migrate_surface_removed") {
 		t.Fatalf("missing update-surface diagnostics: %+v", result.Diagnostics)
 	}
 	human := RenderHumanSkill(result)
@@ -336,14 +336,15 @@ skills:
 func writeSkillDoctorWrapper(t *testing.T, dir string, role string) {
 	t.Helper()
 	content := `---
-name: kkachi-blue-wrapper
+name: doksuri-wrapper
 metadata:
   kas:
-    kind: color_wrapper
+    kind: project_wrapper
+    project: doksuri
     role: blue_commander
     role_manifest: kkachi-agent-skills:roles/` + role + `.yaml
     plugin_namespace: kkachi-agent-skills
-    overlay_root: skills/<project>/kas-overlays
+    overlay_skill: doksuri-overlay
 ---
 # Wrapper
 `
@@ -364,7 +365,8 @@ metadata:
     kind: project_overlay
     project: ` + project + `
     role: blue_commander
-    overlay_for: ` + overlayFor + `
+    applies_to:
+      - ` + overlayFor + `
     merge_mode: additive_constraints
     base_version: "` + baseVersion + `"
 ---

@@ -39,8 +39,11 @@ func TestBuildDryRunRendersProjectPrefixedSuiteAndWritesNothing(t *testing.T) {
 	if result.Command != "install-project-kas" || result.Mode != "project_dry_run" || !result.DryRun || !result.NoWrite.Guaranteed {
 		t.Fatalf("unexpected command/no-write shape: %+v", result)
 	}
-	assertPlannedSkill(t, result, "kkachi-plan", "doksuri-server-plan", "skills/doksuri-server/doksuri-server-plan/SKILL.md")
-	assertPlannedSkill(t, result, "kkachi-final-verify", "doksuri-server-final-verify", "skills/doksuri-server/doksuri-server-final-verify/SKILL.md")
+	if len(result.PlannedSkills) != 0 {
+		t.Fatalf("plugin-mode install must not plan profile-local copied base skills: %+v", result.PlannedSkills)
+	}
+	assertChangedPathAction(t, result, "skills/doksuri-server/doksuri-server-wrapper/SKILL.md", "create")
+	assertChangedPathAction(t, result, "skills/doksuri-server/doksuri-server-overlay/SKILL.md", "create")
 	if result.PlannedManifest["kind"] != ProfileManifestKind {
 		t.Fatalf("unexpected manifest preview: %+v", result.PlannedManifest)
 	}
@@ -63,7 +66,7 @@ func TestBuildDryRunRendersProjectPrefixedSuiteAndWritesNothing(t *testing.T) {
 			t.Fatalf("human dry-run output missing %q:\n%s", want, human)
 		}
 	}
-	if result.ProjectTailoring.Mode != "prefix_render_only" || result.ProjectTailoring.SemanticPortRequiredBeforeApprovedInstall || result.ProjectTailoring.SemanticAdaptationClaimed {
+	if result.ProjectTailoring.Mode != "plugin_base_with_project_overlay" || result.ProjectTailoring.SemanticPortRequiredBeforeApprovedInstall || result.ProjectTailoring.SemanticAdaptationClaimed {
 		t.Fatalf("unexpected tailoring posture: %+v", result.ProjectTailoring)
 	}
 	if result.ApprovalRequest.EvidenceRef != "dry-run:"+result.PlanHash || !result.ApprovalRequest.HashIncludesProfile || !result.ApprovalRequest.HashIncludesNoWriteEvidence || !result.ApprovalRequest.HashIncludesBackupPlan {
@@ -77,6 +80,80 @@ func TestBuildDryRunRendersProjectPrefixedSuiteAndWritesNothing(t *testing.T) {
 	if repeated.PlanHash != result.PlanHash {
 		t.Fatalf("plan hash was not stable: %s != %s", repeated.PlanHash, result.PlanHash)
 	}
+}
+
+func TestProjectInstallCreatesCanonicalWrapperOverlayAndReference(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{
+		"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n",
+	})
+	profileRoot := filepath.Join(t.TempDir(), "profiles", "hwangchung")
+	opts := Options{Profile: "hwangchung", Project: "kkachi-agent-skills", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+
+	dryRun, err := BuildDryRun(repo, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !dryRun.OK {
+		t.Fatalf("expected ok dry-run, got diagnostics=%+v conflicts=%+v", dryRun.Diagnostics, dryRun.Conflicts)
+	}
+	assertChangedPathAction(t, dryRun, "skills/kkachi-agent-skills/kkachi-agent-skills-wrapper/SKILL.md", "create")
+	assertChangedPathAction(t, dryRun, "skills/kkachi-agent-skills/kkachi-agent-skills-overlay/SKILL.md", "create")
+	assertChangedPathAction(t, dryRun, "skills/kkachi-agent-skills/kkachi-agent-skills-overlay/references/legacy-delta-extract.md", "create")
+
+	approved, err := ApplyApprovedInstall(repo, opts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !approved.OK {
+		t.Fatalf("approved install failed: diagnostics=%+v conflicts=%+v", approved.Diagnostics, approved.Conflicts)
+	}
+	wrapperPath := filepath.Join(profileRoot, "skills", "kkachi-agent-skills", "kkachi-agent-skills-wrapper", "SKILL.md")
+	overlayPath := filepath.Join(profileRoot, "skills", "kkachi-agent-skills", "kkachi-agent-skills-overlay", "SKILL.md")
+	refPath := filepath.Join(profileRoot, "skills", "kkachi-agent-skills", "kkachi-agent-skills-overlay", "references", "legacy-delta-extract.md")
+	wrapper := string(readFileForTest(t, wrapperPath))
+	overlay := string(readFileForTest(t, overlayPath))
+	ref := string(readFileForTest(t, refPath))
+	for _, want := range []string{"name: kkachi-agent-skills-wrapper", "kind: project_wrapper", "overlay_skill: kkachi-agent-skills-overlay", "base_copy_policy: forbidden_by_default"} {
+		if !strings.Contains(wrapper, want) {
+			t.Fatalf("wrapper missing %q:\n%s", want, wrapper)
+		}
+	}
+	for _, want := range []string{"name: kkachi-agent-skills-overlay", "kind: project_overlay", "merge_mode: additive_constraints", "references/legacy-delta-extract.md"} {
+		if !strings.Contains(overlay, want) {
+			t.Fatalf("overlay missing %q:\n%s", want, overlay)
+		}
+	}
+	if !strings.Contains(ref, "Legacy delta extract") || !strings.Contains(ref, "No legacy archive was present") {
+		t.Fatalf("overlay reference did not record refresh/legacy posture:\n%s", ref)
+	}
+	entries, err := os.ReadDir(filepath.Join(profileRoot, "skills", "kkachi-agent-skills"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(entries); got != 2 {
+		names := []string{}
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		t.Fatalf("plugin-mode project suite must contain only wrapper and overlay directories, got %d: %v", got, names)
+	}
+	manifest := readProjectInstallManifest(t, filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json"))
+	suite := manifest["project_suites"].([]any)[0].(map[string]any)
+	components := suite["composition_files"].([]any)
+	if len(components) != 3 {
+		t.Fatalf("manifest should record wrapper/overlay/reference composition files, got %+v", components)
+	}
+
+	repeated, err := BuildDryRun(repo, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !repeated.OK {
+		t.Fatalf("repeat dry-run after approved install should trust wrapper/overlay manifest entries, diagnostics=%+v conflicts=%+v", repeated.Diagnostics, repeated.Conflicts)
+	}
+	assertChangedPathAction(t, repeated, "skills/kkachi-agent-skills/kkachi-agent-skills-wrapper/SKILL.md", "skip")
+	assertChangedPathAction(t, repeated, "skills/kkachi-agent-skills/kkachi-agent-skills-overlay/SKILL.md", "skip")
+	assertChangedPathAction(t, repeated, "skills/kkachi-agent-skills/kkachi-agent-skills-overlay/references/legacy-delta-extract.md", "skip")
 }
 
 func TestBuildDryRunProjectsOnlySelectedRoleSkills(t *testing.T) {
@@ -98,11 +175,9 @@ func TestBuildDryRunProjectsOnlySelectedRoleSkills(t *testing.T) {
 	if result.SuiteMode != SuiteModeRoleSubset || result.RoleLabel != "Red safety/fail-closed reviewer subset" {
 		t.Fatalf("unexpected role evidence: %+v", result)
 	}
-	if len(result.PlannedSkills) != 2 || len(result.SelectedSkills) != 2 || len(result.ExcludedSkills) != 2 {
-		t.Fatalf("unexpected role projection counts: planned=%+v selected=%+v excluded=%+v", result.PlannedSkills, result.SelectedSkills, result.ExcludedSkills)
+	if len(result.PlannedSkills) != 0 || len(result.SelectedSkills) != 2 || len(result.ExcludedSkills) != 2 {
+		t.Fatalf("unexpected plugin-mode role projection counts: planned=%+v selected=%+v excluded=%+v", result.PlannedSkills, result.SelectedSkills, result.ExcludedSkills)
 	}
-	assertPlannedSkill(t, result, "kkachi-review", "doksuri-server-review", "skills/doksuri-server/doksuri-server-review/SKILL.md")
-	assertPlannedSkill(t, result, "kkachi-verify", "doksuri-server-verify", "skills/doksuri-server/doksuri-server-verify/SKILL.md")
 	for _, excluded := range result.ExcludedSkills {
 		if excluded.Reason != "outside_suite_role" || excluded.InstalledSkill == "" || excluded.SourceSkill == "" {
 			t.Fatalf("excluded skill missing reason/rendered identity: %+v", excluded)
@@ -180,8 +255,17 @@ func TestApplyApprovedInstallNoWriteOnMismatchAndSuccessfulCreate(t *testing.T) 
 	if !approved.OK || approved.Mode != "project_approved_copy" || approved.InstallID == "" || approved.ManifestPath == "" || approved.Recovery == nil {
 		t.Fatalf("approved install missing evidence: %+v", approved)
 	}
-	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); err != nil {
-		t.Fatalf("approved install did not write project skill: %v", err)
+	for _, rel := range []string{
+		filepath.Join("skills", "doksuri-server", "doksuri-server-wrapper", "SKILL.md"),
+		filepath.Join("skills", "doksuri-server", "doksuri-server-overlay", "SKILL.md"),
+		filepath.Join("skills", "doksuri-server", "doksuri-server-overlay", "references", "legacy-delta-extract.md"),
+	} {
+		if _, err := os.Stat(filepath.Join(profileRoot, rel)); err != nil {
+			t.Fatalf("approved install did not write composition file %s: %v", rel, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); !os.IsNotExist(err) {
+		t.Fatalf("plugin-only install wrote stale copied project skill or unexpected stat error: %v", err)
 	}
 	manifest := readProjectInstallManifest(t, filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json"))
 	if manifest["kind"] != ProfileManifestKind {
@@ -193,6 +277,9 @@ func TestApplyApprovedInstallNoWriteOnMismatchAndSuccessfulCreate(t *testing.T) 
 	suite := manifest["project_suites"].([]any)[0].(map[string]any)
 	if suite["kind"] != ManifestKind || suite["project"] != "doksuri-server" || suite["semantic_adaptation_claimed"] != false || suite["drift_policy"] != "manual_review_required" {
 		t.Fatalf("unexpected project suite manifest: %+v", suite)
+	}
+	if len(suite["installed_skills"].([]any)) != 0 || len(suite["composition_files"].([]any)) != 3 || len(suite["selected_skills"].([]any)) != 2 {
+		t.Fatalf("plugin-only manifest should track selected plugin skills and composition files only: %+v", suite)
 	}
 }
 
@@ -223,12 +310,15 @@ func TestApplyApprovedInstallUsesMaterializedSourceWhenPublicSourceRepoIsEmbedde
 	if !approved.OK {
 		t.Fatalf("approved install should render from the internal materialized source path, got diagnostics=%+v", approved.Diagnostics)
 	}
-	written, err := os.ReadFile(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-review", "SKILL.md"))
-	if err != nil {
-		t.Fatalf("approved install did not write projected skill: %v", err)
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-review", "SKILL.md")); !os.IsNotExist(err) {
+		t.Fatalf("plugin-only install wrote projected copied skill or unexpected stat error: %v", err)
 	}
-	if !strings.Contains(string(written), "doksuri-server-review") {
-		t.Fatalf("project-prefixed skill content was not rendered: %s", string(written))
+	written, err := os.ReadFile(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-wrapper", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("approved install did not write project wrapper: %v", err)
+	}
+	if !strings.Contains(string(written), "doksuri-server wrapper") || !strings.Contains(string(written), "plugin_namespace: kkachi-agent-skills") {
+		t.Fatalf("project wrapper was not rendered from materialized source: %s", string(written))
 	}
 }
 
@@ -259,7 +349,7 @@ func TestApplyApprovedInstallRejectsKASSymlinkBeforeSkillWrites(t *testing.T) {
 	if approved.OK || firstDiagnosticCode(approved) != "project_install_preflight_failed" {
 		t.Fatalf("approved install should fail closed on .kas symlink: %+v", approved)
 	}
-	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-wrapper", "SKILL.md")); !os.IsNotExist(err) {
 		t.Fatalf("approved install wrote skill before manifest preflight failure or unexpected stat error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")); !os.IsNotExist(err) {
@@ -279,27 +369,18 @@ func TestApplyApprovedInstallTrustedUpdateBacksUpAndLocalModificationConflicts(t
 	if err != nil || !first.OK {
 		t.Fatalf("initial install failed: result=%+v err=%v", first, err)
 	}
+
 	writeProjectInstallFile(t, filepath.Join(repo, "skills", "kkachi-plan", "SKILL.md"), "---\nname: kkachi-plan\n---\n# kkachi-plan\nnew\n")
 	writeSkillPackYAML(t, repo, []string{"kkachi-plan"})
 	updatePlan, err := BuildDryRun(repo, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updatePlan.Summary.CountsByAction["update"] != 1 || len(updatePlan.BackupPlan) != 1 {
-		t.Fatalf("expected trusted update with backup plan: %+v", updatePlan)
-	}
-	updated, err := ApplyApprovedInstall(repo, opts, updatePlan.ApprovalRequest.EvidenceRef)
-	if err != nil || !updated.OK {
-		t.Fatalf("trusted update failed: result=%+v err=%v", updated, err)
-	}
-	if updated.Summary.CountsByAction["backup"] != 1 {
-		t.Fatalf("trusted update did not record backup: %+v", updated.Summary)
-	}
-	if _, err := os.Stat(filepath.Join(updated.BackupPath, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); err != nil {
-		t.Fatalf("backup file missing: %v", err)
+	if !updatePlan.OK || len(updatePlan.PlannedSkills) != 0 || updatePlan.Summary.CountsByAction["skip"] != 3 || len(updatePlan.BackupPlan) != 0 {
+		t.Fatalf("plugin-only source base changes should not re-copy project skills: %+v", updatePlan)
 	}
 
-	writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md"), "local edit\n")
+	writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-overlay", "SKILL.md"), "local edit\n")
 	conflicted, err := BuildDryRun(repo, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -353,8 +434,9 @@ func TestBuildDryRunRejectsDuplicateUnsafeSymlinkUnknownProfileAndHashStateChang
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertConflict(t, result, "duplicate_installed_skill")
-	assertConflict(t, result, "duplicate_target_path")
+	if !result.OK || len(result.PlannedSkills) != 0 {
+		t.Fatalf("plugin-only project install should not fail on base-skill copy target collisions: %+v", result)
+	}
 
 	unknown, err := BuildDryRun(repo, Options{Profile: "missing", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, DryRun: true})
 	if err != nil {
@@ -437,7 +519,7 @@ func TestBuildDryRunFailClosesGenericUmbrellaOnlyAndExistingTargets(t *testing.T
 		t.Fatal(err)
 	}
 	assertConflict(t, result, "generic_installed_skill_name")
-	assertConflict(t, result, "existing_target_not_manifested")
+	assertConflict(t, result, "stale_copied_project_skill")
 	if result.OK {
 		t.Fatalf("conflicted dry-run must be ok:false: %+v", result)
 	}
@@ -455,7 +537,7 @@ func TestBuildDryRunFailClosesUmbrellaOnlyProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertConflict(t, result, "umbrella_only")
+	assertConflict(t, result, "stale_copied_project_skill")
 }
 
 func TestBuildDryRunRejectsUmbrellaOnlySourceSuite(t *testing.T) {
@@ -464,7 +546,9 @@ func TestBuildDryRunRejectsUmbrellaOnlySourceSuite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertConflict(t, result, "umbrella_only")
+	if !result.OK || len(result.PlannedSkills) != 0 || len(result.CompositionFiles) != 3 {
+		t.Fatalf("plugin-only project install should not copy an umbrella source suite: %+v", result)
+	}
 }
 
 func TestPlannerSourceContainsNoWriteAPIs(t *testing.T) {
@@ -586,6 +670,28 @@ func writeProjectInstallFile(t *testing.T, path string, content string) {
 	}
 }
 
+func readFileForTest(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func assertChangedPathAction(t *testing.T, result Result, target string, action string) {
+	t.Helper()
+	for _, changed := range result.ChangedPaths {
+		if changed.Path == target {
+			if changed.Action != action {
+				t.Fatalf("changed path %s action=%s, want %s", target, changed.Action, action)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing changed path %s in %+v", target, result.ChangedPaths)
+}
+
 func assertPlannedSkill(t *testing.T, result Result, source string, installed string, target string) {
 	t.Helper()
 	for _, skill := range result.PlannedSkills {
@@ -663,8 +769,8 @@ func TestProjectSuiteDoctorDetectsHealthyMissingUmbrellaChecksumAndUnknownDirs(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !healthy.OK || healthy.Mode != modeProjectSuiteDoctor || healthy.SourcePack.ID != VirtualSourcePackID || healthy.ProjectSuite.InstalledSkillCount != 2 {
-		t.Fatalf("expected healthy project-suite doctor, got %+v", healthy)
+	if !healthy.OK || healthy.Mode != modeProjectSuiteDoctor || healthy.SourcePack.ID != VirtualSourcePackID || healthy.ProjectSuite.InstalledSkillCount != 0 || healthy.ProjectSuite.FilesChecked != 3 {
+		t.Fatalf("expected healthy plugin-only project-suite doctor, got %+v", healthy)
 	}
 
 	writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-extra", "SKILL.md"), "extra")
@@ -676,7 +782,8 @@ func TestProjectSuiteDoctorDetectsHealthyMissingUmbrellaChecksumAndUnknownDirs(t
 		t.Fatalf("expected unknown project-prefixed dir warning, got %+v", warning.ProjectSuiteDiagnostics)
 	}
 
-	if err := os.WriteFile(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md"), []byte("local edit\n"), 0o644); err != nil {
+	wrapperPath := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-wrapper", "SKILL.md")
+	if err := os.WriteFile(wrapperPath, []byte("local edit\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	mismatch, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
@@ -684,18 +791,18 @@ func TestProjectSuiteDoctorDetectsHealthyMissingUmbrellaChecksumAndUnknownDirs(t
 		t.Fatal(err)
 	}
 	if mismatch.OK || !hasProjectSuiteDiag(mismatch.ProjectSuiteDiagnostics, "checksum_mismatch", "error") {
-		t.Fatalf("expected checksum mismatch error, got %+v", mismatch.ProjectSuiteDiagnostics)
+		t.Fatalf("expected wrapper checksum mismatch error, got %+v", mismatch.ProjectSuiteDiagnostics)
 	}
 
 	manifestPath := filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")
 	manifest := readProjectInstallManifest(t, manifestPath)
 	for _, rawSuite := range manifest["project_suites"].([]any) {
 		suite := rawSuite.(map[string]any)
-		for _, rawSkill := range suite["installed_skills"].([]any) {
-			skill := rawSkill.(map[string]any)
-			if skill["installed_skill"] == "doksuri-server-plan" {
-				skill["tailoring_mode"] = "profile_local_repo_semantic_tailoring"
-				skill["drift_policy"] = "manual_review_required"
+		for _, rawComponent := range suite["composition_files"].([]any) {
+			component := rawComponent.(map[string]any)
+			if component["name"] == "doksuri-server-wrapper" {
+				component["tailoring_mode"] = "profile_local_repo_semantic_tailoring"
+				component["drift_policy"] = "manual_review_required"
 			}
 		}
 	}
@@ -741,56 +848,49 @@ func TestProjectSuiteDoctorRoleAwareSemantics(t *testing.T) {
 
 	t.Run("blue full suite healthy", func(t *testing.T) {
 		doctor := installProjectSuiteAndDoctor(t, repo, project, "blue_commander")
-		if !doctor.OK || doctor.ProjectSuite.InstalledSkillCount != len(skills) {
-			t.Fatalf("expected blue full suite healthy, got ok=%t state=%+v diagnostics=%+v", doctor.OK, doctor.ProjectSuite, doctor.ProjectSuiteDiagnostics)
+		if !doctor.OK || doctor.ProjectSuite.InstalledSkillCount != 0 || doctor.ProjectSuite.FilesChecked != 3 {
+			t.Fatalf("expected blue plugin-only suite healthy, got ok=%t state=%+v diagnostics=%+v", doctor.OK, doctor.ProjectSuite, doctor.ProjectSuiteDiagnostics)
 		}
 	})
 
-	for _, tc := range []struct {
-		role  string
-		count int
-	}{
-		{role: "red_reviewer", count: 2},
-		{role: "orange_pm_reviewer", count: 1},
-		{role: "gray_scribe", count: 2},
-	} {
-		t.Run(tc.role+" subset healthy", func(t *testing.T) {
-			doctor := installProjectSuiteAndDoctor(t, repo, project, tc.role)
-			if !doctor.OK || doctor.ProjectSuite.InstalledSkillCount != tc.count {
-				t.Fatalf("expected role subset healthy with only selected skills installed, got ok=%t state=%+v diagnostics=%+v", doctor.OK, doctor.ProjectSuite, doctor.ProjectSuiteDiagnostics)
+	for _, role := range []string{"red_reviewer", "orange_pm_reviewer", "gray_scribe"} {
+		t.Run(role+" subset healthy", func(t *testing.T) {
+			doctor := installProjectSuiteAndDoctor(t, repo, project, role)
+			if !doctor.OK || doctor.ProjectSuite.InstalledSkillCount != 0 || doctor.ProjectSuite.FilesChecked != 3 {
+				t.Fatalf("expected role subset plugin-only suite healthy, got ok=%t state=%+v diagnostics=%+v", doctor.OK, doctor.ProjectSuite, doctor.ProjectSuiteDiagnostics)
 			}
 			if hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "missing_file", "error") || hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "missing_selected_role_skill", "error") {
-				t.Fatalf("unselected full-suite skills must not be missing errors: %+v", doctor.ProjectSuiteDiagnostics)
+				t.Fatalf("plugin-qualified role skills must not be checked as profile-local missing files: %+v", doctor.ProjectSuiteDiagnostics)
 			}
 		})
 	}
 
-	t.Run("missing selected role skill is an error", func(t *testing.T) {
+	t.Run("selected skills remain manifest role evidence not profile-local file obligations", func(t *testing.T) {
 		profileRoot := installProjectSuite(t, repo, project, "red_reviewer")
-		removeManifestInstalledSkill(t, profileRoot, project, "doksuri-server-verify")
+		removeManifestSelectedSkill(t, profileRoot, project, "doksuri-server-verify")
 		doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
-		if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "missing_selected_role_skill", "error") {
-			t.Fatalf("expected missing selected role skill error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+		if !doctor.OK || hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "missing_selected_role_skill", "error") {
+			t.Fatalf("plugin-only doctor must not treat selected_skills as copied-file obligations, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
 		}
 	})
 
-	t.Run("selected checksum mismatch is an error", func(t *testing.T) {
+	t.Run("wrapper checksum mismatch is an error", func(t *testing.T) {
 		profileRoot := installProjectSuite(t, repo, project, "orange_pm_reviewer")
-		if err := os.WriteFile(filepath.Join(profileRoot, "skills", project, "doksuri-server-review", "SKILL.md"), []byte("local drift\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(profileRoot, "skills", project, "doksuri-server-wrapper", "SKILL.md"), []byte("local drift\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
 		if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "checksum_mismatch", "error") {
-			t.Fatalf("expected selected checksum mismatch error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+			t.Fatalf("expected wrapper checksum mismatch error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
 		}
 	})
 
-	t.Run("out of role KAS-managed physical extra is an error", func(t *testing.T) {
+	t.Run("out of role copied KAS-managed physical skill is an error", func(t *testing.T) {
 		profileRoot := installProjectSuite(t, repo, project, "gray_scribe")
 		writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", project, "doksuri-server-implement", "SKILL.md"), skills["kkachi-implement"])
 		doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
 		if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "out_of_role_kas_managed_skill", "error") {
-			t.Fatalf("expected out-of-role KAS-managed skill error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
+			t.Fatalf("expected out-of-role copied KAS-managed skill error, got ok=%t diagnostics=%+v", doctor.OK, doctor.ProjectSuiteDiagnostics)
 		}
 	})
 
@@ -832,12 +932,13 @@ func TestProjectSuiteDoctorRoleAwareSemantics(t *testing.T) {
 	})
 
 	for _, role := range []string{"red_reviewer", "orange_pm_reviewer", "gray_scribe"} {
-		t.Run("legacy full suite unhealthy for "+role, func(t *testing.T) {
+		t.Run("legacy copied suite unhealthy for "+role, func(t *testing.T) {
 			profileRoot := installProjectSuite(t, repo, project, "blue_commander")
+			writeProjectInstallFile(t, filepath.Join(profileRoot, "skills", project, "doksuri-server-implement", "SKILL.md"), skills["kkachi-implement"])
 			setManifestSuiteRole(t, profileRoot, project, &role)
 			doctor := buildProjectSuiteDoctorForTest(t, repo, profileRoot, project)
 			if doctor.OK || !hasProjectSuiteDiag(doctor.ProjectSuiteDiagnostics, "out_of_role_kas_managed_skill", "error") {
-				t.Fatalf("expected legacy full suite to be unhealthy for %s, got ok=%t diagnostics=%+v", role, doctor.OK, doctor.ProjectSuiteDiagnostics)
+				t.Fatalf("expected legacy copied suite to be unhealthy for %s, got ok=%t diagnostics=%+v", role, doctor.OK, doctor.ProjectSuiteDiagnostics)
 			}
 		})
 	}
@@ -934,7 +1035,7 @@ func TestApplyProjectUninstallFailsClosedOnDriftSymlinkAndBacksUp(t *testing.T) 
 	if err != nil || !installed.OK {
 		t.Fatalf("approved install failed: result=%+v err=%v", installed, err)
 	}
-	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")
+	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-wrapper", "SKILL.md")
 	originalTarget, err := os.ReadFile(target)
 	if err != nil {
 		t.Fatal(err)
@@ -1023,7 +1124,7 @@ func TestApplyProjectUninstallFailsClosedOnDriftSymlinkAndBacksUp(t *testing.T) 
 	if _, err := os.Stat(localOnly); err != nil {
 		t.Fatalf("approved uninstall touched local-only file: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(applied.BackupPath, "files", "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(applied.BackupPath, "files", "skills", "doksuri-server", "doksuri-server-wrapper", "SKILL.md")); err != nil {
 		t.Fatalf("approved uninstall did not write backup file: %v", err)
 	}
 	updatedManifest := readProjectInstallManifest(t, manifestPath)
@@ -1060,13 +1161,79 @@ func TestProjectRepairHumanOutputShowsSuiteDiagnosticsAndActions(t *testing.T) {
 		"no trusted project_suites[] entry exists",
 		"next_action: Install or repair the project-specific suite",
 		"path skills/doksuri-server",
-		"Action: create skills/doksuri-server/doksuri-server-plan/SKILL.md",
-		"restore_missing_project_suite_file",
+		"Action: create skills/doksuri-server/doksuri-server-wrapper/SKILL.md",
+		"restore_missing_project_composition_file",
 		"Approval required: true",
 	} {
 		if !strings.Contains(human, want) {
 			t.Fatalf("human repair output missing %q:\n%s", want, human)
 		}
+	}
+}
+
+func TestProjectRepairAdoptsExistingWrapperOverlayCompositionIntoManifest(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{"kkachi-plan": "---\nname: kkachi-plan\n---\n# kkachi-plan\n"})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+	opts := Options{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+	dryRun, err := BuildDryRun(repo, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approved, err := ApplyApprovedInstall(repo, opts, dryRun.ApprovalRequest.EvidenceRef)
+	if err != nil || !approved.OK {
+		t.Fatalf("approved install failed: result=%+v err=%v", approved, err)
+	}
+	manifestPath := filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")
+	manifest := readProjectInstallManifest(t, manifestPath)
+	suites := manifest["project_suites"].([]any)
+	delete(suites[0].(map[string]any), "composition_files")
+	writeJSON(t, manifestPath, manifest)
+
+	overlayRel := filepath.ToSlash(filepath.Join("skills", "doksuri-server", "doksuri-server-overlay", "SKILL.md"))
+	referenceRel := filepath.ToSlash(filepath.Join("skills", "doksuri-server", "doksuri-server-overlay", "references", "legacy-delta-extract.md"))
+	writeProjectInstallFile(t, filepath.Join(profileRoot, filepath.FromSlash(overlayRel)), "local overlay lesson\n")
+	writeProjectInstallFile(t, filepath.Join(profileRoot, filepath.FromSlash(referenceRel)), "local reference lesson\n")
+	overlaySHA, err := checksumFile(filepath.Join(profileRoot, filepath.FromSlash(overlayRel)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	referenceSHA, err := checksumFile(filepath.Join(profileRoot, filepath.FromSlash(referenceRel)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repair, err := BuildProjectRepairDryRun(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !repair.OK || !repair.ApprovalRequest.Required {
+		t.Fatalf("composition adoption repair should be approvable: %+v", repair)
+	}
+	assertProjectAction(t, repair, "manifest_update", ".kas/skill-pack-manifest.json")
+	assertCompositionFile(t, repair, overlayRel, "adopt_existing", overlaySHA, "profile_local_repo_semantic_tailoring")
+	assertCompositionFile(t, repair, referenceRel, "adopt_existing", referenceSHA, "profile_local_repo_semantic_tailoring")
+
+	vault := filepath.Join(t.TempDir(), "vault")
+	if err := os.MkdirAll(vault, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	applied, err := ApplyApprovedRepair(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", SuiteRole: "blue_commander", ProfileRoot: profileRoot, BackupVaultRoot: vault}, repair.ApprovalRequest.EvidenceRef)
+	if err != nil || !applied.OK {
+		t.Fatalf("approved composition adoption failed: result=%+v err=%v", applied, err)
+	}
+	updated := readProjectInstallManifest(t, manifestPath)
+	composition := updated["project_suites"].([]any)[0].(map[string]any)["composition_files"].([]any)
+	if len(composition) != 3 {
+		t.Fatalf("expected three composition files in manifest, got %+v", composition)
+	}
+	assertManifestCompositionChecksum(t, composition, overlayRel, overlaySHA)
+	assertManifestCompositionChecksum(t, composition, referenceRel, referenceSHA)
+	doctor, err := BuildProjectSuiteDoctor(repo, ProjectSuiteOptions{Profile: "kwanwoo", Project: "doksuri-server", ProfileRoot: profileRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !doctor.OK {
+		t.Fatalf("doctor should pass after manifest adoption: %+v", doctor.ProjectSuiteDiagnostics)
 	}
 }
 
@@ -1081,7 +1248,7 @@ func TestProjectSuiteDoctorHumanOutputShowsDiagnosticDetailsAndBoundedNext(t *te
 		ManifestPath:  ".kas/skill-pack-manifest.json",
 		ProjectSuite:  ProjectSuiteState{ManifestState: "present", PhysicalState: "drifted", FilesChecked: 1},
 		ProjectSuiteDiagnostics: []ProjectSuiteDiagnostic{
-			suiteDiag("doksuri-server", "doksuri-server-review", "skills/doksuri-server/doksuri-server-review/SKILL.md", "error", "checksum_mismatch", "installed file checksum differs from manifest/source evidence", "Review diagnostics and use only an approved KASROLE-004 repair/prune plan when applicable."),
+			suiteDiag("doksuri-server", "doksuri-server-wrapper", "skills/doksuri-server/doksuri-server-wrapper/SKILL.md", "error", "checksum_mismatch", "installed file checksum differs from manifest/source evidence", "Review diagnostics and use only an approved KASROLE-004 repair/prune plan when applicable."),
 		},
 	}
 	finalizeProjectSuiteDoctor(&result)
@@ -1090,8 +1257,8 @@ func TestProjectSuiteDoctorHumanOutputShowsDiagnosticDetailsAndBoundedNext(t *te
 	assertNoHangul(t, human)
 	for _, want := range []string{
 		"project-suite diagnostic: error/checksum_mismatch - installed file checksum differs from manifest/source evidence",
-		"skill doksuri-server-review",
-		"path skills/doksuri-server/doksuri-server-review/SKILL.md",
+		"skill doksuri-server-wrapper",
+		"path skills/doksuri-server/doksuri-server-wrapper/SKILL.md",
 		"next_action: Review diagnostics and use only an approved KASROLE-004 repair/prune plan when applicable.",
 		"Next: Review project-suite diagnostics; use approved dry-run planning only, and reserve repair/prune/profile cleanup for approved KASROLE-004 workflows when applicable.",
 	} {
@@ -1119,7 +1286,7 @@ func TestProjectSuiteDoctorRealPathBoundsInspectNextAction(t *testing.T) {
 		t.Fatalf("approved install failed: result=%+v err=%v", approved, err)
 	}
 
-	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")
+	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-wrapper", "SKILL.md")
 	if err := os.WriteFile(target, []byte("local edit\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -1135,8 +1302,8 @@ func TestProjectSuiteDoctorRealPathBoundsInspectNextAction(t *testing.T) {
 	assertNoHangul(t, human)
 	for _, want := range []string{
 		"project-suite diagnostic: error/checksum_mismatch - installed file checksum differs from manifest/source evidence",
-		"skill doksuri-server-plan",
-		"path skills/doksuri-server/doksuri-server-plan/SKILL.md",
+		"skill doksuri-server-wrapper",
+		"path skills/doksuri-server/doksuri-server-wrapper/SKILL.md",
 		"next_action: Review diagnostics and use only an approved KASROLE-004 repair/prune plan when applicable.",
 	} {
 		if !strings.Contains(human, want) {
@@ -1197,7 +1364,7 @@ func TestProjectRepairDefaultsSourcePackDryRunApprovalAndUnknownExplicit(t *test
 	if err != nil || !approved.OK {
 		t.Fatalf("approved install failed: result=%+v err=%v", approved, err)
 	}
-	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")
+	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-wrapper", "SKILL.md")
 	if err := os.Remove(target); err != nil {
 		t.Fatal(err)
 	}
@@ -1254,6 +1421,8 @@ func TestProjectRepairRoleAwarePrune(t *testing.T) {
 	profileRoot := installProjectSuite(t, repo, project, "blue_commander")
 	role := "red_reviewer"
 	setManifestSuiteRole(t, profileRoot, project, &role)
+	addLegacyCopiedProjectSkill(t, profileRoot, project, "kkachi-implement", "---\nname: doksuri-server-implement\n---\n# doksuri-server-implement\n")
+	addLegacyCopiedProjectSkill(t, profileRoot, project, "kkachi-final-verify", "---\nname: doksuri-server-final-verify\n---\n# doksuri-server-final-verify\n")
 	personal := filepath.Join(profileRoot, "skills", project, "doksuri-server-local-note", "SKILL.md")
 	writeProjectInstallFile(t, personal, "personal\n")
 
@@ -1286,7 +1455,7 @@ func TestProjectRepairRoleAwarePrune(t *testing.T) {
 		t.Fatal(err)
 	}
 	if noPrune.OK || !hasProjectActionDiagnostic(noPrune, "out_of_role_kas_managed_skill") {
-		t.Fatalf("out-of-role extras without --prune-extra must remain blocked: %+v", noPrune)
+		t.Fatalf("out-of-role legacy copied skills without --prune-extra must remain blocked: %+v", noPrune)
 	}
 	for _, action := range noPrune.PlannedActions {
 		if action.Action == "remove" {
@@ -1304,7 +1473,7 @@ func TestProjectRepairRoleAwarePrune(t *testing.T) {
 	if prune.SuiteRole != role || prune.SuiteMode != SuiteModeRoleSubset || prune.RoleLabel == "" || !prune.ApprovalRequest.HashIncludesRoleFields {
 		t.Fatalf("missing role-bound evidence: %+v", prune)
 	}
-	if prune.Summary.CountsByAction["remove"] != 2 || prune.Summary.CountsByAction["skip"] != 2 {
+	if prune.Summary.CountsByAction["remove"] != 2 {
 		t.Fatalf("unexpected compact counts: %+v", prune.Summary)
 	}
 	for _, removed := range []string{"doksuri-server-final-verify", "doksuri-server-implement"} {
@@ -1315,9 +1484,8 @@ func TestProjectRepairRoleAwarePrune(t *testing.T) {
 	}
 	human := RenderHumanProjectAction(prune)
 	assertNoHangul(t, human)
-	countsLine := "Counts: keep 2, create 0, update 0, remove 2"
-	if !strings.Contains(human, countsLine) || strings.Index(human, countsLine) > strings.Index(human, "Action:") {
-		t.Fatalf("human output must show compact counts before detailed actions:\n%s", human)
+	if !strings.Contains(human, "remove 2") || strings.Index(human, "remove 2") > strings.Index(human, "Action:") {
+		t.Fatalf("human output must show compact remove count before detailed actions:\n%s", human)
 	}
 	if !strings.Contains(human, "Backup: apply requires explicit absolute --backup-vault-root") ||
 		!strings.Contains(human, "Recovery: manifest write last") ||
@@ -1347,6 +1515,8 @@ func TestProjectRepairRoleAwareApply(t *testing.T) {
 	profileRoot := installProjectSuite(t, repo, project, "blue_commander")
 	role := "red_reviewer"
 	setManifestSuiteRole(t, profileRoot, project, &role)
+	implementContent := "---\nname: doksuri-server-implement\n---\n# doksuri-server-implement\n"
+	addLegacyCopiedProjectSkill(t, profileRoot, project, "kkachi-implement", implementContent)
 	personal := filepath.Join(profileRoot, "skills", project, "doksuri-server-local-note", "SKILL.md")
 	writeProjectInstallFile(t, personal, "personal\n")
 	opts := ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: role, ProfileRoot: profileRoot, PruneExtra: true}
@@ -1395,6 +1565,7 @@ func TestProjectRepairRoleAwareApply(t *testing.T) {
 
 	driftRoot := installProjectSuite(t, repo, project, "blue_commander")
 	setManifestSuiteRole(t, driftRoot, project, &role)
+	addLegacyCopiedProjectSkill(t, driftRoot, project, "kkachi-implement", implementContent)
 	driftOpts := ProjectSuiteOptions{Profile: "kwanwoo", Project: project, SuiteRole: role, ProfileRoot: driftRoot, PruneExtra: true}
 	driftDryRun, err := BuildProjectRepairDryRun(repo, driftOpts)
 	if err != nil || !driftDryRun.OK {
@@ -1448,8 +1619,8 @@ func TestProjectRepairRoleAwareApply(t *testing.T) {
 	}
 	manifest := readProjectInstallManifest(t, filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json"))
 	suite := manifest["project_suites"].([]any)[0].(map[string]any)
-	if suite["suite_role"] != role || len(suite["installed_skills"].([]any)) != 2 || manifest["last_repair"] == nil {
-		t.Fatalf("manifest was not written last with selected role subset evidence: %+v", manifest)
+	if suite["suite_role"] != role || len(suite["installed_skills"].([]any)) != 0 || manifest["last_repair"] == nil {
+		t.Fatalf("manifest was not written last with legacy copied skill pruned: %+v", manifest)
 	}
 	if !containsString(applied.NoSpillover.UnknownPersonalSkillsPreserved, filepath.ToSlash(filepath.Join("skills", project, "doksuri-server-local-note", "SKILL.md"))) {
 		t.Fatalf("apply missing no-spillover evidence: %+v", applied.NoSpillover)
@@ -1533,6 +1704,33 @@ func assertProjectAction(t *testing.T, result ProjectActionResult, action string
 	t.Fatalf("missing action=%s target=%s in %+v", action, targetPath, result.PlannedActions)
 }
 
+func assertCompositionFile(t *testing.T, result ProjectActionResult, targetPath string, action string, checksum string, tailoringMode string) {
+	t.Helper()
+	for _, component := range result.CompositionFiles {
+		if component.TargetPath == targetPath {
+			if component.Action != action || component.Checksum != checksum || component.TailoringMode != tailoringMode {
+				t.Fatalf("unexpected composition file for %s: %+v", targetPath, component)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing composition file %s in %+v", targetPath, result.CompositionFiles)
+}
+
+func assertManifestCompositionChecksum(t *testing.T, composition []any, targetPath string, checksum string) {
+	t.Helper()
+	for _, raw := range composition {
+		entry := raw.(map[string]any)
+		if entry["target_path"] == targetPath {
+			if entry["checksum"] != checksum {
+				t.Fatalf("unexpected manifest checksum for %s: %+v", targetPath, entry)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing manifest composition file %s in %+v", targetPath, composition)
+}
+
 func containsString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
@@ -1540,4 +1738,53 @@ func containsString(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func removeManifestSelectedSkill(t *testing.T, profileRoot string, project string, installedSkill string) {
+	t.Helper()
+	manifestPath := filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")
+	manifest := readProjectInstallManifest(t, manifestPath)
+	for _, rawSuite := range manifest["project_suites"].([]any) {
+		suite := rawSuite.(map[string]any)
+		if suite["project"] != project {
+			continue
+		}
+		rawSkills := suite["selected_skills"].([]any)
+		filtered := make([]any, 0, len(rawSkills))
+		for _, rawSkill := range rawSkills {
+			skill := rawSkill.(map[string]any)
+			if skill["installed_skill"] == installedSkill {
+				continue
+			}
+			filtered = append(filtered, skill)
+		}
+		suite["selected_skills"] = filtered
+	}
+	writeJSON(t, manifestPath, manifest)
+}
+
+func addLegacyCopiedProjectSkill(t *testing.T, profileRoot string, project string, sourceSkill string, content string) {
+	t.Helper()
+	installed := renderInstalledSkill(project, sourceSkill)
+	target := filepath.ToSlash(filepath.Join("skills", project, installed, "SKILL.md"))
+	writeProjectInstallFile(t, filepath.Join(profileRoot, filepath.FromSlash(target)), content)
+	manifestPath := filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json")
+	manifest := readProjectInstallManifest(t, manifestPath)
+	for _, rawSuite := range manifest["project_suites"].([]any) {
+		suite := rawSuite.(map[string]any)
+		if suite["project"] != project {
+			continue
+		}
+		rawSkills := suite["installed_skills"].([]any)
+		suite["installed_skills"] = append(rawSkills, map[string]any{
+			"source_skill":    sourceSkill,
+			"source_pack_id":  sourceSkill,
+			"installed_skill": installed,
+			"target_path":     target,
+			"checksum":        sha256Bytes([]byte(content)),
+			"drift_policy":    "manual_review_required",
+			"tailoring_mode":  "prefix_render_only",
+		})
+	}
+	writeJSON(t, manifestPath, manifest)
 }

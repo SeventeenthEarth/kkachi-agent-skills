@@ -1,24 +1,24 @@
 ---
-name: kkachi-orange-wrapper
-description: Thin profile-local wrapper for Orange KAS plugin review skills and project overlays.
+name: "{{ project }}-wrapper"
+description: Thin project-local wrapper for Orange KAS plugin skills and the project overlay.
 metadata:
   kas:
-    kind: color_wrapper
-    role: orange_reviewer
+    kind: project_wrapper
+    project: "{{ project }}"
+    role: orange_pm_reviewer
     role_manifest: kkachi-agent-skills:roles/orange.yaml
     plugin_namespace: kkachi-agent-skills
-    overlay_root: skills/<project>/kas-overlays
+    overlay_skill: "{{ project }}-overlay"
     base_copy_policy: forbidden_by_default
 ---
 
-# Orange KAS wrapper
+# Orange KAS project wrapper
 
-Use this wrapper only as a profile-local discovery and composition entrypoint.
-It points to the official KAS plugin base and project overlays; it is not a
-copy of the base KAS skill pack.
+Use this wrapper only as a profile-local project discovery and composition
+entrypoint. It points to the official KAS plugin base and the paired project
+overlay; it is not a copy of the base KAS skill pack.
 
-When KAS operator-review guidance is needed, load the plugin base by qualified
-name:
+When KAS phase guidance is needed, load the plugin base by qualified name:
 
 ```text
 skill_view("kkachi-agent-skills:<base>")
@@ -26,15 +26,18 @@ skill_view("kkachi-agent-skills:<base>")
 
 Role manifest: `kkachi-agent-skills:roles/orange.yaml`
 
-Allowed base subset: `kkachi-review`, as declared by the Orange role manifest.
-Do not infer implementation, verification, or orchestration authority from this
-wrapper.
+Allowed base subset: `kkachi-review`, as declared by the Orange role manifest. Do not infer additional authority from the
+profile or project name.
 
 Overlay lookup:
 
 ```text
-skills/<project>/kas-overlays/<project>-orange-<base-skill>-overlay/SKILL.md
+skills/{{ project }}/{{ project }}-overlay/SKILL.md
+skills/{{ project }}/{{ project }}-overlay/references/*.md
 ```
+
+Optional advanced overlays may live under `skills/{{ project }}/kas-overlays/`
+only when the single project overlay is insufficient and the reason is reviewed.
 
 For overlay authoring or composition details, load:
 
@@ -44,7 +47,7 @@ skill_view("kkachi-agent-skills:kas-overlay-compose-guide")
 skill_view("kkachi-agent-skills:kas-overlay-doctor-guide")
 ```
 
-If the plugin base, role manifest, or overlay target is missing: stop, report
+If the plugin base, role manifest, or project overlay is missing: stop, report
 the exact missing surface, do not use profile-local copied skills as fallback,
 and request review or approval.
 

@@ -42,6 +42,7 @@ type SkillSourceRecord struct {
 	Role        string   `json:"role,omitempty"`
 	Project     string   `json:"project,omitempty"`
 	OverlayFor  string   `json:"overlay_for,omitempty"`
+	AppliesTo   []string `json:"applies_to,omitempty"`
 	BaseVersion string   `json:"base_version,omitempty"`
 	ReasonCodes []string `json:"reason_codes,omitempty"`
 }
@@ -94,8 +95,10 @@ type skillMetadata struct {
 	RoleManifest    string
 	PluginNamespace string
 	OverlayRoot     string
+	OverlaySkill    string
 	Project         string
 	OverlayFor      string
+	AppliesTo       []string
 	MergeMode       string
 	BaseVersion     string
 }
@@ -132,6 +135,7 @@ func BuildSkill(repo string, opts SkillOptions) (SkillDoctorResult, error) {
 		ReasonCodes:                []string{},
 		Summary: SkillDoctorSummary{CountsBySourceClass: map[string]int{
 			"plugin_base":              0,
+			"project_wrapper":          0,
 			"color_wrapper":            0,
 			"project_overlay":          0,
 			"legacy_copied_base_suite": 0,
@@ -197,8 +201,8 @@ func BuildSkill(repo string, opts SkillOptions) (SkillDoctorResult, error) {
 			}
 			result.SourceClasses = append(result.SourceClasses, record)
 		}
-		addSkillDiag(&result, "info", "plugin_update_readiness_readback_only", "plugin package readiness is based on source readback only; run update plugin --dry-run for update planning before any approved apply.")
-		addSkillDiag(&result, "warning", "update_surface_legacy_alias_present", "bare update remains a legacy project-suite alias; use update plugin for plugin package planning and update project-suite for project-suite lifecycle.")
+		addSkillDiag(&result, "info", "plugin_readiness_readback_only", "plugin package readiness is based on source readback only; public update commands are intentionally not exposed.")
+		addSkillDiag(&result, "info", "update_migrate_surface_removed", "public update/migrate CLI surfaces are removed; use kkachi-agent-skills-overlay-refresh for semantic overlay refresh.")
 	}
 
 	if _, err := discovery.BuildSourceRoleManifestReadback(sourceRepoPath); err != nil {
@@ -282,9 +286,13 @@ func classifyProfileSkills(result *SkillDoctorResult, sourceRepo string, profile
 			classifyOverlay(result, sourceRepo, pathForJSON, dirRel, data, meta, pkg)
 			return nil
 		}
-		if meta.Kind == "color_wrapper" {
+		if meta.Kind == "project_wrapper" || meta.Kind == "color_wrapper" {
 			wrapperCount++
-			record := SkillSourceRecord{SourceClass: "color_wrapper", Name: meta.Name, Path: pathForJSON, Status: "ok", Role: meta.Role}
+			sourceClass := "project_wrapper"
+			if meta.Kind == "color_wrapper" {
+				sourceClass = "color_wrapper"
+			}
+			record := SkillSourceRecord{SourceClass: sourceClass, Name: meta.Name, Path: pathForJSON, Status: "ok", Role: meta.Role, Project: meta.Project}
 			validateWrapper(result, &record, meta, pkg, roleManifestRoles)
 			result.SourceClasses = append(result.SourceClasses, record)
 			return filepath.SkipDir
@@ -306,7 +314,7 @@ func classifyProfileSkills(result *SkillDoctorResult, sourceRepo string, profile
 		addSkillDiag(result, "error", "profile_unreadable", "profile skill inventory walk failed: "+err.Error())
 	}
 	if wrapperCount == 0 {
-		addSkillDiag(result, "error", "missing_wrapper_evidence", "no profile-local color wrapper was found under profile skills.")
+		addSkillDiag(result, "error", "missing_wrapper_evidence", "no profile-local project wrapper was found under profile skills.")
 	}
 }
 
@@ -326,12 +334,12 @@ func overlayOutsideRequestedProject(dirRel string, meta skillMetadata, requested
 }
 
 func classifyOverlay(result *SkillDoctorResult, sourceRepo string, pathForJSON string, dirRel string, data []byte, meta skillMetadata, pkg discovery.PluginPackage) {
-	record := SkillSourceRecord{SourceClass: "project_overlay", Name: meta.Name, Path: pathForJSON, Status: "ok", Role: meta.Role, Project: meta.Project, OverlayFor: meta.OverlayFor, BaseVersion: meta.BaseVersion}
+	record := SkillSourceRecord{SourceClass: "project_overlay", Name: meta.Name, Path: pathForJSON, Status: "ok", Role: meta.Role, Project: meta.Project, OverlayFor: meta.OverlayFor, AppliesTo: append([]string(nil), meta.AppliesTo...), BaseVersion: meta.BaseVersion}
 	parts := strings.Split(dirRel, "/")
-	if len(parts) < 4 || parts[0] != "skills" || parts[2] != "kas-overlays" {
+	if !isCanonicalProjectOverlayPath(dirRel, meta) && !isAdvancedOverlayPath(dirRel) {
 		record.Status = "invalid"
 		record.ReasonCodes = append(record.ReasonCodes, "invalid_overlay_layout")
-		addSkillDiag(result, "error", "invalid_overlay_layout", "project overlay must live under skills/<project>/kas-overlays/<overlay>/SKILL.md: "+pathForJSON)
+		addSkillDiag(result, "error", "invalid_overlay_layout", "project overlay must live under skills/<project>/<project>-overlay/SKILL.md or optional skills/<project>/kas-overlays/<overlay>/SKILL.md: "+pathForJSON)
 	}
 	if meta.Kind != "project_overlay" {
 		record.Status = "invalid"
@@ -353,10 +361,22 @@ func classifyOverlay(result *SkillDoctorResult, sourceRepo string, pathForJSON s
 		record.ReasonCodes = append(record.ReasonCodes, "invalid_overlay_frontmatter")
 		addSkillDiag(result, "error", "invalid_overlay_frontmatter", "project overlay metadata.kas.merge_mode is missing: "+pathForJSON)
 	}
-	if !pluginQualifiedOverlayTarget(meta.OverlayFor, pkg) {
+	targets := append([]string(nil), meta.AppliesTo...)
+	if len(targets) == 0 && meta.OverlayFor != "" {
+		targets = append(targets, meta.OverlayFor)
+	}
+	if len(targets) == 0 {
 		record.Status = "invalid"
 		record.ReasonCodes = append(record.ReasonCodes, "invalid_overlay_frontmatter")
-		addSkillDiag(result, "error", "invalid_overlay_frontmatter", "project overlay overlay_for must name a registered plugin-qualified KAS base skill: "+pathForJSON)
+		addSkillDiag(result, "error", "invalid_overlay_frontmatter", "project overlay metadata.kas.applies_to is missing or empty: "+pathForJSON)
+	}
+	for _, target := range targets {
+		if !pluginQualifiedOverlayTarget(target, pkg) {
+			record.Status = "invalid"
+			record.ReasonCodes = append(record.ReasonCodes, "invalid_overlay_frontmatter")
+			addSkillDiag(result, "error", "invalid_overlay_frontmatter", "project overlay applies_to/overlay_for must name registered plugin-qualified KAS base skills: "+pathForJSON)
+			break
+		}
 	}
 	if shadowsPluginBase(pkg, meta.Name, filepath.Base(filepath.Dir(pathForJSON))) {
 		record.Status = "invalid"
@@ -390,23 +410,34 @@ func validateWrapper(result *SkillDoctorResult, record *SkillSourceRecord, meta 
 	if meta.PluginNamespace == "" || meta.PluginNamespace != pkg.Namespace {
 		record.Status = "invalid"
 		record.ReasonCodes = append(record.ReasonCodes, "missing_plugin_evidence")
-		addSkillDiag(result, "error", "missing_plugin_evidence", "color wrapper plugin_namespace is missing or does not match official plugin namespace: "+record.Path)
+		addSkillDiag(result, "error", "missing_plugin_evidence", "project wrapper plugin_namespace is missing or does not match official plugin namespace: "+record.Path)
 	}
 	roleFromManifest := roleNameFromQualifiedRoleManifest(meta.RoleManifest, pkg.Namespace)
 	if roleFromManifest == "" || !roles[roleFromManifest] {
 		record.Status = "invalid"
 		record.ReasonCodes = append(record.ReasonCodes, "missing_role_evidence")
-		addSkillDiag(result, "error", "missing_role_evidence", "color wrapper role_manifest is missing or does not name a known source role manifest: "+record.Path)
+		addSkillDiag(result, "error", "missing_role_evidence", "project wrapper role_manifest is missing or does not name a known source role manifest: "+record.Path)
 	}
 	if meta.Role != "" && roleFromManifest != "" && !wrapperRoleMatchesManifest(meta.Role, roleFromManifest) {
 		record.Status = "invalid"
 		record.ReasonCodes = append(record.ReasonCodes, "wrapper_role_manifest_mismatch")
-		addSkillDiag(result, "error", "wrapper_role_manifest_mismatch", "color wrapper metadata.kas.role does not match its role_manifest role: "+record.Path)
+		addSkillDiag(result, "error", "wrapper_role_manifest_mismatch", "project wrapper metadata.kas.role does not match its role_manifest role: "+record.Path)
 	}
-	if meta.OverlayRoot == "" {
+	if meta.Kind == "project_wrapper" {
+		if meta.Project == "" {
+			record.Status = "invalid"
+			record.ReasonCodes = append(record.ReasonCodes, "missing_wrapper_evidence")
+			addSkillDiag(result, "error", "missing_wrapper_evidence", "project wrapper metadata.kas.project evidence is missing: "+record.Path)
+		}
+		if meta.OverlaySkill == "" {
+			record.Status = "invalid"
+			record.ReasonCodes = append(record.ReasonCodes, "missing_wrapper_evidence")
+			addSkillDiag(result, "error", "missing_wrapper_evidence", "project wrapper overlay_skill evidence is missing: "+record.Path)
+		}
+	} else if meta.OverlayRoot == "" {
 		record.Status = "invalid"
 		record.ReasonCodes = append(record.ReasonCodes, "missing_wrapper_evidence")
-		addSkillDiag(result, "error", "missing_wrapper_evidence", "color wrapper overlay_root evidence is missing: "+record.Path)
+		addSkillDiag(result, "error", "missing_wrapper_evidence", "legacy color wrapper overlay_root evidence is missing: "+record.Path)
 	}
 }
 
@@ -441,14 +472,31 @@ func parseSkillMetadata(data []byte) skillMetadata {
 	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
 		return meta
 	}
+	activeListKey := ""
 	for i := 1; i < len(lines); i++ {
 		trimmed := strings.TrimSpace(lines[i])
 		if trimmed == "---" {
 			break
 		}
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "- ") {
+			if activeListKey == "applies_to" {
+				value := strings.Trim(strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")), `"'`)
+				if value != "" {
+					meta.AppliesTo = append(meta.AppliesTo, value)
+				}
+			}
+			continue
+		}
 		key, value, ok := splitSkillYAMLLine(trimmed)
 		if !ok {
 			continue
+		}
+		activeListKey = ""
+		if value == "" {
+			activeListKey = key
 		}
 		switch key {
 		case "name":
@@ -463,10 +511,16 @@ func parseSkillMetadata(data []byte) skillMetadata {
 			meta.PluginNamespace = value
 		case "overlay_root":
 			meta.OverlayRoot = value
+		case "overlay_skill":
+			meta.OverlaySkill = value
 		case "project":
 			meta.Project = value
 		case "overlay_for":
 			meta.OverlayFor = value
+		case "applies_to":
+			if value != "" {
+				meta.AppliesTo = append(meta.AppliesTo, value)
+			}
 		case "merge_mode":
 			meta.MergeMode = value
 		case "base_version":
@@ -488,6 +542,22 @@ func splitSkillYAMLLine(trimmed string) (string, string, bool) {
 }
 
 func isOverlayPath(dirRel string) bool {
+	return isCanonicalProjectOverlayPath(dirRel, skillMetadata{}) || isAdvancedOverlayPath(dirRel)
+}
+
+func isCanonicalProjectOverlayPath(dirRel string, meta skillMetadata) bool {
+	parts := strings.Split(filepath.ToSlash(dirRel), "/")
+	if len(parts) != 3 || parts[0] != "skills" || parts[1] == "" {
+		return false
+	}
+	expected := parts[1] + "-overlay"
+	if meta.Project != "" {
+		expected = meta.Project + "-overlay"
+	}
+	return parts[2] == expected
+}
+
+func isAdvancedOverlayPath(dirRel string) bool {
 	parts := strings.Split(filepath.ToSlash(dirRel), "/")
 	return len(parts) >= 4 && parts[0] == "skills" && parts[1] != "" && parts[2] == "kas-overlays"
 }

@@ -154,8 +154,10 @@ type metadata struct {
 	RoleManifest    string
 	PluginNamespace string
 	OverlayRoot     string
+	OverlaySkill    string
 	Project         string
 	OverlayFor      string
+	AppliesTo       []string
 	MergeMode       string
 	BaseVersion     string
 }
@@ -608,6 +610,7 @@ func parseMetadata(data []byte) metadata {
 	lines := strings.Split(string(data), "\n")
 	inFrontmatter := false
 	pathByIndent := map[int][]string{}
+	activeListKey := ""
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if i == 0 && trimmed == "---" {
@@ -617,7 +620,16 @@ func parseMetadata(data []byte) metadata {
 		if inFrontmatter && trimmed == "---" {
 			break
 		}
-		if !inFrontmatter || trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "- ") {
+		if !inFrontmatter || trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "- ") {
+			if activeListKey == "applies_to" {
+				value := strings.Trim(strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")), `"'`)
+				if value != "" {
+					meta.AppliesTo = append(meta.AppliesTo, value)
+				}
+			}
 			continue
 		}
 		key, value, ok := strings.Cut(trimmed, ":")
@@ -630,8 +642,16 @@ func parseMetadata(data []byte) metadata {
 		if value == "" {
 			parent := pathByIndent[indent-2]
 			pathByIndent[indent] = append(append([]string{}, parent...), splitMetadataKey(key)...)
+			path := pathByIndent[indent]
+			activeListKey = ""
+			if len(path) == 3 && path[0] == "metadata" && path[1] == "kas" {
+				activeListKey = path[2]
+			} else if indent == 0 {
+				activeListKey = key
+			}
 			continue
 		}
+		activeListKey = ""
 		parent := pathByIndent[indent-2]
 		path := append(append([]string{}, parent...), splitMetadataKey(key)...)
 		if len(path) == 3 && path[0] == "metadata" && path[1] == "kas" {
@@ -672,10 +692,16 @@ func assignMetadata(meta *metadata, key string, value string) {
 		meta.PluginNamespace = value
 	case "overlay_root":
 		meta.OverlayRoot = value
+	case "overlay_skill":
+		meta.OverlaySkill = value
 	case "project":
 		meta.Project = value
 	case "overlay_for":
 		meta.OverlayFor = value
+	case "applies_to":
+		if value != "" {
+			meta.AppliesTo = append(meta.AppliesTo, value)
+		}
 	case "merge_mode":
 		meta.MergeMode = value
 	case "base_version":
@@ -684,11 +710,11 @@ func assignMetadata(meta *metadata, key string, value string) {
 }
 
 func isProjectOverlayCandidate(skill skillFile) bool {
-	return skill.Meta.Kind == "project_overlay" || strings.Contains(filepath.ToSlash(skill.Rel), "/kas-overlays/") || skill.Meta.OverlayFor != "" || skill.Meta.MergeMode != ""
+	return skill.Meta.Kind == "project_overlay" || strings.Contains(filepath.ToSlash(skill.Rel), "/kas-overlays/") || isCanonicalProjectOverlayRel(skill.Rel, skill.Meta) || skill.Meta.OverlayFor != "" || len(skill.Meta.AppliesTo) > 0 || skill.Meta.MergeMode != ""
 }
 
 func isRoleWrapperCandidate(skill skillFile) bool {
-	return skill.Meta.Kind == "color_wrapper" || skill.Meta.RoleManifest != "" || skill.Meta.PluginNamespace != "" || skill.Meta.OverlayRoot != ""
+	return skill.Meta.Kind == "project_wrapper" || skill.Meta.Kind == "color_wrapper" || skill.Meta.RoleManifest != "" || skill.Meta.PluginNamespace != "" || skill.Meta.OverlayRoot != "" || skill.Meta.OverlaySkill != ""
 }
 
 func isKAHCompanionSurface(skill skillFile) bool {
@@ -726,19 +752,37 @@ func containsOwnershipConflict(data []byte) bool {
 	return strings.Contains(text, "kah owns plugin") || strings.Contains(text, "kah owns kas") || strings.Contains(text, "kah owns wrapper") || strings.Contains(text, "kah owns update")
 }
 
+func isCanonicalProjectOverlayRel(rel string, meta metadata) bool {
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	if len(parts) != 4 || parts[0] != "skills" || parts[len(parts)-1] != "SKILL.md" || parts[1] == "" {
+		return false
+	}
+	expected := parts[1] + "-overlay"
+	if meta.Project != "" {
+		expected = meta.Project + "-overlay"
+	}
+	return parts[2] == expected
+}
+
 func candidateOverlayPath(skill skillFile) string {
-	project := skill.Meta.Project
-	if project == "" {
-		parts := strings.Split(filepath.ToSlash(skill.Rel), "/")
-		if len(parts) >= 4 && parts[0] == "skills" && parts[2] == "kas-overlays" {
-			project = parts[1]
+	rel := filepath.ToSlash(skill.Rel)
+	parts := strings.Split(rel, "/")
+	if len(parts) >= 4 && parts[0] == "skills" && parts[len(parts)-1] == "SKILL.md" {
+		if parts[2] == "kas-overlays" || (len(parts) == 4 && parts[2] == parts[1]+"-overlay") {
+			return rel
 		}
 	}
+
+	project := skill.Meta.Project
 	if project == "" {
 		project = "<project>"
 	}
 	name := strings.TrimPrefix(skill.ID, "kkachi-")
-	return "skills/" + project + "/kas-overlays/" + project + "-" + name + "-overlay/SKILL.md"
+	name = strings.TrimSuffix(name, "-overlay")
+	if strings.HasPrefix(name, project+"-") {
+		name = strings.TrimPrefix(name, project+"-")
+	}
+	return "skills/" + project + "/" + project + "-overlay/SKILL.md"
 }
 
 func previewLines(data []byte, limit int) []string {

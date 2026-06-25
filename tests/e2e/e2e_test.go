@@ -95,61 +95,6 @@ func TestSTRICT007E2EGoldenGuidanceReadback(t *testing.T) {
 	}
 }
 
-func TestRootBinaryUpdateAgentInstructionsDryRun(t *testing.T) {
-	binary := buildRootBinary(t)
-	repo := t.TempDir()
-	cmd := exec.Command(binary, "update", "agent-instructions", "--repo-path", repo, "--source-repo", repoRoot(t), "--project", "kan-control", "--dry-run", "--json")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("update agent-instructions dry-run failed: %v\n%s", err, out)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(out, &payload); err != nil {
-		t.Fatalf("invalid JSON: %v\n%s", err, out)
-	}
-	if payload["command"] != "update agent-instructions" || payload["mode"] != "dry_run" || payload["plan_hash"] == "" {
-		t.Fatalf("unexpected payload: %+v", payload)
-	}
-	noWrite := payload["no_write"].(map[string]any)
-	if noWrite["guaranteed"] != true || noWrite["profile_write_count"] != float64(0) || noWrite["kab_runtime_mutation_count"] != float64(0) {
-		t.Fatalf("missing no-write evidence: %+v", noWrite)
-	}
-	if _, err := os.Stat(filepath.Join(repo, "AGENTS.md")); !os.IsNotExist(err) {
-		t.Fatalf("dry-run wrote repo-local AGENTS.md: %v", err)
-	}
-}
-
-func TestRootBinaryUpdateAgentInstructionsApply(t *testing.T) {
-	binary := buildRootBinary(t)
-	repo := t.TempDir()
-	dryRun := exec.Command(binary, "update", "agent-instructions", "--repo-path", repo, "--source-repo", repoRoot(t), "--project", "kan-control", "--dry-run", "--json")
-	dryOut, err := dryRun.CombinedOutput()
-	if err != nil {
-		t.Fatalf("update agent-instructions dry-run failed: %v\n%s", err, dryOut)
-	}
-	var dryPayload map[string]any
-	if err := json.Unmarshal(dryOut, &dryPayload); err != nil {
-		t.Fatalf("invalid dry-run JSON: %v\n%s", err, dryOut)
-	}
-	evidence := dryPayload["approval_request"].(map[string]any)["evidence_ref"].(string)
-	apply := exec.Command(binary, "update", "agent-instructions", "--repo-path", repo, "--source-repo", repoRoot(t), "--project", "kan-control", "--apply", evidence, "--json")
-	applyOut, err := apply.CombinedOutput()
-	if err != nil {
-		t.Fatalf("update agent-instructions apply failed: %v\n%s", err, applyOut)
-	}
-	var applyPayload map[string]any
-	if err := json.Unmarshal(applyOut, &applyPayload); err != nil {
-		t.Fatalf("invalid apply JSON: %v\n%s", err, applyOut)
-	}
-	noWrite := applyPayload["no_write"].(map[string]any)
-	if noWrite["guaranteed"] != false || noWrite["repo_write_count"].(float64) <= 0 || noWrite["profile_write_count"] != float64(0) {
-		t.Fatalf("unexpected apply write evidence: %+v", noWrite)
-	}
-	if _, err := os.Stat(filepath.Join(repo, "AGENTS.md")); err != nil {
-		t.Fatalf("expected AGENTS.md to be written: %v", err)
-	}
-}
-
 func writeFakeKAH(t *testing.T) string {
 	t.Helper()
 	binDir := t.TempDir()
@@ -427,105 +372,6 @@ func TestSkillPluginDoctorE2ENoWrite(t *testing.T) {
 	}
 }
 
-func TestMigrateProfileSkillsE2ENoWrite(t *testing.T) {
-	root := repoRoot(t)
-	binary := buildRootBinary(t)
-	profileRoot := filepath.Join(t.TempDir(), "profile")
-	sourcePlan, err := os.ReadFile(filepath.Join(root, "skills", "kkachi-plan", "SKILL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(profileRoot, "skills", "kkachi-plan"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(profileRoot, "skills", "kkachi-plan", "SKILL.md"), sourcePlan, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	writeE2ESkill(t, filepath.Join(profileRoot, "skills", "kkachi-review"), "kkachi-review", "# kkachi-review\nlocal delta\n")
-	writeE2ESkillDoctorWrapper(t, filepath.Join(profileRoot, "skills", "kkachi-blue-wrapper"))
-	writeE2ESkillDoctorOverlay(t, filepath.Join(profileRoot, "skills", "doksuri", "kas-overlays", "doksuri-blue-plan-overlay"), "kkachi-agent-skills:plan")
-	writeE2ESkill(t, filepath.Join(profileRoot, "skills", "personal-note"), "personal-note", "# personal-note\n")
-	writeE2ESkill(t, filepath.Join(profileRoot, "skills", "kah-companion"), "kah-companion", "# KAH companion\nkkachi-agent-helper handoff\n")
-	before := treeHash(t, profileRoot)
-
-	cmd := exec.Command(binary, "migrate-profile-skills", "--repo", root, "--profile", "hwangchung", "--profile-root", profileRoot, "--project", "doksuri", "--dry-run", "--json")
-	cmd.Env = append(os.Environ(), "KAS_ALLOW_PROFILE_ROOT_OVERRIDE=1")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("migrate-profile-skills failed: %v\n%s", err, out)
-	}
-	if after := treeHash(t, profileRoot); after != before {
-		t.Fatalf("migrate-profile-skills mutated profile tree: before=%s after=%s", before, after)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(out, &payload); err != nil {
-		t.Fatal(err)
-	}
-	noWrite := payload["no_write_evidence"].(map[string]any)
-	noSpillover := payload["no_spillover_evidence"].(map[string]any)
-	if payload["ok"] != true || payload["mode"] != "profile_skill_migration_classifier" || noWrite["guaranteed"] != true {
-		t.Fatalf("unexpected migration classifier payload: %+v", payload)
-	}
-	for _, field := range []string{"profile_skill_write_count", "profile_skill_delete_count", "profile_skill_migration_count", "kah_state_write_count", "kab_runtime_mutation_count", "hermes_runtime_mutation_count", "auth_provider_config_write_count"} {
-		if noWrite[field].(float64) != 0 {
-			t.Fatalf("unexpected no-write counter %s in %+v", field, noWrite)
-		}
-	}
-	if noSpillover["external_project_write_count"].(float64) != 0 || noSpillover["unrequested_profile_touched"].(bool) {
-		t.Fatalf("unexpected no-spillover counters: %+v", noSpillover)
-	}
-	counts := payload["summary"].(map[string]any)["counts_by_bucket"].(map[string]any)
-	for _, bucket := range []string{"base_identical", "base_with_local_delta", "project_overlay_candidate", "role_wrapper_candidate", "unknown_personal_skill", "kah_companion_surface"} {
-		if counts[bucket].(float64) == 0 {
-			t.Fatalf("missing bucket %s in %+v", bucket, counts)
-		}
-	}
-}
-
-func TestMigrateProfileSkillsE2EDefaultHermesProfileRoot(t *testing.T) {
-	root := repoRoot(t)
-	binary := buildRootBinary(t)
-	home := t.TempDir()
-	profile := "yeomong-default"
-	profileRoot := filepath.Join(home, ".hermes", "profiles", profile)
-	sourcePlan, err := os.ReadFile(filepath.Join(root, "skills", "kkachi-plan", "SKILL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(profileRoot, "skills", "kkachi-plan"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(profileRoot, "skills", "kkachi-plan", "SKILL.md"), sourcePlan, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	before := treeHash(t, profileRoot)
-
-	cmd := exec.Command(binary, "migrate-profile-skills", "--repo", root, "--profile", profile, "--dry-run", "--json")
-	cmd.Env = append(os.Environ(), "HOME="+home)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("migrate-profile-skills default root failed: %v\n%s", err, out)
-	}
-	if after := treeHash(t, profileRoot); after != before {
-		t.Fatalf("migrate-profile-skills default root mutated profile tree: before=%s after=%s", before, after)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(out, &payload); err != nil {
-		t.Fatal(err)
-	}
-	want, err := filepath.Abs(profileRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target := payload["target_profile"].(map[string]any)
-	if target["root"] != want {
-		t.Fatalf("target_profile.root = %q, want %q", target["root"], want)
-	}
-	if payload["ok"] != true || payload["summary"].(map[string]any)["counts_by_bucket"].(map[string]any)["base_identical"].(float64) != 1 {
-		t.Fatalf("unexpected default-root classifier payload: %+v", payload)
-	}
-}
-
 func TestWorkflowGraphRepairProposalAndApplyE2E(t *testing.T) {
 	root := repoRoot(t)
 	binary := buildRootBinary(t)
@@ -754,8 +600,8 @@ func TestRootInstalledBinaryUsesEmbeddedSkillPackForProjectDryRunOutsideRepo(t *
 	if err := json.Unmarshal(out, &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload["ok"] != true || payload["command"] != "install-project-kas" || len(payload["planned_skills"].([]any)) == 0 {
-		t.Fatalf("unexpected embedded-source project dry-run payload: %+v", payload)
+	if payload["ok"] != true || payload["command"] != "install-project-kas" || len(payload["planned_skills"].([]any)) != 0 || len(payload["composition_files"].([]any)) != 3 {
+		t.Fatalf("unexpected embedded-source plugin-only project dry-run payload: %+v", payload)
 	}
 }
 
@@ -833,18 +679,19 @@ func TestRealRepoInstallProjectKASDryRunWritesNothing(t *testing.T) {
 		t.Fatalf("unexpected no-write evidence: %+v", noWrite)
 	}
 	planned := payload["planned_skills"].([]any)
-	if len(planned) == 0 {
-		t.Fatalf("expected planned project skills: %+v", payload)
+	components := payload["composition_files"].([]any)
+	if len(planned) != 0 || len(components) != 3 {
+		t.Fatalf("expected plugin-only dry-run to plan wrapper/overlay composition files only: %+v", payload)
 	}
-	foundPlan := false
-	for _, raw := range planned {
-		skill := raw.(map[string]any)
-		if skill["source_pack_id"] == "kkachi-plan" && skill["installed_skill"] == "doksuri-server-plan" && skill["target_path"] == "skills/doksuri-server/doksuri-server-plan/SKILL.md" {
-			foundPlan = true
+	foundWrapper := false
+	for _, raw := range components {
+		component := raw.(map[string]any)
+		if component["kind"] == "project_wrapper" && component["target_path"] == "skills/doksuri-server/doksuri-server-wrapper/SKILL.md" {
+			foundWrapper = true
 		}
 	}
-	if !foundPlan || !strings.HasPrefix(payload["plan_hash"].(string), "sha256:") {
-		t.Fatalf("missing project plan/hash evidence: %+v", payload)
+	if !foundWrapper || !strings.HasPrefix(payload["plan_hash"].(string), "sha256:") {
+		t.Fatalf("missing project wrapper/hash evidence: %+v", payload)
 	}
 }
 
@@ -894,8 +741,11 @@ func TestRealRepoApprovedProjectKASInstallAndWrongHashNoWrite(t *testing.T) {
 	if approvePayload["ok"] != true || approvePayload["mode"] != "project_approved_copy" || approvePayload["install_id"] == "" {
 		t.Fatalf("unexpected approved project payload: %+v", approvePayload)
 	}
-	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); err != nil {
-		t.Fatalf("approved project install did not write expected project skill: %v", err)
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-wrapper", "SKILL.md")); err != nil {
+		t.Fatalf("approved project install did not write expected project wrapper: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")); !os.IsNotExist(err) {
+		t.Fatalf("plugin-only project install wrote copied project skill or unexpected stat error: %v", err)
 	}
 	manifestBytes, err := os.ReadFile(filepath.Join(profileRoot, ".kas", "skill-pack-manifest.json"))
 	if err != nil {
@@ -923,7 +773,7 @@ func TestRealRepoApprovedProjectKASInstallAndWrongHashNoWrite(t *testing.T) {
 		t.Fatalf("unexpected project-suite doctor payload: %+v", doctorPayload)
 	}
 
-	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-plan", "SKILL.md")
+	target := filepath.Join(profileRoot, "skills", "doksuri-server", "doksuri-server-wrapper", "SKILL.md")
 	if err := os.Remove(target); err != nil {
 		t.Fatal(err)
 	}

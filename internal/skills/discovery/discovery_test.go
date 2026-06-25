@@ -505,10 +505,11 @@ func TestCommittedPluginPackageGuideSkillsConsistent(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertGuideReadback(t, readback.Guides, map[string]string{
-		"kas-overlay-compose-guide": "skills/kas-overlay-compose-guide/SKILL.md",
-		"kas-overlay-doctor-guide":  "skills/kas-overlay-doctor-guide/SKILL.md",
-		"kas-project-overlay-guide": "skills/kas-project-overlay-guide/SKILL.md",
-		"kkachi-install-guide":      "skills/kkachi-install-guide/SKILL.md",
+		"kas-overlay-compose-guide":           "skills/kas-overlay-compose-guide/SKILL.md",
+		"kas-overlay-doctor-guide":            "skills/kas-overlay-doctor-guide/SKILL.md",
+		"kas-project-overlay-guide":           "skills/kas-project-overlay-guide/SKILL.md",
+		"kkachi-agent-skills-overlay-refresh": "skills/kkachi-agent-skills-overlay-refresh/SKILL.md",
+		"kkachi-install-guide":                "skills/kkachi-install-guide/SKILL.md",
 	})
 	for _, guide := range readback.Guides {
 		if guide.SourceClass != "official_plugin_guide" || guide.PackageSource != PluginPackageManifestPath {

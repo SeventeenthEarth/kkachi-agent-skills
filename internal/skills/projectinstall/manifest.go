@@ -20,6 +20,7 @@ type manifestSkillRecord struct {
 	Checksum       string
 	DriftPolicy    string
 	TailoringMode  string
+	Kind           string
 }
 
 func discoverDefaultProjectSuite(sourceRepo string) ([]discovery.SourcePack, string, error) {
@@ -158,6 +159,27 @@ func trustedProjectSuite(profileRoot string, project string, sourcePack string) 
 		}
 		records[target] = manifestSkillRecord{InstalledSkill: installed, TargetPath: target, Checksum: checksum, DriftPolicy: driftPolicy, TailoringMode: tailoringMode}
 	}
+	if rawComponents, ok := suite["composition_files"].([]any); ok {
+		for _, raw := range rawComponents {
+			component, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			target, _ := component["target_path"].(string)
+			if discovery.IsInvalidRelativePath(target) || !strings.HasPrefix(target, "skills/"+project+"/") {
+				return records, []Conflict{conflict("unsafe_manifest_target_path", project, "", target, "project suite manifest contains an unsafe composition target_path", "Repair the project suite manifest before approved install.")}, &previous
+			}
+			checksum, _ := component["checksum"].(string)
+			name, _ := component["name"].(string)
+			driftPolicy, _ := component["drift_policy"].(string)
+			tailoringMode, _ := component["tailoring_mode"].(string)
+			kind, _ := component["kind"].(string)
+			if records[target].TargetPath != "" {
+				return records, []Conflict{conflict("duplicate_manifest_target_path", project, name, target, "project suite manifest contains duplicate target_path", "Repair the project suite manifest before approved install.")}, &previous
+			}
+			records[target] = manifestSkillRecord{InstalledSkill: name, TargetPath: target, Checksum: checksum, DriftPolicy: driftPolicy, TailoringMode: tailoringMode, Kind: kind}
+		}
+	}
 	return records, nil, &previous
 }
 
@@ -257,6 +279,25 @@ func projectSuiteManifestEntry(dryRun Result, evidenceRef string, approvedHash s
 			"tailoring_mode":       "prefix_render_only",
 		})
 	}
+	composition := []any{}
+	for _, component := range dryRun.CompositionFiles {
+		changedEntry := changedByPath[component.TargetPath]
+		backupRel := any(nil)
+		if changedEntry.BackupPath != "" {
+			backupRel = changedEntry.BackupPath
+		}
+		composition = append(composition, map[string]any{
+			"kind":                 component.Kind,
+			"name":                 component.Name,
+			"target_path":          component.TargetPath,
+			"checksum":             component.Checksum,
+			"previous_sha256":      changedEntry.PreviousSHA256,
+			"backup_relative_path": backupRel,
+			"bytes":                component.Bytes,
+			"drift_policy":         component.DriftPolicy,
+			"tailoring_mode":       component.TailoringMode,
+		})
+	}
 	backupRequired := false
 	for _, entry := range changed {
 		if entry.Action == "backup" {
@@ -284,5 +325,6 @@ func projectSuiteManifestEntry(dryRun Result, evidenceRef string, approvedHash s
 		"backup":                      map[string]any{"required": backupRequired, "path": backupRoot, "created": backupRequired},
 		"previous_manifest":           map[string]any{"path": previousManifestPath, "sha256": dryRun.TargetProfile.PreviousManifestSHA256},
 		"installed_skills":            installed,
+		"composition_files":           composition,
 	}
 }

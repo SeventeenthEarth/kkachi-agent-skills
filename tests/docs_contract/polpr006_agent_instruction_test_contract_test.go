@@ -7,11 +7,10 @@ import (
 
 func TestPOLPR006RepoLocalAgentInstructionLifecycleContract(t *testing.T) {
 	requireContainsAll(t, "docs/sot/kas-cli-contract.md", []string{
-		"update agent-instructions",
-		"--repo-path <path>",
-		"--source-repo <kas-source-repo>",
-		"templates/agent-instructions/*.tmpl",
-		"`AGENTS.md` / `CLAUDE.md` repo-local lifecycle",
+		"POLPR-006 previously defined an `update agent-instructions` repo-local lifecycle surface",
+		"public `update` command is removed under SKILL-005",
+		"future non-ambiguous command name or skill workflow",
+		"The former surface managed repository-root instruction files only",
 		"profile-local skill installation",
 		"`create`",
 		"`update_managed_block`",

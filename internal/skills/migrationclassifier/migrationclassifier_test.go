@@ -15,8 +15,8 @@ func TestBuildClassifiesAllBucketsAndWritesNothing(t *testing.T) {
 	writeClassifierRepo(t, repo)
 	writeClassifierSkill(t, filepath.Join(profileRoot, "skills", "kkachi-plan"), "kkachi-plan", "base plan")
 	writeClassifierSkill(t, filepath.Join(profileRoot, "skills", "kkachi-review"), "kkachi-review", "base review with local delta")
-	writeClassifierOverlay(t, filepath.Join(profileRoot, "skills", "doksuri", "kas-overlays", "doksuri-blue-plan-overlay"))
-	writeClassifierWrapper(t, filepath.Join(profileRoot, "skills", "kkachi-blue-wrapper"))
+	writeClassifierOverlay(t, filepath.Join(profileRoot, "skills", "doksuri", "doksuri-overlay"))
+	writeClassifierWrapper(t, filepath.Join(profileRoot, "skills", "doksuri", "doksuri-wrapper"))
 	writeClassifierSkill(t, filepath.Join(profileRoot, "skills", "personal-note"), "personal-note", "personal notes")
 	writeClassifierSkill(t, filepath.Join(profileRoot, "skills", "kah-companion"), "kah-companion", "KAH companion surface for kkachi-agent-helper handoff")
 	before, err := treeSHA256(profileRoot)
@@ -64,6 +64,9 @@ func TestBuildClassifiesAllBucketsAndWritesNothing(t *testing.T) {
 	for _, item := range result.Items {
 		if item.Bucket == "" || item.HashEvidence.ProfileSkillSHA256 == "" || item.HashEvidence.HashAlgorithm != "sha256" || item.SemanticExtractionPacket.PacketType == "" {
 			t.Fatalf("item missing required evidence: %+v", item)
+		}
+		if item.ProfilePath == "skills/doksuri/doksuri-overlay/SKILL.md" && item.SemanticExtractionPacket.CandidateOverlayPath != item.ProfilePath {
+			t.Fatalf("canonical project overlay candidate path should preserve existing path, got %q want %q", item.SemanticExtractionPacket.CandidateOverlayPath, item.ProfilePath)
 		}
 		if len(item.ForbiddenActions) == 0 || item.NextAction == "" || item.Owner == "" || item.RecoveryHint == "" {
 			t.Fatalf("item missing operator safety fields: %+v", item)
@@ -348,9 +351,10 @@ metadata:
     role: blue_commander
     role_manifest: kkachi-agent-skills:roles/blue.yaml
     plugin_namespace: kkachi-agent-skills
-    overlay_root: skills/<project>/kas-overlays
+    overlay_skill: doksuri-overlay
     project: doksuri
-    overlay_for: kkachi-agent-skills:plan
+    applies_to:
+      - kkachi-agent-skills:plan
     merge_mode: additive_constraints
     base_version: v1
 ---
@@ -361,20 +365,20 @@ metadata:
 		meta.Role != "blue_commander" ||
 		meta.RoleManifest != "kkachi-agent-skills:roles/blue.yaml" ||
 		meta.PluginNamespace != "kkachi-agent-skills" ||
-		meta.OverlayRoot != "skills/<project>/kas-overlays" ||
+		meta.OverlaySkill != "doksuri-overlay" ||
 		meta.Project != "doksuri" ||
-		meta.OverlayFor != "kkachi-agent-skills:plan" ||
+		len(meta.AppliesTo) != 1 || meta.AppliesTo[0] != "kkachi-agent-skills:plan" ||
 		meta.MergeMode != "additive_constraints" ||
 		meta.BaseVersion != "v1" {
 		t.Fatalf("unexpected metadata parse: %+v", meta)
 	}
 
 	dotted := parseMetadata([]byte(`---
-metadata.kas.kind: color_wrapper
+metadata.kas.kind: project_wrapper
 metadata.other.role: ignored-role
 ---
 `))
-	if dotted.Kind != "color_wrapper" || dotted.Role != "" {
+	if dotted.Kind != "project_wrapper" || dotted.Role != "" {
 		t.Fatalf("unexpected dotted metadata parse: %+v", dotted)
 	}
 }
@@ -420,12 +424,13 @@ func writeClassifierSkill(t *testing.T, dir string, name string, body string) {
 func writeClassifierOverlay(t *testing.T, dir string) {
 	t.Helper()
 	content := `---
-name: doksuri-blue-plan-overlay
+name: doksuri-overlay
 metadata:
   kas:
     kind: project_overlay
     project: doksuri
-    overlay_for: kkachi-agent-skills:plan
+    applies_to:
+      - kkachi-agent-skills:plan
     merge_mode: additive_constraints
 ---
 # Overlay
@@ -442,14 +447,15 @@ project-specific plan guidance
 func writeClassifierWrapper(t *testing.T, dir string) {
 	t.Helper()
 	content := `---
-name: kkachi-blue-wrapper
+name: doksuri-wrapper
 metadata:
   kas:
-    kind: color_wrapper
+    kind: project_wrapper
+    project: doksuri
     role: blue_commander
     role_manifest: kkachi-agent-skills:roles/blue.yaml
     plugin_namespace: kkachi-agent-skills
-    overlay_root: skills/<project>/kas-overlays
+    overlay_skill: doksuri-overlay
 ---
 # Wrapper
 thin wrapper

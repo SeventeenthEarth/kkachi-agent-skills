@@ -78,12 +78,10 @@ kkachi-agent-skills install [--repo <path>] --profile <profile> <pack-id>... --a
 kkachi-agent-skills doctor [--repo <path>] --profile <profile> [--project <path>] [--json]
 kkachi-agent-skills doctor [--repo <path>] --profile <profile> --project <project> --project-suite [--json]
 kkachi-agent-skills doctor [--repo <path>] --project <path> --workflow-graph --json
-kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
-kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
-kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --from-generic --dry-run [--json]
-kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --from-generic --apply dry-run:sha256:<hash> [--json]
-kkachi-agent-skills update [--repo <path>] --profile <profile> --project <project> --state <path> --dry-run [--json]
-kkachi-agent-skills update [--repo <path>] --profile <profile> --project <project> --state <path> --apply dry-run:sha256:<hash> [--json]
+kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --suite-role <role> --dry-run [--json]
+kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --suite-role <role> --apply dry-run:sha256:<hash> [--json]
+kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --suite-role <role> --from-generic --dry-run [--json]
+kkachi-agent-skills install [--repo <path>] --profile <profile> --project <project> --suite-role <role> --from-generic --apply dry-run:sha256:<hash> [--json]
 kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <project> --dry-run [--json]
 kkachi-agent-skills repair [--repo <path>] --profile <profile> --project <project> --apply dry-run:sha256:<hash> [--json]
 kkachi-agent-skills repair [--repo <path>] --project <path> --workflow-graph --propose --reason <reason> [--json]
@@ -124,25 +122,28 @@ copy install requires `--approve dry-run:<hash>`, recomputes the plan, fails
 closed on hash mismatch, copies selected packs into the target profile, records
 manifest/checksum evidence, and prints recovery guidance.
 
-For project-specific KAS suites, the public lifecycle commands are `install`,
-`update`, `doctor`, `repair`, and `uninstall`. Dry-run forms preserve the
-TOKEN-004 no-write behavior: `install --project --dry-run` uses the
-project-suite install planner, `install --from-generic --dry-run` uses the
-generic-to-project migration planner, `update --dry-run` uses the sync
-classifier, `repair --dry-run` uses the project repair planner, and
-`uninstall --dry-run` reads the manifest and filesystem to plan
-manifest-tracked removals while skipping local-only or unmanifested files.
-TOKEN-005 write forms require `--apply dry-run:sha256:<hash>` from the matching
-current dry-run plan and fail closed before mutation on malformed, mismatched,
-or stale evidence. `uninstall --apply` additionally requires
-`--backup-vault-root <abs-path>` and rejects missing, relative, profile-contained,
-symlink-unsafe, or unwritable backup roots.
+For project-specific `kkachi-agent-skills` suites, the public lifecycle commands are
+`install`, `doctor`, `repair`, and `uninstall`. Public `update` and `migrate`
+commands are intentionally not exposed: semantic overlay refresh belongs in the
+`kkachi-agent-skills-overlay-refresh` skill, not in the deterministic CLI.
+Dry-run forms preserve the TOKEN-004 no-write behavior: `install --project
+--suite-role <role> --dry-run` uses the project-suite install planner and plans
+the selected project-prefixed phase skills plus the canonical
+`<project>-wrapper`, `<project>-overlay`, and
+`<project>-overlay/references/legacy-delta-extract.md` composition files;
+`install --from-generic --dry-run` plans explicit generic-to-project setup,
+`repair --dry-run` uses the project repair planner, and `uninstall --dry-run`
+reads the manifest and filesystem to plan manifest-tracked removals while
+skipping local-only or unmanifested files. TOKEN-005 write forms require
+`--apply dry-run:sha256:<hash>` from the matching current dry-run plan and fail
+closed before mutation on malformed, mismatched, or stale evidence. `uninstall
+--apply` additionally requires `--backup-vault-root <abs-path>` and rejects
+missing, relative, profile-contained, symlink-unsafe, or unwritable backup roots.
 
 Compatibility commands remain available for existing automation:
-`sync-project-kas`, `install-project-kas`, `repair-project-kas`, and
-`migrate-project-kas`. Their approved install/repair/migration paths preserve
-the existing approval-hash behavior; public docs prefer `--apply` for lifecycle
-writes.
+`sync-project-kas`, `install-project-kas`, and `repair-project-kas`. Public
+compatibility `migrate-project-kas` is removed to avoid implying that the CLI
+can perform semantic migration.
 
 `doctor` verifies source pack integrity, installed profile state,
 manifest/checksum consistency, KAH availability/version/capabilities, optional

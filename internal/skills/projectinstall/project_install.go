@@ -90,6 +90,17 @@ type PlannedSkill struct {
 	TailoringMode  string `json:"tailoring_mode"`
 }
 
+type PlannedCompositionFile struct {
+	Kind          string `json:"kind"`
+	Name          string `json:"name"`
+	TargetPath    string `json:"target_path"`
+	DriftPolicy   string `json:"drift_policy"`
+	Checksum      string `json:"checksum"`
+	Action        string `json:"action"`
+	Bytes         int    `json:"bytes"`
+	TailoringMode string `json:"tailoring_mode"`
+}
+
 type ChangedPath struct {
 	Path           string  `json:"path"`
 	Action         string  `json:"action"`
@@ -155,39 +166,40 @@ type Conflict struct {
 }
 
 type Result struct {
-	OK               bool                    `json:"ok"`
-	Command          string                  `json:"command"`
-	Mode             string                  `json:"mode"`
-	CLIVersion       string                  `json:"cli_version"`
-	DryRun           bool                    `json:"dry_run"`
-	NoWrite          NoWriteEvidence         `json:"no_write"`
-	SourceRepo       discovery.SourceRepo    `json:"source_repo"`
-	TargetProfile    discovery.TargetProfile `json:"target_profile"`
-	Project          Project                 `json:"project"`
-	SourcePack       SourcePack              `json:"source_pack"`
-	SuiteRole        string                  `json:"suite_role"`
-	SuiteMode        string                  `json:"suite_mode"`
-	RoleLabel        string                  `json:"role_label"`
-	RoleRegistry     RoleRegistryEvidence    `json:"role_registry"`
-	SelectedSkills   []RoleSkillEvidence     `json:"selected_skills"`
-	ExcludedSkills   []RoleSkillEvidence     `json:"excluded_skills"`
-	ProjectTailoring ProjectTailoring        `json:"project_tailoring"`
-	Summary          Summary                 `json:"summary"`
-	PlannedManifest  map[string]any          `json:"planned_manifest"`
-	PlannedSkills    []PlannedSkill          `json:"planned_skills"`
-	ChangedPaths     []ChangedPath           `json:"changed_paths"`
-	BackupPlan       []BackupEntry           `json:"backup_plan"`
-	Checksums        Checksums               `json:"checksums"`
-	PlanHash         string                  `json:"plan_hash"`
-	ApprovalRequest  ApprovalRequest         `json:"approval_request"`
-	Approval         ApprovalEvidence        `json:"approval,omitempty"`
-	InstallID        string                  `json:"install_id,omitempty"`
-	ManifestPath     string                  `json:"manifest_path,omitempty"`
-	BackupPath       string                  `json:"backup_path,omitempty"`
-	Recovery         *Recovery               `json:"recovery,omitempty"`
-	Conflicts        []Conflict              `json:"conflicts"`
-	Diagnostics      []discovery.Diagnostic  `json:"diagnostics"`
-	NextAction       string                  `json:"next_action"`
+	OK               bool                     `json:"ok"`
+	Command          string                   `json:"command"`
+	Mode             string                   `json:"mode"`
+	CLIVersion       string                   `json:"cli_version"`
+	DryRun           bool                     `json:"dry_run"`
+	NoWrite          NoWriteEvidence          `json:"no_write"`
+	SourceRepo       discovery.SourceRepo     `json:"source_repo"`
+	TargetProfile    discovery.TargetProfile  `json:"target_profile"`
+	Project          Project                  `json:"project"`
+	SourcePack       SourcePack               `json:"source_pack"`
+	SuiteRole        string                   `json:"suite_role"`
+	SuiteMode        string                   `json:"suite_mode"`
+	RoleLabel        string                   `json:"role_label"`
+	RoleRegistry     RoleRegistryEvidence     `json:"role_registry"`
+	SelectedSkills   []RoleSkillEvidence      `json:"selected_skills"`
+	ExcludedSkills   []RoleSkillEvidence      `json:"excluded_skills"`
+	ProjectTailoring ProjectTailoring         `json:"project_tailoring"`
+	Summary          Summary                  `json:"summary"`
+	PlannedManifest  map[string]any           `json:"planned_manifest"`
+	PlannedSkills    []PlannedSkill           `json:"planned_skills"`
+	CompositionFiles []PlannedCompositionFile `json:"composition_files"`
+	ChangedPaths     []ChangedPath            `json:"changed_paths"`
+	BackupPlan       []BackupEntry            `json:"backup_plan"`
+	Checksums        Checksums                `json:"checksums"`
+	PlanHash         string                   `json:"plan_hash"`
+	ApprovalRequest  ApprovalRequest          `json:"approval_request"`
+	Approval         ApprovalEvidence         `json:"approval,omitempty"`
+	InstallID        string                   `json:"install_id,omitempty"`
+	ManifestPath     string                   `json:"manifest_path,omitempty"`
+	BackupPath       string                   `json:"backup_path,omitempty"`
+	Recovery         *Recovery                `json:"recovery,omitempty"`
+	Conflicts        []Conflict               `json:"conflicts"`
+	Diagnostics      []discovery.Diagnostic   `json:"diagnostics"`
+	NextAction       string                   `json:"next_action"`
 }
 
 func BuildDryRun(repo string, opts Options) (Result, error) {
@@ -236,7 +248,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 		finalize(&result)
 		return result, nil
 	}
-	roleRegistry, role, selectedPacks, selected, excluded, roleConflicts, roleDiagnostics := resolveProjectSuiteRole(sourceRepo, opts.SuiteRole, packs, opts.Project)
+	roleRegistry, role, _, selected, excluded, roleConflicts, roleDiagnostics := resolveProjectSuiteRole(sourceRepo, opts.SuiteRole, packs, opts.Project)
 	result.RoleRegistry = roleRegistry
 	result.RoleLabel = role.DisplayLabel
 	if role.SelectionMode == "full_source_suite" {
@@ -257,11 +269,14 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 		result.Conflicts = append(result.Conflicts, c)
 		result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: c.Condition, Message: c.Message})
 	}
-	planned, changed, conflicts, backups := planVirtualSuite(sourceRepo, profileRoot, opts.Project, selectedPacks, trust)
-	result.PlannedSkills = planned
-	result.ChangedPaths = changed
-	result.BackupPlan = backups
-	for _, conflict := range conflicts {
+	composition, componentChanged, componentConflicts, componentBackups := planProjectCompositionFiles(profileRoot, opts.Project, trust)
+	result.PlannedSkills = []PlannedSkill{}
+	result.CompositionFiles = composition
+	result.ChangedPaths = append(result.ChangedPaths, componentChanged...)
+	result.BackupPlan = append(result.BackupPlan, componentBackups...)
+	sort.Slice(result.ChangedPaths, func(i, j int) bool { return result.ChangedPaths[i].Path < result.ChangedPaths[j].Path })
+	sort.Slice(result.BackupPlan, func(i, j int) bool { return result.BackupPlan[i].Path < result.BackupPlan[j].Path })
+	for _, conflict := range componentConflicts {
 		result.Conflicts = append(result.Conflicts, conflict)
 		result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: conflict.Condition, Message: conflict.Message})
 	}
@@ -272,15 +287,6 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 	result.SourcePack.PackChecksums = packChecksums
 	result.SourcePack.SuiteChecksum = checksumAny(map[string]any{"registry_sha256": registryChecksum, "pack_checksums": packChecksums})
 
-	nonUmbrella := 0
-	for _, skill := range result.PlannedSkills {
-		if skill.InstalledSkill != opts.Project+"-kas" {
-			nonUmbrella++
-		}
-	}
-	if len(result.PlannedSkills) == 0 || nonUmbrella == 0 {
-		addConflict(&result, "umbrella_only", opts.Project+"-kas", "skills/"+opts.Project+"/"+opts.Project+"-kas/SKILL.md", "source suite produced no non-umbrella project-prefixed skills", "Select a full source suite with project phase skills before approved install.")
-	}
 	scanProfileConflicts(&result, profileRoot, opts.Project)
 	if manifestChecksum != nil {
 		result.TargetProfile.PreviousManifestSHA256 = manifestChecksum
@@ -327,14 +333,172 @@ func baseResult(sourceRepo string, profileRoot string, opts Options) Result {
 		RoleRegistry:     RoleRegistryEvidence{Path: RoleRegistryPath},
 		SelectedSkills:   []RoleSkillEvidence{},
 		ExcludedSkills:   []RoleSkillEvidence{},
-		ProjectTailoring: ProjectTailoring{Mode: "prefix_render_only", Preserves: []string{"project_language", "project_runtime", "project_test_commands", "project_authority_ladder"}, Source: "skill-pack.yaml_and_project_id", SemanticPortRequiredBeforeApprovedInstall: false, SemanticAdaptationClaimed: false},
+		ProjectTailoring: ProjectTailoring{Mode: "plugin_base_with_project_overlay", Preserves: []string{"project_language", "project_runtime", "project_test_commands", "project_authority_ladder"}, Source: "plugin_namespace_skill_pack_yaml_and_project_overlay", SemanticPortRequiredBeforeApprovedInstall: false, SemanticAdaptationClaimed: false},
 		PlannedSkills:    []PlannedSkill{},
+		CompositionFiles: []PlannedCompositionFile{},
 		ChangedPaths:     []ChangedPath{},
 		BackupPlan:       []BackupEntry{},
 		Conflicts:        []Conflict{},
 		Diagnostics:      []discovery.Diagnostic{},
 		NextAction:       "Review changed_paths and approve with install --profile " + opts.Profile + " --project " + opts.Project + " --suite-role " + opts.SuiteRole + " --apply dry-run:<plan_hash>; verify with doctor --project-suite after approved install.",
 	}
+}
+
+func planProjectCompositionFiles(profileRoot string, project string, trust map[string]manifestSkillRecord) ([]PlannedCompositionFile, []ChangedPath, []Conflict, []BackupEntry) {
+	plans := []PlannedCompositionFile{}
+	changed := []ChangedPath{}
+	conflicts := []Conflict{}
+	backups := []BackupEntry{}
+	for _, spec := range projectCompositionSpecs(project) {
+		content := projectCompositionContent(project, spec.Kind)
+		newSHA := sha256Bytes([]byte(content))
+		trusted := trust[spec.TargetPath]
+		action, prev, errCode, errMessage := targetAction(profileRoot, spec.TargetPath, newSHA, trusted)
+		if (spec.Kind == "project_overlay" || spec.Kind == "project_overlay_reference") && action == "update" && prev != nil && trusted.TargetPath != "" && trusted.Checksum == *prev {
+			action = "skip"
+			newSHA = *prev
+		}
+		if errCode != "" {
+			conflicts = append(conflicts, conflict(errCode, project, spec.Name, spec.TargetPath, errMessage, "Resolve the existing profile target before approved install."))
+		}
+		plans = append(plans, PlannedCompositionFile{Kind: spec.Kind, Name: spec.Name, TargetPath: spec.TargetPath, DriftPolicy: spec.DriftPolicy, Checksum: newSHA, Action: action, Bytes: len(content), TailoringMode: spec.TailoringMode})
+		entry := ChangedPath{Path: spec.TargetPath, Action: action, InstalledSkill: spec.Name, SourcePackID: "project_composition", PreviousSHA256: prev, NewSHA256: newSHA, Bytes: len(content), ErrorCode: errCode, ErrorMessage: errMessage}
+		if action == "update" && prev != nil {
+			backup := BackupEntry{Path: spec.TargetPath, BackupPath: filepath.ToSlash(filepath.Join(".kas", "backups", "dry-run", filepath.FromSlash(spec.TargetPath))), PreviousSHA256: *prev, Bytes: len(content)}
+			entry.BackupPath = backup.BackupPath
+			backups = append(backups, backup)
+		}
+		changed = append(changed, entry)
+	}
+	sort.Slice(plans, func(i, j int) bool { return plans[i].TargetPath < plans[j].TargetPath })
+	sort.Slice(changed, func(i, j int) bool { return changed[i].Path < changed[j].Path })
+	sort.Slice(backups, func(i, j int) bool { return backups[i].Path < backups[j].Path })
+	return plans, changed, conflicts, backups
+}
+
+type projectCompositionSpec struct {
+	Kind          string
+	Name          string
+	TargetPath    string
+	DriftPolicy   string
+	TailoringMode string
+}
+
+func projectCompositionSpecs(project string) []projectCompositionSpec {
+	return []projectCompositionSpec{
+		{Kind: "project_wrapper", Name: project + "-wrapper", TargetPath: filepath.ToSlash(filepath.Join("skills", project, project+"-wrapper", "SKILL.md")), DriftPolicy: "manual_review_required", TailoringMode: "generated_project_wrapper"},
+		{Kind: "project_overlay", Name: project + "-overlay", TargetPath: filepath.ToSlash(filepath.Join("skills", project, project+"-overlay", "SKILL.md")), DriftPolicy: "manual_review_required", TailoringMode: "profile_local_repo_semantic_tailoring"},
+		{Kind: "project_overlay_reference", Name: project + "-overlay-legacy-delta-extract", TargetPath: filepath.ToSlash(filepath.Join("skills", project, project+"-overlay", "references", "legacy-delta-extract.md")), DriftPolicy: "manual_review_required", TailoringMode: "profile_local_repo_semantic_tailoring"},
+	}
+}
+
+func projectCompositionContent(project string, kind string) string {
+	switch kind {
+	case "project_wrapper":
+		return projectWrapperContent(project)
+	case "project_overlay":
+		return projectOverlayContent(project)
+	case "project_overlay_reference":
+		return projectOverlayReferenceContent(project)
+	default:
+		return ""
+	}
+}
+
+func projectWrapperContent(project string) string {
+	return fmt.Sprintf(`---
+name: %[1]s-wrapper
+description: Thin project wrapper for kkachi-agent-skills plugin skills while working on %[1]s.
+version: 0.1.0
+metadata:
+  kas:
+    kind: project_wrapper
+    project: %[1]s
+    role: blue_commander
+    role_manifest: kkachi-agent-skills:roles/blue.yaml
+    plugin_namespace: kkachi-agent-skills
+    overlay_skill: %[1]s-overlay
+    base_copy_policy: forbidden_by_default
+---
+
+# %[1]s wrapper
+
+Use this wrapper as the profile-local entry point for %[1]s work.
+
+## Composition
+
+1. Load the relevant plugin-qualified base skill from kkachi-agent-skills for the active phase.
+2. Load %[1]s-overlay for project-specific constraints and retained local lessons.
+3. Treat copied project-suite skills as stale legacy; the profile-local project suite must contain only this wrapper and the project overlay.
+
+## Boundary
+
+- Scope is %[1]s project guidance for this Hermes profile.
+- This wrapper does not authorize credential/service configuration, backend activation, broad profile cleanup, commit, push, or release.
+`, project)
+}
+
+func projectOverlayContent(project string) string {
+	return fmt.Sprintf(`---
+name: %[1]s-overlay
+description: Project overlay for kkachi-agent-skills plugin skills while working on %[1]s.
+version: 0.1.0
+metadata:
+  kas:
+    kind: project_overlay
+    project: %[1]s
+    role: blue_commander
+    applies_to:
+      - kkachi-agent-skills:kkachi-orchestrate
+      - kkachi-agent-skills:kkachi-plan
+      - kkachi-agent-skills:kkachi-implement
+      - kkachi-agent-skills:kkachi-verify
+      - kkachi-agent-skills:kkachi-final-verify
+      - kkachi-agent-skills:kkachi-multi-agent-review
+    merge_mode: additive_constraints
+    base_version: "0.1.0"
+    references:
+      - references/legacy-delta-extract.md
+---
+
+# %[1]s overlay
+
+Use this overlay when applying KAS phase skills to the %[1]s project from this Hermes profile.
+
+## Project boundaries
+
+- Keep project-specific rules, runtime notes, architecture hints, verification posture, and retained local lessons here or under references/.
+- Keep shared KAS semantics in the plugin base skills; do not copy full base skill bodies into this overlay.
+- Keep credential, service, backend activation, push, release, and public distribution changes out of scope unless 주군 approves them explicitly.
+
+## Retained local lessons
+
+- Legacy delta extract: references/legacy-delta-extract.md
+- If a legacy suite was archived before install, semantically port only durable project-specific lessons into this overlay/reference tree.
+
+## Operating rules
+
+1. Load the relevant plugin KAS base skill first.
+2. Apply this overlay as additive project constraints.
+3. Delete temporary legacy comparison archives after refresh/extraction/verification; keep only non-secret backup evidence when needed.
+`, project)
+}
+
+func projectOverlayReferenceContent(project string) string {
+	return fmt.Sprintf(`# Legacy delta extract for %[1]s overlay
+
+No legacy archive was present or read by this deterministic install step.
+
+Use this reference to preserve manually reviewed project-specific lessons from an archived profile-local suite. Do not paste full copied base skill bodies here. Record only durable deltas that improve work on %[1]s, such as programming language/runtime notes, repository architecture, verification commands, authority boundaries, recurring pitfalls, and approved workflow exceptions.
+
+## Semantic port checklist
+
+- [ ] Compare archived %[1]s-* copied skills against current plugin base behavior.
+- [ ] Extract only project-specific constraints or proven local lessons.
+- [ ] Remove stale provider/runtime/auth details unless re-verified.
+- [ ] Keep secrets and credentials out of this file.
+- [ ] Cite evidence paths for retained lessons when available.
+`, project)
 }
 
 func planVirtualSuite(sourceRepo string, profileRoot string, project string, packs []discovery.SourcePack, trust map[string]manifestSkillRecord) ([]PlannedSkill, []ChangedPath, []Conflict, []BackupEntry) {
@@ -445,26 +609,21 @@ func scanProfileConflicts(result *Result, profileRoot string, project string) {
 	if err != nil {
 		return
 	}
-	umbrellaOnly := false
-	nonUmbrella := false
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
-		if name == project+"-kas" {
-			umbrellaOnly = true
+		if name == project+"-wrapper" || name == project+"-overlay" {
 			continue
 		}
 		if strings.HasPrefix(name, project+"-") {
-			nonUmbrella = true
+			target := filepath.ToSlash(filepath.Join("skills", project, name, "SKILL.md"))
+			addConflict(result, "stale_copied_project_skill", name, target, "profile project suite contains a copied project-prefixed skill directory; plugin base skills must stay in the plugin namespace", "Move any durable local deltas into the project overlay/reference tree, then remove the copied skill directory.")
 			continue
 		}
 		target := filepath.ToSlash(filepath.Join("skills", project, name, "SKILL.md"))
 		addConflict(result, "generic_installed_skill_name", name, target, "profile project suite contains a generic or non-project-prefixed skill directory", "Move or migrate generic skills only through a later approved migration workflow.")
-	}
-	if umbrellaOnly && !nonUmbrella {
-		addConflict(result, "umbrella_only", project+"-kas", filepath.ToSlash(filepath.Join("skills", project, project+"-kas", "SKILL.md")), "profile contains only a project umbrella skill without the required project-prefixed suite", "Install the full project-specific suite after KASPROJ-003 approval evidence.")
 	}
 }
 
@@ -473,6 +632,10 @@ func plannedManifest(opts Options, sourceChecksum string, skills []PlannedSkill,
 	for _, skill := range skills {
 		installed = append(installed, map[string]any{"installed_skill": skill.InstalledSkill, "source_pack_id": skill.SourcePackID, "target_path": skill.TargetPath, "checksum": skill.Checksum, "drift_policy": skill.DriftPolicy, "tailoring_mode": skill.TailoringMode})
 	}
+	composition := make([]map[string]any, 0, len(result.CompositionFiles))
+	for _, component := range result.CompositionFiles {
+		composition = append(composition, map[string]any{"kind": component.Kind, "name": component.Name, "target_path": component.TargetPath, "checksum": component.Checksum, "drift_policy": component.DriftPolicy, "tailoring_mode": component.TailoringMode})
+	}
 	suite := map[string]any{
 		"kind":                        ManifestKind,
 		"project":                     opts.Project,
@@ -480,6 +643,7 @@ func plannedManifest(opts Options, sourceChecksum string, skills []PlannedSkill,
 		"drift_policy":                suiteDriftPolicy(result.SuiteMode),
 		"semantic_adaptation_claimed": false,
 		"installed_skills":            installed,
+		"composition_files":           composition,
 	}
 	if result.SuiteRole != "" {
 		suite["suite_mode"] = result.SuiteMode

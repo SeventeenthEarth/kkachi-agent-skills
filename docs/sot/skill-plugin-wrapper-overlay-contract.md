@@ -3,8 +3,8 @@
 Date: 2026-06-24
 Owner: KAS workflow/policy layer
 Confirming role: Responsible approver / SKILL-001 accepted SOT; SKILL-002 implementation evidence is tracked separately
-Status: accepted SOT for `SKILL` epic; implementation is phased by roadmap task. SKILL-002 implements the plugin package, source role manifests, and dry-run update readback only. No profile wrapper rollout, project overlay migration, profile cleanup, KAH/KAB runtime behavior, or installed-profile mutation is implemented or authorized by this document alone.
-Authority level: KAS-side planning source of truth for plugin-backed KAS base skills, color role wrappers, profile-local project overlays, guide skills, composition policy, doctor diagnostics, and migration from copied profile-local base suites.
+Status: accepted SOT for `SKILL` epic; implementation is phased by roadmap task. SKILL-002 implements the plugin package and source role manifests without any public `update` or `migrate` CLI surface. No project wrapper rollout, project overlay refresh, profile cleanup, KAH/KAB runtime behavior, or installed-profile mutation is implemented or authorized by this document alone.
+Authority level: KAS-side planning source of truth for plugin-backed KAS base skills, project wrappers, profile-local project overlays, guide skills, composition policy, doctor diagnostics, and migration from copied profile-local base suites.
 Scope: `kkachi-agent-skills` docs, registries, source skill packaging, future Hermes plugin registration, wrapper/overlay guidance, profile-skill manifest semantics, and KAS doctor planning. No auth/token/gateway/provider/model mutation, live Hermes runtime activation, KAH deterministic state mutation, KAB backend/session activation, Kanban routing change, broad profile cleanup, or automatic rollout is authorized by this SOT.
 Related docs: `docs/sot/kas-cli-contract.md`, `docs/sot/project-specific-kas-install-contract.md`, `docs/sot/role-aware-project-suite-contract.md`, `docs/sot/project-kas-sync-state.md`, `docs/sot/kasrel-hermes-v016-provenance-contract.md`, `docs/sot/token-economy-and-agent-instruction-contract.md`, `docs/roadmap.md`, Hermes plugin skill documentation.
 Evidence/source paths:
@@ -20,11 +20,11 @@ The target model is:
 
 1. **KAS plugin base**: canonical KAS base skills live in the KAS source repo and are registered as Hermes plugin skills. They are loaded with plugin-qualified names such as `kkachi-agent-skills:plan` and are treated as read-only base behavior from the profile point of view. Short names such as `kkachi-agent-skills:plan` are in-plugin canonicalization to registered base IDs such as `kkachi-plan`; they are not profile fallback, copied-suite fallback, or permission to resolve outside the official plugin package.
 2. **Color role manifests**: Blue/Red/Orange/Gray role selections live in KAS source metadata. They define which plugin base skills each color role may normally use.
-3. **Thin profile wrappers**: each active color profile keeps a small, discoverable profile-local wrapper skill that states its role, points to plugin-qualified base skills, and explains overlay composition. The wrapper is not a copy of the KAS base pack.
-4. **Project overlays**: project-specific optimization lives under the owning profile's skill tree, inside a project-named directory, as additive/constraint/evidence overlays that reference a plugin base target. Project overlays do not edit plugin base skills and do not copy full base skill bodies.
+3. **Thin project wrappers**: each approved profile/project target keeps a small, discoverable profile-local wrapper skill under the project directory. The wrapper states the project and role, points to plugin-qualified base skills, names the project overlay, and is not a copy of the KAS base pack.
+4. **Project overlays**: project-specific optimization lives under the owning profile's skill tree, inside the same project-named directory, as one default project overlay plus optional `references/` files. Project overlays add or narrow project facts, constraints, evidence rules, and phase notes across named plugin base targets; they do not edit plugin base skills and do not copy full base skill bodies.
 5. **Guide skills**: KAS must ship guide skills that teach agents how to author, compose, validate, and promote project overlays without forking the base.
-6. **Plugin update lifecycle**: the KAS CLI update surface must update the official KAS plugin package only, including plugin registration metadata, canonical base skills, role manifests, and guide skills. It must not overwrite profile wrappers, project overlays, KAH state, KAB runtime state, or profile-local personal skills.
-7. **Doctor and migration**: KAS doctor must detect legacy copied base suites, plugin registration gaps, wrapper/role mismatches, stale/shadowing overlays, and migration candidates. Cleanup remains dry-run-first and approval-gated.
+6. **No CLI update/migrate lifecycle**: `kkachi-agent-skills` must not expose public `update` or `migrate` commands for plugin packages, project suites, profile skills, or overlays. These names imply semantic migration/update authority that the deterministic CLI cannot safely provide.
+7. **Doctor and overlay refresh**: `kkachi-agent-skills doctor` detects legacy copied base suites, plugin registration gaps, wrapper/role mismatches, stale/shadowing overlays, and refresh candidates. Semantic overlay refresh is handled by the `kkachi-agent-skills-overlay-refresh` skill, not by CLI migration.
 
 This SOT intentionally preserves project-specific optimization as a first-class requirement. The change is not “no local skill customization”; it is “local customization is a delta overlay, not a forked base copy.”
 
@@ -41,9 +41,9 @@ The target architecture must still support the practical benefit of prior projec
 | Layer | Owns | Must not own |
 |---|---|---|
 | KAS plugin base | canonical KAS phase/operation skills, color role manifests, guide skills, plugin registration metadata, base versioning, and base dependency guidance | profile-local project authority, profile secrets, gateway/provider/model runtime, project-specific semantic edits that only apply to one profile/project |
-| Profile wrapper | discoverability for the active profile, color role declaration, plugin-qualified base references, overlay lookup rules, and role-specific safety reminders | full base skill bodies, broad KAS fork content, hidden fallback to missing plugin skills, or authority outside the profile's registered role |
+| Project wrapper | discoverability for the approved profile/project target, project declaration, color role declaration, plugin-qualified base references, paired overlay lookup rules, and role-specific safety reminders | full base skill bodies, broad KAS fork content, hidden fallback to missing plugin skills, or authority outside the profile's registered role |
 | Project overlay | project-specific SOT pointers, repo paths, verification commands, local risk boundaries, evidence format additions, role-local constraints, and promotion candidates | editing plugin base skills, copying entire base bodies, removing fail-closed base constraints without review, changing auth/tokens/gateway/provider/model state |
-| KAS plugin update command | official KAS plugin package update planning/apply for plugin metadata, plugin-registered base skills, role manifests, guide skills, and plugin version/readback evidence | profile-local overlay merge, wrapper overwrite, legacy copied-suite cleanup, personal skill mutation, KAH state writes, KAB runtime activation, auth/token/gateway/provider/model mutation |
+| `kkachi-agent-skills` CLI lifecycle | deterministic install, doctor, repair, toolchain, workflow, uninstall, and version surfaces only; no public update or migrate commands | semantic overlay refresh, plugin/package update, project-suite migration, profile-skill migration, hidden cleanup, personal skill mutation, KAH state writes, KAB runtime activation, auth/token/gateway/provider/model mutation |
 | KAS doctor | read-only diagnosis of plugin/wrapper/overlay/base-copy drift and approval-gated repair planning | unapproved deletion, silent adoption of unknown profile skills, live runtime mutation, or KAH/KAB state changes |
 | KAH | deterministic project/run/workflow state and evidence gates when a KAS run uses KAH | KAS plugin packaging, KAS plugin update, profile skill inventory policy, subjective role selection |
 | KAB | backend/session/runtime evidence when an approved lane dispatches work | KAS skill distribution or overlay composition policy |
@@ -64,10 +64,15 @@ KAS source repo
     guides/kas-project-overlay-guide/SKILL.md
     guides/kas-overlay-compose-guide/SKILL.md
     guides/kas-overlay-doctor-guide/SKILL.md
+    guides/kkachi-agent-skills-overlay-refresh/SKILL.md
 
 Hermes profile skill tree
-  skills/<color-wrapper>/SKILL.md
-  skills/<project>/kas-overlays/<project>-<role>-<base-skill>-overlay/SKILL.md
+  skills/<project>/<project>-wrapper/SKILL.md
+  skills/<project>/<project>-overlay/SKILL.md
+  skills/<project>/<project>-overlay/references/*.md
+
+Optional advanced extension when a single project overlay is too coarse
+  skills/<project>/kas-overlays/<project>-<role>-<phase-or-base>-overlay/SKILL.md
 ```
 
 The exact in-repo plugin package path may be chosen during SKILL-002 implementation, but the implementation must preserve these public contracts:
@@ -80,7 +85,8 @@ surface, not a second source loader root.
 - KAS base skills are registered as Hermes plugin skills and are loadable through plugin-qualified names.
 - Plugin skill names do not require copying into `~/.hermes/profiles/<profile>/skills/`.
 - Color role manifests are source-controlled and deterministic.
-- Profile-local wrappers and overlays are intentionally small and may reference plugin-qualified base names.
+- Profile-local project wrappers and overlays are intentionally small and may reference plugin-qualified base names.
+- `kkachi-agent-skills install --project ... --suite-role ... --apply dry-run:<hash>` must materialize the default wrapper, default overlay, and overlay `references/legacy-delta-extract.md` alongside the selected project phase skills. The manifest records those deterministic composition files under `composition_files[]`, separate from role-selected `installed_skills[]`. After a manifest entry exists, install/repair must preserve overlay/reference content as project-local semantic tailoring; repair may adopt their current checksums into `composition_files[]`, while the generated wrapper may be repaired from the canonical template.
 - Any different packaging path or namespace requires a SOT update before implementation is marked complete.
 
 ## 5. Color role model
@@ -96,25 +102,26 @@ The initial role projection follows the current Kkachi color boundaries.
 
 KAH companion skills may have analogous color subsets, but this SOT owns KAS first. KAH mirror behavior must be updated through the KAH repo or a recorded KAS/KAH companion task rather than silently assuming this KAS SOT mutates KAH distribution.
 
-Unknown, misspelled, or unregistered color roles fail closed. A profile wrapper must not infer elevated capability from profile name alone; it must reference a registered role manifest and the registry/profile authority surface.
+Unknown, misspelled, or unregistered color roles fail closed. A project wrapper must not infer elevated capability from profile name alone; it must reference a registered role manifest and the registry/profile authority surface.
 
-## 6. Profile wrapper contract
+## 6. Project wrapper contract
 
-A profile wrapper is a discoverability and composition entrypoint. It should be visible in ordinary profile-local skill discovery so the model can learn the local operating rule even when plugin skills are not listed in the same flat skill inventory.
+A project wrapper is a profile-local discoverability and composition entrypoint for one approved profile/project target. It should be visible in ordinary profile-local skill discovery under `skills/<project>/<project>-wrapper/` so the model can learn the local operating rule even when plugin skills are not listed in the same flat skill inventory.
 
 Minimum wrapper fields:
 
 ```yaml
 ---
-name: kkachi-blue-wrapper
-description: Thin profile-local wrapper for Blue KAS plugin skills and project overlays.
+name: kkachi-agent-helper-wrapper
+description: Thin project-local wrapper for KAS plugin skills and the kkachi-agent-helper project overlay.
 metadata:
   kas:
-    kind: color_wrapper
+    kind: project_wrapper
+    project: kkachi-agent-helper
     role: blue_commander
     role_manifest: kkachi-agent-skills:roles/blue.yaml
     plugin_namespace: kkachi-agent-skills
-    overlay_root: skills/<project>/kas-overlays
+    overlay_skill: kkachi-agent-helper-overlay
     base_copy_policy: forbidden_by_default
 ---
 ```
@@ -122,49 +129,67 @@ metadata:
 The wrapper must:
 
 1. instruct the agent to load plugin-qualified KAS base skills such as `skill_view("kkachi-agent-skills:plan")` when a matching phase skill is needed;
-2. name the role manifest and allowed role subset;
-3. explain how project overlays are selected and composed;
-4. fail closed when the plugin base skill or role manifest is unavailable;
+2. name the project, role manifest, and allowed role subset;
+3. point to the single default project overlay and explain that optional `kas-overlays/` entries are advanced extensions only;
+4. fail closed when the plugin base skill, role manifest, or project overlay is unavailable;
 5. avoid embedding or duplicating full base skill bodies;
 6. preserve Kkachi authority boundaries and explicit approval gates.
 
-Wrappers may contain local phrasing for the profile's Korean name, role, and channels, but they must not become project-specific dumping grounds. Project-specific material belongs in project overlays.
+Wrappers may contain local phrasing for the profile's Korean name, role, channel, and project, but they must not become base-skill forks. Project-specific detail belongs in the paired project overlay and its `references/` files.
 
 ## 7. Project overlay contract
 
-Project overlays are the approved place for project-specific KAS optimization under the plugin model.
+Project overlays are the approved place for project-specific KAS optimization under the plugin model. The default is one project overlay per profile/project target, not one copied overlay per base skill.
 
 Canonical profile-relative layout:
 
 ```text
-skills/<project>/kas-overlays/<project>-<role>-<base-skill>-overlay/SKILL.md
+skills/<project>/<project>-overlay/SKILL.md
+skills/<project>/<project>-overlay/references/*.md
 ```
 
 Examples:
 
 ```text
-skills/doksuri/kas-overlays/doksuri-blue-plan-overlay/SKILL.md
-skills/doksuri/kas-overlays/doksuri-blue-implement-overlay/SKILL.md
-skills/sudal/kas-overlays/sudal-red-review-overlay/SKILL.md
-skills/space-compiler/kas-overlays/space-compiler-orange-review-overlay/SKILL.md
+skills/kkachi-agent-helper/kkachi-agent-helper-overlay/SKILL.md
+skills/kkachi-agent-helper/kkachi-agent-helper-overlay/references/project-context.md
+skills/doksuri/doksuri-overlay/SKILL.md
+skills/doksuri/doksuri-overlay/references/verification.md
+```
+
+Optional advanced extension when a single project overlay is too coarse:
+
+```text
+skills/<project>/kas-overlays/<project>-<role>-<phase-or-base>-overlay/SKILL.md
 ```
 
 Minimum overlay frontmatter:
 
 ```yaml
 ---
-name: doksuri-blue-plan-overlay
-description: Doksuri-specific Blue planning overlay for KAS plugin plan guidance.
+name: kkachi-agent-helper-overlay
+description: Project-specific KAS overlay for kkachi-agent-helper.
 metadata:
   kas:
     kind: project_overlay
-    project: doksuri
+    project: kkachi-agent-helper
     role: blue_commander
-    overlay_for: kkachi-agent-skills:plan
+    plugin_namespace: kkachi-agent-skills
+    applies_to:
+      - kkachi-agent-skills:orchestrate
+      - kkachi-agent-skills:plan
+      - kkachi-agent-skills:implement
+      - kkachi-agent-skills:verify
+      - kkachi-agent-skills:final-verify
     merge_mode: additive_constraints
     base_version: "<kas-version-or-commit>"
     authority_sources:
       - /path/to/project/sot.md
+    references:
+      - references/project-context.md
+      - references/architecture.md
+      - references/verification.md
+      - references/authority-sources.md
     last_reviewed: "YYYY-MM-DD"
     promotion_candidate: false
 ---
@@ -195,7 +220,7 @@ When a task uses KAS under the `SKILL` target model, the agent composes guidance
 
 1. **Current command/card/channel context**: the user request, Kanban card, current channel prompt, and explicit approvals are the immediate task context.
 2. **Project overlay**: profile-local project-specific constraints and evidence rules add to or narrow the base behavior for the selected project.
-3. **Color wrapper**: the profile's role wrapper supplies role boundary, base skill selection, and overlay lookup policy.
+3. **Project wrapper**: the profile-local project wrapper supplies project/role boundary, base skill selection, and overlay lookup policy.
 4. **KAS plugin base**: the canonical plugin skill supplies default phase/operation behavior.
 
 This order is not permission to silently override safety. Merge policy is fail-closed:
@@ -219,38 +244,44 @@ Required guide skills:
 1. `kas-project-overlay-guide`: authoring guide for project overlays, including path/frontmatter rules, allowed content, forbidden content, and examples.
 2. `kas-overlay-compose-guide`: runtime composition guide for selecting plugin base, wrapper, and project overlay; includes merge modes and conflict handling.
 3. `kas-overlay-doctor-guide`: diagnostic guide for identifying copied base suites, invalid overlays, stale base versions, missing plugin registration, shadowing, and promotion candidates.
+4. `kkachi-agent-skills-overlay-refresh`: LLM-assisted workflow guide for refreshing a project overlay by temporarily archiving the current overlay as inactive legacy, rebuilding a clean current overlay, semantically porting only durable project-specific rules, verifying, and then removing the legacy archive.
 
 These guide skills are KAS source skills, not profile-local per-project overlays. They may be exposed through the plugin and referenced by wrapper skills. If Hermes plugin skill discoverability remains weaker than flat profile-local discovery, the wrapper must explicitly instruct the agent to load these guide skills by plugin-qualified name.
 
-## 10. Update command semantics
+## 10. No CLI update/migrate semantics and overlay refresh skill
 
-The routine update path under the `SKILL` target model is **plugin-package update first**, not profile-skill-copy refresh.
+The `kkachi-agent-skills` CLI must not expose public `update` or `migrate` commands. This includes plugin update, project-suite update/migration, profile-skill migration, and overlay migration. Those names imply semantic authority and safe merge behavior that a deterministic CLI cannot provide; semantic overlay refresh belongs in the `kkachi-agent-skills-overlay-refresh` skill.
 
-Canonical command shape:
+Canonical command surface is limited to deterministic or diagnostic operations such as:
 
 ```text
-kkachi-agent-skills update plugin --dry-run [--json]
-kkachi-agent-skills update plugin --apply dry-run:sha256:<hash> [--json]
+kkachi-agent-skills list
+kkachi-agent-skills install ...
+kkachi-agent-skills doctor ...
+kkachi-agent-skills repair ...
+kkachi-agent-skills toolchain ...
+kkachi-agent-skills workflow-create|workflow-promote|workflow-route|workflow-trigger ...
+kkachi-agent-skills uninstall ...
+kkachi-agent-skills version
 ```
 
-The exact flag set may be refined during implementation, but the command semantics are fixed:
+Overlay refresh is intentionally handled by the `kkachi-agent-skills-overlay-refresh` skill rather than a CLI command. The refresh workflow is:
 
-| Surface | Update command may change | Update command must not change |
-|---|---|---|
-| KAS plugin package | plugin metadata, registered base skill files, role manifests, guide skills, plugin version/readback evidence, and local plugin package lock/manifest when approved | profile-local wrappers, project overlays, legacy copied base suites, personal skills, KAH `.kkachi/` state, KAB runtime/session state, auth/token/gateway/provider/model config |
-| KAS profile wrappers | no automatic write by plugin update; at most report compatibility/readback diagnostics and suggested wrapper template changes | silent wrapper overwrite or hidden fallback from stale wrapper content |
-| Project overlays | no automatic write by plugin update; at most report stale `base_version`, invalid `overlay_for`, or conflict diagnostics | automatic merge, semantic port, deletion, or promotion into plugin base |
-| Legacy copied skills | no automatic write by plugin update; at most classify as legacy/shadowing risk | deletion, adoption, or use as fallback base |
+1. copy the active `skills/<project>/<project>-overlay/` to a temporary `skills/<project>/<project>-overlay-legacy/`;
+2. mark the temporary legacy archive with `metadata.kas.kind: project_overlay_legacy`, `active: false`, and `superseded_by: <project>-overlay`;
+3. create a fresh canonical `skills/<project>/<project>-overlay/` from the current `kkachi-agent-skills` template/SOT;
+4. use LLM-assisted review to port only durable project-specific constraints, paths, architecture notes, verification rules, authority constraints, and recurring lessons from the legacy archive;
+5. reject copied base text, stale workaround text, runtime/provider/auth/model settings, and fallback behavior;
+6. run doctor/diff verification and request review when confidence is low;
+7. after successful refresh and review, remove `skills/<project>/<project>-overlay-legacy/` because it is only a temporary comparison aid.
 
-`update plugin` must be dry-run-first and approval-hash-bound for writes. A dry-run must include the target plugin namespace, current version/source, proposed version/source, planned changed paths, role manifest impact, guide skill impact, no-write evidence, and the doctor command that should be run after apply. SKILL-002 exposes these fields as `namespace`, `current_version`, `current_source`, `proposed_version`, `proposed_source`, `planned_changed_paths`, `role_manifest_impact`, `guide_skill_impact`, `no_write_evidence`, and `suggested_doctor_command`. During SKILL-002, `suggested_doctor_command` is a non-executing recommendation string only, and `diagnostics` is intentionally empty until SKILL-004; neither field claims SKILL-004 doctor behavior. Apply must recompute the current plan and fail closed if the approved hash no longer matches.
+The CLI may provide read-only doctor evidence that helps this skill, but it must not decide which legacy prose to port and must not perform semantic overlay merges.
 
-Existing project-suite lifecycle update behavior must not remain ambiguous with plugin update. The explicit scoped surface is `update project-suite ...`; the bare `update ...` command remains a backward-compatible legacy alias for the project-suite lifecycle path for now, while `update plugin ...` is the SKILL-002 dry-run plugin-package surface and `update agent-instructions` remains a separate repo-instruction surface. None of these update surfaces may copy the official KAS base pack into profile skill directories as the steady-state path.
-
-KAH has no implementation responsibility for `update plugin`. KAH may later record a KAS update evidence reference in run artifacts or gate reports, but only as evidence preservation; KAH must not install, update, vendor, merge, or clean Hermes/KAS skill content.
+KAH has no implementation responsibility for overlay refresh. KAH may preserve `kkachi-agent-skills` overlay refresh evidence references in run artifacts or gate reports, but only as evidence preservation; KAH must not install, update, vendor, merge, or clean Hermes/`kkachi-agent-skills` skill content.
 
 ## 11. Doctor, manifest, and diagnostic semantics
 
-KAS doctor has a read-only SKILL mode exposed as `kkachi-agent-skills doctor --plugin --repo <kas-repo> --json`. This mode is diagnostic-only: it reads explicit source plugin package evidence, role manifests, profile wrappers, project overlays, copied base-suite evidence, personal skills, and unknown profile skills, then reports reason-coded JSON/human diagnostics without writing. `--repo` is required for plugin doctor mode so the source evidence root is explicit and embedded source cache materialization is not part of the no-write claim. It is incompatible with `--workflow-graph` and `--project-suite`; mixed doctor modes fail closed with `doctor_mode_ambiguous` and bounded next-action guidance.
+KAS doctor has a read-only SKILL mode exposed as `kkachi-agent-skills doctor --plugin --repo <kas-repo> --json`. This mode is diagnostic-only: it reads explicit source plugin package evidence, role manifests, project wrappers, project overlays, copied base-suite evidence, personal skills, and unknown profile skills, then reports reason-coded JSON/human diagnostics without writing. `--repo` is required for plugin doctor mode so the source evidence root is explicit and embedded source cache materialization is not part of the no-write claim. It is incompatible with `--workflow-graph` and `--project-suite`; mixed doctor modes fail closed with `doctor_mode_ambiguous` and bounded next-action guidance.
 
 The `doctor --plugin --json` packet includes KASREL readback fields for review readiness checks: `provenance_contract_version`, `source_class_evidence`, `dependency_audit`, `skill_dependencies`, `command_surface_dependencies`, `deleted_bundle_reference`, and `deleted_bundle_diagnostics`. These fields are non-secret readback evidence only; absent evidence is emitted as explicit empty arrays or `null` and does not authorize profile mutation, KAB activation, provider/model configuration, deleted-bundle fallback lookup, or install readiness by assumption.
 
@@ -261,37 +292,37 @@ Minimum diagnostics:
 | KAS plugin missing or disabled | error | Wrapper/overlay cannot safely resolve base skills. |
 | Required plugin base skill missing | error | The selected KAS phase cannot run from canonical base. |
 | Role manifest missing or unknown | error | The profile's color role cannot be safely projected. |
-| Profile wrapper missing for an active color profile | warning or error by rollout stage | Discoverability/composition is incomplete. |
+| Project wrapper missing for an active color profile | warning or error by rollout stage | Discoverability/composition is incomplete. |
 | Wrapper role mismatches registry/profile authority | error | Role boundary is unsafe. |
 | Profile-local full KAS base copy present | warning during migration, error after cutover | Legacy fork/shadow risk. |
-| Overlay lacks `overlay_for` or references non-plugin target | error | Cannot safely compose overlay. |
+| Overlay lacks plugin-qualified `applies_to` targets, or optional advanced overlay lacks `overlay_for`, or either references a non-plugin target | error | Cannot safely compose overlay. |
 | Overlay copies too much base content | error or warning by threshold | Likely fork instead of delta. |
 | Overlay shadows base skill name | error | Ambiguous skill identity. |
 | Overlay base version is stale | warning | Needs review against current plugin base. |
 | Overlay contains secrets/runtime settings | error | Must be removed before use. |
 | Overlay improvement appears reusable | info | Promotion candidate for KAS guide/base review. |
-| Plugin update available or partially applied | warning or error by rollout stage | Run `update plugin --dry-run` or complete approved apply before claiming current plugin-base readiness. |
-| `update` command surface remains ambiguous | warning before cutover, error after cutover | Operators must be able to distinguish plugin update from project-suite update and agent-instruction update. |
-| KAH appears to own KAS plugin update/install | error | Boundary violation; KAH may preserve evidence refs only. |
+| Public update/migrate CLI command present | error | `kkachi-agent-skills` must not expose public `update` or `migrate` commands; use `kkachi-agent-skills-overlay-refresh` for semantic overlay refresh. |
+| Temporary overlay legacy archive still active or left after refresh | error | `overlay-legacy` is a comparison aid only; mark inactive and remove after successful refresh/review. |
+| KAH appears to own `kkachi-agent-skills` plugin update/install/refresh | error | Boundary violation; KAH may preserve evidence refs only. |
 
-Doctor output must distinguish `plugin_base`, `color_wrapper`, `project_overlay`, `legacy_copied_base_suite`, `personal_skill`, and `unknown_source` source classes. It must not delete, rewrite, or adopt profile-local skills without explicit dry-run/apply approval. Missing plugin, role, wrapper, or overlay evidence must produce diagnostics; profile-local copied suites are never a fallback for missing plugin/wrapper/overlay evidence.
+Doctor output must distinguish `plugin_base`, `project_wrapper`, `project_overlay`, `legacy_copied_base_suite`, `personal_skill`, and `unknown_source` source classes. It must not delete, rewrite, or adopt profile-local skills without explicit dry-run/apply approval. Missing plugin, role, wrapper, or overlay evidence must produce diagnostics; profile-local copied suites are never a fallback for missing plugin/wrapper/overlay evidence.
 
-## 12. Migration policy
+## 12. Legacy profile material and overlay refresh policy
 
-Existing profile-local KAS/KAH copied suites are migration input, not the steady-state target.
+Existing profile-local copied `kkachi-agent-skills` / `kkachi-agent-helper` suites are legacy input, not the steady-state target. The public CLI must not provide a profile-skill migration command. Legacy material is handled through review, doctor evidence, and the `kkachi-agent-skills-overlay-refresh` skill when an active project overlay needs semantic refresh.
 
-Migration must be dry-run-first and classify each profile-local KAS-like skill as:
+Legacy material may be classified during review as:
 
-- `base_identical`: content matches plugin/source base and can be removed after approval once wrapper/plugin readiness is proven;
-- `base_with_local_delta`: content differs and needs semantic extraction into a project overlay or common guide candidate;
-- `project_overlay_candidate`: local content is project-specific and should be moved into `skills/<project>/kas-overlays/...`;
-- `role_wrapper_candidate`: local content belongs in a thin profile wrapper;
+- `base_identical`: content matches plugin/source base and should not be copied forward into an overlay;
+- `base_with_local_delta`: content differs and needs human/LLM-assisted semantic review before any durable project-specific part is ported;
+- `project_overlay_candidate`: local content appears project-specific and may belong in `skills/<project>/<project>-overlay/` or, only when justified, an optional advanced `skills/<project>/kas-overlays/...` extension;
+- `role_wrapper_candidate`: local content belongs in a thin project wrapper;
 - `unknown_personal_skill`: preserve and request review;
-- `kah_companion_surface`: belongs to KAH or a paired KAS/KAH migration task, not silent KAS-only cleanup.
+- `kah_companion_surface`: belongs to `kkachi-agent-helper` or a paired `kkachi-agent-skills`/`kkachi-agent-helper` task, not silent `kkachi-agent-skills`-only cleanup.
 
-KAS exposes the SKILL-005 classifier as `kkachi-agent-skills migrate-profile-skills --repo <kas-repo> --profile <profile> --dry-run --json`. The command is dry-run/report-only: it emits per-item `bucket`, hash/provenance evidence, semantic extraction packets, diagnostics, `no_write_evidence`, `no_spillover_evidence`, `forbidden_actions`, `owner`, `review_required`, `recovery_hint`, and `next_action`; human output must state dry-run/report-only, no writes performed, no deletion or migration authorized, and the next approval gate. Its default profile root is `~/.hermes/profiles/<profile>`; `--profile-root` remains a guarded test/harness override. It has no approve/apply/delete/migrate mode. Missing or ambiguous profile inventory, hashes, KASREL provenance/dependency evidence, ownership boundaries, unreadable skills, or auth/token/gateway/provider/model/runtime content fails closed with review-required diagnostics rather than fallback classification.
+The `kkachi-agent-skills-overlay-refresh` skill owns the safe semantic path for refreshing overlays. It may temporarily create `skills/<project>/<project>-overlay-legacy/` with `kind: project_overlay_legacy` and `active: false`; after the refreshed overlay is verified and accepted, the legacy archive must be removed. This SOT does not authorize broad copied-suite cleanup, automatic deletion, CLI migration, or use of copied profile skills as fallback base behavior.
 
-Apply must require explicit 주군 approval for exact profiles/projects, backup/vault evidence, no-spillover scan, recovery instructions, and post-apply doctor evidence. This SOT alone does not authorize deleting the currently observed copied profile skills.
+Any real profile mutation requires explicit 주군 approval for exact profiles/projects, backup/vault evidence when destructive changes are possible, no-spillover scan, recovery instructions, and post-change doctor evidence. This SOT alone does not authorize deleting the currently observed copied profile skills.
 
 ## 13. Relationship to existing SOTs
 
@@ -303,16 +334,18 @@ Apply must require explicit 주군 approval for exact profiles/projects, backup/
 
 ## 14. Required roadmap sequence
 
+This amendment supersedes the earlier SKILL-006 pilot assumption that `kas-overlays/` was the default canonical project overlay path. `kas-overlays/` is retained only as an optional advanced extension after review.
+
 `SKILL` is a planning and migration epic. It should start with SOT acceptance and then proceed in small PR-candidate tasks.
 
 1. `SKILL-001` — accept this plugin-wrapper-overlay SOT, register the docs/roadmap references, and record color review / responsible approval.
-2. `SKILL-002` — implement KAS Hermes plugin package registration for canonical base skills, deterministic source role manifests, bounded guide metadata/readback exposure, and the plugin-package dry-run update lifecycle surface; prove plugin-qualified skill loading and update dry-run/readback in non-mutating smoke tests. SKILL-002 does not author thin wrapper templates, project overlay authoring guides, composition-guide bodies, or doctor-guide bodies.
-3. `SKILL-003` — add thin color wrapper templates and guide skills (`kas-project-overlay-guide`, `kas-overlay-compose-guide`, `kas-overlay-doctor-guide`); verify wrapper instructions do not copy base bodies.
+2. `SKILL-002` — implement `kkachi-agent-skills` Hermes plugin package registration for canonical base skills, deterministic source role manifests, and bounded guide metadata/readback exposure; prove plugin-qualified skill loading in non-mutating smoke tests. SKILL-002 must not expose public `update` or `migrate` CLI surfaces and does not author thin wrapper templates, project overlay authoring guides, composition-guide bodies, overlay-refresh workflow bodies, or doctor-guide bodies.
+3. `SKILL-003` — add thin project wrapper templates and guide skills (`kas-project-overlay-guide`, `kas-overlay-compose-guide`, `kas-overlay-doctor-guide`, `kkachi-agent-skills-overlay-refresh`); verify wrapper instructions do not copy base bodies and overlay refresh is skill-mediated rather than CLI-mediated.
 4. `SKILL-004` — implement read-only SKILL doctor diagnostics for plugin/wrapper/overlay/legacy-copy provenance and invalid overlay detection.
-5. `SKILL-005` — implement dry-run migration classifier for existing copied KAS/KAH-like profile skills, including semantic extraction packets and no-spillover evidence; no deletion.
-6. `SKILL-006` — run one approved pilot migration for exact profile/project targets after explicit 주군 approval, backup, no-spillover scan, and recovery plan.
+5. `SKILL-005` — remove public update/migrate CLI surfaces and keep legacy copied-suite handling as doctor/review evidence only; no deletion.
+6. `SKILL-006` — run one approved pilot overlay refresh for exact profile/project targets through `kkachi-agent-skills-overlay-refresh` after explicit 주군 approval, backup/no-spillover evidence when needed, and recovery plan.
 
-Later tasks may merge SKILL behavior into `install`, `doctor`, `sync-project-kas`, `update project-suite`, or replacement commands only after the earlier SKILL tasks provide evidence. The public update surface must remain unambiguous: plugin-package update is not project-suite update and neither is KAH-owned.
+Later tasks may merge SKILL behavior into `install`, `doctor`, `sync-project-kas`, or replacement commands only after the earlier SKILL tasks provide evidence. Public `update` and `migrate` surfaces remain removed unless a future accepted SOT explicitly reinstates a non-semantic deterministic surface under a non-ambiguous name.
 
 ## 15. Non-goals and deferrals
 
@@ -333,13 +366,13 @@ Later tasks may merge SKILL behavior into `install`, `doctor`, `sync-project-kas
 Before KAS claims SKILL support as implemented:
 
 - Plugin-qualified KAS base skills load from the Hermes plugin path without copying into profile skill directories.
-- `kkachi-agent-skills update plugin --dry-run --json` reports only official plugin-package changes and no profile wrapper/project overlay/KAH/KAB/auth/provider/runtime mutation.
+- The public CLI exposes no `update` or `migrate` commands; semantic overlay refresh is handled by `kkachi-agent-skills-overlay-refresh`, not deterministic CLI migration.
 - Blue/Red/Orange/Gray role manifests are deterministic, source-controlled, and tested.
-- Thin wrapper templates exist and are small enough to be discoverability/composition surfaces rather than base forks.
+- Thin project wrapper templates exist and are small enough to be discoverability/composition surfaces rather than base forks.
 - Project overlay frontmatter and layout are documented and tested with valid/invalid fixtures.
 - Doctor reports plugin base, wrapper, overlay, legacy copy, personal skill, and unknown source classes distinctly.
-- Doctor reports plugin update readiness, ambiguous update command surfaces, and KAH-boundary violations distinctly.
-- Migration dry-run classifies existing copied profile-local KAS/KAH-like skills without writes.
+- Doctor reports public update/migrate command exposure and KAH-boundary violations distinctly.
+- Legacy copied profile-local `kkachi-agent-skills` / `kkachi-agent-helper` material is review input only and is not a CLI migration target.
 - Cleanup/apply requires explicit 주군 approval, backup, no-spillover scan, and recovery evidence.
 - `docs/README.md`, `docs/kkachi-docs-map.yaml`, and `docs/roadmap.md` register this SOT and preserve the no-implementation boundary.
 - Red/Orange/Gray review accepts the safety, operator clarity, and evidence trace before broad rollout.

@@ -23,9 +23,9 @@ fall back to a profile-local copied skill, request review/approval.
 Example: invalid overlay target.
 
 ```text
-condition: overlay_for is `kkachi-plan` instead of `kkachi-agent-skills:plan`
+condition: applies_to contains `kkachi-plan` instead of `kkachi-agent-skills:plan`
 severity: error
-operator action: stop, report `overlay_for`, do not rewrite the overlay
+operator action: stop, report `applies_to`, do not rewrite the overlay
 silently, request review/approval.
 ```
 

@@ -111,6 +111,7 @@ type ProjectActionResult struct {
 	ProjectSuiteDiagnostics []ProjectSuiteDiagnostic `json:"project_suite_diagnostics"`
 	PlannedActions          []PlannedAction          `json:"planned_actions"`
 	PlannedSkills           []PlannedSkill           `json:"planned_skills,omitempty"`
+	CompositionFiles        []PlannedCompositionFile `json:"composition_files,omitempty"`
 	ChangedPaths            []ChangedPath            `json:"changed_paths"`
 	BackupPlan              []BackupEntry            `json:"backup_plan"`
 	NoSpillover             NoSpilloverEvidence      `json:"no_spillover"`
@@ -428,6 +429,7 @@ func baseProjectActionResult(command string, mode string, sourceRepo string, pro
 		ProjectSuiteDiagnostics: []ProjectSuiteDiagnostic{},
 		PlannedActions:          []PlannedAction{},
 		PlannedSkills:           []PlannedSkill{},
+		CompositionFiles:        []PlannedCompositionFile{},
 		ChangedPaths:            []ChangedPath{},
 		BackupPlan:              []BackupEntry{},
 		NoSpillover:             NoSpilloverEvidence{ScopeProfile: opts.Profile, ScopeProject: opts.Project, UnrelatedProfilesMutated: 0, KAHStateWriteCount: 0, KABRuntimeMutationCount: 0, ManifestWriteLast: true},
@@ -558,6 +560,29 @@ func inspectProjectSuite(profileRoot string, project string, sourcePackID string
 			info.Diagnostics = append(info.Diagnostics, suiteDiag(project, installed, target, "warning", "profile_source_language_drift", "installed skill drift_policy is outside known KASPROJ policies", "Review source/profile drift before relying on this suite."))
 		}
 	}
+	if rawComponents, ok := info.Suite["composition_files"].([]any); ok {
+		for _, raw := range rawComponents {
+			component, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			name, _ := component["name"].(string)
+			target, _ := component["target_path"].(string)
+			checksum, _ := component["checksum"].(string)
+			driftPolicy, _ := component["drift_policy"].(string)
+			tailoringMode, _ := component["tailoring_mode"].(string)
+			kind, _ := component["kind"].(string)
+			if discovery.IsInvalidRelativePath(target) || !strings.HasPrefix(target, "skills/"+project+"/") {
+				info.Diagnostics = append(info.Diagnostics, suiteDiag(project, name, target, "error", "profile_source_language_drift", "manifest composition file target path is not project-scoped/canonical", "Manually repair composition file identity before automated repair/migration."))
+				continue
+			}
+			if info.Records[target].TargetPath != "" {
+				info.Diagnostics = append(info.Diagnostics, suiteDiag(project, name, target, "error", "duplicate_manifest_target_path", "project suite manifest contains duplicate target_path", "Manually repair duplicate target paths."))
+				continue
+			}
+			info.Records[target] = manifestSkillRecord{InstalledSkill: name, TargetPath: target, Checksum: checksum, DriftPolicy: driftPolicy, TailoringMode: tailoringMode, Kind: kind}
+		}
+	}
 	if manifestOnlyUmbrella {
 		info.Diagnostics = append(info.Diagnostics, suiteDiag(project, project+"-kas", filepath.ToSlash(filepath.Join("skills", project, project+"-kas", "SKILL.md")), "error", "umbrella_only", "manifest lists only the project umbrella skill", "Repair or install the full project-prefixed suite."))
 	}
@@ -610,9 +635,6 @@ func roleAwareProjectSuiteDoctorDiagnostics(sourceRepo string, profileRoot strin
 	for _, skill := range selected {
 		selectedTargets[skill.TargetPath] = skill
 		selectedInstalled[skill.InstalledSkill] = true
-		if info.Records[skill.TargetPath].TargetPath == "" {
-			roleDiags = append(roleDiags, suiteDiag(project, skill.InstalledSkill, skill.TargetPath, "error", "missing_selected_role_skill", fmt.Sprintf("suite_role %s requires selected skill %s but it is not recorded in the project suite manifest", suiteRole, skill.InstalledSkill), "Reinstall with the same explicit registered suite_role, or use only an approved KASROLE-004 workflow when applicable."))
-		}
 	}
 
 	managedInstalled := map[string]RoleSkillEvidence{}
@@ -628,6 +650,9 @@ func roleAwareProjectSuiteDoctorDiagnostics(sourceRepo string, profileRoot strin
 		outOfRoleSeverity = "warning"
 	}
 	for target, record := range info.Records {
+		if record.Kind != "" {
+			continue
+		}
 		if selectedTargets[target].TargetPath != "" {
 			continue
 		}
@@ -745,12 +770,16 @@ func suiteState(profileRoot string, project string, info projectSuiteManifestInf
 		physical = "missing"
 	}
 	filesChecked := 0
-	for target := range info.Records {
+	installedCount := 0
+	for target, record := range info.Records {
+		if record.Kind == "" {
+			installedCount++
+		}
 		if _, err := os.Stat(filepath.Join(profileRoot, filepath.FromSlash(target))); err == nil {
 			filesChecked++
 		}
 	}
-	return ProjectSuiteState{ManifestState: info.State, PhysicalState: physical, InstalledSkillCount: len(info.Records), FilesChecked: filesChecked}
+	return ProjectSuiteState{ManifestState: info.State, PhysicalState: physical, InstalledSkillCount: installedCount, FilesChecked: filesChecked}
 }
 
 func addRequestedRoleManifestDiagnostics(result *ProjectActionResult, info projectSuiteManifestInfo) {
@@ -835,31 +864,25 @@ func planRepairActions(result *ProjectActionResult, sourceRepo string, profileRo
 			}
 		}
 	}
-	for _, pack := range packs {
-		skill, changed := plannedRepairSkill(sourceRepo, profileRoot, project, pack, info)
-		result.PlannedSkills = append(result.PlannedSkills, skill)
-		result.ChangedPaths = append(result.ChangedPaths, changed)
+	composition, compositionChanged, compositionActions, compositionBackups, compositionManifestNeeds := planRepairCompositionFiles(profileRoot, project, info)
+	result.CompositionFiles = composition
+	result.ChangedPaths = append(result.ChangedPaths, compositionChanged...)
+	for _, changed := range compositionChanged {
 		if changed.Action == "conflict" || changed.Action == "error" {
 			code := changed.ErrorCode
 			if code == "" {
-				code = "project_repair_conflict"
+				code = "project_composition_repair_conflict"
 			}
 			message := changed.ErrorMessage
 			if message == "" {
-				message = "project repair plan contains an unsafe target action"
+				message = "project composition repair plan contains an unsafe target action"
 			}
 			result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: code, Message: message})
 		}
-		if changed.Action == "create" || changed.Action == "update" {
-			result.PlannedActions = append(result.PlannedActions, actionFromChanged(project, skill, changed, repairReason(changed.Action)))
-		}
-		if changed.Action == "update" && changed.PreviousSHA256 != nil {
-			backup := BackupEntry{Path: changed.Path, BackupPath: filepath.ToSlash(filepath.Join(".kas", "backups", "dry-run", filepath.FromSlash(changed.Path))), PreviousSHA256: *changed.PreviousSHA256, Bytes: changed.Bytes}
-			result.BackupPlan = append(result.BackupPlan, backup)
-			result.PlannedActions[len(result.PlannedActions)-1].BackupPath = backup.BackupPath
-		}
 	}
-	if manifestNeedsProjectRepair(result, info) || len(pruneTargets) > 0 || (result.SuiteRole != "" && manifestRoleNeedsRepair(result, info)) {
+	result.PlannedActions = append(result.PlannedActions, compositionActions...)
+	result.BackupPlan = append(result.BackupPlan, compositionBackups...)
+	if manifestNeedsProjectRepair(result, info) || compositionManifestNeeds || len(pruneTargets) > 0 || (result.SuiteRole != "" && manifestRoleNeedsRepair(result, info)) {
 		result.PlannedActions = append(result.PlannedActions, PlannedAction{Action: "manifest_update", Project: project, TargetPath: ".kas/skill-pack-manifest.json", Reason: "refresh_project_suite_manifest"})
 	}
 	sortProjectActionResult(result)
@@ -911,6 +934,63 @@ func manifestRoleNeedsRepair(result *ProjectActionResult, info projectSuiteManif
 		return false
 	}
 	return info.Suite["suite_role"] != result.SuiteRole || info.Suite["suite_mode"] != result.SuiteMode
+}
+
+func planRepairCompositionFiles(profileRoot string, project string, info projectSuiteManifestInfo) ([]PlannedCompositionFile, []ChangedPath, []PlannedAction, []BackupEntry, bool) {
+	plans := []PlannedCompositionFile{}
+	changed := []ChangedPath{}
+	actions := []PlannedAction{}
+	backups := []BackupEntry{}
+	manifestNeeds := false
+	for _, spec := range projectCompositionSpecs(project) {
+		content := []byte(projectCompositionContent(project, spec.Kind))
+		newSHA := sha256Bytes(content)
+		record := info.Records[spec.TargetPath]
+		checksum := newSHA
+		action := "skip"
+		bytes := len(content)
+		abs := filepath.Join(profileRoot, filepath.FromSlash(spec.TargetPath))
+		current, size, readErr := existingFileChecksumAndSize(abs)
+		if readErr != nil {
+			if errors.Is(readErr, os.ErrNotExist) {
+				action = "create"
+				entry := ChangedPath{Path: spec.TargetPath, Action: "create", InstalledSkill: spec.Name, SourcePackID: "project_composition", NewSHA256: newSHA, Bytes: len(content)}
+				changed = append(changed, entry)
+				actions = append(actions, PlannedAction{Action: "create", Project: project, InstalledSkill: spec.Name, SourcePackID: "project_composition", SourceSkill: spec.Kind, TargetPath: spec.TargetPath, Reason: "restore_missing_project_composition_file", NewSHA256: newSHA, Bytes: len(content)})
+			} else {
+				action = "error"
+				changed = append(changed, ChangedPath{Path: spec.TargetPath, Action: "error", InstalledSkill: spec.Name, SourcePackID: "project_composition", NewSHA256: newSHA, Bytes: len(content), ErrorCode: "target_read_failed", ErrorMessage: readErr.Error()})
+			}
+		} else if spec.Kind == "project_overlay" || spec.Kind == "project_overlay_reference" {
+			checksum = current
+			bytes = size
+			if record.TargetPath == "" || record.Checksum != current || record.Kind != spec.Kind || record.DriftPolicy != spec.DriftPolicy || record.TailoringMode != spec.TailoringMode {
+				action = "adopt_existing"
+				manifestNeeds = true
+			}
+		} else if current != newSHA {
+			action = "update"
+			prev := current
+			entry := ChangedPath{Path: spec.TargetPath, Action: "update", InstalledSkill: spec.Name, SourcePackID: "project_composition", PreviousSHA256: &prev, NewSHA256: newSHA, Bytes: len(content)}
+			backup := BackupEntry{Path: spec.TargetPath, BackupPath: filepath.ToSlash(filepath.Join(".kas", "backups", "dry-run", filepath.FromSlash(spec.TargetPath))), PreviousSHA256: prev, Bytes: size}
+			entry.BackupPath = backup.BackupPath
+			changed = append(changed, entry)
+			backups = append(backups, backup)
+			actions = append(actions, PlannedAction{Action: "update", Project: project, InstalledSkill: spec.Name, SourcePackID: "project_composition", SourceSkill: spec.Kind, TargetPath: spec.TargetPath, Reason: "repair_project_wrapper_from_canonical_template", PreviousSHA256: &prev, NewSHA256: newSHA, Bytes: len(content), BackupPath: backup.BackupPath})
+		} else if record.TargetPath == "" || record.Checksum != newSHA || record.Kind != spec.Kind || record.DriftPolicy != spec.DriftPolicy || record.TailoringMode != spec.TailoringMode {
+			action = "adopt_existing"
+			manifestNeeds = true
+		}
+		if record.TargetPath == "" || record.Checksum != checksum || record.Kind != spec.Kind || record.DriftPolicy != spec.DriftPolicy || record.TailoringMode != spec.TailoringMode {
+			manifestNeeds = true
+		}
+		plans = append(plans, PlannedCompositionFile{Kind: spec.Kind, Name: spec.Name, TargetPath: spec.TargetPath, DriftPolicy: spec.DriftPolicy, Checksum: checksum, Action: action, Bytes: bytes, TailoringMode: spec.TailoringMode})
+	}
+	sort.Slice(plans, func(i, j int) bool { return plans[i].TargetPath < plans[j].TargetPath })
+	sort.Slice(changed, func(i, j int) bool { return changed[i].Path < changed[j].Path })
+	sort.Slice(actions, func(i, j int) bool { return actions[i].TargetPath < actions[j].TargetPath })
+	sort.Slice(backups, func(i, j int) bool { return backups[i].Path < backups[j].Path })
+	return plans, changed, actions, backups, manifestNeeds
 }
 
 func plannedRepairSkill(sourceRepo string, profileRoot string, project string, pack discovery.SourcePack, info projectSuiteManifestInfo) (PlannedSkill, ChangedPath) {
@@ -1353,6 +1433,11 @@ func preflightProjectAction(dryRun ProjectActionResult, _ string) error {
 }
 
 func renderedContentForProjectAction(result ProjectActionResult, entry ChangedPath) ([]byte, error) {
+	for _, component := range result.CompositionFiles {
+		if component.TargetPath == entry.Path {
+			return []byte(projectCompositionContent(result.Project.ID, component.Kind)), nil
+		}
+	}
 	for _, skill := range result.PlannedSkills {
 		if skill.TargetPath != entry.Path {
 			continue
@@ -1367,7 +1452,7 @@ func renderedContentForProjectAction(result ProjectActionResult, entry ChangedPa
 }
 
 func projectActionAsInstallResult(action ProjectActionResult) Result {
-	return Result{OK: action.OK, Command: action.Command, Mode: action.Mode, CLIVersion: action.CLIVersion, DryRun: action.DryRun, NoWrite: action.NoWrite, SourceRepo: action.SourceRepo, TargetProfile: action.TargetProfile, Project: action.Project, SourcePack: action.SourcePack, SuiteRole: action.SuiteRole, SuiteMode: action.SuiteMode, RoleLabel: action.RoleLabel, RoleRegistry: action.RoleRegistry, SelectedSkills: action.SelectedSkills, ExcludedSkills: action.ExcludedSkills, PlannedSkills: action.PlannedSkills, ChangedPaths: action.ChangedPaths, BackupPlan: action.BackupPlan, PlanHash: action.PlanHash, Diagnostics: action.Diagnostics}
+	return Result{OK: action.OK, Command: action.Command, Mode: action.Mode, CLIVersion: action.CLIVersion, DryRun: action.DryRun, NoWrite: action.NoWrite, SourceRepo: action.SourceRepo, TargetProfile: action.TargetProfile, Project: action.Project, SourcePack: action.SourcePack, SuiteRole: action.SuiteRole, SuiteMode: action.SuiteMode, RoleLabel: action.RoleLabel, RoleRegistry: action.RoleRegistry, SelectedSkills: action.SelectedSkills, ExcludedSkills: action.ExcludedSkills, PlannedSkills: action.PlannedSkills, CompositionFiles: action.CompositionFiles, ChangedPaths: action.ChangedPaths, BackupPlan: action.BackupPlan, PlanHash: action.PlanHash, Diagnostics: action.Diagnostics}
 }
 
 func makeProjectActionID(command string, planHash string, now time.Time) string {
@@ -1390,8 +1475,8 @@ func finalizeProjectAction(result *ProjectActionResult) {
 		counts[changed.Action]++
 	}
 	result.Summary = Summary{TotalSkills: len(result.PlannedSkills), TotalFiles: len(result.ChangedPaths), SelectedSkills: len(result.SelectedSkills), ExcludedSkills: len(result.ExcludedSkills), CountsByAction: counts, ConflictCount: 0, DiagnosticCount: len(result.Diagnostics)}
-	result.Checksums = Checksums{SourcePack: result.SourcePack.SuiteChecksum, PlannedManifest: checksumAny(projectActionPlannedManifest(*result)), PlannedSkills: checksumAny(result.PlannedSkills), ChangedPaths: checksumAny(result.ChangedPaths)}
-	canonical := map[string]any{"command": result.Command, "mode": result.Mode, "cli_version": result.CLIVersion, "dry_run": result.DryRun, "no_write": result.NoWrite, "source_repo": result.SourceRepo, "target_profile": result.TargetProfile, "manifest_path": result.ManifestPath, "previous_manifest_sha256": result.TargetProfile.PreviousManifestSHA256, "project": result.Project, "source_pack": result.SourcePack, "suite_role": result.SuiteRole, "suite_mode": result.SuiteMode, "role_label": result.RoleLabel, "role_registry": result.RoleRegistry, "selected_skills": result.SelectedSkills, "excluded_skills": result.ExcludedSkills, "prune_extra": result.PruneExtra, "summary": result.Summary, "project_suite_diagnostics": result.ProjectSuiteDiagnostics, "planned_actions": result.PlannedActions, "planned_skills": result.PlannedSkills, "changed_paths": result.ChangedPaths, "backup_plan": result.BackupPlan, "no_spillover": result.NoSpillover, "checksums": result.Checksums, "manual_semantic_port_tasks": result.ManualSemanticPortTasks, "diagnostics": result.Diagnostics}
+	result.Checksums = Checksums{SourcePack: result.SourcePack.SuiteChecksum, PlannedManifest: checksumAny(projectActionPlannedManifest(*result)), PlannedSkills: checksumAny(map[string]any{"planned_skills": result.PlannedSkills, "composition_files": result.CompositionFiles}), ChangedPaths: checksumAny(result.ChangedPaths)}
+	canonical := map[string]any{"command": result.Command, "mode": result.Mode, "cli_version": result.CLIVersion, "dry_run": result.DryRun, "no_write": result.NoWrite, "source_repo": result.SourceRepo, "target_profile": result.TargetProfile, "manifest_path": result.ManifestPath, "previous_manifest_sha256": result.TargetProfile.PreviousManifestSHA256, "project": result.Project, "source_pack": result.SourcePack, "suite_role": result.SuiteRole, "suite_mode": result.SuiteMode, "role_label": result.RoleLabel, "role_registry": result.RoleRegistry, "selected_skills": result.SelectedSkills, "excluded_skills": result.ExcludedSkills, "composition_files": result.CompositionFiles, "prune_extra": result.PruneExtra, "summary": result.Summary, "project_suite_diagnostics": result.ProjectSuiteDiagnostics, "planned_actions": result.PlannedActions, "planned_skills": result.PlannedSkills, "changed_paths": result.ChangedPaths, "backup_plan": result.BackupPlan, "no_spillover": result.NoSpillover, "checksums": result.Checksums, "manual_semantic_port_tasks": result.ManualSemanticPortTasks, "diagnostics": result.Diagnostics}
 	result.PlanHash = checksumAny(canonical)
 	blocking := noErrorDiagnostics(result.Diagnostics)
 	result.OK = blocking
@@ -1412,7 +1497,7 @@ func projectActionPlannedManifest(result ProjectActionResult) map[string]any {
 }
 
 func projectActionRoleManifestResult(action ProjectActionResult) Result {
-	return Result{SuiteRole: action.SuiteRole, SuiteMode: action.SuiteMode, RoleLabel: action.RoleLabel, RoleRegistry: action.RoleRegistry, SelectedSkills: action.SelectedSkills, ExcludedSkills: action.ExcludedSkills}
+	return Result{SuiteRole: action.SuiteRole, SuiteMode: action.SuiteMode, RoleLabel: action.RoleLabel, RoleRegistry: action.RoleRegistry, SelectedSkills: action.SelectedSkills, ExcludedSkills: action.ExcludedSkills, CompositionFiles: action.CompositionFiles}
 }
 
 func hasWritableProjectAction(actions []PlannedAction) bool {

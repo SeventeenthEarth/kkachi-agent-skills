@@ -217,6 +217,53 @@ func BuildProjectUninstallDryRun(opts ProjectSuiteOptions) ProjectUninstallResul
 			result.BackupRecovery.BackupRequired = true
 		}
 	}
+	if rawComponents, ok := suite["composition_files"].([]any); ok {
+		for _, raw := range rawComponents {
+			component, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			name, _ := component["name"].(string)
+			target, _ := component["target_path"].(string)
+			checksum, _ := component["checksum"].(string)
+			manifested[target] = true
+			if discovery.IsInvalidRelativePath(target) || !strings.HasPrefix(target, "skills/"+opts.Project+"/") {
+				addUninstallSuiteDiag(&result, suiteDiag(opts.Project, name, target, "error", "unsafe_manifest_target_path", "project suite manifest contains an unsafe composition target_path", "Repair the manifest before uninstall."))
+				continue
+			}
+			if checksum == "" {
+				addUninstallSuiteDiag(&result, suiteDiag(opts.Project, name, target, "error", "checksum_evidence_missing", "manifest composition target lacks checksum evidence", "Repair manifest checksum evidence before uninstall."))
+				continue
+			}
+			abs := filepath.Join(profileRoot, filepath.FromSlash(target))
+			current, size, readErr := existingFileChecksumAndSize(abs)
+			action := "remove"
+			reason := "manifest_tracked_project_composition_file"
+			if readErr != nil {
+				if errors.Is(readErr, os.ErrNotExist) {
+					action = "no_change"
+					reason = "manifest_tracked_file_already_missing"
+				} else {
+					code := "target_read_failed"
+					if strings.Contains(readErr.Error(), "symlink") {
+						code = "target_symlink_rejected"
+					}
+					addUninstallSuiteDiag(&result, suiteDiag(opts.Project, name, target, "error", code, "manifest composition target_path cannot be read safely: "+readErr.Error(), "Fix file permissions before uninstall."))
+					action = "error"
+				}
+			} else if current != checksum {
+				addUninstallSuiteDiag(&result, suiteDiag(opts.Project, name, target, "error", "checksum_mismatch", "installed composition file checksum differs from manifest evidence", "Run doctor/repair or review local edits before uninstall."))
+				action = "conflict"
+				reason = "manifest_checksum_mismatch"
+			}
+			removal := PlannedRemoval{Action: action, Project: opts.Project, InstalledSkill: name, SourcePackID: result.SourcePack.ID, TargetPath: target, ManifestSHA256: checksum, CurrentSHA256: stringPtrIfNotEmpty(current), Bytes: size, Reason: reason}
+			result.PlannedRemovals = append(result.PlannedRemovals, removal)
+			if action == "remove" {
+				result.ChangedPaths = append(result.ChangedPaths, ChangedPath{Path: target, Action: "remove", InstalledSkill: name, SourcePackID: result.SourcePack.ID, PreviousSHA256: &current, Bytes: size})
+				result.BackupRecovery.BackupRequired = true
+			}
+		}
+	}
 	result.SkippedLocalFiles = scanSkippedProjectFiles(profileRoot, opts.Project, manifested)
 	finalizeUninstall(&result)
 	return result
@@ -429,7 +476,11 @@ func preflightApprovedUninstall(dryRun ProjectUninstallResult, removals []Planne
 			return fmt.Errorf("duplicate removal target: %s", removal.TargetPath)
 		}
 		seen[removal.TargetPath] = true
-		if unsafeManifestProjectTarget(dryRun.Project.ID, removal.InstalledSkill, removal.TargetPath) {
+		if removal.Reason == "manifest_tracked_project_composition_file" {
+			if discovery.IsInvalidRelativePath(removal.TargetPath) || !strings.HasPrefix(removal.TargetPath, "skills/"+dryRun.Project.ID+"/") {
+				return fmt.Errorf("unsafe manifest removal target: %s", removal.TargetPath)
+			}
+		} else if unsafeManifestProjectTarget(dryRun.Project.ID, removal.InstalledSkill, removal.TargetPath) {
 			return fmt.Errorf("unsafe manifest removal target: %s", removal.TargetPath)
 		}
 		target, err := safeProfileWritePath(dryRun.TargetProfile.Root, removal.TargetPath)

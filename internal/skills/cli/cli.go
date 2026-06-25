@@ -10,14 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/agentinstructions"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/doctor"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/graphsync"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kasstate"
-	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/migrationclassifier"
-	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/pluginupdate"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/projectinstall"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/toolchain"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
@@ -45,7 +42,7 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		stderr = os.Stderr
 	}
 	if len(argv) == 0 {
-		return emitError(stderr, "command_required", "expected list, install, update, doctor, repair, migrate-profile-skills, toolchain, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, or version command", "", false, "")
+		return emitError(stderr, "command_required", "expected list, install, doctor, repair, toolchain, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, or version command", "", false, "")
 	}
 	if isVersionArg(argv[0]) {
 		return runVersion(argv[1:], stdout, stderr)
@@ -59,14 +56,10 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runList(argv[1:], stdout, stderr, env)
 	case "install":
 		return runInstall(argv[1:], stdout, stderr, env)
-	case "update":
-		return runUpdate(argv[1:], stdout, stderr, env)
 	case "doctor":
 		return runDoctor(argv[1:], stdout, stderr, env)
 	case "repair":
 		return runRepair(argv[1:], stdout, stderr, env)
-	case "migrate-profile-skills":
-		return runMigrateProfileSkills(argv[1:], stdout, stderr, env)
 	case "toolchain":
 		return runToolchain(argv[1:], stdout, stderr, env)
 	case "workflow-create":
@@ -87,10 +80,8 @@ func Main(argv []string, stdout io.Writer, stderr io.Writer, env map[string]stri
 		return runInstallProjectKAS(argv[1:], stdout, stderr, env)
 	case "repair-project-kas":
 		return runRepairProjectKAS(argv[1:], stdout, stderr, env)
-	case "migrate-project-kas":
-		return runMigrateProjectKAS(argv[1:], stdout, stderr, env)
 	default:
-		return emitError(stderr, "unknown_command", "only the list, install, update, doctor, repair, migrate-profile-skills, toolchain, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
+		return emitError(stderr, "unknown_command", "only the list, install, doctor, repair, toolchain, workflow-create, workflow-promote, workflow-route, workflow-trigger, uninstall, and version commands are routine public lifecycle commands", argv[0], false, "")
 	}
 }
 
@@ -294,154 +285,6 @@ func runPublicProjectInstall(repo string, profile string, project string, source
 	})
 }
 
-func runUpdate(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
-	if len(argv) > 0 && argv[0] == "agent-instructions" {
-		return runUpdateAgentInstructions(argv[1:], stdout, stderr)
-	}
-	if len(argv) > 0 && argv[0] == "plugin" {
-		return runUpdatePlugin(argv[1:], stdout, stderr)
-	}
-	if len(argv) > 0 && argv[0] == "project-suite" {
-		return runUpdate(argv[1:], stdout, stderr, env)
-	}
-	fs := flag.NewFlagSet("update", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	profile := fs.String("profile", "", "Hermes target profile name")
-	project := fs.String("project", "", "project-specific KAS id")
-	statePath := fs.String("state", "", "project kas-project-state.yaml path")
-	legacyMarkerPath := fs.String("legacy-marker", "", "optional legacy kab-adoption-stage.md path")
-	repoPath := fs.String("repo", "", "current upstream KAS source repo path")
-	projectRoot := fs.String("project-root", "", "project-specific KAS root path")
-	dryRun := fs.Bool("dry-run", false, "classify project KAS update without writing")
-	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash> for approved lifecycle writes")
-	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
-	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
-	if hasHelpArg(argv) {
-		fs.SetOutput(stdout)
-		fs.Usage()
-		return 0
-	}
-	if err := fs.Parse(argv); err != nil {
-		return 2
-	}
-	if *dryRun && *apply != "" {
-		return emitError(stderr, "update_mode_ambiguous", "update accepts either --dry-run or --apply, not both.", "update", *jsonOutput, "Run dry-run first, then rerun with only --apply dry-run:sha256:<hash>.")
-	}
-	if !*dryRun && *apply == "" {
-		return emitError(stderr, "update_requires_dry_run_or_apply", "update requires --dry-run or --apply dry-run:sha256:<hash>.", "update", *jsonOutput, "Rerun with update --profile <profile> --project <project-id> --state <path> --dry-run.")
-	}
-	if *profile == "" {
-		return emitError(stderr, "profile_required", "update requires --profile <profile>.", "update", *jsonOutput, "")
-	}
-	if *project == "" {
-		return emitError(stderr, "project_required", "update requires --project <project-id>.", "update", *jsonOutput, "")
-	}
-	opts := kasstate.Options{Profile: *profile, Project: *project, StatePath: *statePath, LegacyMarkerPath: *legacyMarkerPath, DryRun: true, RepoPath: *repoPath, ProjectRoot: *projectRoot}
-	var result kasstate.LifecycleUpdateResult
-	if *apply != "" {
-		result = kasstate.ApplyLifecycleUpdate(opts, *apply)
-	} else {
-		result = kasstate.BuildLifecycleUpdate(opts)
-	}
-	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
-		return kasstate.RenderHumanLifecycleUpdate(result)
-	})
-}
-
-func runUpdatePlugin(argv []string, stdout io.Writer, stderr io.Writer) int {
-	fs := flag.NewFlagSet("update plugin", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	repo := fs.String("repo", "", "source KAS repo path")
-	dryRun := fs.Bool("dry-run", false, "report official plugin package changes without writing")
-	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
-	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
-	if hasHelpArg(argv) {
-		fs.SetOutput(stdout)
-		fs.Usage()
-		return 0
-	}
-	if err := fs.Parse(argv); err != nil {
-		return 2
-	}
-	if fs.NArg() != 0 {
-		return emitError(stderr, "unexpected_argument", "update plugin does not accept positional arguments after the subcommand.", "update plugin", *jsonOutput, "")
-	}
-	if !*dryRun {
-		return emitError(stderr, "plugin_update_requires_dry_run", "update plugin currently supports only --dry-run; apply/write behavior is outside the implemented SKILL scope.", "update plugin", *jsonOutput, "Rerun with update plugin --dry-run --json.")
-	}
-	result, err := pluginupdate.BuildDryRun(pluginupdate.Options{Repo: *repo, DryRun: true})
-	if err != nil {
-		return emitError(stderr, "plugin_update_planner_failed", err.Error(), "update plugin", *jsonOutput, "")
-	}
-	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
-		return fmt.Sprintf("Status: plugin update dry-run ready for %s.\nWrites: dry-run only; wrappers/overlays/KAH/KAB/auth/provider/model writes 0.\nNext: %s", result.Namespace, result.NextAction)
-	})
-}
-
-func runUpdateAgentInstructions(argv []string, stdout io.Writer, stderr io.Writer) int {
-	fs := flag.NewFlagSet("update agent-instructions", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	repoPath := fs.String("repo-path", "", "target repository root containing AGENTS.md / CLAUDE.md")
-	sourceRepo := fs.String("source-repo", "", "KAS source repository root containing templates/agent-instructions")
-	project := fs.String("project", "", "project name/id for template rendering")
-	repositoryRole := fs.String("repository-role", "", "repository role for template rendering")
-	projectSuiteID := fs.String("project-suite-id", "", "project suite id for template rendering")
-	kabAdoptionStage := fs.String("kab-adoption-stage", "", "selected KAB adoption stage label for template rendering")
-	upstreamKASBaseline := fs.String("upstream-kas-baseline", "", "upstream KAS baseline label for template rendering")
-	localAuthorityNotes := fs.String("local-authority-notes", "", "local authority notes for template rendering")
-	notApplicable := fs.String("not-applicable", "", "comma-separated AGENTS.md/CLAUDE.md files to mark not_applicable")
-	notApplicableReason := fs.String("not-applicable-reason", "", "reason used for not_applicable file outcomes")
-	dryRun := fs.Bool("dry-run", false, "plan repo-local instruction changes without writing")
-	apply := fs.String("apply", "", "approval evidence ref dry-run:sha256:<hash> for approved repo-local instruction writes")
-	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
-	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
-	if hasHelpArg(argv) {
-		fs.SetOutput(stdout)
-		fs.Usage()
-		return 0
-	}
-	if err := fs.Parse(argv); err != nil {
-		return 2
-	}
-	if fs.NArg() != 0 {
-		return emitError(stderr, "unexpected_argument", "update agent-instructions does not accept positional arguments after the subcommand.", "update agent-instructions", *jsonOutput, "")
-	}
-	if *dryRun && *apply != "" {
-		return emitError(stderr, "agent_instructions_mode_ambiguous", "update agent-instructions accepts either --dry-run or --apply, not both.", "update agent-instructions", *jsonOutput, "Run dry-run first, then rerun with only --apply dry-run:sha256:<hash>.")
-	}
-	if !*dryRun && *apply == "" {
-		return emitError(stderr, "agent_instructions_requires_dry_run_or_apply", "update agent-instructions requires --dry-run or --apply dry-run:sha256:<hash>.", "update agent-instructions", *jsonOutput, "Rerun with update agent-instructions --repo-path <path> --dry-run.")
-	}
-	if *repoPath == "" {
-		return emitError(stderr, "repo_path_required", "update agent-instructions requires --repo-path <path>.", "update agent-instructions", *jsonOutput, "")
-	}
-	opts := agentinstructions.Options{
-		RepoPath:            *repoPath,
-		SourceRepoPath:      *sourceRepo,
-		Project:             *project,
-		RepositoryRole:      *repositoryRole,
-		ProjectSuiteID:      *projectSuiteID,
-		KABAdoptionStage:    *kabAdoptionStage,
-		UpstreamKASBaseline: *upstreamKASBaseline,
-		LocalAuthorityNotes: *localAuthorityNotes,
-		NotApplicable:       splitFlagList(*notApplicable),
-		NotApplicableReason: *notApplicableReason,
-	}
-	var result agentinstructions.Result
-	var err error
-	if *apply != "" {
-		result, err = agentinstructions.Apply(opts, *apply)
-	} else {
-		result, err = agentinstructions.BuildDryRun(opts)
-	}
-	if err != nil {
-		return emitError(stderr, "agent_instructions_planner_failed", err.Error(), "update agent-instructions", *jsonOutput, "")
-	}
-	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
-		return agentinstructions.RenderHuman(result)
-	})
-}
-
 func runDoctor(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -624,55 +467,6 @@ func runRepair(argv []string, stdout io.Writer, stderr io.Writer, env map[string
 	result.NextAction = publicRepairNextAction(result, approval != "")
 	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
 		return projectinstall.RenderHumanProjectAction(result)
-	})
-}
-
-func runMigrateProfileSkills(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
-	fs := flag.NewFlagSet("migrate-profile-skills", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	repo := fs.String("repo", "", "source KAS repo path")
-	profile := fs.String("profile", "", "Hermes target profile name")
-	project := fs.String("project", "", "optional project id used only for candidate readback")
-	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
-	dryRun := fs.Bool("dry-run", false, "required; report migration classification without writing")
-	approve := fs.String("approve", "", "unsupported; SKILL-005 has no approval/apply mode")
-	apply := fs.String("apply", "", "unsupported; SKILL-005 has no approval/apply mode")
-	deleteFlag := fs.Bool("delete", false, "unsupported; SKILL-005 never deletes profile skills")
-	migrateFlag := fs.Bool("migrate", false, "unsupported; SKILL-005 never migrates profile skills")
-	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
-	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
-	if hasHelpArg(argv) {
-		fs.SetOutput(stdout)
-		fs.Usage()
-		return 0
-	}
-	if err := fs.Parse(argv); err != nil {
-		return 2
-	}
-	if fs.NArg() != 0 {
-		return emitError(stderr, "unexpected_argument", "migrate-profile-skills does not accept positional arguments.", "migrate-profile-skills", *jsonOutput, "")
-	}
-	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
-		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "migrate-profile-skills", *jsonOutput, "")
-	}
-	if !*dryRun {
-		return emitError(stderr, "migration_classifier_requires_dry_run", "migrate-profile-skills is report-only for SKILL-005 and requires --dry-run.", "migrate-profile-skills", *jsonOutput, "Rerun with migrate-profile-skills --repo <kas-repo> --profile <profile> --dry-run --json.")
-	}
-	if *approve != "" || *apply != "" || *deleteFlag || *migrateFlag {
-		return emitError(stderr, "migration_classifier_mode_ambiguous", "migrate-profile-skills has no approve/apply/delete/migrate mode; SKILL-005 is dry-run/report-only.", "migrate-profile-skills", *jsonOutput, "Rerun with only --dry-run; use a later approved SKILL-006-like flow for any mutation.")
-	}
-	if *repo == "" {
-		return emitError(stderr, "repo_required", "migrate-profile-skills requires --repo <kas-repo> so source evidence is explicit.", "migrate-profile-skills", *jsonOutput, "")
-	}
-	if *profile == "" {
-		return emitError(stderr, "profile_required", "migrate-profile-skills requires --profile <profile>.", "migrate-profile-skills", *jsonOutput, "")
-	}
-	result, err := migrationclassifier.Build(*repo, migrationclassifier.Options{Profile: *profile, Project: *project, ProfileRoot: *profileRoot})
-	if err != nil {
-		return emitError(stderr, "migration_classifier_failed", err.Error(), "migrate-profile-skills", *jsonOutput, "")
-	}
-	return emitResult(stdout, stderr, result.OK, *jsonOutput, result, func() string {
-		return migrationclassifier.RenderHuman(result)
 	})
 }
 
@@ -1345,73 +1139,6 @@ func runRepairProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env 
 	return code
 }
 
-func runMigrateProjectKAS(argv []string, stdout io.Writer, stderr io.Writer, env map[string]string) int {
-	fs := flag.NewFlagSet("migrate-project-kas", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	repo := fs.String("repo", "", "source KAS repo path")
-	profile := fs.String("profile", "", "Hermes target profile name")
-	project := fs.String("project", "", "project-specific KAS id")
-	sourcePack := fs.String("source-pack", projectinstall.VirtualSourcePackID, "project source suite id; defaults to kas-default-project-suite")
-	profileRoot := fs.String("profile-root", "", "test/harness-only explicit profile root")
-	fromGeneric := fs.Bool("from-generic", false, "explicitly migrate clean KAS-managed generic candidates")
-	dryRun := fs.Bool("dry-run", false, "report planned migration without writing")
-	approve := fs.String("approve", "", "approval evidence ref dry-run:<plan_hash>")
-	jsonOutput := fs.Bool("json", false, "emit machine-readable JSON")
-	fs.Bool("no-color", false, "accepted for stable CLI shape; output is uncolored")
-	if hasHelpArg(argv) {
-		fs.SetOutput(stdout)
-		fs.Usage()
-		return 0
-	}
-	if projectInstallApproveMissingValue(argv) {
-		return emitError(stderr, "approval_evidence_malformed", "approval evidence must be exactly dry-run:sha256:<64 lowercase hex>.", "migrate-project-kas", wantsJSON(argv), "Rerun with the dry-run JSON approval_request.evidence_ref value.")
-	}
-	if err := fs.Parse(argv); err != nil {
-		return 2
-	}
-	if *profileRoot != "" && envValue(env, "KAS_ALLOW_PROFILE_ROOT_OVERRIDE") != "1" {
-		return emitError(stderr, "profile_root_override_rejected", "--profile-root is only allowed under an explicit test/harness guard.", "migrate-project-kas", *jsonOutput, "")
-	}
-	if *dryRun && *approve != "" {
-		return emitError(stderr, "project_migration_mode_ambiguous", "migrate-project-kas accepts either --dry-run or --approve, not both.", "migrate-project-kas", *jsonOutput, "Run dry-run first, then rerun with only --approve dry-run:<hash>.")
-	}
-	if !*dryRun && *approve == "" {
-		return emitError(stderr, "project_migration_requires_dry_run_or_approve", "migrate-project-kas requires --dry-run or --approve dry-run:<hash>.", "migrate-project-kas", *jsonOutput, "Rerun with migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run.")
-	}
-	if !*fromGeneric {
-		return emitError(stderr, "from_generic_required", "migrate-project-kas requires --from-generic.", "migrate-project-kas", *jsonOutput, "Rerun with migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run.")
-	}
-	if *profile == "" {
-		return emitError(stderr, "profile_required", "migrate-project-kas requires --profile <profile>.", "migrate-project-kas", *jsonOutput, "")
-	}
-	if *project == "" {
-		return emitError(stderr, "project_required", "migrate-project-kas requires --project <project>.", "migrate-project-kas", *jsonOutput, "")
-	}
-	opts := projectinstall.ProjectSuiteOptions{Profile: *profile, Project: *project, SourcePack: *sourcePack, SourcePackExplicit: hasFlag(argv, "--source-pack"), ProfileRoot: *profileRoot, FromGeneric: *fromGeneric}
-	var result projectinstall.ProjectActionResult
-	var err error
-	if *approve != "" {
-		result, err = projectinstall.ApplyApprovedMigration(*repo, opts, *approve)
-	} else {
-		result, err = projectinstall.BuildProjectMigrationDryRun(*repo, opts)
-	}
-	if err != nil {
-		return emitError(stderr, "project_migration_failed", err.Error(), "migrate-project-kas", *jsonOutput, "")
-	}
-	out := stdout
-	code := 0
-	if !result.OK {
-		out = stderr
-		code = 2
-	}
-	if *jsonOutput {
-		_ = writeJSON(out, result)
-	} else {
-		fmt.Fprintln(out, projectinstall.RenderHumanProjectAction(result))
-	}
-	return code
-}
-
 func normalizeInstallArgs(argv []string) []string {
 	rewritten := []string{}
 	positionals := []string{}
@@ -1500,11 +1227,9 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Available commands:")
 	fmt.Fprintln(w, "  list     List available KAS skill packs")
-	fmt.Fprintln(w, "  install  Plan KAS install or project-suite migration")
-	fmt.Fprintln(w, "  update   Classify project KAS updates, or update agent-instructions")
+	fmt.Fprintln(w, "  install  Plan KAS install or project-suite setup")
 	fmt.Fprintln(w, "  doctor   Verify a profile-scoped KAS install")
 	fmt.Fprintln(w, "  repair   Plan project-suite repair without writing")
-	fmt.Fprintln(w, "  migrate-profile-skills  Classify copied profile skills without writing")
 	fmt.Fprintln(w, "  toolchain  Generate and validate ignored .kkachi/toolchain.yaml")
 	fmt.Fprintln(w, "  workflow-create   Plan custom task-DAG workflow candidates without writing")
 	fmt.Fprintln(w, "  workflow-promote  Propose run-local workflow promotion without writing")
@@ -1514,7 +1239,7 @@ func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, "  version  Print CLI version information")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Compatibility commands:")
-	fmt.Fprintln(w, "  sync-project-kas, install-project-kas, repair-project-kas, migrate-project-kas")
+	fmt.Fprintln(w, "  sync-project-kas, install-project-kas, repair-project-kas")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Use \"kkachi-agent-skills <command> --help\" for command options.")
 }
@@ -1582,7 +1307,7 @@ func emitError(w io.Writer, code string, message string, command string, jsonOut
 	if jsonOutput {
 		_ = writeJSON(w, payload)
 	} else {
-		fmt.Fprintln(w, "Error: "+message)
+		fmt.Fprintln(w, "Error: ["+code+"] "+message)
 	}
 	return 2
 }

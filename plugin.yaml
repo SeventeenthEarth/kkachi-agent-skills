@@ -1,0 +1,8 @@
+name: kkachi-agent-skills
+version: 0.1.0
+description: >-
+  Kkachi Agent Skills plugin package: canonical KAS base skills, guide skills,
+  and role manifests for plugin-qualified loading.
+kind: standalone
+provides_skills:
+  - kkachi-agent-skills

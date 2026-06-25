@@ -327,7 +327,7 @@ For project-specific suite installs, the target path must use:
 skills/<project>/<project>-<phase-or-skill>/SKILL.md
 ```
 
-This extends the profile-scoped manifest vocabulary. The current CLI implements KASPROJ-002 read-only project-suite dry-run planning, KASPROJ-003 approval-hash-bound project-suite install, and KASPROJ-004 project-suite doctor/repair/migrate. It still must not be described as performing semantic-port completion, operational rollout, generic fallback, or KAB runtime activation.
+This extends the profile-scoped manifest vocabulary. The current CLI implements KASPROJ-002 read-only project-suite dry-run planning, KASPROJ-003 approval-hash-bound project-suite install, and KASPROJ-004 project-suite doctor/repair. It still must not be described as performing semantic-port completion, operational rollout, generic fallback, or KAB runtime activation.
 
 ## 5. First-run operator path
 
@@ -1027,49 +1027,40 @@ Approved install form:
 kkachi-agent-skills install-project-kas --profile <profile> --project <project> --suite-role <role> --source-pack kas-default-project-suite --approve dry-run:<hash> [--json]
 ```
 
-Approved install recomputes the current dry-run, compares the approval evidence to the recomputed `plan_hash`, and writes nothing unless the required `--suite-role` is present, the hash matches, and the plan has no conflicts/errors. It preflights all targets and source checksums, rejects missing/unknown roles, unsafe/path-traversing/symlink-escaping/ambiguous/duplicate/local-modified targets, backs up trusted replacements under `.kas/backups/<install_id>/`, atomically writes project skill files, verifies checksums, and writes `.kas/skill-pack-manifest.json` last. Output includes approval evidence, `install_id`, `manifest_path`, backup/recovery evidence, changed path counts/actions, and a next action to run project-suite doctor.
+Approved install recomputes the current dry-run, compares the approval evidence to the recomputed `plan_hash`, and writes nothing unless the required `--suite-role` is present, the hash matches, and the plan has no conflicts/errors. It preflights all targets and source checksums, rejects missing/unknown roles, unsafe/path-traversing/symlink-escaping/ambiguous/duplicate/local-modified targets, backs up trusted replacements under `.kas/backups/<install_id>/`, atomically writes selected project skill files plus canonical wrapper/overlay/reference composition files, verifies checksums, and writes `.kas/skill-pack-manifest.json` last. Output includes approval evidence, `install_id`, `manifest_path`, backup/recovery evidence, changed path counts/actions, `composition_files[]` evidence, and a next action to run project-suite doctor.
 
-KASPROJ-004 implemented project-suite doctor/repair/migrate forms:
+KASPROJ-004 implemented project-suite doctor/repair forms:
 
 ```bash
 kkachi-agent-skills doctor --profile <profile> --project <project> --project-suite [--json]
 kkachi-agent-skills repair-project-kas --profile <profile> --project <project> --dry-run [--json]
 kkachi-agent-skills repair-project-kas --profile <profile> --project <project> --approve dry-run:<hash> [--json]
-kkachi-agent-skills migrate-project-kas --profile <profile> --project <project> --from-generic --dry-run [--json]
-kkachi-agent-skills migrate-project-kas --profile <profile> --project <project> --from-generic --approve dry-run:<hash> [--json]
 ```
+
+`migrate-project-kas` is intentionally not a public compatibility command. Project-specific semantic porting or overlay refresh is review/skill-mediated, not a deterministic CLI migration.
+
+`repair-project-kas` defaults `source_pack` to `kas-default-project-suite`; optional explicit `--source-pack` values fail closed when unknown.
 
 TOKEN-004 public lifecycle forms wrap the same dry-run planners:
 
 ```bash
-kkachi-agent-skills install --profile <profile> --project <project> --dry-run [--json]
-kkachi-agent-skills install --profile <profile> --project <project> --from-generic --dry-run [--json]
+kkachi-agent-skills install --profile <profile> --project <project> --suite-role <role> --dry-run [--json]
+kkachi-agent-skills install --profile <profile> --project <project> --suite-role <role> --from-generic --dry-run [--json]
 kkachi-agent-skills repair --profile <profile> --project <project> --dry-run [--json]
 kkachi-agent-skills uninstall --profile <profile> --project <project> --dry-run [--json]
 ```
 
 In TOKEN-004, these public project forms were read-only. `install --project`
-used the project-suite dry-run planner, `install --from-generic` used the
-generic-to-project migration dry-run planner, and `repair` used the project
-repair dry-run planner. Public write/apply forms failed closed before TOKEN-005.
-The old `install-project-kas`, `repair-project-kas`, and `migrate-project-kas`
-commands remain compatibility surfaces for existing tests and scripts.
+used the role-aware project-suite dry-run planner and planned selected
+project-prefixed phase skills plus deterministic wrapper/overlay/reference
+composition files, `install --from-generic` planned explicit generic-to-project
+setup without semantic merge, and `repair` used the project repair dry-run
+planner. Public write/apply forms failed closed before TOKEN-005.
+The old `install-project-kas` and `repair-project-kas` commands remain compatibility surfaces for existing tests and scripts; `migrate-project-kas` is removed.
 
-POLPR-006 adds the `AGENTS.md` / `CLAUDE.md` repo-local lifecycle as a
-separate public update subcommand:
+POLPR-006 previously defined an `update agent-instructions` repo-local lifecycle surface, but the public `update` command is removed under SKILL-005 to avoid ambiguous update semantics. Repo-local agent-instruction refresh must be reintroduced only through a future non-ambiguous command name or skill workflow with its own accepted SOT/update.
 
-```bash
-kkachi-agent-skills update agent-instructions --repo-path <path> --source-repo <kas-source-repo> --dry-run --json
-kkachi-agent-skills update agent-instructions --repo-path <path> --source-repo <kas-source-repo> --apply dry-run:sha256:<hash> --json
-```
-
-`--source-repo` identifies the KAS source checkout that contains
-`templates/agent-instructions/*.tmpl`. It defaults to the current working
-directory for source-repo dogfood runs, so installed-binary or out-of-tree
-operator flows must pass the source repo explicitly until a later task adds an
-embedded-template or installed-template locator.
-
-This surface manages repository-root instruction files only. It is distinct
+The former surface managed repository-root instruction files only. It was distinct
 from profile-local skill installation and must not read profile manifests,
 write Hermes profile skills, activate profiles, mutate KAH state, control KAB
 runtime sessions, or change auth/token/provider/gateway/model settings.
@@ -1105,18 +1096,15 @@ activate profiles. Removal and backup/evidence writing are TOKEN-005 behavior.
 
 TOKEN-005 public lifecycle write forms use `--apply dry-run:sha256:<hash>`.
 `install --project --apply`, `install --from-generic --apply`,
-`repair --apply`, `update --apply`, and `uninstall --apply` recompute the
-current dry-run evidence and fail closed before mutation when the token is
-malformed, mismatched, stale, or paired with `--dry-run`. `update --apply`
-writes only hash-bound auto-copy candidates and keeps semantic merge, removed
-upstream, new upstream, and conflict classifications blocked. `uninstall
---apply` removes only manifest-tracked project-suite files and requires
-`--backup-vault-root <abs-path>`; the backup root must be absolute, outside the
-target profile, symlink-safe, and writable/verifiable. Backup files, manifest
-snapshot, skipped local-only files, checksums, approval evidence, and uninstall
-evidence are written under the explicit vault root before any removal, and the
-profile manifest is updated last while preserving unrelated `installs` and
-`project_suites`.
+`repair --apply`, and `uninstall --apply` recompute the current dry-run evidence
+and fail closed before mutation when the token is malformed, mismatched, stale,
+or paired with `--dry-run`. `uninstall --apply` removes only manifest-tracked
+project-suite files and requires `--backup-vault-root <abs-path>`; the backup
+root must be absolute, outside the target profile, symlink-safe, and
+writable/verifiable. Backup files, manifest snapshot, skipped local-only files,
+checksums, approval evidence, and uninstall evidence are written under the
+explicit vault root before any removal, and the profile manifest is updated last
+while preserving unrelated `installs` and `project_suites`.
 
 KASROLE-002 makes role-aware project install explicit on the public lifecycle
 surface:
@@ -1143,7 +1131,7 @@ Contractual rules for project commands:
 
 - dry-run planner behavior belongs to KASPROJ-002 and performs no profile writes;
 - approved project-specific install belongs to KASPROJ-003 and requires approval evidence matching the recomputed dry-run plan hash;
-- doctor/repair/migrate behavior belongs to KASPROJ-004 and uses the severity semantics from the project-specific install SOT;
+- doctor/repair behavior belongs to KASPROJ-004 and uses the severity semantics from the project-specific install SOT; public migrate behavior is removed;
 - KASPROJ-005 refines doctor semantics so project-local semantic tailoring is a warning condition, not a failed source/template checksum comparison;
 - repair and migration are dry-run-first, approval-gated, backup-aware, and must not silently convert generic skills into project-tailored skills;
 - all project-suite writes must use `target_path` values under `skills/<project>/<project>-<phase-or-skill>/SKILL.md`;

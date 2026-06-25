@@ -17,6 +17,7 @@ guides:
   - kas-project-overlay-guide
   - kas-overlay-compose-guide
   - kas-overlay-doctor-guide
+  - kkachi-agent-skills-overlay-refresh
 skills:
   - kkachi-orchestrate
   - kkachi-task-contract

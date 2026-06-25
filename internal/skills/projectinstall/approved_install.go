@@ -179,8 +179,8 @@ func preflightApprovedInstall(dryRun Result, relativeBackupRoot string, sourceRe
 	if dryRun.RoleRegistry.Path != RoleRegistryPath || dryRun.RoleRegistry.Version != RoleRegistryVersion || !strings.HasPrefix(dryRun.RoleRegistry.Checksum, "sha256:") {
 		return fmt.Errorf("malformed role_registry evidence")
 	}
-	if len(dryRun.SelectedSkills) != len(dryRun.PlannedSkills) {
-		return fmt.Errorf("selected skill evidence does not match planned skills")
+	if len(dryRun.SelectedSkills) == 0 {
+		return fmt.Errorf("selected plugin skill evidence is missing")
 	}
 	seenSkills := map[string]bool{}
 	seenPaths := map[string]bool{}
@@ -282,7 +282,13 @@ func renderedContentForEntry(result Result, entry ChangedPath, sourceRepo string
 		}
 		return plannedSkillContent(sourceRepo, pack, skill.SourceSkill, skill.InstalledSkill)
 	}
-	return nil, fmt.Errorf("no planned skill maps target path %s", entry.Path)
+	for _, component := range result.CompositionFiles {
+		if component.TargetPath != entry.Path {
+			continue
+		}
+		return []byte(projectCompositionContent(result.Project.ID, component.Kind)), nil
+	}
+	return nil, fmt.Errorf("no planned skill or composition file maps target path %s", entry.Path)
 }
 
 func sourcePackForPlannedSkill(sourceRepo string, packID string) (discovery.SourcePack, bool) {
@@ -341,6 +347,7 @@ func buildApprovedResult(dryRun Result, evidenceRef string, approvedHash string,
 		Summary:          Summary{TotalSkills: dryRun.Summary.TotalSkills, TotalFiles: counts["create"] + counts["update"] + counts["manifest_update"], SelectedSkills: len(dryRun.SelectedSkills), ExcludedSkills: len(dryRun.ExcludedSkills), CountsByAction: counts, ConflictCount: counts["conflict"], DiagnosticCount: len(diagnostics)},
 		PlannedManifest:  dryRun.PlannedManifest,
 		PlannedSkills:    dryRun.PlannedSkills,
+		CompositionFiles: dryRun.CompositionFiles,
 		ChangedPaths:     changed,
 		BackupPlan:       dryRun.BackupPlan,
 		Checksums:        dryRun.Checksums,

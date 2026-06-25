@@ -10,33 +10,35 @@ const skillPluginWrapperOverlaySOT = "docs/sot/skill-plugin-wrapper-overlay-cont
 func TestSKILLPluginWrapperOverlaySOTDefinesArchitecture(t *testing.T) {
 	requireContainsAll(t, skillPluginWrapperOverlaySOT, []string{
 		"Status: accepted SOT for `SKILL` epic",
-		"SKILL-002 implements the plugin package, source role manifests, and dry-run update readback only",
+		"SKILL-002 implements the plugin package and source role manifests without any public `update` or `migrate` CLI surface",
 		"KAS plugin base",
 		"Color role manifests",
-		"Thin profile wrappers",
+		"Thin project wrappers",
 		"Project overlays",
 		"Guide skills",
-		"Plugin update lifecycle",
-		"Doctor and migration",
+		"No CLI update/migrate lifecycle",
+		"Doctor and overlay refresh",
 		"plugin-qualified names such as `kkachi-agent-skills:plan`",
 		"Short names such as `kkachi-agent-skills:plan` are in-plugin canonicalization to registered base IDs such as `kkachi-plan`",
-		"kkachi-agent-skills update plugin --dry-run",
-		"`namespace`, `current_version`, `current_source`, `proposed_version`, `proposed_source`, `planned_changed_paths`, `role_manifest_impact`, `guide_skill_impact`, `no_write_evidence`, and `suggested_doctor_command`",
-		"`suggested_doctor_command` is a non-executing recommendation string only",
-		"`diagnostics` is intentionally empty until SKILL-004",
+		"must not expose public `update` or `migrate` commands",
+		"`kkachi-agent-skills-overlay-refresh` skill",
+		"mark the temporary legacy archive with `metadata.kas.kind: project_overlay_legacy`",
+		"after successful refresh and review, remove `skills/<project>/<project>-overlay-legacy/`",
 		"kkachi-agent-skills doctor --plugin --repo <kas-repo> --json",
 		"`--repo` is required for plugin doctor mode",
 		"`doctor_mode_ambiguous`",
-		"The explicit scoped surface is `update project-suite ...`; the bare `update ...` command remains a backward-compatible legacy alias",
-		"KAH has no implementation responsibility for `update plugin`",
+		"The `kkachi-agent-skills` CLI must not expose public `update` or `migrate` commands",
+		"KAH has no implementation responsibility for overlay refresh",
 		"Profile-local full KAS base copy present | warning during migration, error after cutover",
 	})
 }
 
 func TestSKILLProjectOverlayContractDefinesLayoutAndMergePolicy(t *testing.T) {
 	requireContainsAll(t, skillPluginWrapperOverlaySOT, []string{
-		"skills/<project>/kas-overlays/<project>-<role>-<base-skill>-overlay/SKILL.md",
-		"overlay_for: kkachi-agent-skills:plan",
+		"skills/<project>/<project>-overlay/SKILL.md",
+		"skills/<project>/<project>-overlay/references/*.md",
+		"applies_to:",
+		"kkachi-agent-skills:plan",
 		"merge_mode: additive_constraints",
 		"replacement_candidate",
 		"replacement_approved",
@@ -58,14 +60,15 @@ func TestSKILLDocsRegistrationAndRoadmap(t *testing.T) {
 	requireContainsAll(t, "docs/roadmap.md", []string{
 		"### EPIC: SKILL",
 		"| SKILL-001 | Accept plugin-wrapper-overlay SOT | Completed |",
-		"| SKILL-002 | Implement Hermes plugin package, role manifests, and plugin update surface | In Review |",
+		"| SKILL-002 | Implement Hermes plugin package and role manifests without update/migrate CLI | In Review |",
 		"| SKILL-004 | Implement read-only SKILL doctor diagnostics | In Review |",
-		"`doctor --plugin --repo <kas-repo>` distinguishes `plugin_base`, `color_wrapper`, `project_overlay`, `legacy_copied_base_suite`, `personal_skill`, and `unknown_source`",
-		"`update project-suite` is the explicit scoped project-suite lifecycle alias",
+		"`doctor --plugin --repo <kkachi-agent-skills-repo>` distinguishes `plugin_base`, `project_wrapper`, `project_overlay`, `project_overlay_legacy`, `legacy_copied_base_suite`, `personal_skill`, and `unknown_source`",
+		"The public CLI must not expose `update` or `migrate` commands",
 		"Do not mark Completed until color review and final KAH gate pass",
-		"plugin update readiness, ambiguous update command surfaces, KAH-boundary violations",
-		"| SKILL-006 | Pilot one approved profile/project migration | Planned |",
-		"no profile mutation or cleanup",
+		"public update/migrate command exposure, KAH-boundary violations",
+		"| SKILL-006 | Pilot one approved profile/project overlay refresh | Completed |",
+		"single project overlay layout",
+		"legacy archive inactive/readback then removed",
 	})
 }
 
@@ -78,10 +81,10 @@ func TestSKILL003WrapperTemplatesAndGuidesAreThinAndConcrete(t *testing.T) {
 	}
 	for _, wrapper := range wrappers {
 		requireContainsAll(t, wrapper, []string{
-			"kind: color_wrapper",
+			"kind: project_wrapper",
 			"role_manifest: kkachi-agent-skills:roles/",
 			"plugin_namespace: kkachi-agent-skills",
-			"overlay_root: skills/<project>/kas-overlays",
+			"overlay_skill:",
 			`skill_view("kkachi-agent-skills:<base>")`,
 			"Allowed base subset:",
 			"stop, report",
@@ -98,9 +101,11 @@ func TestSKILL003WrapperTemplatesAndGuidesAreThinAndConcrete(t *testing.T) {
 	}
 
 	requireContainsAll(t, "skills/kas-project-overlay-guide/SKILL.md", []string{
-		"skills/<project>/kas-overlays/<project>-<role>-<base-skill>-overlay/SKILL.md",
-		"overlay_for: kkachi-agent-skills:plan",
-		"overlay_for: kkachi-plan",
+		"skills/<project>/<project>-overlay/SKILL.md",
+		"skills/<project>/<project>-overlay/references/*.md",
+		"applies_to:",
+		"kkachi-agent-skills:plan",
+		"kkachi-plan",
 		"Stop and request review",
 	})
 	requireContainsAll(t, "skills/kas-overlay-compose-guide/SKILL.md", []string{
@@ -116,8 +121,16 @@ func TestSKILL003WrapperTemplatesAndGuidesAreThinAndConcrete(t *testing.T) {
 		"SKILL-004 owns the",
 		"implemented read-only doctor diagnostics",
 		"required plugin base skill missing",
-		"overlay_for is `kkachi-plan`",
+		"applies_to contains `kkachi-plan`",
 		"profile-local full KAS base copy present",
+	})
+	requireContainsAll(t, "skills/kkachi-agent-skills-overlay-refresh/SKILL.md", []string{
+		"name: kkachi-agent-skills-overlay-refresh",
+		"<project>-overlay-legacy",
+		"kind: project_overlay_legacy",
+		"active: false",
+		"remove `<project>-overlay-legacy`",
+		"not a CLI migration",
 	})
 }
 
@@ -127,6 +140,7 @@ func TestSKILL003GuidePackageConventionAndReadbackContract(t *testing.T) {
 		"kas-project-overlay-guide",
 		"kas-overlay-compose-guide",
 		"kas-overlay-doctor-guide",
+		"kkachi-agent-skills-overlay-refresh",
 	})
 	requireContainsAll(t, skillPluginWrapperOverlaySOT, []string{
 		"source package convention stores guide bodies at `skills/<guide-id>/SKILL.md`",
@@ -153,7 +167,7 @@ func TestSKILL004DoctorCommandContract(t *testing.T) {
 		"without writing",
 		"incompatible with `--workflow-graph` and `--project-suite`",
 		"mixed doctor modes fail closed with `doctor_mode_ambiguous`",
-		"`plugin_base`, `color_wrapper`, `project_overlay`, `legacy_copied_base_suite`, `personal_skill`, and `unknown_source`",
+		"`plugin_base`, `project_wrapper`, `project_overlay`, `legacy_copied_base_suite`, `personal_skill`, and `unknown_source`",
 		"profile-local copied suites are never a fallback",
 	})
 	requireContainsAll(t, "internal/skills/doctor/skill.go", []string{
@@ -168,34 +182,31 @@ func TestSKILL004DoctorCommandContract(t *testing.T) {
 	})
 }
 
-func TestSKILL005MigrationClassifierCommandContract(t *testing.T) {
+func TestSKILL005RemovedUpdateMigrateCommandContract(t *testing.T) {
 	requireContainsAll(t, skillPluginWrapperOverlaySOT, []string{
-		"`kkachi-agent-skills migrate-profile-skills --repo <kas-repo> --profile <profile> --dry-run --json`",
-		"dry-run/report-only",
-		"`bucket`, hash/provenance evidence, semantic extraction packets, diagnostics, `no_write_evidence`, `no_spillover_evidence`, `forbidden_actions`, `owner`, `review_required`, `recovery_hint`, and `next_action`",
-		"Its default profile root is `~/.hermes/profiles/<profile>`",
-		"has no approve/apply/delete/migrate mode",
-		"Missing or ambiguous profile inventory, hashes, KASREL provenance/dependency evidence, ownership boundaries, unreadable skills, or auth/token/gateway/provider/model/runtime content fails closed",
+		"The `kkachi-agent-skills` CLI must not expose public `update` or `migrate` commands",
+		"semantic overlay refresh belongs in the `kkachi-agent-skills-overlay-refresh` skill",
+		"Legacy material is handled through review, doctor evidence",
+		"This SOT does not authorize broad copied-suite cleanup, automatic deletion, CLI migration",
 	})
 	requireContainsAll(t, "docs/roadmap.md", []string{
-		"| SKILL-005 | Implement migration dry-run classifier | In Review |",
-		"`migrate-profile-skills --dry-run --json` classifies existing copied KAS/KAH-like profile skills",
+		"| SKILL-005 | Remove update/migrate CLI and keep legacy handling review-only | In Review |",
+		"Public `update`, `migrate-profile-skills`, and `migrate-project-kas` CLI surfaces are removed",
 		"Do not mark Completed until focused tests, aggregate feasible tests, `git diff --check`, KAH gates, color review/MAR as required, and final KAH gate pass.",
 	})
 	requireContainsAll(t, "internal/skills/cli/cli.go", []string{
-		"migrate-profile-skills",
-		"migration_classifier_requires_dry_run",
-		"migration_classifier_mode_ambiguous",
+		"only the list, install, doctor, repair, toolchain",
+		"sync-project-kas, install-project-kas, repair-project-kas",
 	})
-	requireContainsAll(t, "internal/skills/migrationclassifier/migrationclassifier.go", []string{
-		"profile_skill_migration_classifier",
-		"base_identical",
-		"base_with_local_delta",
-		"project_overlay_candidate",
-		"role_wrapper_candidate",
-		"unknown_personal_skill",
-		"kah_companion_surface",
-		"no_write_evidence",
-		"no_spillover_evidence",
-	})
+	cli := readRepoFile(t, "internal/skills/cli/cli.go")
+	for _, forbidden := range []string{
+		"case \"update\"",
+		"case \"migrate-profile-skills\"",
+		"case \"migrate-project-kas\"",
+		"runMigrateProfileSkills",
+	} {
+		if strings.Contains(cli, forbidden) {
+			t.Fatalf("removed CLI surface still present: %s", forbidden)
+		}
+	}
 }
