@@ -11,6 +11,11 @@ backend execution, automated review-by-different-tool transport, KAB plan
 lifecycle, or bridge evidence, KHS must select a KAB backend lane, render the
 backend-specific prompt, call KAB, and preserve KAB runtime evidence.
 
+GAJAE GJC delegated execution is a separate KAS/KAH-planned delegation lane:
+GJC produces candidate design, plan, and implementation artifacts through the
+KAH wrapper while KAB remains non-primary unless a later approved task
+explicitly selects KAB runtime/session control.
+
 Maturity note: KAS v0.1.9 carries the current release-default version on top of the v0.1.8 release-target snapshot, the v0.1.7 TOLMR local toolchain metadata, stage policy, and rollout-readiness evidence, the v0.1.6 STRICT workflow evidence alignment and MARTL MAR task-loop execution surfaces, the v0.1.5 MAR role-first multi-agent review lane, and the v0.1.4 WFLOW task-DAG workflow release lane. It remains an
 early skill/process pack rather than a final polished product, but KAH graph,
 configurable-feedback, and workflow catalog promotion substrates are capability-evidenced. Real Hermes/Kkachi
