@@ -9,6 +9,7 @@ metadata:
     role_manifest: kkachi-agent-skills:roles/red.yaml
     plugin_namespace: kkachi-agent-skills
     overlay_skill: "{{ project }}-overlay"
+    refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh
     base_copy_policy: forbidden_by_default
 ---
 
@@ -46,6 +47,14 @@ skill_view("kkachi-agent-skills:kas-project-overlay-guide")
 skill_view("kkachi-agent-skills:kas-overlay-compose-guide")
 skill_view("kkachi-agent-skills:kas-overlay-doctor-guide")
 ```
+
+For source-built KAS overlay refresh of this project, also load:
+
+```text
+skill_view("kkachi-agent-skills:kkachi-agent-skills-overlay-refresh")
+```
+
+Treat refresh as LLM-assisted semantic porting, not CLI migration.
 
 If the plugin base, role manifest, or project overlay is missing: stop, report
 the exact missing surface, do not use profile-local copied skills as fallback,

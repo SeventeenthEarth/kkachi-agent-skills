@@ -23,6 +23,18 @@ Overlay refresh is a profile-local/project-local operation. During this workflow
 
 Do **not** edit the official `kkachi-agent-skills` plugin/base skills as part of an overlay refresh. If a finding looks generally reusable for the plugin, record it as a separate promotion candidate and route it through the normal `kkachi-agent-skills` review/implementation gates; do not silently patch plugin skills while refreshing a project overlay.
 
+## Turnkey role-suite scope default
+
+When 주군 asks for a project overlay refresh without naming a single role-only target, refresh the full project role suite together:
+
+- Blue, Red, Orange, and Gray are included by default;
+- Teal is included only when the target project/team has a Teal lane and the task has UI/UX scope;
+- a Blue/Hwangchung-only refresh is incomplete unless 주군 explicitly requested Blue only;
+- every included role/profile gets its own role-local wrapper/overlay refresh and verification;
+- do not merge other roles' authority into one profile overlay. The fan-out is across profiles, while each overlay remains scoped to its registered role.
+
+Before writing, identify the role/profile matrix and run dry-run or equivalent inspection for every included role. If any role cannot be verified, report the suite refresh as blocked or partial instead of silently completing the available role.
+
 ## When to Use
 
 Use this skill when:
@@ -81,6 +93,8 @@ If the original overlay frontmatter contains project metadata, preserve it below
 
 1. **Preflight and scope**
    - Confirm exact `<profile>` and `<project>`.
+   - Confirm whether this is an explicitly single-role refresh or the default Blue/Red/Orange/Gray role-suite refresh; include Teal only for Teal + UI/UX scope.
+   - Build the role/profile matrix before editing any overlay.
    - Read the current active overlay and references.
    - Read current wrapper, plugin guide, and SOT basis.
    - Record that this is an LLM-assisted overlay refresh, not a CLI update or migration.
@@ -136,6 +150,7 @@ Report in Korean to 주군 with:
 - `Ported`: concise list of legacy rules kept.
 - `Rejected`: copied/stale/unsafe legacy content not ported.
 - `Verification`: doctor/tests/diff commands and results.
+- `Role matrix`: per included role/profile status, skipped/not-applicable reason, and whether wrapper/overlay/doctor evidence exists.
 - `Risks`: uncertainty, manual review needs, or approval gates.
 
 ## Common Pitfalls
@@ -145,10 +160,12 @@ Report in Korean to 주군 with:
 3. **Copying base text forward.** The refreshed overlay should contain project-specific constraints, not a fork of plugin base skills.
 4. **Using short aliases in durable docs.** Use `kkachi-agent-skills` in documentation and skill names; reserve short forms for casual conversation only.
 5. **Deleting evidence too early.** Keep the temporary legacy archive until diff review confirms required project knowledge was ported.
+6. **Completing only Blue by accident.** Unless 주군 explicitly requested one role, refresh Blue/Red/Orange/Gray together and include Teal only for Teal + UI/UX scope.
 
 ## Verification Checklist
 
 - [ ] Exact profile and project were confirmed.
+- [ ] Role scope was confirmed: explicit single-role, or default Blue/Red/Orange/Gray suite with Teal decision recorded.
 - [ ] Legacy archive was created with `kind: project_overlay_legacy` and `active: false`.
 - [ ] New active overlay uses canonical `kind: project_overlay` metadata and `applies_to` plugin-qualified targets.
 - [ ] Only durable project-specific content was ported.

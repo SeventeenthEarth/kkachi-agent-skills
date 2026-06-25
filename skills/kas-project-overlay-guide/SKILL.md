@@ -33,6 +33,17 @@ coarse and the reason is reviewed:
 skills/<project>/kas-overlays/<project>-<role>-<phase-or-base>-overlay/SKILL.md
 ```
 
+## Role-suite authoring scope
+
+For project-suite install, update, repair, or refresh requests, default to a turnkey role suite unless 주군 explicitly names a single role-only target:
+
+- Blue, Red, Orange, and Gray are authored/updated/verified together;
+- Teal is added only when the target project/team has a Teal lane and the task has UI/UX scope;
+- each profile receives only its own role-local wrapper/overlay metadata;
+- do not put Red, Orange, Gray, or Teal authority into the Blue overlay, and do not call a Blue-only overlay update a completed project-suite refresh.
+
+The overlay guide describes the shape of one role-local overlay. The install/refresh operator is responsible for fan-out across the complete role/profile matrix and reporting per-role evidence.
+
 ## Valid Frontmatter Example
 
 ```yaml

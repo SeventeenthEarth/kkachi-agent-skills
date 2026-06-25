@@ -223,6 +223,18 @@ For split repos, also verify that sibling project `.kkachi/`, `.kkachi-workflow.
 
 ## KAS install vs project overlay boundary
 
+### Project-suite role fan-out default
+
+When 주군 asks to install, update, repair, or refresh a KAS/KAH project suite and does not explicitly scope the work to one named role, treat the operation as a turnkey role-suite update:
+
+- apply and verify Blue, Red, Orange, and Gray together;
+- include Teal only when the target project/team has a Teal lane and the task has UI/UX scope;
+- do not report a Blue/Hwangchung-only install or refresh as complete for the project suite unless 주군 explicitly requested a Blue-only operation;
+- run dry-run/plan output first for every included role/profile, then apply only after the whole role set matches intent;
+- report the result as a role matrix with per-role profile, wrapper, overlay, doctor/verification result, and any skipped/not-applicable reason.
+
+The per-profile installed layout remains role-local: each profile receives only its own wrapper/overlay and must not expand one overlay beyond that profile's registered role. The turnkey requirement is an orchestration scope rule, not permission to put Red/Orange/Gray authority into the Blue profile.
+
 When 주군 asks to apply or update KAS for a specific project, treat project-specific KAS/KAH as isolated per repo. Do not reuse a sibling repo's KAS installation/overlay/reference, `.kkachi` state, workflow graph, docs map, CodeGraph evidence, or test-command policy when language, layout, roadmap IDs, test commands, or authority boundaries differ. Duplication is acceptable and preferred over cross-repo bleed-through.
 
 For split repositories that are operated independently, isolation is not satisfied by only creating one thin umbrella skill. Create or verify a complete project-specific operational KAS suite that covers the recurring phase classes for that repo (task contract, backend select, phase state, prompt compose, plan, implement, ask/blockers, review, feedback, verify, docs update, final verify, improvement capture, and any repo-specific bootstrap/conformance lane). If only the umbrella exists, report it as an incomplete bootstrap, not as KAS installation complete.
@@ -278,6 +290,7 @@ Report to master in Korean:
 - KAB (bridge+plugins): ✅ 설치됨 / ❌ 미설치 (bridge/opencode/codex 빌드 상태 포함)
 - 프로젝트 적용: KAH project init 실행 준비됨 / 추가 정보 필요
 - KAS KAB adoption stage: Stage 1 / Stage 2 / Stage 3 선택됨 또는 변경 필요
+- Project-suite role matrix: Blue / Red / Orange / Gray 적용·검증 상태, Teal 포함/제외 사유
 
 다음 단계:
 - [구체적인 다음 작업]

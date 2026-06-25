@@ -40,6 +40,9 @@ func TestSKILLProjectOverlayContractDefinesLayoutAndMergePolicy(t *testing.T) {
 		"applies_to:",
 		"kkachi-agent-skills:plan",
 		"merge_mode: additive_constraints",
+		"refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh",
+		"generated wrappers must not hard-code Blue metadata",
+		"role-aware `applies_to` lists that match the selected suite role subset",
 		"replacement_candidate",
 		"replacement_approved",
 		"If an overlay conflicts with plugin base safety, role authority, or a current SOT, the agent must stop",
@@ -85,7 +88,10 @@ func TestSKILL003WrapperTemplatesAndGuidesAreThinAndConcrete(t *testing.T) {
 			"role_manifest: kkachi-agent-skills:roles/",
 			"plugin_namespace: kkachi-agent-skills",
 			"overlay_skill:",
+			"refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh",
 			`skill_view("kkachi-agent-skills:<base>")`,
+			`skill_view("kkachi-agent-skills:kkachi-agent-skills-overlay-refresh")`,
+			"LLM-assisted semantic porting, not CLI migration",
 			"Allowed base subset:",
 			"stop, report",
 			"do not use profile-local copied skills as fallback",
@@ -95,7 +101,7 @@ func TestSKILL003WrapperTemplatesAndGuidesAreThinAndConcrete(t *testing.T) {
 		if strings.Count(content, "# ") > 1 {
 			t.Fatalf("%s looks like a copied base body, heading count too high", wrapper)
 		}
-		if len(content) > 2200 {
+		if len(content) > 2400 {
 			t.Fatalf("%s is too large for a thin wrapper template: %d bytes", wrapper, len(content))
 		}
 	}

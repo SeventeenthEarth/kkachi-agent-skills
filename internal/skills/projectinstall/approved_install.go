@@ -286,7 +286,7 @@ func renderedContentForEntry(result Result, entry ChangedPath, sourceRepo string
 		if component.TargetPath != entry.Path {
 			continue
 		}
-		return []byte(projectCompositionContent(result.Project.ID, component.Kind)), nil
+		return []byte(projectCompositionContent(result.Project.ID, component.Kind, projectSuiteRole{ID: result.SuiteRole, DisplayLabel: result.RoleLabel}, result.SelectedSkills)), nil
 	}
 	return nil, fmt.Errorf("no planned skill or composition file maps target path %s", entry.Path)
 }

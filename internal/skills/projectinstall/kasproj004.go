@@ -864,7 +864,7 @@ func planRepairActions(result *ProjectActionResult, sourceRepo string, profileRo
 			}
 		}
 	}
-	composition, compositionChanged, compositionActions, compositionBackups, compositionManifestNeeds := planRepairCompositionFiles(profileRoot, project, info)
+	composition, compositionChanged, compositionActions, compositionBackups, compositionManifestNeeds := planRepairCompositionFiles(profileRoot, project, projectSuiteRole{ID: result.SuiteRole, DisplayLabel: result.RoleLabel}, result.SelectedSkills, info)
 	result.CompositionFiles = composition
 	result.ChangedPaths = append(result.ChangedPaths, compositionChanged...)
 	for _, changed := range compositionChanged {
@@ -936,14 +936,14 @@ func manifestRoleNeedsRepair(result *ProjectActionResult, info projectSuiteManif
 	return info.Suite["suite_role"] != result.SuiteRole || info.Suite["suite_mode"] != result.SuiteMode
 }
 
-func planRepairCompositionFiles(profileRoot string, project string, info projectSuiteManifestInfo) ([]PlannedCompositionFile, []ChangedPath, []PlannedAction, []BackupEntry, bool) {
+func planRepairCompositionFiles(profileRoot string, project string, role projectSuiteRole, selected []RoleSkillEvidence, info projectSuiteManifestInfo) ([]PlannedCompositionFile, []ChangedPath, []PlannedAction, []BackupEntry, bool) {
 	plans := []PlannedCompositionFile{}
 	changed := []ChangedPath{}
 	actions := []PlannedAction{}
 	backups := []BackupEntry{}
 	manifestNeeds := false
 	for _, spec := range projectCompositionSpecs(project) {
-		content := []byte(projectCompositionContent(project, spec.Kind))
+		content := []byte(projectCompositionContent(project, spec.Kind, role, selected))
 		newSHA := sha256Bytes(content)
 		record := info.Records[spec.TargetPath]
 		checksum := newSHA
@@ -1435,7 +1435,7 @@ func preflightProjectAction(dryRun ProjectActionResult, _ string) error {
 func renderedContentForProjectAction(result ProjectActionResult, entry ChangedPath) ([]byte, error) {
 	for _, component := range result.CompositionFiles {
 		if component.TargetPath == entry.Path {
-			return []byte(projectCompositionContent(result.Project.ID, component.Kind)), nil
+			return []byte(projectCompositionContent(result.Project.ID, component.Kind, projectSuiteRole{ID: result.SuiteRole, DisplayLabel: result.RoleLabel}, result.SelectedSkills)), nil
 		}
 	}
 	for _, skill := range result.PlannedSkills {

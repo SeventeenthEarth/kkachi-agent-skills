@@ -269,7 +269,7 @@ func BuildDryRun(repo string, opts Options) (Result, error) {
 		result.Conflicts = append(result.Conflicts, c)
 		result.Diagnostics = append(result.Diagnostics, discovery.Diagnostic{Level: "error", Code: c.Condition, Message: c.Message})
 	}
-	composition, componentChanged, componentConflicts, componentBackups := planProjectCompositionFiles(profileRoot, opts.Project, trust)
+	composition, componentChanged, componentConflicts, componentBackups := planProjectCompositionFiles(profileRoot, opts.Project, role, selected, trust)
 	result.PlannedSkills = []PlannedSkill{}
 	result.CompositionFiles = composition
 	result.ChangedPaths = append(result.ChangedPaths, componentChanged...)
@@ -344,13 +344,13 @@ func baseResult(sourceRepo string, profileRoot string, opts Options) Result {
 	}
 }
 
-func planProjectCompositionFiles(profileRoot string, project string, trust map[string]manifestSkillRecord) ([]PlannedCompositionFile, []ChangedPath, []Conflict, []BackupEntry) {
+func planProjectCompositionFiles(profileRoot string, project string, role projectSuiteRole, selected []RoleSkillEvidence, trust map[string]manifestSkillRecord) ([]PlannedCompositionFile, []ChangedPath, []Conflict, []BackupEntry) {
 	plans := []PlannedCompositionFile{}
 	changed := []ChangedPath{}
 	conflicts := []Conflict{}
 	backups := []BackupEntry{}
 	for _, spec := range projectCompositionSpecs(project) {
-		content := projectCompositionContent(project, spec.Kind)
+		content := projectCompositionContent(project, spec.Kind, role, selected)
 		newSHA := sha256Bytes([]byte(content))
 		trusted := trust[spec.TargetPath]
 		action, prev, errCode, errMessage := targetAction(profileRoot, spec.TargetPath, newSHA, trusted)
@@ -392,12 +392,12 @@ func projectCompositionSpecs(project string) []projectCompositionSpec {
 	}
 }
 
-func projectCompositionContent(project string, kind string) string {
+func projectCompositionContent(project string, kind string, role projectSuiteRole, selected []RoleSkillEvidence) string {
 	switch kind {
 	case "project_wrapper":
-		return projectWrapperContent(project)
+		return projectWrapperContent(project, role)
 	case "project_overlay":
-		return projectOverlayContent(project)
+		return projectOverlayContent(project, role, selected)
 	case "project_overlay_reference":
 		return projectOverlayReferenceContent(project)
 	default:
@@ -405,7 +405,53 @@ func projectCompositionContent(project string, kind string) string {
 	}
 }
 
-func projectWrapperContent(project string) string {
+func normalizeProjectSuiteRoleID(roleID string) string {
+	roleID = strings.TrimSpace(roleID)
+	if roleID == "" {
+		return "blue_commander"
+	}
+	return roleID
+}
+
+func projectSuiteRoleManifest(roleID string) string {
+	switch normalizeProjectSuiteRoleID(roleID) {
+	case "blue_commander":
+		return "kkachi-agent-skills:roles/blue.yaml"
+	case "red_reviewer":
+		return "kkachi-agent-skills:roles/red.yaml"
+	case "orange_pm_reviewer":
+		return "kkachi-agent-skills:roles/orange.yaml"
+	case "gray_scribe":
+		return "kkachi-agent-skills:roles/gray.yaml"
+	default:
+		color, _, _ := strings.Cut(normalizeProjectSuiteRoleID(roleID), "_")
+		if color == "" {
+			color = "blue"
+		}
+		return "kkachi-agent-skills:roles/" + color + ".yaml"
+	}
+}
+
+func renderAppliesTo(selected []RoleSkillEvidence) string {
+	if len(selected) == 0 {
+		return "      - kkachi-agent-skills:kkachi-plan"
+	}
+	lines := make([]string, 0, len(selected))
+	for _, skill := range selected {
+		if strings.TrimSpace(skill.SourceSkill) == "" {
+			continue
+		}
+		lines = append(lines, "      - kkachi-agent-skills:"+skill.SourceSkill)
+	}
+	if len(lines) == 0 {
+		return "      - kkachi-agent-skills:kkachi-plan"
+	}
+	return strings.Join(lines, "\n")
+}
+
+func projectWrapperContent(project string, role projectSuiteRole) string {
+	roleID := normalizeProjectSuiteRoleID(role.ID)
+	roleManifest := projectSuiteRoleManifest(roleID)
 	return fmt.Sprintf(`---
 name: %[1]s-wrapper
 description: Thin project wrapper for kkachi-agent-skills plugin skills while working on %[1]s.
@@ -414,10 +460,11 @@ metadata:
   kas:
     kind: project_wrapper
     project: %[1]s
-    role: blue_commander
-    role_manifest: kkachi-agent-skills:roles/blue.yaml
+    role: %[2]s
+    role_manifest: %[3]s
     plugin_namespace: kkachi-agent-skills
     overlay_skill: %[1]s-overlay
+    refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh
     base_copy_policy: forbidden_by_default
 ---
 
@@ -431,14 +478,26 @@ Use this wrapper as the profile-local entry point for %[1]s work.
 2. Load %[1]s-overlay for project-specific constraints and retained local lessons.
 3. Treat copied project-suite skills as stale legacy; the profile-local project suite must contain only this wrapper and the project overlay.
 
+## Source-built overlay refresh
+
+When refreshing this project overlay from a source-built kkachi-agent-skills checkout, also load:
+
+`+"```text"+`
+skill_view("kkachi-agent-skills:kkachi-agent-skills-overlay-refresh")
+`+"```"+`
+
+Treat refresh as LLM-assisted semantic porting, not CLI migration.
+
 ## Boundary
 
 - Scope is %[1]s project guidance for this Hermes profile.
 - This wrapper does not authorize credential/service configuration, backend activation, broad profile cleanup, commit, push, or release.
-`, project)
+`, project, roleID, roleManifest)
 }
 
-func projectOverlayContent(project string) string {
+func projectOverlayContent(project string, role projectSuiteRole, selected []RoleSkillEvidence) string {
+	roleID := normalizeProjectSuiteRoleID(role.ID)
+	appliesTo := renderAppliesTo(selected)
 	return fmt.Sprintf(`---
 name: %[1]s-overlay
 description: Project overlay for kkachi-agent-skills plugin skills while working on %[1]s.
@@ -447,16 +506,12 @@ metadata:
   kas:
     kind: project_overlay
     project: %[1]s
-    role: blue_commander
+    role: %[2]s
     applies_to:
-      - kkachi-agent-skills:kkachi-orchestrate
-      - kkachi-agent-skills:kkachi-plan
-      - kkachi-agent-skills:kkachi-implement
-      - kkachi-agent-skills:kkachi-verify
-      - kkachi-agent-skills:kkachi-final-verify
-      - kkachi-agent-skills:kkachi-multi-agent-review
+%[3]s
     merge_mode: additive_constraints
     base_version: "0.1.0"
+    refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh
     references:
       - references/legacy-delta-extract.md
 ---
@@ -464,6 +519,16 @@ metadata:
 # %[1]s overlay
 
 Use this overlay when applying KAS phase skills to the %[1]s project from this Hermes profile.
+
+## Source-built overlay refresh
+
+When refreshing this project overlay from a source-built kkachi-agent-skills checkout, load the refresh guide before proposing CLI repair/install steps:
+
+`+"```text"+`
+skill_view("kkachi-agent-skills:kkachi-agent-skills-overlay-refresh")
+`+"```"+`
+
+Treat refresh as LLM-assisted semantic porting, not CLI migration.
 
 ## Project boundaries
 
@@ -481,7 +546,7 @@ Use this overlay when applying KAS phase skills to the %[1]s project from this H
 1. Load the relevant plugin KAS base skill first.
 2. Apply this overlay as additive project constraints.
 3. Delete temporary legacy comparison archives after refresh/extraction/verification; keep only non-secret backup evidence when needed.
-`, project)
+`, project, roleID, appliesTo)
 }
 
 func projectOverlayReferenceContent(project string) string {

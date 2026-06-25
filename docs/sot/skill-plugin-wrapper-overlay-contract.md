@@ -122,6 +122,7 @@ metadata:
     role_manifest: kkachi-agent-skills:roles/blue.yaml
     plugin_namespace: kkachi-agent-skills
     overlay_skill: kkachi-agent-helper-overlay
+    refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh
     base_copy_policy: forbidden_by_default
 ---
 ```
@@ -129,11 +130,13 @@ metadata:
 The wrapper must:
 
 1. instruct the agent to load plugin-qualified KAS base skills such as `skill_view("kkachi-agent-skills:plan")` when a matching phase skill is needed;
-2. name the project, role manifest, and allowed role subset;
+2. name the project, the explicit suite role, role manifest, and allowed role subset; generated wrappers must not hard-code Blue metadata when `--suite-role red_reviewer`, `orange_pm_reviewer`, or `gray_scribe` was selected;
 3. point to the single default project overlay and explain that optional `kas-overlays/` entries are advanced extensions only;
-4. fail closed when the plugin base skill, role manifest, or project overlay is unavailable;
-5. avoid embedding or duplicating full base skill bodies;
-6. preserve Kkachi authority boundaries and explicit approval gates.
+4. record `refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh` and a body reminder to load that guide before source-built overlay refresh or CLI repair/install proposals;
+5. fail closed when the plugin base skill, role manifest, or project overlay is unavailable;
+6. avoid embedding or duplicating full base skill bodies;
+7. route source-built project overlay refresh work to `skill_view("kkachi-agent-skills:kkachi-agent-skills-overlay-refresh")` and identify it as LLM-assisted semantic porting, not CLI migration;
+8. preserve Kkachi authority boundaries and explicit approval gates.
 
 Wrappers may contain local phrasing for the profile's Korean name, role, channel, and project, but they must not become base-skill forks. Project-specific detail belongs in the paired project overlay and its `references/` files.
 
@@ -183,6 +186,7 @@ metadata:
       - kkachi-agent-skills:final-verify
     merge_mode: additive_constraints
     base_version: "<kas-version-or-commit>"
+    refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh
     authority_sources:
       - /path/to/project/sot.md
     references:
@@ -197,6 +201,7 @@ metadata:
 
 Allowed overlay content:
 
+- role-aware `applies_to` lists that match the selected suite role subset; Red, Orange, and Gray overlays must not advertise Blue-only implementation, backend-selection, orchestration, or optimization bases unless explicitly selected by their role registry;
 - project authority sources, repo paths, docs maps, SOT freshness rules, and reviewer lanes;
 - project-specific test/verification commands and evidence artifacts;
 - local risk boundaries, fail-closed rules, approval gates, and non-goals;

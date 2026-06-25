@@ -113,12 +113,12 @@ func TestProjectInstallCreatesCanonicalWrapperOverlayAndReference(t *testing.T) 
 	wrapper := string(readFileForTest(t, wrapperPath))
 	overlay := string(readFileForTest(t, overlayPath))
 	ref := string(readFileForTest(t, refPath))
-	for _, want := range []string{"name: kkachi-agent-skills-wrapper", "kind: project_wrapper", "overlay_skill: kkachi-agent-skills-overlay", "base_copy_policy: forbidden_by_default"} {
+	for _, want := range []string{"name: kkachi-agent-skills-wrapper", "kind: project_wrapper", "overlay_skill: kkachi-agent-skills-overlay", "refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh", "base_copy_policy: forbidden_by_default", `skill_view("kkachi-agent-skills:kkachi-agent-skills-overlay-refresh")`, "LLM-assisted semantic porting, not CLI migration"} {
 		if !strings.Contains(wrapper, want) {
 			t.Fatalf("wrapper missing %q:\n%s", want, wrapper)
 		}
 	}
-	for _, want := range []string{"name: kkachi-agent-skills-overlay", "kind: project_overlay", "merge_mode: additive_constraints", "references/legacy-delta-extract.md"} {
+	for _, want := range []string{"name: kkachi-agent-skills-overlay", "kind: project_overlay", "merge_mode: additive_constraints", "refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh", `skill_view("kkachi-agent-skills:kkachi-agent-skills-overlay-refresh")`, "LLM-assisted semantic porting, not CLI migration", "references/legacy-delta-extract.md"} {
 		if !strings.Contains(overlay, want) {
 			t.Fatalf("overlay missing %q:\n%s", want, overlay)
 		}
@@ -154,6 +154,68 @@ func TestProjectInstallCreatesCanonicalWrapperOverlayAndReference(t *testing.T) 
 	assertChangedPathAction(t, repeated, "skills/kkachi-agent-skills/kkachi-agent-skills-wrapper/SKILL.md", "skip")
 	assertChangedPathAction(t, repeated, "skills/kkachi-agent-skills/kkachi-agent-skills-overlay/SKILL.md", "skip")
 	assertChangedPathAction(t, repeated, "skills/kkachi-agent-skills/kkachi-agent-skills-overlay/references/legacy-delta-extract.md", "skip")
+}
+
+func TestProjectInstallRendersRoleAwareWrapperOverlayRefreshHints(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{
+		"kkachi-review":       "---\nname: kkachi-review\n---\n# kkachi-review\n",
+		"kkachi-verify":       "---\nname: kkachi-verify\n---\n# kkachi-verify\n",
+		"kkachi-final-verify": "---\nname: kkachi-final-verify\n---\n# kkachi-final-verify\n",
+		"kkachi-implement":    "---\nname: kkachi-implement\n---\n# kkachi-implement\n",
+	})
+	cases := []struct {
+		role          string
+		manifest      string
+		wantAppliesTo []string
+		forbidden     []string
+	}{
+		{role: "red_reviewer", manifest: "kkachi-agent-skills:roles/red.yaml", wantAppliesTo: []string{"kkachi-agent-skills:kkachi-review", "kkachi-agent-skills:kkachi-verify"}, forbidden: []string{"kkachi-agent-skills:kkachi-implement"}},
+		{role: "orange_pm_reviewer", manifest: "kkachi-agent-skills:roles/orange.yaml", wantAppliesTo: []string{"kkachi-agent-skills:kkachi-review"}, forbidden: []string{"kkachi-agent-skills:kkachi-implement", "kkachi-agent-skills:kkachi-final-verify"}},
+		{role: "gray_scribe", manifest: "kkachi-agent-skills:roles/gray.yaml", wantAppliesTo: []string{"kkachi-agent-skills:kkachi-review", "kkachi-agent-skills:kkachi-final-verify"}, forbidden: []string{"kkachi-agent-skills:kkachi-implement"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.role, func(t *testing.T) {
+			profileRoot := filepath.Join(t.TempDir(), "profile")
+			opts := Options{Profile: "role-test", Project: "sample-project", SuiteRole: tc.role, SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true}
+			dryRun, err := BuildDryRun(repo, opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !dryRun.OK {
+				t.Fatalf("dry-run failed: diagnostics=%+v conflicts=%+v", dryRun.Diagnostics, dryRun.Conflicts)
+			}
+			approved, err := ApplyApprovedInstall(repo, opts, dryRun.ApprovalRequest.EvidenceRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !approved.OK {
+				t.Fatalf("approved install failed: diagnostics=%+v conflicts=%+v", approved.Diagnostics, approved.Conflicts)
+			}
+			wrapper := string(readFileForTest(t, filepath.Join(profileRoot, "skills", "sample-project", "sample-project-wrapper", "SKILL.md")))
+			overlay := string(readFileForTest(t, filepath.Join(profileRoot, "skills", "sample-project", "sample-project-overlay", "SKILL.md")))
+			for _, want := range []string{"role: " + tc.role, "role_manifest: " + tc.manifest, "refresh_skill: kkachi-agent-skills:kkachi-agent-skills-overlay-refresh", `skill_view("kkachi-agent-skills:kkachi-agent-skills-overlay-refresh")`} {
+				if !strings.Contains(wrapper, want) {
+					t.Fatalf("wrapper missing %q:\n%s", want, wrapper)
+				}
+				if !strings.Contains(overlay, want) && strings.HasPrefix(want, "refresh_skill:") {
+					t.Fatalf("overlay missing %q:\n%s", want, overlay)
+				}
+			}
+			if !strings.Contains(overlay, "role: "+tc.role) {
+				t.Fatalf("overlay missing role %s:\n%s", tc.role, overlay)
+			}
+			for _, want := range tc.wantAppliesTo {
+				if !strings.Contains(overlay, want) {
+					t.Fatalf("overlay missing applies_to %q:\n%s", want, overlay)
+				}
+			}
+			for _, forbidden := range tc.forbidden {
+				if strings.Contains(overlay, "      - "+forbidden) {
+					t.Fatalf("overlay includes out-of-role applies_to %q:\n%s", forbidden, overlay)
+				}
+			}
+		})
+	}
 }
 
 func TestBuildDryRunProjectsOnlySelectedRoleSkills(t *testing.T) {
