@@ -137,7 +137,7 @@ GAJAE uses shared logical task ids across KAS and KAH. Repo-local commits/PRs an
 | Task ID | Owner | Title | Status |
 |---|---|---|---|
 | GAJAE-001 | KAS-led docs/SOT | Register GAJAE SOTs and roadmap sequence | Completed |
-| GAJAE-002 | KAH | Implement KAH GJC wrapper MVP | Planned |
+| GAJAE-002 | KAH | Implement KAH GJC wrapper MVP | Completed |
 | GAJAE-003 | KAS+KAH (KAS-led) | Add GJC packet/template and artifact-reference contract | Planned |
 | GAJAE-004 | KAS+KAH | Pilot async ralplan with Kanban wake and plan lock | Planned |
 | GAJAE-005 | KAS+KAH | Pilot async ultragoal with KAT evidence and review loop | Planned |
