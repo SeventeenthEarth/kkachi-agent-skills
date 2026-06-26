@@ -1,0 +1,63 @@
+schema_version: kas.gajae_gjc_packet.v1
+packet_kind: deep_interview
+task_id: "{{ task_id }}"
+run_id: "{{ run_id }}"
+
+source_command:
+  korean: "{{ korean_source_command }}"
+  role: "source-of-truth command text; do not translate or replace it."
+
+gjc_operational_brief_english: |
+  Run GJC deep-interview to produce a candidate design or epic-shaping artifact
+  for the Kkachi task. Preserve the source command and return artifact_refs only
+  for run-local candidate output evidence.
+
+authority_boundaries:
+  owner: KAS/Blue/color/MAR/final
+  rule: "GJC is executor only; KAS/Blue/color/MAR/final gates decide acceptance."
+  kah_role: "KAH validates packet_ref and artifact_refs mechanically only."
+  no_acceptance_by_gjc: true
+
+stop_ask_gates:
+  ask_required_when:
+    - "source command conflicts with this packet"
+    - "required SOT or acceptance criteria are missing"
+    - "requested action enters forbidden_scope"
+    - "plan/design authority is ambiguous"
+  stop_required_when:
+    - "packet_ref is missing, stale, or checksum-mismatched"
+    - "GJC cannot produce run-local artifact_refs"
+    - "runtime/profile/provider/auth/token/gateway/model mutation would be required"
+
+plan_lock:
+  required_before_implementation: false
+  rule: "Deep-interview output is a candidate only; it cannot lock or approve a plan."
+  conflict_behavior: "report_plan_conflict_and_return_to_KAS"
+
+fallback_policy: none_fail_closed
+no_gjc_self_approval: true
+
+forbidden_scope:
+  - KAB Stage 2/3 activation
+  - live GJC/KAT/KAB runtime activation beyond this delegated packet
+  - provider/auth/token/gateway/model/profile mutation
+  - install/release/push
+  - GJC self-approval
+  - GAJAE-004 async callback pilot
+  - GAJAE-005 KAT ultragoal evidence pilot
+  - GAJAE-006 watcher/callback closeout
+
+expected_outputs:
+  - artifact_kind: candidate_deep_interview_report
+    artifact_refs_required: true
+    acceptance_status: candidate_until_KAS_Blue_accepts
+
+artifact_ref_contract:
+  packet_ref: "KAS input packet evidence: path plus sha256, validated by KAH mechanically."
+  artifact_refs: "GJC candidate output evidence: run-local paths plus sha256 hashes."
+  hash_rule: "sha256:<64 lowercase hex characters>"
+  run_local_only: true
+
+completion_boundary:
+  candidate_status: deep_interview_ready
+  not_completion: "Does not approve design, plan, implementation, MAR, or final completion."

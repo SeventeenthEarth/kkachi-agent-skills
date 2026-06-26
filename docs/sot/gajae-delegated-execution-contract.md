@@ -89,6 +89,33 @@ KAS source command / SOT envelope
 
 KAS packets must be English for agent-facing GJC content. Direct reports/questions to 주군 remain Korean.
 
+## 4.1. GAJAE-003 packet contract
+
+GAJAE-003 adds KAS-owned machine-readable packet templates for `deep_interview`,
+`ralplan`, `ultragoal`, `review_fix_turn`, and `callback_contract` under
+`templates/run-artifacts/`. Each packet preserves `source_command.korean` as the
+source of truth and uses `gjc_operational_brief_english` for GJC-facing
+operational instructions.
+
+Required packet fields are `schema_version`, `packet_kind`, `task_id`, `run_id`,
+`source_command.korean`, `gjc_operational_brief_english`,
+`authority_boundaries`, `stop_ask_gates`, `plan_lock`,
+`fallback_policy: none_fail_closed`, `no_gjc_self_approval: true`,
+`forbidden_scope`, `expected_outputs`, `artifact_ref_contract`, and
+`completion_boundary`.
+
+`packet_ref` is KAS input packet evidence: a repository-relative run-local packet
+path plus `sha256:<hash>` that KAH may validate mechanically before starting GJC
+and when reading status. `artifact_refs` are GJC candidate output evidence:
+run-local artifact paths plus hashes emitted by GJC and preserved by KAH. KAH validates packet and artifact references mechanically only; it does not parse packet policy, choose fallback behavior, approve plans, adjudicate review/MAR, or decide final acceptance.
+
+Packets must encode stop/ask gates, plan-lock expectations where applicable, no
+hidden fallback, no warning-only final gates, no GJC self-approval, and
+KAS/Blue/color/MAR/final authority boundaries. Missing, stale, cross-run,
+unreadable, non-regular, or checksum-mismatched `packet_ref` evidence fails
+closed and requires regenerating or repairing the run-local packet evidence
+before consuming GJC status.
+
 ## 5. Gate vocabulary
 
 - `deep-interview_ready`: design/epic candidate exists; not accepted until KAS/Blue accepts it.
@@ -138,7 +165,7 @@ GAJAE uses shared logical task ids across KAS and KAH. Repo-local commits/PRs an
 |---|---|---|---|
 | GAJAE-001 | KAS-led docs/SOT | Register GAJAE SOTs and roadmap sequence | Completed |
 | GAJAE-002 | KAH | Implement KAH GJC wrapper MVP | Completed |
-| GAJAE-003 | KAS+KAH (KAS-led) | Add GJC packet/template and artifact-reference contract | Planned |
+| GAJAE-003 | KAS+KAH (KAS-led) | Add GJC packet/template and artifact-reference contract | Completed |
 | GAJAE-004 | KAS+KAH | Pilot async ralplan with Kanban wake and plan lock | Planned |
 | GAJAE-005 | KAS+KAH | Pilot async ultragoal with KAT evidence and review loop | Planned |
 | GAJAE-006 | KAS+KAH | Productize watcher/callback closeout and docs/evidence surfaces | Planned |

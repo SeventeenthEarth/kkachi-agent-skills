@@ -1,0 +1,64 @@
+schema_version: kas.gajae_gjc_packet.v1
+packet_kind: ralplan
+task_id: "{{ task_id }}"
+run_id: "{{ run_id }}"
+
+source_command:
+  korean: "{{ korean_source_command }}"
+  role: "source-of-truth command text; do not translate or replace it."
+
+gjc_operational_brief_english: |
+  Run GJC ralplan to produce a candidate task plan artifact. Preserve the Korean
+  source command as SOT and return English operational output with run-local
+  artifact_refs for the plan candidate.
+
+authority_boundaries:
+  owner: KAS/Blue/color/MAR/final
+  rule: "GJC plan output is a candidate until KAS plan review and Blue synthesis accept it."
+  kah_role: "KAH validates packet_ref and artifact_refs mechanically only."
+  no_acceptance_by_gjc: true
+
+stop_ask_gates:
+  ask_required_when:
+    - "plan-vet exposes a materially branching decision"
+    - "source command, SOT, and acceptance criteria disagree"
+    - "review conditions cannot be encoded without policy expansion"
+  stop_required_when:
+    - "packet_ref is missing, stale, or checksum-mismatched"
+    - "required plan evidence cannot be written as artifact_refs"
+    - "hidden fallback or warning-only evidence would be needed"
+
+plan_lock:
+  required_before_implementation: true
+  lock_owner: KAS/Blue
+  accepted_plan_hash: "{{ accepted_plan_sha256_or_pending }}"
+  conflict_behavior: "report_plan_conflict_and_return_to_KAS"
+
+fallback_policy: none_fail_closed
+no_gjc_self_approval: true
+
+forbidden_scope:
+  - KAB Stage 2/3 activation
+  - live GJC/KAT/KAB runtime activation beyond this delegated packet
+  - provider/auth/token/gateway/model/profile mutation
+  - install/release/push
+  - GJC self-approval
+  - automatic plan rewrite after plan lock
+  - GAJAE-004 async callback pilot
+  - GAJAE-005 KAT ultragoal evidence pilot
+  - GAJAE-006 watcher/callback closeout
+
+expected_outputs:
+  - artifact_kind: candidate_ralplan
+    artifact_refs_required: true
+    acceptance_status: candidate_until_plan_review_and_lock
+
+artifact_ref_contract:
+  packet_ref: "KAS input packet evidence: path plus sha256, validated by KAH mechanically."
+  artifact_refs: "GJC candidate output evidence: run-local paths plus sha256 hashes."
+  hash_rule: "sha256:<64 lowercase hex characters>"
+  run_local_only: true
+
+completion_boundary:
+  candidate_status: ralplan_ready
+  not_completion: "Does not approve the plan, lock the plan, authorize implementation, or mark final completion."

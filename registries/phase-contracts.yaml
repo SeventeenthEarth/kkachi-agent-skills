@@ -207,6 +207,48 @@ evidence_summary_contract:
     - "No auth/token/provider/gateway/model mutation authorization."
     - "TOKEN-009 review bundle and TOKEN-010 changed-path matrix scope is owned by adjacent contracts, not by TOKEN-008 evidence summaries."
 
+gjc_packet_contract:
+  contract_version: "gajae003.v1"
+  owner: KAS
+  kah_validation_role: mechanical_validation_only
+  purpose: "KAS-owned GJC delegation packet templates for GAJAE planning, implementation, review/fix, and callback candidate evidence."
+  packet_templates:
+    deep_interview: "templates/run-artifacts/gjc-deep-interview-packet.yaml.tmpl"
+    ralplan: "templates/run-artifacts/gjc-ralplan-packet.yaml.tmpl"
+    ultragoal: "templates/run-artifacts/gjc-ultragoal-packet.yaml.tmpl"
+    review_fix_turn: "templates/run-artifacts/gjc-review-fix-turn-packet.yaml.tmpl"
+    callback_contract: "templates/run-artifacts/gjc-callback-contract-packet.yaml.tmpl"
+  required_fields:
+    - schema_version
+    - packet_kind
+    - task_id
+    - run_id
+    - source_command.korean
+    - gjc_operational_brief_english
+    - authority_boundaries
+    - stop_ask_gates
+    - plan_lock
+    - fallback_policy
+    - no_gjc_self_approval
+    - forbidden_scope
+    - expected_outputs
+    - artifact_ref_contract
+    - completion_boundary
+  fixed_values:
+    fallback_policy: none_fail_closed
+    no_gjc_self_approval: true
+  reference_vocabulary:
+    packet_ref: "KAS input packet evidence validated by KAH as a run-local path plus sha256."
+    artifact_refs: "GJC candidate output evidence preserved by KAH as run-local paths plus sha256 hashes."
+  boundary_rules:
+    - "Korean source command remains the source of truth."
+    - "GJC-facing operational content is English."
+    - "GJC output is candidate evidence only."
+    - "KAS/Blue/color/MAR/final gates remain acceptance authority."
+    - "KAH validates packet_ref and artifact_refs mechanically only; it must not parse packet policy or decide acceptance."
+    - "No KAB Stage 2/3 activation, live GJC/KAT/KAB invocation, profile/provider/auth/token/gateway/model mutation, install, release, push, hidden fallback, warning-only gate, or GJC self-approval."
+    - "GAJAE-004, GAJAE-005, and GAJAE-006 remain deferred unless separately approved."
+
 review_bundle_contract:
   contract_version: "token009.v1"
   template: "templates/run-artifacts/review-bundle.yaml.tmpl"

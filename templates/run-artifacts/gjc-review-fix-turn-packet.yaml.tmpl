@@ -1,0 +1,62 @@
+schema_version: kas.gajae_gjc_packet.v1
+packet_kind: review_fix_turn
+task_id: "{{ task_id }}"
+run_id: "{{ run_id }}"
+
+source_command:
+  korean: "{{ korean_source_command }}"
+  role: "source-of-truth command text; do not translate or replace it."
+
+gjc_operational_brief_english: |
+  Run a bounded GJC review/fix turn for accepted review or MAR findings only.
+  Preserve finding refs, changed-surface limits, and run-local artifact_refs for
+  the candidate fix evidence.
+
+authority_boundaries:
+  owner: KAS/Blue/color/MAR/final
+  rule: "GJC may propose or apply a candidate fix only inside accepted findings; KAS/Blue/color/MAR/final decide disposition."
+  kah_role: "KAH validates packet_ref and artifact_refs mechanically only."
+  no_acceptance_by_gjc: true
+
+stop_ask_gates:
+  ask_required_when:
+    - "finding disposition is unclear"
+    - "fix would exceed accepted review/MAR scope"
+    - "new authority or non-goal waiver is needed"
+  stop_required_when:
+    - "packet_ref is missing, stale, or checksum-mismatched"
+    - "accepted finding refs are missing"
+    - "hidden fallback or warning-only review handling would be needed"
+
+plan_lock:
+  required_before_implementation: true
+  accepted_plan_hash: "{{ accepted_plan_sha256 }}"
+  conflict_behavior: "block_and_return_to_KAS_for_disposition"
+
+fallback_policy: none_fail_closed
+no_gjc_self_approval: true
+
+forbidden_scope:
+  - unreviewed scope expansion
+  - KAB Stage 2/3 activation
+  - provider/auth/token/gateway/model/profile mutation
+  - install/release/push
+  - GJC self-approval
+  - GAJAE-004 async callback pilot
+  - GAJAE-005 KAT ultragoal evidence pilot
+  - GAJAE-006 watcher/callback closeout
+
+expected_outputs:
+  - artifact_kind: candidate_review_fix_evidence
+    artifact_refs_required: true
+    acceptance_status: candidate_until_reverification_and_review
+
+artifact_ref_contract:
+  packet_ref: "KAS input packet evidence: path plus sha256, validated by KAH mechanically."
+  artifact_refs: "GJC candidate output evidence: run-local paths plus sha256 hashes."
+  hash_rule: "sha256:<64 lowercase hex characters>"
+  run_local_only: true
+
+completion_boundary:
+  candidate_status: ultragoal_ready
+  not_completion: "Does not close findings, approve MAR, approve color review, or mark final completion."

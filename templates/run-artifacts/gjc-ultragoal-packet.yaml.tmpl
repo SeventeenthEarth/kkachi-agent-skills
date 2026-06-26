@@ -1,0 +1,63 @@
+schema_version: kas.gajae_gjc_packet.v1
+packet_kind: ultragoal
+task_id: "{{ task_id }}"
+run_id: "{{ run_id }}"
+
+source_command:
+  korean: "{{ korean_source_command }}"
+  role: "source-of-truth command text; do not translate or replace it."
+
+gjc_operational_brief_english: |
+  Run GJC ultragoal create-goals for the accepted locked plan only. Produce a
+  candidate implementation-goal bundle and preserve run-local artifact_refs for
+  brief, goals, ledger, and implementation evidence as applicable.
+
+authority_boundaries:
+  owner: KAS/Blue/color/MAR/final
+  rule: "GJC implementation output remains candidate evidence until verification, color review, MAR when required, and final gates pass."
+  kah_role: "KAH validates packet_ref and artifact_refs mechanically only."
+  no_acceptance_by_gjc: true
+
+stop_ask_gates:
+  ask_required_when:
+    - "accepted plan hash is missing or conflicts with packet content"
+    - "implementation would exceed accepted plan scope"
+    - "fix requires a policy, provider, profile, auth, token, gateway, or model decision"
+  stop_required_when:
+    - "packet_ref is missing, stale, or checksum-mismatched"
+    - "plan_lock is not accepted"
+    - "candidate output cannot preserve artifact_refs"
+
+plan_lock:
+  required_before_implementation: true
+  accepted_plan_hash: "{{ accepted_plan_sha256 }}"
+  conflict_behavior: "block_and_emit_plan_conflict_report"
+
+fallback_policy: none_fail_closed
+no_gjc_self_approval: true
+
+forbidden_scope:
+  - KAB Stage 2/3 activation
+  - live KAT invocation unless GAJAE-005 is separately approved
+  - provider/auth/token/gateway/model/profile mutation
+  - install/release/push
+  - GJC self-approval
+  - warning-only verification gates
+  - GAJAE-004 async callback pilot
+  - GAJAE-005 KAT ultragoal evidence pilot
+  - GAJAE-006 watcher/callback closeout
+
+expected_outputs:
+  - artifact_kind: candidate_ultragoal_bundle
+    artifact_refs_required: true
+    acceptance_status: candidate_until_verification_review_mar_final
+
+artifact_ref_contract:
+  packet_ref: "KAS input packet evidence: path plus sha256, validated by KAH mechanically."
+  artifact_refs: "GJC candidate output evidence: run-local paths plus sha256 hashes."
+  hash_rule: "sha256:<64 lowercase hex characters>"
+  run_local_only: true
+
+completion_boundary:
+  candidate_status: ultragoal_ready
+  not_completion: "Does not approve implementation, tests, MAR, color review, or final completion."
