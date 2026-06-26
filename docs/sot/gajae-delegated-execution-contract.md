@@ -157,6 +157,21 @@ GAJAE must minimize Hermes-visible token usage:
 
 Watchers and callbacks must not approve plans, summarize raw logs with an LLM, decide review results, or mark final completion by themselves.
 
+### GAJAE-004 source-side pilot
+
+GAJAE-004 may update source-side KAS templates and KAH helper behavior for the
+async `ralplan` / callback / plan-lock pilot after explicit ask/apply approval.
+This authorization is bounded to source, tests, and docs. It does not authorize
+commit, push, install, release, live/default runtime activation, KAB Stage 2/3
+activation, real GJC/KAT execution outside tests/mocks, or
+profile/provider/auth/token/gateway/model mutation.
+
+`ralplan_ready` and `callback_delivered` remain candidate/evidence states only.
+Neither state approves the plan, starts implementation, satisfies color/MAR
+review, or marks final completion. `plan_locked` requires accepted_plan_hash after KAS/Blue/color review
+and must bind that hash to the reviewed candidate plan artifact. Post-lock drift
+requires a plan-conflict report before continuation.
+
 ## 8. Shared task sequence
 
 GAJAE uses shared logical task ids across KAS and KAH. Repo-local commits/PRs and gates remain separate.
@@ -166,7 +181,7 @@ GAJAE uses shared logical task ids across KAS and KAH. Repo-local commits/PRs an
 | GAJAE-001 | KAS-led docs/SOT | Register GAJAE SOTs and roadmap sequence | Completed |
 | GAJAE-002 | KAH | Implement KAH GJC wrapper MVP | Completed |
 | GAJAE-003 | KAS+KAH (KAS-led) | Add GJC packet/template and artifact-reference contract | Completed |
-| GAJAE-004 | KAS+KAH | Pilot async ralplan with Kanban wake and plan lock | Planned |
+| GAJAE-004 | KAS+KAH | Pilot async ralplan with Kanban wake and plan lock | Completed / source-side pilot |
 | GAJAE-005 | KAS+KAH | Pilot async ultragoal with KAT evidence and review loop | Planned |
 | GAJAE-006 | KAS+KAH | Productize watcher/callback closeout and docs/evidence surfaces | Planned |
 

@@ -247,7 +247,8 @@ gjc_packet_contract:
     - "KAS/Blue/color/MAR/final gates remain acceptance authority."
     - "KAH validates packet_ref and artifact_refs mechanically only; it must not parse packet policy or decide acceptance."
     - "No KAB Stage 2/3 activation, live GJC/KAT/KAB invocation, profile/provider/auth/token/gateway/model mutation, install, release, push, hidden fallback, warning-only gate, or GJC self-approval."
-    - "GAJAE-004, GAJAE-005, and GAJAE-006 remain deferred unless separately approved."
+    - "GAJAE-004 async ralplan/callback pilot is allowed only for ralplan_ready and callback evidence."
+    - "GAJAE-005 and GAJAE-006 remain deferred unless separately approved."
 
 review_bundle_contract:
   contract_version: "token009.v1"

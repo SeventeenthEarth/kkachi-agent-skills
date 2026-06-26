@@ -32,6 +32,8 @@ plan_lock:
   required_before_implementation: true
   lock_owner: KAS/Blue
   accepted_plan_hash: "{{ accepted_plan_sha256_or_pending }}"
+  pilot_scope: "GAJAE-004 async ralplan/callback pilot"
+  lock_boundary: "plan lock remains pending until KAS/Blue/color plan review acceptance"
   conflict_behavior: "report_plan_conflict_and_return_to_KAS"
 
 fallback_policy: none_fail_closed
@@ -44,7 +46,6 @@ forbidden_scope:
   - install/release/push
   - GJC self-approval
   - automatic plan rewrite after plan lock
-  - GAJAE-004 async callback pilot
   - GAJAE-005 KAT ultragoal evidence pilot
   - GAJAE-006 watcher/callback closeout
 
