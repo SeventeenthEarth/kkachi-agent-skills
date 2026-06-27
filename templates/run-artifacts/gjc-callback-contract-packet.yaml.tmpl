@@ -8,10 +8,12 @@ source_command:
   role: "source-of-truth command text; do not translate or replace it."
 
 gjc_operational_brief_english: |
-  Prepare callback metadata for a ready candidate artifact without claiming
-  same-thread wake, plan approval, review acceptance, MAR acceptance, or final
-  completion. GAJAE-004 callback delivery is evidence only until KAS plan review.
-  If notification origin/thread metadata is unavailable, record no-wake-claim.
+  Prepare productized callback/watcher metadata for a ready candidate artifact
+  without claiming same-thread wake, plan approval, review acceptance, MAR
+  acceptance, or final completion. GAJAE-004 callback delivery and GAJAE-006
+  watcher closeout are factual evidence only until KAS/Blue/color/MAR/final
+  gates accept them. If notification origin/thread plus watcher evidence is
+  unavailable, record no-wake-claim.
 
 authority_boundaries:
   owner: KAS/Blue/color/MAR/final
@@ -42,8 +44,8 @@ forbidden_scope:
   - KAB Stage 2/3 activation
   - provider/auth/token/gateway/model/profile mutation
   - install/release/push
-  - GAJAE-005 KAT ultragoal evidence pilot
-  - GAJAE-006 watcher/callback closeout
+  - GAJAE-005 KAT/ultragoal evidence as approval authority
+  - GAJAE-006 watcher/callback closeout as final completion or wake readiness without evidence
 
 expected_outputs:
   - artifact_kind: callback_contract_candidate
@@ -55,8 +57,15 @@ artifact_ref_contract:
   artifact_refs: "GJC candidate output evidence: run-local paths plus sha256 hashes."
   hash_rule: "sha256:<64 lowercase hex characters>"
   run_local_only: true
+  source_status_hash: "Required status_hash that triggered the callback or watcher closeout."
+  idempotency_key: "Required replay/conflict key; exact replay is stable, conflicts fail closed."
+  callback_result: "pending, delivered, or failed as factual callback evidence only."
   notification_ref: "Use no-wake-claim when same-thread/origin metadata is absent."
+  notification_status: "metadata_recorded_no_wake_claim or no_wake_claim; never acceptance."
+  wake_evidence_status: "missing_watcher_evidence until explicit origin/thread metadata and watcher proof exist."
 
 completion_boundary:
   candidate_status: callback_delivered
+  watcher_status: watcher_closeout_evidence_only
   not_completion: "Does not approve plan, review, MAR, final completion, or same-thread wake readiness."
+  same_thread_wake_default: no-wake-claim

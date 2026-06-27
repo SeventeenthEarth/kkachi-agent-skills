@@ -164,7 +164,7 @@ GAJAE must minimize Hermes-visible token usage:
 3. A no-agent watcher, Kanban callback, or process completion callback prints only compact actionable state changes.
 4. KAS/Blue re-enters only for questions, plan review, implementation review, MAR disposition, conflict handling, or final gate.
 
-Watchers and callbacks must not approve plans, summarize raw logs with an LLM, decide review results, or mark final completion by themselves.
+Watchers and callbacks must not approve plans, summarize raw logs with an LLM, decide review results, or mark final completion by themselves. Productized callback/watcher closeout evidence must report only factual routing state: run id, task id, callback idempotency key, source status hash, callback result, notification metadata availability, wake-evidence status, current required actor, wait reason, recovery hint, and artifact/status refs. Missing origin/thread/watcher evidence remains `no-wake-claim` rather than a degraded wake-readiness claim.
 
 ### GAJAE-004 source-side pilot
 
@@ -214,8 +214,8 @@ GAJAE uses shared logical task ids across KAS and KAH. Repo-local commits/PRs an
 | GAJAE-002 | KAH | Implement KAH GJC wrapper MVP | Completed |
 | GAJAE-003 | KAS+KAH (KAS-led) | Add GJC packet/template and artifact-reference contract | Completed |
 | GAJAE-004 | KAS+KAH | Pilot async ralplan with Kanban wake and plan lock | Completed / source-side pilot |
-| GAJAE-005 | KAS+KAH | Pilot async ultragoal with KAT evidence and review loop | Planned |
-| GAJAE-006 | KAS+KAH | Productize watcher/callback closeout and docs/evidence surfaces | Planned |
+| GAJAE-005 | KAS+KAH | Pilot async ultragoal with KAT evidence and review loop | Source-side pilot |
+| GAJAE-006 | KAS+KAH | Productize watcher/callback closeout and docs/evidence surfaces | Completed |
 
 ## 9. GAJAE-001 acceptance criteria
 

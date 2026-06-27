@@ -123,15 +123,23 @@ func TestGAJAE004AsyncRalplanPilotIsAllowedWithoutBroadeningDeferredScope(t *tes
 		"packet_kind: callback_contract",
 		"callback_delivered",
 		"no-wake-claim",
-		"callback delivery is evidence only until KAS plan review",
-		"GAJAE-005 KAT ultragoal evidence pilot",
-		"GAJAE-006 watcher/callback closeout",
+		"GAJAE-004 callback delivery and GAJAE-006",
+		"source_status_hash",
+		"idempotency_key",
+		"callback_result",
+		"notification_status",
+		"wake_evidence_status",
+		"missing_watcher_evidence",
+		"metadata_recorded_no_wake_claim",
+		"same_thread_wake_default: no-wake-claim",
+		"GAJAE-005 KAT/ultragoal evidence as approval authority",
+		"GAJAE-006 watcher/callback closeout as final completion or wake readiness without evidence",
 	})
 	requireNotContains(t, "templates/run-artifacts/gjc-callback-contract-packet.yaml.tmpl", []string{"evidence_only_until_GAJAE_004_005_006"})
 
 	requireContainsAll(t, "registries/phase-contracts.yaml", []string{
 		"GAJAE-004 async ralplan/callback pilot is allowed only for ralplan_ready and callback evidence.",
-		"GAJAE-005 and GAJAE-006 remain deferred unless separately approved.",
+		"GAJAE-005 KAT/ultragoal evidence and GAJAE-006 watcher/callback closeout remain factual source-side evidence unless separately approved for final completion, live runtime, or same-thread wake readiness.",
 	})
 	requireContainsAll(t, "docs/sot/gajae-delegated-execution-contract.md", []string{
 		"GAJAE-004 source-side pilot",
