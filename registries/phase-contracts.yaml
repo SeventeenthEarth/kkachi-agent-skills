@@ -233,6 +233,8 @@ gjc_packet_contract:
     - native_ralplan_input.stage
     - native_ralplan_input.stage_n
     - native_ralplan_input.artifact
+    - native_ultragoal_input.mode
+    - native_ultragoal_input.brief
     - forbidden_scope
     - expected_outputs
     - artifact_ref_contract
@@ -250,6 +252,7 @@ gjc_packet_contract:
     - "KAS/Blue/color/MAR/final gates remain acceptance authority."
     - "KAH validates packet_ref and artifact_refs mechanically only; it must not parse packet policy or decide acceptance."
     - "KAH projects `native_ralplan_input` into GJC 0.7.3 `ralplan --write` flags and must fail closed instead of falling back to `--packet`."
+    - "KAH materializes `native_ultragoal_input.brief` as run-local `native_input_ref` evidence and projects it into GJC 0.7.3 `ultragoal create-goals --brief-file <path> --json`; it must fail closed instead of falling back to `--packet`."
     - "No KAB Stage 2/3 activation, live GJC/KAT/KAB invocation, profile/provider/auth/token/gateway/model mutation, install, release, push, hidden fallback, warning-only gate, or GJC self-approval."
     - "GAJAE-004 async ralplan/callback pilot is allowed only for ralplan_ready and callback evidence."
     - "GAJAE-005 KAT/ultragoal evidence and GAJAE-006 watcher/callback closeout remain factual source-side evidence unless separately approved for final completion, live runtime, or same-thread wake readiness."

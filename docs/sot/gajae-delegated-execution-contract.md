@@ -106,7 +106,10 @@ Required packet fields are `schema_version`, `packet_kind`, `task_id`, `run_id`,
 
 `packet_ref` is KAS input packet evidence: a repository-relative run-local packet
 path plus `sha256:<hash>` that KAH may validate mechanically before starting GJC
-and when reading status. `artifact_refs` are GJC candidate output evidence:
+and when reading status. `native_input_ref` is KAH-materialized run-local
+native input evidence derived from KAS packet fields such as `native_ralplan_input`
+or `native_ultragoal_input`; KAH validates its path and hash mechanically and
+uses it only as GJC invocation input, not as approval evidence. `artifact_refs` are GJC candidate output evidence:
 run-local artifact paths plus hashes emitted by GJC and preserved by KAH. KAH validates packet and artifact references mechanically only; it does not parse packet policy, choose fallback behavior, approve plans, adjudicate review/MAR, or decide final acceptance.
 
 Packets must encode stop/ask gates, plan-lock expectations where applicable, no
@@ -217,14 +220,14 @@ GAJAE uses shared logical task ids across KAS and KAH. Repo-local commits/PRs an
 | GAJAE-005 | KAS+KAH | Pilot async ultragoal with KAT evidence and review loop | Source-side pilot |
 | GAJAE-006 | KAS+KAH | Productize watcher/callback closeout and docs/evidence surfaces | Completed |
 | GAJAE-007 | KAH+KAS | Real GJC `ralplan` adapter | Completed |
-| GAJAE-008 | KAH+KAS | Real GJC `ultragoal` adapter | Planned |
+| GAJAE-008 | KAH+KAS | Real GJC `ultragoal` adapter | Completed |
 | GAJAE-009 | KAH+KAT (KAH-led) | KAT evidence normalization / KAH attach adapter | Planned |
 | GAJAE-010 | KAS+KAH+KAT | Contract docs and skill guidance update | Planned |
 
 ## 8.1. GAJAE-007..010 pilot-unblock task scope
 
 - `GAJAE-007` changes code/contract behavior so KAS packets carry `native_ralplan_input.stage`, `.stage_n`, and `.artifact`, KAH derives native GJC 0.7.3 `ralplan --write` flags from those fields, and KAH records only candidate plan evidence.
-- `GAJAE-008` changes code/contract behavior so KAH derives native GJC 0.7.3 ultragoal brief input from KAS packets and records only implementation-candidate evidence.
+- `GAJAE-008` changes code/contract behavior so KAH materializes `native_ultragoal_input.brief` into run-local `native_input_ref` evidence, invokes GJC 0.7.3 as `ultragoal create-goals --brief-file <path> --json`, adapts native goals/ledger output into run-local `artifact_refs`, and records only implementation-candidate evidence.
 - `GAJAE-009` changes code/contract behavior so KAH can attach factual KAT v0.1.0 evidence through a normalized bindable snapshot, or KAT emits that bindable snapshot directly. In both cases KAT remains factual and never authoritative.
 - `GAJAE-010` updates KAS/KAH/KAT repo docs and Hermes skill guidance after the adapters settle. Verification evidence remains a done criterion inside those tasks, not a separate roadmap task.
 

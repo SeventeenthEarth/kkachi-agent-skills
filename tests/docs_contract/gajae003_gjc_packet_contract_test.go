@@ -41,6 +41,12 @@ func TestGAJAE003GJCPacketTemplatesExistAndPreserveBoundaries(t *testing.T) {
 func TestGAJAE005UltragoalKATEvidenceAndReviewFixBoundaries(t *testing.T) {
 	requireContainsAll(t, "templates/run-artifacts/gjc-ultragoal-packet.yaml.tmpl", []string{
 		"candidate_status: ultragoal_ready",
+		"native_ultragoal_input:",
+		"mode: brief_file",
+		"{{ gjc_ultragoal_brief }}",
+		"native_input_ref",
+		"ultragoal create-goals --brief-file <native_input_ref.path> --json",
+		"must not pass the packet path as `--packet`",
 		"kat_status: kat_evidence_ready",
 		"kat_refs",
 		"status_ref",
@@ -51,12 +57,19 @@ func TestGAJAE005UltragoalKATEvidenceAndReviewFixBoundaries(t *testing.T) {
 		"extractor_status",
 		"command_exit_code",
 		"attachment_status",
-		"real async GJC ultragoal invocation unless separately approved",
+		"real async GJC ultragoal invocation except the explicitly approved bounded GAJAE-008 native GJC smoke",
 		"live KAT invocation unless separately approved",
 		"Does not approve implementation, tests, review findings, MAR, color review, waiver, or final completion.",
 	})
 	requireNotContains(t, "templates/run-artifacts/gjc-ultragoal-packet.yaml.tmpl", []string{
 		"GAJAE-005 KAT ultragoal evidence pilot",
+	})
+
+	requireContainsAll(t, "registries/phase-contracts.yaml", []string{
+		"native_ultragoal_input.mode",
+		"native_ultragoal_input.brief",
+		"KAH materializes `native_ultragoal_input.brief` as run-local `native_input_ref` evidence",
+		"ultragoal create-goals --brief-file <path> --json",
 	})
 
 	requireContainsAll(t, "templates/run-artifacts/gjc-review-fix-turn-packet.yaml.tmpl", []string{
@@ -65,7 +78,7 @@ func TestGAJAE005UltragoalKATEvidenceAndReviewFixBoundaries(t *testing.T) {
 		"support_status: deferred_until_KAH_review_fix_status_support",
 		"artifact_refs_required: false",
 		"kat_refs",
-		"real async GJC ultragoal invocation unless separately approved",
+		"real async GJC ultragoal invocation except the explicitly approved bounded GAJAE-008 native GJC smoke",
 		"live KAT invocation unless separately approved",
 		"Does not close findings, approve MAR, approve color review, approve waiver, or mark final completion.",
 	})

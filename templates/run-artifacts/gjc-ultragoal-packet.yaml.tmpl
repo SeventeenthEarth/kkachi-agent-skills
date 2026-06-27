@@ -39,9 +39,15 @@ plan_lock:
 fallback_policy: none_fail_closed
 no_gjc_self_approval: true
 
+native_ultragoal_input:
+  mode: brief_file
+  brief: |
+    {{ gjc_ultragoal_brief }}
+  projection_rule: "KAH must materialize this brief as run-local native_input_ref evidence and invoke GJC 0.7.3 as `ultragoal create-goals --brief-file <native_input_ref.path> --json`; KAH must not pass the packet path as `--packet`."
+
 forbidden_scope:
   - KAB Stage 2/3 activation
-  - real async GJC ultragoal invocation unless separately approved
+  - real async GJC ultragoal invocation except the explicitly approved bounded GAJAE-008 native GJC smoke
   - live KAT invocation unless separately approved
   - provider/auth/token/gateway/model/profile mutation
   - install/release/push
