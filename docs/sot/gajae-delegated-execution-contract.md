@@ -35,7 +35,7 @@ The pilot evidence listed above plus the 2026-06-27 `/tmp/kkachi-gjc` scratch ve
 3. Native `gjc ultragoal create-goals` and `gjc ultragoal status --json` expose a durable goal ledger/status surface, but installed GJC 0.7.3 requires KAH to provide `--brief`, `--brief-file`, or `--from-stdin`; `--packet` alone is not a valid live invocation.
 4. GJC can call Hermes Kanban CLI to add a comment and complete a task.
 5. A Hermes background process running GJC can perform that callback, so Hermes does not need to spend LLM tokens while waiting.
-6. KAT v0.1.0 can emit raw logs, summary JSON/Markdown, status JSON, status hash, and Kkachi run-id artifact paths; raw KAT v0.1.0 status JSON is not yet directly KAH-attachable without normalization because KAH currently rejects unsupported fields such as `command_id`.
+6. KAT v0.1.0 can emit raw logs, summary JSON/Markdown, status JSON, status hash, and Kkachi run-id artifact paths; GAJAE-009 KAH behavior can now normalize these factual status/summary/raw-log refs into KAH-bindable KAT evidence without requiring KAT source changes. KAT `status_hash` remains KAT self-integrity metadata, not the GJC source status hash.
 7. KAT `--run-id` is a global flag and must appear before `run`.
 8. GJC execution from Hermes needs real-user home normalization such as `HOME=/Users/draccoon`; the KAH wrapper must own this instead of leaving it to packet authors.
 9. Non-interactive GJC use must carry an explicit `GJC_SESSION_ID` or equivalent wrapper-managed session id.
@@ -152,10 +152,14 @@ Extractor status handling:
 
 KAH KAT attachment evidence is factual only and should include run id,
 status ref/hash, summary JSON ref/hash, summary Markdown ref/hash, raw-log
-ref/hash, extractor status, command exit code, and attachment status. Missing,
-unsafe, cross-run, malformed, hashless, checksum-mismatched, run-id-mismatched,
-approval-claiming, waiver-claiming, or final-acceptance-claiming KAT evidence
-fails closed. KAH records the evidence shape; KAS/Blue/color/MAR/final gates
+ref/hash, extractor status, command exit code, and attachment status. For
+GAJAE-009, KAH may derive summary/raw refs and hashes from KAT v0.1.0
+`summary_path`, `summary_sha256`, `raw_log_path`, and `raw_log_sha256` fields
+when the caller supplies the run-local KAT status ref/hash; the derived Markdown
+summary ref is the sibling `<summary>.md` file. Missing, unsafe, cross-run,
+malformed, hashless, checksum-mismatched, run-id-mismatched, symlinked,
+non-regular, approval-claiming, waiver-claiming, or final-acceptance-claiming
+KAT evidence fails closed. KAH records the evidence shape; KAS/Blue/color/MAR/final gates
 interpret acceptance.
 
 ## 7. Async and wake-up policy
@@ -221,14 +225,14 @@ GAJAE uses shared logical task ids across KAS and KAH. Repo-local commits/PRs an
 | GAJAE-006 | KAS+KAH | Productize watcher/callback closeout and docs/evidence surfaces | Completed |
 | GAJAE-007 | KAH+KAS | Real GJC `ralplan` adapter | Completed |
 | GAJAE-008 | KAH+KAS | Real GJC `ultragoal` adapter | Completed |
-| GAJAE-009 | KAH+KAT (KAH-led) | KAT evidence normalization / KAH attach adapter | Planned |
+| GAJAE-009 | KAH+KAT (KAH-led) | KAT evidence normalization / KAH attach adapter | Completed |
 | GAJAE-010 | KAS+KAH+KAT | Contract docs and skill guidance update | Planned |
 
 ## 8.1. GAJAE-007..010 pilot-unblock task scope
 
 - `GAJAE-007` changes code/contract behavior so KAS packets carry `native_ralplan_input.stage`, `.stage_n`, and `.artifact`, KAH derives native GJC 0.7.3 `ralplan --write` flags from those fields, and KAH records only candidate plan evidence.
 - `GAJAE-008` changes code/contract behavior so KAH materializes `native_ultragoal_input.brief` into run-local `native_input_ref` evidence, invokes GJC 0.7.3 as `ultragoal create-goals --brief-file <path> --json`, adapts native goals/ledger output into run-local `artifact_refs`, and records only implementation-candidate evidence.
-- `GAJAE-009` changes code/contract behavior so KAH can attach factual KAT v0.1.0 evidence through a normalized bindable snapshot, or KAT emits that bindable snapshot directly. In both cases KAT remains factual and never authoritative.
+- `GAJAE-009` changes code/contract behavior so KAH can attach factual KAT v0.1.0 evidence through KAH-side normalization of status/summary/raw-log refs without requiring KAT source changes. KAT remains factual and never authoritative.
 - `GAJAE-010` updates KAS/KAH/KAT repo docs and Hermes skill guidance after the adapters settle. Verification evidence remains a done criterion inside those tasks, not a separate roadmap task.
 
 ## 9. GAJAE-001 acceptance criteria

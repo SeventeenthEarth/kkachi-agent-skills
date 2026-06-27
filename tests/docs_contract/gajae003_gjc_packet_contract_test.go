@@ -93,7 +93,8 @@ func TestGAJAE005UltragoalKATEvidenceAndReviewFixBoundaries(t *testing.T) {
 		"Review/fix-turn KAT attachment is not required in GAJAE-005 until KAH implements",
 		"KAT attachment remains implemented for",
 		"Missing,",
-		"unsafe, cross-run, malformed, hashless, checksum-mismatched, run-id-mismatched",
+		"summary ref is the sibling `<summary>.md` file",
+		"malformed, hashless, checksum-mismatched, run-id-mismatched, symlinked",
 		"real GJC `ultragoal` invocation, live KAT execution",
 	})
 }
