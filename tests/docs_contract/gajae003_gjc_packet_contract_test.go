@@ -33,10 +33,56 @@ func TestGAJAE003GJCPacketTemplatesExistAndPreserveBoundaries(t *testing.T) {
 			"artifact_refs",
 			"KAS/Blue/color/MAR/final",
 			"GAJAE-004",
-			"GAJAE-005",
 			"GAJAE-006",
 		})
 	}
+}
+
+func TestGAJAE005UltragoalKATEvidenceAndReviewFixBoundaries(t *testing.T) {
+	requireContainsAll(t, "templates/run-artifacts/gjc-ultragoal-packet.yaml.tmpl", []string{
+		"candidate_status: ultragoal_ready",
+		"kat_status: kat_evidence_ready",
+		"kat_refs",
+		"status_ref",
+		"summary_ref",
+		"raw_log_ref",
+		"status_hash",
+		"raw_log_hash",
+		"extractor_status",
+		"command_exit_code",
+		"attachment_status",
+		"real async GJC ultragoal invocation unless separately approved",
+		"live KAT invocation unless separately approved",
+		"Does not approve implementation, tests, review findings, MAR, color review, waiver, or final completion.",
+	})
+	requireNotContains(t, "templates/run-artifacts/gjc-ultragoal-packet.yaml.tmpl", []string{
+		"GAJAE-005 KAT ultragoal evidence pilot",
+	})
+
+	requireContainsAll(t, "templates/run-artifacts/gjc-review-fix-turn-packet.yaml.tmpl", []string{
+		"candidate_status: review_fix_candidate_ready",
+		"kat_status: deferred_until_KAH_review_fix_status_support",
+		"support_status: deferred_until_KAH_review_fix_status_support",
+		"artifact_refs_required: false",
+		"kat_refs",
+		"real async GJC ultragoal invocation unless separately approved",
+		"live KAT invocation unless separately approved",
+		"Does not close findings, approve MAR, approve color review, approve waiver, or mark final completion.",
+	})
+	requireNotContains(t, "templates/run-artifacts/gjc-review-fix-turn-packet.yaml.tmpl", []string{
+		"candidate_status: ultragoal_ready",
+		"GAJAE-005 KAT ultragoal evidence pilot",
+	})
+
+	requireContainsAll(t, "docs/sot/gajae-delegated-execution-contract.md", []string{
+		"`review_fix_candidate_ready`",
+		"`ultragoal_ready`, `kat_evidence_ready`, and `review_fix_candidate_ready` remain",
+		"Review/fix-turn KAT attachment is not required in GAJAE-005 until KAH implements",
+		"KAT attachment remains implemented for",
+		"Missing,",
+		"unsafe, cross-run, malformed, hashless, checksum-mismatched, run-id-mismatched",
+		"real GJC `ultragoal` invocation, live KAT execution",
+	})
 }
 
 func TestGAJAE003GJCPacketContractIsRegistered(t *testing.T) {

@@ -123,6 +123,7 @@ before consuming GJC status.
 - `plan_locked`: accepted plan hash is recorded and future drift requires a plan-conflict report.
 - `ultragoal_ready`: implementation bundle candidate exists; not accepted until verification and review gates pass.
 - `kat_evidence_ready`: KAT command evidence exists; does not imply acceptance by itself.
+- `review_fix_candidate_ready`: bounded review/fix candidate evidence exists for accepted findings; it is distinct from ordinary `ultragoal_ready` and does not close findings or approve MAR/color/final gates.
 - `callback_delivered`: Kanban/watcher callback evidence exists; does not imply review or completion.
 - `final_accepted`: KAS/Blue final synthesis after required evidence/review gates.
 
@@ -145,6 +146,14 @@ Extractor status handling:
 - `precise` or `partial` can support compact failure triage.
 - `degraded` or `no_match` is a rule-mining signal, not a pass/fail override.
 - Command exit code remains authoritative for command success/failure.
+
+KAH KAT attachment evidence is factual only and should include run id,
+status ref/hash, summary JSON ref/hash, summary Markdown ref/hash, raw-log
+ref/hash, extractor status, command exit code, and attachment status. Missing,
+unsafe, cross-run, malformed, hashless, checksum-mismatched, run-id-mismatched,
+approval-claiming, waiver-claiming, or final-acceptance-claiming KAT evidence
+fails closed. KAH records the evidence shape; KAS/Blue/color/MAR/final gates
+interpret acceptance.
 
 ## 7. Async and wake-up policy
 
@@ -171,6 +180,29 @@ Neither state approves the plan, starts implementation, satisfies color/MAR
 review, or marks final completion. `plan_locked` requires accepted_plan_hash after KAS/Blue/color review
 and must bind that hash to the reviewed candidate plan artifact. Post-lock drift
 requires a plan-conflict report before continuation.
+
+### GAJAE-005 source-side pilot
+
+GAJAE-005 may update source-side KAS templates and KAH helper behavior for the
+async `ultragoal` / KAT attachment / review-fix pilot after explicit ask/apply
+approval. This authorization is bounded to source, tests, and docs. It does not
+authorize commit, push, install, release, live/default runtime activation, KAB
+Stage 2/3 activation, real GJC `ultragoal` invocation, live KAT execution, or
+profile/provider/auth/token/gateway/model mutation.
+
+`ultragoal_ready`, `kat_evidence_ready`, and `review_fix_candidate_ready` remain
+candidate/factual evidence states only. They do not approve implementation,
+close findings, satisfy color review, satisfy MAR, approve waivers, or mark
+final completion. Review/fix packets must use `review_fix_candidate_ready` or an
+equally distinct factual status so fix-turn evidence cannot be confused with
+ordinary implementation readiness.
+
+Review/fix-turn KAT attachment is not required in GAJAE-005 until KAH implements
+a dedicated review-fix command/status path. The `review_fix_turn` packet may
+preserve deferred KAT attachment metadata, but it must not claim that KAH can
+attach KAT evidence to `review_fix_candidate_ready` through the current
+`attach-kat-evidence` path. KAT attachment remains implemented for
+`ultragoal_ready` only unless a later approved KAH task expands the status path.
 
 ## 8. Shared task sequence
 
