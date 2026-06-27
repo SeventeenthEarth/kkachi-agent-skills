@@ -216,14 +216,14 @@ GAJAE uses shared logical task ids across KAS and KAH. Repo-local commits/PRs an
 | GAJAE-004 | KAS+KAH | Pilot async ralplan with Kanban wake and plan lock | Completed / source-side pilot |
 | GAJAE-005 | KAS+KAH | Pilot async ultragoal with KAT evidence and review loop | Source-side pilot |
 | GAJAE-006 | KAS+KAH | Productize watcher/callback closeout and docs/evidence surfaces | Completed |
-| GAJAE-007 | KAH+KAS | Real GJC `ralplan` adapter | Planned |
+| GAJAE-007 | KAH+KAS | Real GJC `ralplan` adapter | Completed |
 | GAJAE-008 | KAH+KAS | Real GJC `ultragoal` adapter | Planned |
 | GAJAE-009 | KAH+KAT (KAH-led) | KAT evidence normalization / KAH attach adapter | Planned |
 | GAJAE-010 | KAS+KAH+KAT | Contract docs and skill guidance update | Planned |
 
 ## 8.1. GAJAE-007..010 pilot-unblock task scope
 
-- `GAJAE-007` changes code/contract behavior so KAH derives native GJC 0.7.3 ralplan inputs from KAS packets and records only candidate plan evidence.
+- `GAJAE-007` changes code/contract behavior so KAS packets carry `native_ralplan_input.stage`, `.stage_n`, and `.artifact`, KAH derives native GJC 0.7.3 `ralplan --write` flags from those fields, and KAH records only candidate plan evidence.
 - `GAJAE-008` changes code/contract behavior so KAH derives native GJC 0.7.3 ultragoal brief input from KAS packets and records only implementation-candidate evidence.
 - `GAJAE-009` changes code/contract behavior so KAH can attach factual KAT v0.1.0 evidence through a normalized bindable snapshot, or KAT emits that bindable snapshot directly. In both cases KAT remains factual and never authoritative.
 - `GAJAE-010` updates KAS/KAH/KAT repo docs and Hermes skill guidance after the adapters settle. Verification evidence remains a done criterion inside those tasks, not a separate roadmap task.

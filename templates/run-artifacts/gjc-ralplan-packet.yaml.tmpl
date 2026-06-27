@@ -39,6 +39,13 @@ plan_lock:
 fallback_policy: none_fail_closed
 no_gjc_self_approval: true
 
+native_ralplan_input:
+  stage: "{{ native_ralplan_stage }}"
+  stage_n: {{ native_ralplan_stage_n }}
+  artifact: "{{ native_ralplan_artifact }}"
+  contract: "KAH must pass these fields to GJC 0.7.3 native `ralplan --write` flags and must not pass the packet path as `--packet`."
+  missing_or_invalid_behavior: fail_closed_before_gjc_invocation
+
 forbidden_scope:
   - KAB Stage 2/3 activation
   - live GJC/KAT/KAB runtime activation beyond this delegated packet

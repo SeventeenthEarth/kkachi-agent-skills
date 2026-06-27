@@ -119,6 +119,20 @@ func TestGAJAE004AsyncRalplanPilotIsAllowedWithoutBroadeningDeferredScope(t *tes
 	})
 	requireNotContains(t, "templates/run-artifacts/gjc-ralplan-packet.yaml.tmpl", []string{"GAJAE-004 async callback pilot"})
 
+	requireContainsAll(t, "templates/run-artifacts/gjc-ralplan-packet.yaml.tmpl", []string{
+		"native_ralplan_input:",
+		"stage: \"{{ native_ralplan_stage }}\"",
+		"stage_n: {{ native_ralplan_stage_n }}",
+		"artifact: \"{{ native_ralplan_artifact }}\"",
+		"KAH must pass these fields to GJC 0.7.3 native `ralplan --write` flags and must not pass the packet path as `--packet`.",
+	})
+	requireContainsAll(t, "registries/phase-contracts.yaml", []string{
+		"native_ralplan_input.stage",
+		"native_ralplan_input.stage_n",
+		"native_ralplan_input.artifact",
+		"KAH projects `native_ralplan_input` into GJC 0.7.3 `ralplan --write` flags and must fail closed instead of falling back to `--packet`.",
+	})
+
 	requireContainsAll(t, "templates/run-artifacts/gjc-callback-contract-packet.yaml.tmpl", []string{
 		"packet_kind: callback_contract",
 		"callback_delivered",
