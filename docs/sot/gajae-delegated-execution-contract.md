@@ -28,14 +28,14 @@ GJC is an executor, not an authority source. GJC output becomes a candidate arti
 
 ## 2. Pilot-verified facts
 
-The pilot evidence listed above proves the following implementation assumptions are safe to plan from:
+The pilot evidence listed above plus the 2026-06-27 `/tmp/kkachi-gjc` scratch verification prove the following implementation assumptions and blockers are safe to plan from:
 
 1. GJC `deep-interview`, `ralplan`, and `ultragoal` are present in the installed GJC skill set.
-2. `gjc ralplan --write` can emit plan artifacts with path, stage, stage number, and SHA-256 receipt.
-3. `gjc ultragoal create-goals` and `gjc ultragoal status --json` expose a durable goal ledger/status surface.
+2. Native `gjc ralplan --write` can emit plan artifacts with path, stage, stage number, and SHA-256 receipt, but installed GJC 0.7.3 requires KAH to provide required stage/stage-number/artifact or equivalent inputs; `--packet` alone is not a valid live invocation.
+3. Native `gjc ultragoal create-goals` and `gjc ultragoal status --json` expose a durable goal ledger/status surface, but installed GJC 0.7.3 requires KAH to provide `--brief`, `--brief-file`, or `--from-stdin`; `--packet` alone is not a valid live invocation.
 4. GJC can call Hermes Kanban CLI to add a comment and complete a task.
 5. A Hermes background process running GJC can perform that callback, so Hermes does not need to spend LLM tokens while waiting.
-6. KAT v0.1.0 can emit raw logs, summary JSON/Markdown, status JSON, status hash, and KAH-compatible run-id artifact paths.
+6. KAT v0.1.0 can emit raw logs, summary JSON/Markdown, status JSON, status hash, and Kkachi run-id artifact paths; raw KAT v0.1.0 status JSON is not yet directly KAH-attachable without normalization because KAH currently rejects unsupported fields such as `command_id`.
 7. KAT `--run-id` is a global flag and must appear before `run`.
 8. GJC execution from Hermes needs real-user home normalization such as `HOME=/Users/draccoon`; the KAH wrapper must own this instead of leaving it to packet authors.
 9. Non-interactive GJC use must carry an explicit `GJC_SESSION_ID` or equivalent wrapper-managed session id.
@@ -216,6 +216,17 @@ GAJAE uses shared logical task ids across KAS and KAH. Repo-local commits/PRs an
 | GAJAE-004 | KAS+KAH | Pilot async ralplan with Kanban wake and plan lock | Completed / source-side pilot |
 | GAJAE-005 | KAS+KAH | Pilot async ultragoal with KAT evidence and review loop | Source-side pilot |
 | GAJAE-006 | KAS+KAH | Productize watcher/callback closeout and docs/evidence surfaces | Completed |
+| GAJAE-007 | KAH+KAS | Real GJC `ralplan` adapter | Planned |
+| GAJAE-008 | KAH+KAS | Real GJC `ultragoal` adapter | Planned |
+| GAJAE-009 | KAH+KAT (KAH-led) | KAT evidence normalization / KAH attach adapter | Planned |
+| GAJAE-010 | KAS+KAH+KAT | Contract docs and skill guidance update | Planned |
+
+## 8.1. GAJAE-007..010 pilot-unblock task scope
+
+- `GAJAE-007` changes code/contract behavior so KAH derives native GJC 0.7.3 ralplan inputs from KAS packets and records only candidate plan evidence.
+- `GAJAE-008` changes code/contract behavior so KAH derives native GJC 0.7.3 ultragoal brief input from KAS packets and records only implementation-candidate evidence.
+- `GAJAE-009` changes code/contract behavior so KAH can attach factual KAT v0.1.0 evidence through a normalized bindable snapshot, or KAT emits that bindable snapshot directly. In both cases KAT remains factual and never authoritative.
+- `GAJAE-010` updates KAS/KAH/KAT repo docs and Hermes skill guidance after the adapters settle. Verification evidence remains a done criterion inside those tasks, not a separate roadmap task.
 
 ## 9. GAJAE-001 acceptance criteria
 
