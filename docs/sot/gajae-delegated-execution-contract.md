@@ -226,14 +226,14 @@ GAJAE uses shared logical task ids across KAS and KAH. Repo-local commits/PRs an
 | GAJAE-007 | KAH+KAS | Real GJC `ralplan` adapter | Completed |
 | GAJAE-008 | KAH+KAS | Real GJC `ultragoal` adapter | Completed |
 | GAJAE-009 | KAH+KAT (KAH-led) | KAT evidence normalization / KAH attach adapter | Completed |
-| GAJAE-010 | KAS+KAH+KAT | Contract docs and skill guidance update | Planned |
+| GAJAE-010 | KAS+KAH+KAT | Contract docs and skill guidance update | Completed |
 
 ## 8.1. GAJAE-007..010 pilot-unblock task scope
 
 - `GAJAE-007` changes code/contract behavior so KAS packets carry `native_ralplan_input.stage`, `.stage_n`, and `.artifact`, KAH derives native GJC 0.7.3 `ralplan --write` flags from those fields, and KAH records only candidate plan evidence.
 - `GAJAE-008` changes code/contract behavior so KAH materializes `native_ultragoal_input.brief` into run-local `native_input_ref` evidence, invokes GJC 0.7.3 as `ultragoal create-goals --brief-file <path> --json`, adapts native goals/ledger output into run-local `artifact_refs`, and records only implementation-candidate evidence.
 - `GAJAE-009` changes code/contract behavior so KAH can attach factual KAT v0.1.0 evidence through KAH-side normalization of status/summary/raw-log refs without requiring KAT source changes. KAT remains factual and never authoritative.
-- `GAJAE-010` updates KAS/KAH/KAT repo docs and Hermes skill guidance after the adapters settle. Verification evidence remains a done criterion inside those tasks, not a separate roadmap task.
+- `GAJAE-010` updates KAS/KAH/KAT repo docs and Hermes skill guidance after the adapters settle. The closeout preserves `native_ralplan_input`, `native_ultragoal_input`, KAH-derived `native_input_ref`, KAH-side normalization of KAT factual status/summary/raw-log refs, and the rule that GJC/KAT/KAH evidence is candidate, factual, or mechanical until KAS/Blue/color/MAR/final gates accept it. Verification evidence remains a done criterion inside those tasks, not a separate roadmap task.
 
 ## 9. GAJAE-001 acceptance criteria
 
