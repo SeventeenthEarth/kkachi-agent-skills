@@ -12,6 +12,7 @@ __pycache__/
 .omc/
 .claude/
 .external-review-sidecar/
+.kat/
 feedback.md
 
 bin/
