@@ -11,17 +11,21 @@ scaffold, prompt, or disposition support for MAR policy work.
 
 MAR-002 does not execute providers. This skill provides only scaffold, reviewer
 prompt, reference, and disposition-template support. MAR-003 adds the local
-`mar.py` fixture/mock/read-only script surface. MAR-004 owns provider execution
-safety, failure reason codes, raw-output caps, mutation guards, and adapter-proof
-blocking after provider proof. MAR-005 owns role-first required coverage:
+`mar.py` fixture/mock/read-only script surface. Historical MAR-004..006 evidence
+remains valid for the pre-NEWMAR KAS-runner path, but `docs/sot/mar-execution-realignment.md`
+supersedes the long-term provider-execution ownership line: future healthy MAR
+provider execution moves to KAH `mar` after KAS request bundles, KAH
+validation/status/wait/cancel, fake/no-provider async proof, real adapter proof,
+and reviewed live-pilot approval. MAR-005 owns role-first required coverage:
 `logic`, `security`, `arch`, `cve`, and `test_adequacy` are required roles, and
 each role has declared primary and secondary provider candidates in
-`registries/mar-provider-lanes.json`. MAREV-002 owns later deterministic KAH MAR
-artifact, gate, or schema validation behavior.
+`registries/mar-provider-lanes.json`. Current MAREV-002/KAH behavior is
+`mar-evidence.v1` artifact/gate/schema validation only until NEWMAR
+implementation evidence exists.
 
 ## Boundaries
 
-- Do not execute reviewers or providers from this skill until MAR-004 provider-run implementation evidence exists.
+- Do not execute reviewers or providers from this skill as the future healthy path; after NEWMAR, KAS should render/request/facade while KAH `mar` owns reviewed provider execution. Historical MAR-004 provider-run evidence remains pre-NEWMAR only.
 - Do not treat provider dispatch success, provider availability, rendered
   prompt creation, or unresolved required role coverage as completion evidence.
 - Do not activate KAB as a default MAR path.

@@ -7,6 +7,7 @@ Authority level: KAS planning authority for MAR promotion from accepted Obsidian
 Source SOT: `/Users/draccoon/Workspace/Hermes/17thHermes/40_outputs/projects/kkachi/2026-06-16-kkachi-multi-agent-review-mar-sot.md`
 Paired KAH planning SOT: KAH `docs/sot/multi-agent-review-evidence-gates.md`
 Scope: KAS MAR policy, skill, prompt templates, reviewer matrix, premium escalation rules, and script ownership
+NEWMAR marker: `docs/sot/mar-execution-realignment.md` supersedes this document only for the long-term provider-execution ownership line after `NEWMAR-001` updates/stale-marks active docs. Current source behavior and historical `MAR-004..006` evidence remain valid for the pre-NEWMAR KAS runner path until reviewed replacement tasks land.
 
 ## Purpose
 
@@ -199,12 +200,15 @@ unresolved required role coverage, conflict, low confidence,
 high/blocker/security/fail-closed findings, premium escalation suggestions, or
 explicit task policy.
 
-KAS owns provider execution, parsing, merge-pack creation, status aggregation,
-role coverage, Blue matrix inputs, and Blue disposition. KAH owns deterministic
-evidence/gate validation only after the paired MAREV implementation exists. KAH
-must not choose roles, providers, retries, alternates, or waivers, and KAS must
-not claim that KAH has validated role coverage until MAREV code/test evidence
-exists.
+Pre-NEWMAR, KAS owns provider execution, parsing, merge-pack creation,
+status aggregation, role coverage, Blue matrix inputs, and Blue disposition.
+For future healthy MAR execution, `docs/sot/mar-execution-realignment.md`
+supersedes only the provider-execution ownership line: KAS will own request
+bundles/policy/disposition, while KAH will own deterministic MAR execution and
+evidence after reviewed NEWMAR implementation. KAH must not choose roles,
+providers, retries, alternates, or waivers, and KAS must not claim that KAH has
+validated role coverage or executed providers until corresponding KAH code/test
+evidence exists.
 
 MAR dogfood evidence must run beside the still-active review workflow before
 broad wording claims MAR has replaced legacy review or team color review
