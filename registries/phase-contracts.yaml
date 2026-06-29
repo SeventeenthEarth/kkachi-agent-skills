@@ -257,6 +257,77 @@ gjc_packet_contract:
     - "GAJAE-004 async ralplan/callback pilot is allowed only for ralplan_ready and callback evidence."
     - "GAJAE-005 KAT/ultragoal evidence and GAJAE-006 watcher/callback closeout remain factual source-side evidence unless separately approved for final completion, live runtime, or same-thread wake readiness."
 
+mar_request_bundle_contract:
+  contract_version: "newmar002.v1"
+  owner: KAS
+  kah_validation_role: mechanical_validation_only_until_NEWMAR003
+  purpose: "reviewed schema/capability evidence candidate only for KAS MAR request bundles and provider-registry/correlation metadata before KAH `mar` consumes the contract."
+  schema_files:
+    request_bundle: "schemas/mar/request-bundle.schema.json"
+    provider_registry_correlation: "schemas/mar/provider-registry-correlation.schema.json"
+  templates:
+    request_bundle: "templates/run-artifacts/mar-request.yaml.tmpl"
+    provider_registry_correlation: "templates/run-artifacts/mar-provider-registry-correlation.yaml.tmpl"
+  required_fields:
+    - request_metadata
+    - role_matrix
+    - prompt_refs
+    - input_bundle_ref
+    - provider_registry.ref
+    - provider_registry.schema_version
+    - lane_identity
+    - provider_identity
+    - provider_family
+    - request_bundle_ref
+    - prompt_bundle_refs
+    - adapter_type
+    - adapter_proof_ref
+    - provenance_ref
+    - author_backend_correlation
+    - provider_preflight_ref
+    - provider_preflight.generated_at
+    - provider_preflight.expires_at
+    - provider_preflight.checked_binary_version
+    - provider_preflight.checked_capability_version
+    - execution_policy_values.max_concurrency
+    - execution_policy_values.max_duration
+    - execution_policy_values.max_cost_or_token_budget
+    - execution_policy_values.raw_output_cap
+    - execution_policy_values.secret_scan_redaction_required
+    - execution_policy_values.mutation_guard_required
+    - approval_metadata.approval_posture
+    - approval_metadata.approver_id
+    - approval_metadata.approval_scope
+    - approval_metadata.approval_created_at
+    - approval_metadata.approval_expires_at
+    - approval_metadata.null_validation_posture
+    - retry_waiver_approval_ref
+    - approval_binding.mar_start
+    - approval_binding.mar_start.bound_tuple
+    - mar_start_approval_binding
+    - mar_start_approval_binding.bound_tuple
+    - concurrency_policy_ref
+    - duration_policy_ref
+    - cost_policy_ref
+    - independence_policy_ref
+    - execution_safety_ref
+  fail_closed_on:
+    - missing
+    - stale
+    - mismatched
+    - unsupported
+    - expired
+    - unsafe-ref
+    - extra-unreviewed
+    - checksum-drifting
+  boundary_rules:
+    - "reviewed schema/capability evidence candidate only; no live provider execution authority is created by NEWMAR-002 alone."
+    - "JSON Schema refs must be strict: no nested extra-unreviewed metadata, safe repo-relative paths only, and sha256 fields matching sha256:<64 lowercase hex>."
+    - "approval_binding.mar_start.bound_tuple and mar_start_approval_binding.bound_tuple carry the full plan-vet minimum accepted approval-binding tuple for later KAH validation: request-bundle refs/checksums, prompt/input refs/checksums, provider family, adapter proof, provenance, author-backend correlation refs, provider preflight timestamps/checked versions, execution-policy values, approval scope/checksum/times, retry/waiver refs, and explicit null/validation-only posture."
+    - "KAH must block unsafe provider execution before KAH consumes it."
+    - "KAH may later validate mechanical fields only; KAH must not generate semantic prompts or choose providers, retries, waivers, or acceptance."
+    - "Templates must be explicit with no inferred defaults and no generated semantic prompt text."
+
 review_bundle_contract:
   contract_version: "token009.v1"
   template: "templates/run-artifacts/review-bundle.yaml.tmpl"

@@ -1,0 +1,316 @@
+{
+  "schema_version": "kas.mar.request_bundle.v1",
+  "task_id": "NEWMAR-002",
+  "run_id": "run-20260629T083412Z-690afd973c74",
+  "request_metadata": {
+    "request_id": "mar-req-001",
+    "requested_at": "2026-06-29T08:34:12Z",
+    "request_kind": "role_first_review",
+    "source_authority": "KAS",
+    "candidate_evidence_only": true,
+    "review_surface": {
+      "ref": {
+        "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/artifacts/mar/review-surface.patch",
+        "sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "git_head": "abc1234def5678"
+    }
+  },
+  "role_matrix": {
+    "required_roles": [
+      "logic",
+      "security",
+      "arch",
+      "cve",
+      "test_adequacy"
+    ],
+    "role_bindings": [
+      {
+        "role_id": "logic",
+        "lane_id": "logic/kah_mar_primary",
+        "prompt_ref_id": "logic-review",
+        "provider_registry_entry_id": "logic-primary"
+      },
+      {
+        "role_id": "security",
+        "lane_id": "security/kah_mar_primary",
+        "prompt_ref_id": "security-review",
+        "provider_registry_entry_id": "security-primary"
+      },
+      {
+        "role_id": "arch",
+        "lane_id": "arch/kah_mar_primary",
+        "prompt_ref_id": "arch-review",
+        "provider_registry_entry_id": "arch-primary"
+      },
+      {
+        "role_id": "cve",
+        "lane_id": "cve/kah_mar_primary",
+        "prompt_ref_id": "cve-review",
+        "provider_registry_entry_id": "cve-primary"
+      },
+      {
+        "role_id": "test_adequacy",
+        "lane_id": "test_adequacy/kah_mar_primary",
+        "prompt_ref_id": "test-adequacy-review",
+        "provider_registry_entry_id": "test-primary"
+      }
+    ]
+  },
+  "prompt_refs": [
+    {
+      "id": "logic-review",
+      "path": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+      "sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "id": "security-review",
+      "path": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+      "sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "id": "arch-review",
+      "path": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+      "sha256": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "id": "cve-review",
+      "path": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+      "sha256": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    {
+      "id": "test-adequacy-review",
+      "path": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+      "sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ],
+  "input_bundle_ref": {
+    "path": "../review-bundle.yaml",
+    "sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+  },
+  "provider_registry": {
+    "schema_version": "kas.mar.provider_registry_correlation.v1",
+    "ref": {
+      "path": "registries/mar-provider-lanes.json",
+      "sha256": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "correlation_ref": {
+      "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/mar-provider-registry-correlation.yaml",
+      "sha256": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+    },
+    "snapshot_sha256": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+  },
+  "approval_binding": {
+    "mar_start": {
+      "approval_ref": "kanban:t_newmar002_approve",
+      "task_id": "NEWMAR-002",
+      "run_id": "run-20260629T083412Z-690afd973c74",
+      "review_git_head": "abc1234def5678",
+      "input_bundle_sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "provider_registry_sha256": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "requested_at": "2026-06-29T08:34:12Z",
+      "bound_tuple": {
+        "request_schema_ref": {
+          "path": "schemas/mar/request-bundle.schema.json",
+          "sha256": "sha256:0101010101010101010101010101010101010101010101010101010101010101"
+        },
+        "role_matrix_ref": {
+          "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/artifacts/mar/role-matrix.json",
+          "sha256": "sha256:0202020202020202020202020202020202020202020202020202020202020202"
+        },
+        "prompt_refs_sha256": "sha256:0303030303030303030303030303030303030303030303030303030303030303",
+        "required_roles": [
+          "logic",
+          "security",
+          "arch",
+          "cve",
+          "test_adequacy"
+        ],
+        "provider_lane_id": "logic/kah_mar_primary",
+        "provider_id": "zcode_glm_5_2",
+        "adapter_type": "kah_mar",
+        "provider_registry_ref": {
+          "path": "registries/mar-provider-lanes.json",
+          "sha256": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+        },
+        "provider_correlation_ref": {
+          "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/mar-provider-registry-correlation.yaml",
+          "sha256": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+        },
+        "provider_provenance_ref": {
+          "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/artifacts/gjc/gjc-ultragoal-packet.yaml",
+          "sha256": "sha256:1212121212121212121212121212121212121212121212121212121212121212"
+        },
+        "provider_preflight_ref": {
+          "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/artifacts/mar/provider-preflight.json",
+          "sha256": "sha256:3434343434343434343434343434343434343434343434343434343434343434",
+          "valid_through_request_ts": "2026-06-29T09:00:00Z"
+        },
+        "required_capabilities": [
+          "task_dag_schema_validation",
+          "workflow_instance_state"
+        ],
+        "execution_policy_refs": {
+          "concurrency_policy_ref": {
+            "path": "docs/sot/multi-agent-review-policy.md",
+            "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "duration_policy_ref": {
+            "path": "docs/sot/mar-execution-realignment.md",
+            "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "cost_policy_ref": {
+            "path": "docs/sot/mar-execution-realignment.md",
+            "sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "independence_policy_ref": {
+            "path": "docs/sot/multi-agent-review-policy.md",
+            "sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          "execution_safety_ref": {
+            "path": "docs/sot/mar-execution-realignment.md",
+            "sha256": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          }
+        },
+        "approval_metadata_ref": {
+          "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/approval.md",
+          "sha256": "sha256:0404040404040404040404040404040404040404040404040404040404040404"
+        },
+        "approved_tuple_checksum": "sha256:0505050505050505050505050505050505050505050505050505050505050505",
+        "approval_expires_at": "2026-06-29T09:34:12Z",
+        "retry_waiver_approval_ref": {
+          "path": "docs/approvals/newmar-retry-waiver.md",
+          "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "task_id": "NEWMAR-002",
+        "run_id": "run-20260629T083412Z-690afd973c74",
+        "request_bundle_schema_version": "kas.mar.request_bundle.v1",
+        "request_bundle_ref": {
+          "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/artifacts/mar/request.yaml",
+          "sha256": "sha256:0606060606060606060606060606060606060606060606060606060606060606"
+        },
+        "input_bundle_ref": {
+          "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/review-bundle.yaml",
+          "sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "prompt_bundle_refs": [
+          {
+            "id": "logic-review",
+            "path": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+            "sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          {
+            "id": "security-review",
+            "path": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+            "sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          },
+          {
+            "id": "arch-review",
+            "path": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+            "sha256": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+          },
+          {
+            "id": "cve-review",
+            "path": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+            "sha256": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+          },
+          {
+            "id": "test-adequacy-review",
+            "path": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
+            "sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          }
+        ],
+        "provider_registry_schema_version": "mar.role_lanes.v1",
+        "provider_family": "glm",
+        "adapter_proof_ref": {
+          "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/artifacts/mar/adapter-proof.json",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "author_backend_correlation": {
+          "author_backend_id": "gjc-ultragoal",
+          "author_backend_family": "gjc",
+          "author_session_ref": {
+            "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/artifacts/gjc/gjc-ultragoal-packet.yaml",
+            "sha256": "sha256:1212121212121212121212121212121212121212121212121212121212121212"
+          },
+          "author_thread_ref": null,
+          "author_turn_ref": null,
+          "correlation_status": "candidate_correlated",
+          "independence_policy_ref": {
+            "path": "docs/sot/multi-agent-review-policy.md",
+            "sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        },
+        "provider_preflight": {
+          "ref": {
+            "path": ".kkachi/runs/run-20260629T083412Z-690afd973c74/artifacts/mar/provider-preflight.json",
+            "sha256": "sha256:3434343434343434343434343434343434343434343434343434343434343434"
+          },
+          "generated_at": "2026-06-29T08:20:00Z",
+          "expires_at": "2026-06-29T09:00:00Z",
+          "checked_binary_version": "kkachi-agent-helper 0.2.0",
+          "checked_capability_version": "mar.validation-only.v1"
+        },
+        "execution_policy_values": {
+          "max_concurrency": 1,
+          "max_duration": "15m",
+          "max_cost_or_token_budget": "0-live-provider-tokens",
+          "raw_output_cap": "64KiB",
+          "secret_scan_redaction_required": true,
+          "mutation_guard_required": true,
+          "safety_policy_ref": {
+            "path": "docs/sot/mar-execution-realignment.md",
+            "sha256": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          }
+        },
+        "approval_metadata": {
+          "approval_posture": "approved",
+          "approver_id": "hwangchung",
+          "approval_ref_id": "kanban:t_newmar002_approve",
+          "approval_scope": "validation-only KAS request-bundle candidate evidence",
+          "approved_tuple_checksum": "sha256:0505050505050505050505050505050505050505050505050505050505050505",
+          "approval_created_at": "2026-06-29T08:34:12Z",
+          "approval_expires_at": "2026-06-29T09:34:12Z",
+          "retry_waiver_approval_ref": {
+            "path": "docs/approvals/newmar-retry-waiver.md",
+            "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "null_validation_posture": "not-null; approval is candidate evidence only and does not authorize provider execution"
+        }
+      }
+    }
+  },
+  "retry_waiver_approval_ref": {
+    "path": "docs/approvals/newmar-retry-waiver.md",
+    "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "policy_refs": {
+    "concurrency_policy_ref": {
+      "path": "docs/sot/multi-agent-review-policy.md",
+      "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "duration_policy_ref": {
+      "path": "docs/sot/mar-execution-realignment.md",
+      "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "cost_policy_ref": {
+      "path": "docs/sot/mar-execution-realignment.md",
+      "sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "independence_policy_ref": {
+      "path": "docs/sot/multi-agent-review-policy.md",
+      "sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "execution_safety_ref": {
+      "path": "docs/sot/mar-execution-realignment.md",
+      "sha256": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  },
+  "execution_safety": {
+    "fail_closed_on_stale_or_mismatch": true,
+    "block_provider_execution_until_kah_capability_match": true,
+    "no_generated_semantic_prompt_text": true,
+    "unsafe_ref_policy": "reject",
+    "extra_unreviewed_metadata_policy": "reject"
+  }
+}

@@ -23,6 +23,9 @@ each role has declared primary and secondary provider candidates in
 `mar-evidence.v1` artifact/gate/schema validation only until NEWMAR
 implementation evidence exists.
 
+reviewed NEWMAR-002 request bundle and provider-registry/correlation evidence is candidate evidence for NEWMAR-003+ only. KAH must fail closed on missing, stale, mismatched, unsupported, expired, unsafe-ref, extra-unreviewed, or checksum-drifting metadata before provider execution. The reviewed schema contract uses strict ref objects, safe repo-relative paths only, `sha256:<64 lowercase hex>` checksum fields, and complete `approval_binding.mar_start.bound_tuple` / `mar_start_approval_binding.bound_tuple` records for the minimum approval-binding tuple: request-bundle ref/checksum, prompt/input refs/checksums, provider family, adapter proof, provenance, author-backend correlation refs, provider preflight timestamps/checked versions, execution-policy values, approval scope/checksum/times, retry/waiver refs, and explicit null/validation-only posture.
+KAH NEWMAR-003+ may consume only reviewed NEWMAR-002 schema/capability evidence, never arbitrary/unreviewed/generated metadata. The top-level author backend correlation is a summary view and the bound-tuple author backend correlation is the exact approval binding; overlapping backend family/identity values must match. If approval metadata is stale, mismatched, expired, or checksum-drifting, regenerate the affected packet/ref, rerun review, bind a new exact approval tuple, or stay validation-only; never fall back to default provider execution.
+
 ## Boundaries
 
 - Do not execute reviewers or providers from this skill as the future healthy path; after NEWMAR, KAS should render/request/facade while KAH `mar` owns reviewed provider execution. Historical MAR-004 provider-run evidence remains pre-NEWMAR only.

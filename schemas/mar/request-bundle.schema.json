@@ -1,0 +1,723 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kas.mar.request_bundle.v1",
+  "schema_version": "kas.mar.request_bundle.v1",
+  "title": "KAS MAR request bundle contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "run_id",
+    "request_metadata",
+    "role_matrix",
+    "prompt_refs",
+    "input_bundle_ref",
+    "provider_registry",
+    "approval_binding",
+    "retry_waiver_approval_ref",
+    "policy_refs",
+    "execution_safety"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "kas.mar.request_bundle.v1"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "requested_at",
+        "request_kind",
+        "source_authority",
+        "candidate_evidence_only",
+        "review_surface"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requested_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "request_kind": {
+          "const": "role_first_review"
+        },
+        "source_authority": {
+          "const": "KAS"
+        },
+        "candidate_evidence_only": {
+          "const": true
+        },
+        "review_surface": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ref",
+            "git_head"
+          ],
+          "properties": {
+            "ref": {
+              "$ref": "#/$defs/ref"
+            },
+            "git_head": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "role_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_roles",
+        "role_bindings"
+      ],
+      "properties": {
+        "required_roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "role_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role_id",
+              "lane_id",
+              "prompt_ref_id",
+              "provider_registry_entry_id"
+            ],
+            "properties": {
+              "role_id": {
+                "type": "string"
+              },
+              "lane_id": {
+                "type": "string"
+              },
+              "prompt_ref_id": {
+                "type": "string"
+              },
+              "provider_registry_entry_id": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "prompt_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "$ref": "#/$defs/safe_relative_path"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "input_bundle_ref": {
+      "$ref": "#/$defs/ref"
+    },
+    "provider_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "ref",
+        "correlation_ref",
+        "snapshot_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "kas.mar.provider_registry_correlation.v1"
+        },
+        "ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "correlation_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "approval_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mar_start"
+      ],
+      "properties": {
+        "mar_start": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "approval_ref",
+            "task_id",
+            "run_id",
+            "review_git_head",
+            "input_bundle_sha256",
+            "provider_registry_sha256",
+            "requested_at",
+            "bound_tuple"
+          ],
+          "properties": {
+            "approval_ref": {
+              "type": "string"
+            },
+            "task_id": {
+              "type": "string"
+            },
+            "run_id": {
+              "type": "string"
+            },
+            "review_git_head": {
+              "type": "string"
+            },
+            "input_bundle_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "provider_registry_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "requested_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "bound_tuple": {
+              "$ref": "#/$defs/mar_start_bound_tuple"
+            }
+          }
+        }
+      }
+    },
+    "retry_waiver_approval_ref": {
+      "$ref": "#/$defs/ref"
+    },
+    "policy_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concurrency_policy_ref",
+        "duration_policy_ref",
+        "cost_policy_ref",
+        "independence_policy_ref",
+        "execution_safety_ref"
+      ],
+      "properties": {
+        "concurrency_policy_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "duration_policy_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "cost_policy_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "independence_policy_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "execution_safety_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "execution_safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fail_closed_on_stale_or_mismatch",
+        "block_provider_execution_until_kah_capability_match",
+        "no_generated_semantic_prompt_text",
+        "unsafe_ref_policy",
+        "extra_unreviewed_metadata_policy"
+      ],
+      "properties": {
+        "fail_closed_on_stale_or_mismatch": {
+          "const": true
+        },
+        "block_provider_execution_until_kah_capability_match": {
+          "const": true
+        },
+        "no_generated_semantic_prompt_text": {
+          "const": true
+        },
+        "unsafe_ref_policy": {
+          "const": "reject"
+        },
+        "extra_unreviewed_metadata_policy": {
+          "const": "reject"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/safe_relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "safe_relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+      "not": {
+        "pattern": "^[A-Za-z]:"
+      }
+    },
+    "provider_preflight_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "valid_through_request_ts"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/safe_relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "valid_through_request_ts": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "mar_start_bound_tuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_schema_ref",
+        "role_matrix_ref",
+        "prompt_refs_sha256",
+        "required_roles",
+        "provider_lane_id",
+        "provider_id",
+        "adapter_type",
+        "provider_registry_ref",
+        "provider_correlation_ref",
+        "provider_provenance_ref",
+        "provider_preflight_ref",
+        "required_capabilities",
+        "execution_policy_refs",
+        "approval_metadata_ref",
+        "approved_tuple_checksum",
+        "approval_expires_at",
+        "retry_waiver_approval_ref",
+        "task_id",
+        "run_id",
+        "request_bundle_schema_version",
+        "request_bundle_ref",
+        "input_bundle_ref",
+        "prompt_bundle_refs",
+        "provider_registry_schema_version",
+        "provider_family",
+        "adapter_proof_ref",
+        "author_backend_correlation",
+        "provider_preflight",
+        "execution_policy_values",
+        "approval_metadata"
+      ],
+      "properties": {
+        "request_schema_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "role_matrix_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "prompt_refs_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "required_roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "provider_lane_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_type": {
+          "enum": [
+            "kah_mar",
+            "fixture_only"
+          ]
+        },
+        "provider_registry_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "provider_correlation_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "provider_provenance_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "provider_preflight_ref": {
+          "$ref": "#/$defs/provider_preflight_ref"
+        },
+        "required_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "execution_policy_refs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "concurrency_policy_ref",
+            "duration_policy_ref",
+            "cost_policy_ref",
+            "independence_policy_ref",
+            "execution_safety_ref"
+          ],
+          "properties": {
+            "concurrency_policy_ref": {
+              "$ref": "#/$defs/ref"
+            },
+            "duration_policy_ref": {
+              "$ref": "#/$defs/ref"
+            },
+            "cost_policy_ref": {
+              "$ref": "#/$defs/ref"
+            },
+            "independence_policy_ref": {
+              "$ref": "#/$defs/ref"
+            },
+            "execution_safety_ref": {
+              "$ref": "#/$defs/ref"
+            }
+          }
+        },
+        "approval_metadata_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "approved_tuple_checksum": {
+          "$ref": "#/$defs/sha256"
+        },
+        "approval_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "retry_waiver_approval_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "request_bundle_schema_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "request_bundle_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "input_bundle_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "prompt_bundle_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/prompt_bundle_ref"
+          }
+        },
+        "provider_registry_schema_version": {
+          "const": "mar.role_lanes.v1"
+        },
+        "provider_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_proof_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "author_backend_correlation": {
+          "$ref": "#/$defs/author_backend_correlation_tuple"
+        },
+        "provider_preflight": {
+          "$ref": "#/$defs/provider_preflight_tuple"
+        },
+        "execution_policy_values": {
+          "$ref": "#/$defs/execution_policy_tuple"
+        },
+        "approval_metadata": {
+          "$ref": "#/$defs/approval_metadata_tuple"
+        }
+      }
+    },
+    "prompt_bundle_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "$ref": "#/$defs/safe_relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "author_backend_correlation_tuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "author_backend_id",
+        "author_backend_family",
+        "author_session_ref",
+        "author_thread_ref",
+        "author_turn_ref",
+        "correlation_status",
+        "independence_policy_ref"
+      ],
+      "properties": {
+        "author_backend_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "author_backend_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "author_session_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "author_thread_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "author_turn_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "correlation_status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independence_policy_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "provider_preflight_tuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "generated_at",
+        "expires_at",
+        "checked_binary_version",
+        "checked_capability_version"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "checked_binary_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checked_capability_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "execution_policy_tuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_concurrency",
+        "max_duration",
+        "max_cost_or_token_budget",
+        "raw_output_cap",
+        "secret_scan_redaction_required",
+        "mutation_guard_required",
+        "safety_policy_ref"
+      ],
+      "properties": {
+        "max_concurrency": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_duration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_cost_or_token_budget": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_output_cap": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secret_scan_redaction_required": {
+          "const": true
+        },
+        "mutation_guard_required": {
+          "const": true
+        },
+        "safety_policy_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "approval_metadata_tuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approval_posture",
+        "approver_id",
+        "approval_ref_id",
+        "approval_scope",
+        "approved_tuple_checksum",
+        "approval_created_at",
+        "approval_expires_at",
+        "retry_waiver_approval_ref",
+        "null_validation_posture"
+      ],
+      "properties": {
+        "approval_posture": {
+          "enum": [
+            "approved",
+            "validation_only"
+          ]
+        },
+        "approver_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_ref_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approved_tuple_checksum": {
+          "$ref": "#/$defs/sha256"
+        },
+        "approval_created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "approval_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "retry_waiver_approval_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "null_validation_posture": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
