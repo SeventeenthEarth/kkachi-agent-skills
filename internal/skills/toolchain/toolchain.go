@@ -23,9 +23,11 @@ import (
 )
 
 const (
-	Command        = "toolchain"
-	SchemaVersion  = "kkachi.toolchain.v1"
-	kahProbeSchema = "kah.toolchain_probe.v1"
+	Command                      = "toolchain"
+	SchemaVersion                = "kkachi.toolchain.v1"
+	kahProbeSchema               = "kah.toolchain_probe.v1"
+	kahCapabilitiesSchema        = "0.1"
+	requiredMARCapabilityVersion = "mar.validation-only.v1"
 )
 
 //go:embed templates/kkachi-agent-toolchain.py.tmpl
@@ -100,6 +102,18 @@ type probePayload struct {
 	} `json:"doctor"`
 }
 
+type capabilitiesPayload struct {
+	CapabilitiesSchemaVersion string                   `json:"capabilities_schema_version"`
+	CommandGroups             []capabilityCommandGroup `json:"command_groups"`
+	CompatibilityFlags        map[string]any           `json:"compatibility_flags"`
+}
+
+type capabilityCommandGroup struct {
+	Name        string   `json:"name"`
+	Status      string   `json:"status"`
+	Subcommands []string `json:"subcommands"`
+}
+
 type documentPolicy struct {
 	stageNumeric        int
 	stageCanonical      string
@@ -135,6 +149,9 @@ func Init(opts Options) Result {
 	result := baseResult("toolchain init", opts.ProjectRoot)
 	probe, ok := runProbe(opts, &result)
 	if !ok {
+		return failResult(result)
+	}
+	if ok := validateKAHMARCapability(opts, &result); !ok {
 		return failResult(result)
 	}
 	if ok := materializeProjectMARScripts(opts, &result); !ok {
@@ -177,6 +194,9 @@ func Doctor(opts Options) Result {
 	if _, ok := runProbe(opts, &result); !ok {
 		return failResult(result)
 	}
+	if ok := validateKAHMARCapability(opts, &result); !ok {
+		return failResult(result)
+	}
 	return result
 }
 
@@ -192,6 +212,9 @@ func Refresh(opts Options) Result {
 	}
 	probe, ok := runProbe(opts, &result)
 	if !ok {
+		return failResult(result)
+	}
+	if ok := validateKAHMARCapability(opts, &result); !ok {
 		return failResult(result)
 	}
 	if ok := materializeProjectMARScripts(opts, &result); !ok {
@@ -238,6 +261,9 @@ func ImportLegacy(opts Options) Result {
 	}
 	probe, ok := runProbe(opts, &result)
 	if !ok {
+		return failResult(result)
+	}
+	if ok := validateKAHMARCapability(opts, &result); !ok {
 		return failResult(result)
 	}
 	if ok := materializeProjectMARScripts(opts, &result); !ok {
@@ -300,6 +326,9 @@ func SetStage(opts Options) Result {
 	}
 	probe, ok := runProbe(opts, &result)
 	if !ok {
+		return failResult(result)
+	}
+	if ok := validateKAHMARCapability(opts, &result); !ok {
 		return failResult(result)
 	}
 	if ok := materializeProjectMARScripts(opts, &result); !ok {
@@ -644,6 +673,71 @@ func runProbe(opts Options, result *Result) (probePayload, bool) {
 		}
 	}
 	return payload, true
+}
+
+func validateKAHMARCapability(opts Options, result *Result) bool {
+	command := opts.Runner(opts.ProjectRoot, "capabilities", "--json")
+	if command.Err != nil {
+		message := strings.TrimSpace(string(command.Stderr))
+		if message == "" {
+			message = command.Err.Error()
+		}
+		result.Diagnostics = append(result.Diagnostics, diag("error", "kah_mar_capability_unavailable", message, "", "kah.mar"))
+		return false
+	}
+	var payload capabilitiesPayload
+	if err := json.Unmarshal(command.Stdout, &payload); err != nil {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "kah_mar_capability_invalid_json", err.Error(), "", "kah.mar"))
+		return false
+	}
+	if payload.CapabilitiesSchemaVersion != kahCapabilitiesSchema {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "kah_mar_capability_schema_invalid", "KAH capabilities schema_version is unsupported", "", "capabilities_schema_version"))
+		return false
+	}
+	var mar *capabilityCommandGroup
+	for i := range payload.CommandGroups {
+		if payload.CommandGroups[i].Name == "mar" {
+			mar = &payload.CommandGroups[i]
+			break
+		}
+	}
+	if mar == nil || mar.Status != "supported" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "kah_mar_capability_missing", "effective KAH binary does not advertise supported mar command group", "", "command_groups.mar"))
+		return false
+	}
+	for _, subcommand := range []string{"start", "status", "validate", "wait", "cancel"} {
+		if !containsString(mar.Subcommands, subcommand) {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "kah_mar_capability_missing", "effective KAH binary mar command group is missing required subcommand "+subcommand, "", "command_groups.mar.subcommands"))
+			return false
+		}
+	}
+	for _, flag := range []string{"mar_command_group", "mar_request_validation", "mar_no_provider_blocked_receipt", "mar_wait_timeout", "mar_cancel_safety"} {
+		value, ok := payload.CompatibilityFlags[flag]
+		if !ok || value != true {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "kah_mar_capability_missing", "effective KAH binary is missing required MAR compatibility flag "+flag, "", "compatibility_flags."+flag))
+			return false
+		}
+	}
+	version, ok := payload.CompatibilityFlags["mar_capability_version"].(string)
+	if !ok || version != requiredMARCapabilityVersion {
+		actual := "<missing>"
+		if ok {
+			actual = version
+		}
+		result.Diagnostics = append(result.Diagnostics, diag("error", "kah_mar_capability_mismatch", "effective KAH binary MAR capability version mismatch", "", "compatibility_flags.mar_capability_version"))
+		result.Diagnostics[len(result.Diagnostics)-1].Message += ": expected " + requiredMARCapabilityVersion + ", actual " + actual
+		return false
+	}
+	return true
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func readAndValidate(path string, result *Result) (map[string]string, bool) {

@@ -22,12 +22,33 @@ func fixedNow() time.Time {
 
 func fakeProbeRunner(t *testing.T, calls *[][]string, version string) Runner {
 	t.Helper()
+	return fakeRunner(t, calls, version, nil, nil)
+}
+
+func fakeProbeRunnerWith(t *testing.T, calls *[][]string, mutate func(map[string]any)) Runner {
+	t.Helper()
+	return fakeRunner(t, calls, "0.2.0", mutate, nil)
+}
+
+func fakeRunner(t *testing.T, calls *[][]string, version string, mutateProbe func(map[string]any), mutateCapabilities func(map[string]any)) Runner {
+	t.Helper()
 	return func(workDir string, args ...string) CommandResult {
 		*calls = append(*calls, append([]string{workDir}, args...))
-		if strings.Join(args, " ") != "project probe-toolchain --json --project-root "+workDir {
+		var payload map[string]any
+		switch strings.Join(args, " ") {
+		case "project probe-toolchain --json --project-root " + workDir:
+			payload = fakeProbePayload(workDir, version)
+			if mutateProbe != nil {
+				mutateProbe(payload)
+			}
+		case "capabilities --json":
+			payload = fakeCapabilitiesPayload()
+			if mutateCapabilities != nil {
+				mutateCapabilities(payload)
+			}
+		default:
 			return CommandResult{Stderr: []byte("unexpected command"), Err: errors.New("unexpected command")}
 		}
-		payload := fakeProbePayload(workDir, version)
 		data, err := json.Marshal(payload)
 		if err != nil {
 			t.Fatal(err)
@@ -36,19 +57,20 @@ func fakeProbeRunner(t *testing.T, calls *[][]string, version string) Runner {
 	}
 }
 
-func fakeProbeRunnerWith(t *testing.T, calls *[][]string, mutate func(map[string]any)) Runner {
-	t.Helper()
-	return func(workDir string, args ...string) CommandResult {
-		*calls = append(*calls, append([]string{workDir}, args...))
-		payload := fakeProbePayload(workDir, "0.2.0")
-		if mutate != nil {
-			mutate(payload)
-		}
-		data, err := json.Marshal(payload)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return CommandResult{Stdout: data}
+func fakeCapabilitiesPayload() map[string]any {
+	return map[string]any{
+		"capabilities_schema_version": "0.1",
+		"command_groups": []any{
+			map[string]any{"name": "mar", "status": "supported", "subcommands": []any{"start", "status", "validate", "wait", "cancel"}},
+		},
+		"compatibility_flags": map[string]any{
+			"mar_command_group":               true,
+			"mar_request_validation":          true,
+			"mar_no_provider_blocked_receipt": true,
+			"mar_wait_timeout":                true,
+			"mar_cancel_safety":               true,
+			"mar_capability_version":          requiredMARCapabilityVersion,
+		},
 	}
 }
 
@@ -76,6 +98,49 @@ func fakeProbePayload(workDir string, version string) map[string]any {
 			"reason_codes": []any{},
 		},
 		"diagnostics": []any{},
+	}
+}
+
+func TestNEWMAR003FailsClosedForMissingOrMismatchedEffectiveKAHMARCapability(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		mutateCaps func(map[string]any)
+		code       string
+	}{
+		{
+			name: "missing_mar_group",
+			mutateCaps: func(payload map[string]any) {
+				payload["command_groups"] = []any{}
+			},
+			code: "kah_mar_capability_missing",
+		},
+		{
+			name: "missing_mar_subcommand",
+			mutateCaps: func(payload map[string]any) {
+				payload["command_groups"] = []any{map[string]any{"name": "mar", "status": "supported", "subcommands": []any{"start", "status", "validate", "wait"}}}
+			},
+			code: "kah_mar_capability_missing",
+		},
+		{
+			name: "mismatched_capability_version",
+			mutateCaps: func(payload map[string]any) {
+				flags := payload["compatibility_flags"].(map[string]any)
+				flags["mar_capability_version"] = "mar.validation-only.v0"
+			},
+			code: "kah_mar_capability_mismatch",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			var calls [][]string
+			result := Init(Options{ProjectRoot: root, Runner: fakeRunner(t, &calls, "0.2.0", nil, tc.mutateCaps), Now: fixedNow})
+			if result.OK || firstCode(result.Diagnostics) != tc.code {
+				t.Fatalf("expected %s, got %+v", tc.code, result)
+			}
+			if _, err := os.Stat(filepath.Join(root, ".kkachi", "toolchain.yaml")); !os.IsNotExist(err) {
+				t.Fatalf("failed MAR capability check must not write toolchain.yaml, stat err=%v", err)
+			}
+		})
 	}
 }
 
@@ -456,7 +521,20 @@ func writeFakeVersionBinary(t *testing.T, path string, version string) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	script := "#!/bin/sh\ncase \"$1\" in\n  --version) echo \"" + version + "\" ;;\n  *) echo unexpected >&2; exit 9 ;;\nesac\n"
+	script := `#!/bin/sh
+case "$1" in
+  --version) echo "` + version + `" ;;
+  capabilities)
+    if [ "$2" = "--json" ]; then
+      cat <<'JSON'
+{"capabilities_schema_version":"0.1","command_groups":[{"name":"mar","status":"supported","subcommands":["start","status","validate","wait","cancel"]}],"compatibility_flags":{"mar_command_group":true,"mar_request_validation":true,"mar_no_provider_blocked_receipt":true,"mar_wait_timeout":true,"mar_cancel_safety":true,"mar_capability_version":"mar.validation-only.v1"}}
+JSON
+    else
+      echo unexpected >&2; exit 9
+    fi ;;
+  *) echo unexpected >&2; exit 9 ;;
+esac
+`
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -482,8 +560,8 @@ func TestInitWritesToolchainAtomicallyAfterDeterministicKAHProbe(t *testing.T) {
 	if !result.OK {
 		t.Fatalf("init failed: %+v", result.Diagnostics)
 	}
-	if len(calls) != 1 || strings.Join(calls[0][1:], " ") != "project probe-toolchain --json --project-root "+result.ProjectRoot {
-		t.Fatalf("unexpected KAH probe calls: %+v", calls)
+	if len(calls) != 2 || strings.Join(calls[0][1:], " ") != "project probe-toolchain --json --project-root "+result.ProjectRoot || strings.Join(calls[1][1:], " ") != "capabilities --json" {
+		t.Fatalf("unexpected KAH probe/capability calls: %+v", calls)
 	}
 	toolchainPath := filepath.Join(root, ".kkachi", "toolchain.yaml")
 	data, err := os.ReadFile(toolchainPath)

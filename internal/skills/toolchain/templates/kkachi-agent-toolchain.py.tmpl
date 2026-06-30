@@ -3,6 +3,7 @@ KIND = "{{KIND}}"
 import os
 import re
 import subprocess
+import json
 import sys
 from pathlib import Path
 
@@ -12,6 +13,8 @@ BIN_NAMES = {"kas": "kkachi-agent-skills", "kah": "kkachi-agent-helper"}
 SEMVER_RE = re.compile(r"^v?(\d+\.\d+\.\d+)$")
 SEMVER_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9._-])v?(\d+\.\d+\.\d+)(?![A-Za-z0-9._-])")
 KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+REQUIRED_MAR_CAPABILITY_VERSION = "mar.validation-only.v1"
+REQUIRED_MAR_SUBCOMMANDS = {"start", "status", "validate", "wait", "cancel"}
 
 
 def fail(message: str) -> None:
@@ -202,6 +205,38 @@ def assert_version(binary: Path, expected: str, label: str) -> str:
     return output
 
 
+def assert_kah_mar_capability(kah_bin: Path) -> None:
+    try:
+        completed = subprocess.run([str(kah_bin), "capabilities", "--json"], check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+    except Exception as exc:
+        fail(f"KAH MAR capability check failed for {kah_bin}: {exc}")
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "").strip()
+        fail(f"KAH MAR capability check failed for {kah_bin}: exit {completed.returncode}: {detail}")
+    try:
+        payload = json.loads(completed.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        fail(f"KAH MAR capability check returned invalid JSON: {exc}")
+    mar_group = None
+    for group in payload.get("command_groups") or []:
+        if isinstance(group, dict) and group.get("name") == "mar":
+            mar_group = group
+            break
+    if not mar_group or mar_group.get("status") != "supported":
+        fail("KAH binary missing supported mar command group; effective helper must expose NEWMAR-003 MAR capability")
+    subcommands = set(mar_group.get("subcommands") or [])
+    missing = sorted(REQUIRED_MAR_SUBCOMMANDS - subcommands)
+    if missing:
+        fail(f"KAH MAR command group missing required subcommands: {', '.join(missing)}")
+    flags = payload.get("compatibility_flags") or {}
+    for flag in ("mar_command_group", "mar_request_validation", "mar_no_provider_blocked_receipt", "mar_wait_timeout", "mar_cancel_safety"):
+        if flags.get(flag) is not True:
+            fail(f"KAH missing required MAR compatibility flag: {flag}")
+    actual = flags.get("mar_capability_version")
+    if actual != REQUIRED_MAR_CAPABILITY_VERSION:
+        fail(f"KAH MAR capability version mismatch: expected {REQUIRED_MAR_CAPABILITY_VERSION}, got {actual!r}")
+
+
 def resolve(project_root: Path) -> dict:
     config = project_root / ".kkachi" / "toolchain.yaml"
     meta = select_toolchain(config)
@@ -210,6 +245,7 @@ def resolve(project_root: Path) -> dict:
     kah_bin = require_executable(meta["kah_bin"], "KAH")
     meta["kas_version_output"] = assert_version(kas_bin, meta["kas_cli_version"], "KAS")
     meta["kah_version_output"] = assert_version(kah_bin, meta["kah_cli_version"], "KAH")
+    assert_kah_mar_capability(kah_bin)
     return meta
 
 
