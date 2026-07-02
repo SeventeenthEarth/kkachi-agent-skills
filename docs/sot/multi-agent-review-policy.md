@@ -68,14 +68,15 @@ KAS owns:
 - MAR policy and reviewer selection rules;
 - prompt templates and reviewer role matrix;
 - premium escalation policy;
-- bundled `scripts/mar.py`;
-- output schema and parsing rules;
+- bundled `scripts/mar.py` request/render/validate/readback/`kah-trigger` facade;
+- KAS compatibility schemas and fixture/merge-pack readback rules, not healthy
+  provider process control;
 - Blue disposition template guidance.
 - selecting which `kkachi-agent-helper` binary its own doctor,
   workflow-create, workflow-promote, workflow-trigger, and graphsync /
   workflow-graph repair surfaces execute when invoking KAH capabilities.
 
-KAH owns deterministic evidence only after its paired tasks implement or document support:
+KAH owns deterministic evidence and process control after its paired tasks implement or document support:
 
 - MAR request metadata;
 - provider doctor/preflight results;
@@ -129,11 +130,18 @@ fixed.
 role-to-provider candidates, provider metadata, validation posture, toolchain
 overlay evidence, and provider-failure reason vocabulary. `scripts/mar.py
 provider-lanes` remains a compatibility alias for readback only; the registry is
-role-first.
+role-first. `scripts/mar.py kah-trigger` renders the KAH `mar start` command
+without executing provider CLIs and fails closed on absolute or parent-traversal
+request refs. `scripts/mar.py provider-attempt` is a deprecated compatibility
+facade for pre-NEWMAR evidence paths and must not be used as the healthy
+execution path.
 
-## MAR-004 provider-run contract
+## Historical MAR-004 provider-run contract
 
-MAR-004 made provider execution evidence-driven and fail-closed. Provider attempt
+MAR-004 made provider execution evidence-driven and fail-closed for the
+pre-NEWMAR KAS-runner path. NEWMAR-008 keeps these fields as compatibility and
+migration evidence only; healthy provider execution/control now belongs to KAH
+`mar`. Historical provider attempt
 records must preserve:
 
 - role id, provider id, provider candidate (`primary` or `secondary`), command

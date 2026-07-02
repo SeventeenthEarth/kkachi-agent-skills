@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Local stdlib-only Multi-Agent Review helper.
+"""Local stdlib-only Multi-Agent Review facade.
 
 This helper renders local prompts, normalizes fixture/mock review evidence, and
-prepares fail-closed provider-attempt artifacts for validated MAR lanes.
+prepares KAH `mar start` trigger receipts. It intentionally does not own healthy
+provider execution; reviewed provider control belongs to KAH MAR.
 """
 
 import argparse
@@ -32,6 +33,7 @@ ROLE_LANES_SCHEMA_VERSION = "mar.role_lanes.v1"
 PROVIDER_TOOLS_SCHEMA_VERSION = "mar.provider_tools.v1"
 PROVIDER_ATTEMPT_SCHEMA_VERSION = "mar.provider_attempt.v1"
 ROLE_ATTEMPT_SCHEMA_VERSION = "mar.role_attempt.v1"
+KAH_TRIGGER_SCHEMA_VERSION = "mar.kah_trigger.v1"
 PROVIDER_FAILURE_REASONS = (
     "auth_failed",
     "token_exhausted",
@@ -44,6 +46,7 @@ PROVIDER_FAILURE_REASONS = (
     "parse_failure",
     "mutation_detected",
     "adapter_proof_required",
+    "kah_mar_execution_required",
     "unknown_provider_failure",
 )
 REVIEW_PAYLOAD_FIELDS = (
@@ -140,6 +143,20 @@ def resolve_repo_path(path):
     if candidate.is_absolute():
         return candidate
     return repo_root() / candidate
+
+
+def is_safe_repo_relative_ref(value):
+    if not isinstance(value, str) or not value.strip():
+        return False
+    candidate = Path(value)
+    if candidate.is_absolute():
+        return False
+    parts = candidate.parts
+    if any(part in ("", ".", "..") for part in parts):
+        return False
+    if parts and parts[0].startswith("~"):
+        return False
+    return True
 
 
 def parse_review_path(path, raw_cap):
@@ -832,86 +849,14 @@ def provider_preflight_attempt(args, config, attempt_id=None):
         attempt["provider_failure_reason"] = None
         return attempt
 
-    command = attempt["redacted_command"]
-    raw_text = ""
-    parsed = None
-    try:
-        completed = subprocess.run(
-            build_provider_command(
-                config,
-                getattr(args, "prompt", None),
-                getattr(args, "prompt_text", None),
-                timeout_seconds,
-            ),
-            shell=False,
-            timeout=timeout_seconds,
-            check=False,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=os.environ.copy(),
-        )
-        raw_text = (completed.stdout or "") + (completed.stderr or "")
-        attempt["exit_code"] = completed.returncode
-        attempt["no_provider_execution"] = False
-    except subprocess.TimeoutExpired as exc:
-        raw_text = ((exc.stdout or "") if isinstance(exc.stdout, str) else "") + (
-            (exc.stderr or "") if isinstance(exc.stderr, str) else ""
-        )
-        attempt["ended_at"] = utc_now()
-        attempt["terminal_status"] = "BLOCKED"
-        attempt["provider_failure_reason"] = "timeout"
-        capped = cap_raw_output(raw_text, getattr(args, "raw_cap", DEFAULT_RAW_CAP))
-        attempt["capped_output_note"] = {
-            "cap_bytes": capped["cap_bytes"],
-            "truncated": capped["truncated"],
-        }
-        return write_attempt_outputs(args, attempt, raw_text=raw_text)
-    finally:
-        after = run_git_status()
-
-    attempt["mutation_check"] = {
-        "checked": before["available"] and after["available"],
-        "detected": before["available"] and after["available"] and before["stdout"] != after["stdout"],
-    }
-    capped = cap_raw_output(raw_text, getattr(args, "raw_cap", DEFAULT_RAW_CAP))
-    attempt["capped_output_note"] = {
-        "cap_bytes": capped["cap_bytes"],
-        "truncated": capped["truncated"],
-    }
-
-    if attempt["mutation_check"]["detected"]:
-        attempt["ended_at"] = utc_now()
-        attempt["terminal_status"] = "BLOCKED"
-        attempt["provider_failure_reason"] = "mutation_detected"
-        return write_attempt_outputs(args, attempt, raw_text=raw_text)
-
-    if attempt["exit_code"] != 0:
-        attempt["ended_at"] = utc_now()
-        attempt["terminal_status"] = "DEGRADED"
-        attempt["provider_failure_reason"] = classify_provider_failure(raw_text)
-        return write_attempt_outputs(args, attempt, raw_text=raw_text)
-
-    parsed = parse_review_raw(raw_text, getattr(args, "raw_cap", DEFAULT_RAW_CAP))
-    if parsed.get("reason") == "parse_failure" or parsed.get("status") in ("FAILED", "DEGRADED") and parsed.get("reason") == "invalid_status":
-        attempt["terminal_status"] = "DEGRADED"
-        attempt["provider_failure_reason"] = "parse_failure"
-        attempt["parser_status"] = "parse_failure"
-    else:
-        attempt["terminal_status"] = parsed.get("status", "DEGRADED")
-        attempt["provider_failure_reason"] = None
-        attempt["parser_status"] = "parsed"
-        for key in REVIEW_PAYLOAD_FIELDS:
-            if key in parsed:
-                attempt[key] = parsed[key]
-
-    if attempt["terminal_status"] in NON_CLEAN_STATUSES and not attempt["provider_failure_reason"]:
-        attempt["provider_failure_reason"] = "unknown_provider_failure"
     attempt["ended_at"] = utc_now()
-    # Keep a local variable use so future command-redaction changes are covered by
-    # the attempt object without emitting raw command arguments.
-    attempt["redacted_command"] = command
-    return write_attempt_outputs(args, attempt, raw_text=raw_text, parsed=parsed)
+    attempt["terminal_status"] = "BLOCKED"
+    attempt["provider_failure_reason"] = "kah_mar_execution_required"
+    attempt["parser_status"] = "not_run"
+    attempt["kah_mar_required"] = True
+    attempt["execution_owner"] = "KAH"
+    attempt["kas_role"] = "request_render_trigger_facade"
+    return write_attempt_outputs(args, attempt)
 
 
 def with_mutation_guard(fn, args):
@@ -952,6 +897,8 @@ def cmd_doctor(args):
         "tool": "mar.py",
         "stdlib_only": True,
         "no_provider_execution": True,
+        "execution_owner": "KAH",
+        "kas_role": "request_render_trigger_facade",
         "subcommands": [
             "doctor",
             "render",
@@ -961,6 +908,7 @@ def cmd_doctor(args):
             "provider-lanes",
             "provider-preflight",
             "provider-attempt",
+            "kah-trigger",
         ],
         "allowed_statuses": list(STATUS_VOCABULARY),
         "provider_failure_reasons": list(PROVIDER_FAILURE_REASONS),
@@ -977,6 +925,33 @@ def cmd_doctor(args):
                 detail=str(exc),
             )
     return payload
+
+
+def cmd_kah_trigger(args):
+    if not is_safe_repo_relative_ref(args.request):
+        return structured_failure(
+            "FAILED",
+            "unsafe_request_ref",
+            schema_version=KAH_TRIGGER_SCHEMA_VERSION,
+            request_ref=args.request,
+            execution_owner="KAH",
+            kas_role="request_render_trigger_facade",
+        )
+    command = [args.kah_bin, "mar", "start", "--request", args.request]
+    if args.run_id:
+        command.extend(["--run", args.run_id])
+    return {
+        "schema_version": KAH_TRIGGER_SCHEMA_VERSION,
+        "status": "PASS",
+        "reason": "kah_mar_trigger_ready",
+        "run_id": args.run_id,
+        "task_id": args.task_id,
+        "request_ref": args.request,
+        "execution_owner": "KAH",
+        "kas_role": "request_render_trigger_facade",
+        "kah_command": command,
+        "no_provider_execution": True,
+    }
 
 
 def parse_set_values(values):
@@ -1475,7 +1450,7 @@ def cmd_merge_pack(args):
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Local fixture/mock MAR helper with fail-closed provider attempt scaffolding."
+        description="KAS MAR request/render/trigger facade; provider execution belongs to KAH mar."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1563,6 +1538,15 @@ def build_parser():
     provider_attempt.add_argument("--approval-evidence")
     provider_attempt.add_argument("--waiver-evidence")
     provider_attempt.set_defaults(func=cmd_provider_attempt, guarded=True)
+
+    kah_trigger = subparsers.add_parser(
+        "kah-trigger", help="render a KAH mar start command without executing providers"
+    )
+    kah_trigger.add_argument("--request", required=True)
+    kah_trigger.add_argument("--run-id")
+    kah_trigger.add_argument("--task-id")
+    kah_trigger.add_argument("--kah-bin", default="kkachi-agent-helper")
+    kah_trigger.set_defaults(func=cmd_kah_trigger, guarded=True)
 
     return parser
 

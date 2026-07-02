@@ -25,10 +25,12 @@ if [ -z "$prompt_file" ] || [ ! -f "$prompt_file" ]; then
   exit 66
 fi
 
-# Project-local MARTL adapter: pin the 17번째 지구 Hermes user HOME and local CLI path
-# so provider auth state is read consistently under Hermes. Generalize only via a
-# separate toolchain-discovery task.
-export HOME=/Users/draccoon
+# Project-local MARTL adapter: KAH must inject HOME from
+# toolchain.operator.real_user_home before invoking provider CLIs.
+if [ -z "${HOME:-}" ]; then
+  echo "mar-agy: HOME must be supplied by KAH provider env normalization" >&2
+  exit 78
+fi
 exec /Users/draccoon/.local/bin/agy \
   --print \
   --model "Gemini 3.5 Flash (High)" \

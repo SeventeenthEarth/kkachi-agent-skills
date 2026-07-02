@@ -21,9 +21,65 @@ var marStatusVocabulary = []string{
 func TestMAR003ScriptHelpExposesLocalMVPSurfaces(t *testing.T) {
 	output := runMARCommand(t, "--help")
 	help := string(output)
-	for _, want := range []string{"doctor", "render", "validate", "merge-pack", "role-lanes", "provider-lanes", "provider-preflight", "provider-attempt"} {
+	for _, want := range []string{"doctor", "render", "validate", "merge-pack", "role-lanes", "provider-lanes", "provider-preflight", "provider-attempt", "kah-trigger"} {
 		if !strings.Contains(help, want) {
 			t.Fatalf("scripts/mar.py --help missing %q\n%s", want, help)
+		}
+	}
+}
+
+func TestNEWMAR008KAHTriggerFacadeRendersStartCommandWithoutExecution(t *testing.T) {
+	output := runMARCommand(t,
+		"kah-trigger",
+		"--request", ".kkachi/runs/run-test/artifacts/mar/request.yaml",
+		"--run-id", "run-test",
+		"--task-id", "NEWMAR-008",
+	)
+	var result struct {
+		SchemaVersion       string   `json:"schema_version"`
+		Status              string   `json:"status"`
+		Reason              string   `json:"reason"`
+		ExecutionOwner      string   `json:"execution_owner"`
+		KASRole             string   `json:"kas_role"`
+		KAHCommand          []string `json:"kah_command"`
+		NoProviderExecution bool     `json:"no_provider_execution"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("parse kah-trigger output: %v\n%s", err, output)
+	}
+	if result.SchemaVersion != "mar.kah_trigger.v1" || result.Status != "PASS" || result.Reason != "kah_mar_trigger_ready" {
+		t.Fatalf("kah-trigger facade status mismatch: %+v\n%s", result, output)
+	}
+	if result.ExecutionOwner != "KAH" || result.KASRole != "request_render_trigger_facade" || !result.NoProviderExecution {
+		t.Fatalf("kah-trigger must keep KAS as trigger facade only: %+v\n%s", result, output)
+	}
+	joined := strings.Join(result.KAHCommand, " ")
+	for _, want := range []string{"kkachi-agent-helper", "mar", "start", "--request", ".kkachi/runs/run-test/artifacts/mar/request.yaml"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("kah-trigger command missing %q: %v\n%s", want, result.KAHCommand, output)
+		}
+	}
+}
+
+func TestNEWMAR008KAHTriggerRejectsUnsafeRequestRefs(t *testing.T) {
+	for _, request := range []string{"/tmp/request.yaml", "../outside/request.yaml"} {
+		output := runMARCommand(t,
+			"kah-trigger",
+			"--request", request,
+			"--run-id", "run-test",
+			"--task-id", "NEWMAR-008",
+		)
+		var result struct {
+			Status              string `json:"status"`
+			Reason              string `json:"reason"`
+			RequestRef          string `json:"request_ref"`
+			NoProviderExecution bool   `json:"no_provider_execution"`
+		}
+		if err := json.Unmarshal(output, &result); err != nil {
+			t.Fatalf("parse unsafe kah-trigger output: %v\n%s", err, output)
+		}
+		if result.Status != "FAILED" || result.Reason != "unsafe_request_ref" || result.RequestRef != request || !result.NoProviderExecution {
+			t.Fatalf("kah-trigger must fail closed for unsafe request ref %q: %+v\n%s", request, result, output)
 		}
 	}
 }
@@ -693,8 +749,10 @@ func TestMAR005ProviderAttemptEmitsFailClosedMissingCLIArtifact(t *testing.T) {
 	}
 }
 
-func TestMAR005RoleProviderAttemptMergesParsedReviewerPayload(t *testing.T) {
+func TestNEWMAR008ProviderAttemptIsDeprecatedAndNeverExecutesProvider(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "provider-executed")
 	provider := writeTempExecutable(t, "mar-provider-reviewer", `#!/bin/sh
+touch "`+marker+`"
 cat <<'JSON'
 {"status":"PASS_WITH_FINDINGS","summary":"reviewed role","confidence":0.6,"findings":[{"id":"LIVE-001","severity":"blocker","message":"synthetic blocker"}],"role_scoped_acceptance_criteria_verdicts":[{"criterion":"role/provider separation","verdict":"pass","evidence":"fixture"}],"no_provider_execution":false}
 JSON
@@ -716,29 +774,37 @@ echo '{"status":"PASS","summary":"secondary should not run"}'
 		"--pre-scoped-evidence", "live-provider-test",
 	)
 	var result struct {
-		Status       string `json:"status"`
+		Status                  string   `json:"status"`
+		Reason                  string   `json:"reason"`
+		UnresolvedRequiredRoles []string `json:"unresolved_required_roles"`
+		OperatorReportText      string   `json:"operator_report_text"`
+		NoProviderExecution     bool     `json:"no_provider_execution"`
+		Attempts                []struct {
+			ProviderID            string `json:"provider_id"`
+			TerminalStatus        string `json:"terminal_status"`
+			ProviderFailureReason string `json:"provider_failure_reason"`
+			NoProviderExecution   bool   `json:"no_provider_execution"`
+		} `json:"attempts"`
 		RoleCoverage struct {
-			RedTriggerSummary struct {
-				RedAdjudicationRequired bool     `json:"red_adjudication_required"`
-				Triggers                []string `json:"triggers"`
-			} `json:"red_trigger_summary"`
 			BlueMatrixInputs struct {
-				CoveredRoles             []string                    `json:"covered_roles"`
-				AcceptanceCriteriaMatrix map[string][]map[string]any `json:"acceptance_criteria_matrix"`
+				CoveredRoles []string `json:"covered_roles"`
 			} `json:"blue_matrix_inputs"`
 		} `json:"role_coverage"`
 	}
 	if err := json.Unmarshal(output, &result); err != nil {
 		t.Fatalf("parse role provider-attempt output: %v\n%s", err, output)
 	}
-	if result.Status != "PASS" || !containsString(result.RoleCoverage.BlueMatrixInputs.CoveredRoles, "test_adequacy") {
-		t.Fatalf("role provider-attempt must cover test_adequacy when primary provider succeeds\n%s", output)
+	if result.Status != "FAILED" || result.Reason != "all_required_roles_unresolved" || !result.NoProviderExecution {
+		t.Fatalf("deprecated provider-attempt must fail closed without provider execution\n%s", output)
 	}
-	if len(result.RoleCoverage.BlueMatrixInputs.AcceptanceCriteriaMatrix["test_adequacy"]) != 1 {
-		t.Fatalf("parsed provider AC verdicts must feed Blue matrix\n%s", output)
+	if !containsString(result.UnresolvedRequiredRoles, "test_adequacy") || containsString(result.RoleCoverage.BlueMatrixInputs.CoveredRoles, "test_adequacy") {
+		t.Fatalf("deprecated provider-attempt must not cover role from local provider output\n%s", output)
 	}
-	if !result.RoleCoverage.RedTriggerSummary.RedAdjudicationRequired || !containsString(result.RoleCoverage.RedTriggerSummary.Triggers, "low_confidence") || !containsString(result.RoleCoverage.RedTriggerSummary.Triggers, "blocker") {
-		t.Fatalf("parsed confidence/finding severity must feed Red trigger summary\n%s", output)
+	if len(result.Attempts) == 0 || result.Attempts[0].ProviderFailureReason != "kah_mar_execution_required" || !result.Attempts[0].NoProviderExecution {
+		t.Fatalf("deprecated provider-attempt must point to KAH MAR execution: %+v\n%s", result.Attempts, output)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("KAS provider-attempt executed provider marker unexpectedly: stat err=%v\n%s", err, output)
 	}
 }
 
@@ -967,10 +1033,10 @@ func TestMARTL002ProviderAdaptersRoleMatrixAndVisionMetadata(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read provider %s adapter script %s: %v", providerID, script, err)
 		}
-		if !strings.Contains(string(scriptBytes), "HOME=/Users/draccoon") {
-			t.Fatalf("provider %s adapter script must pin Hermes auth HOME before CLI execution", providerID)
-		}
 		scriptText := string(scriptBytes)
+		if strings.Contains(scriptText, "HOME=/Users/draccoon") || !strings.Contains(scriptText, "toolchain.operator.real_user_home") {
+			t.Fatalf("provider %s adapter script must rely on KAH-injected toolchain.operator.real_user_home, not hard-code HOME", providerID)
+		}
 		switch providerID {
 		case "zcode_glm_5_2":
 			if !strings.Contains(scriptText, "cd /Applications/ZCode.app/Contents/Resources/glm") || !strings.Contains(scriptText, "--prompt") {

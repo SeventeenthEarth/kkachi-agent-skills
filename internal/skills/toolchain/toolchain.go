@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -649,6 +650,37 @@ func (opts Options) nowString() string {
 	return opts.Now().UTC().Format(time.RFC3339)
 }
 
+func operatorRealUserHome() string {
+	if current, err := user.Current(); err == nil && validateOperatorRealUserHome(current.HomeDir) {
+		return filepath.Clean(current.HomeDir)
+	}
+	if home, err := os.UserHomeDir(); err == nil && validateOperatorRealUserHome(home) {
+		return filepath.Clean(home)
+	}
+	if home := os.Getenv("HOME"); validateOperatorRealUserHome(home) {
+		return filepath.Clean(home)
+	}
+	return ""
+}
+
+func validateOperatorRealUserHome(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	cleaned := filepath.Clean(value)
+	if !filepath.IsAbs(cleaned) || cleaned != value || cleaned == string(filepath.Separator) {
+		return false
+	}
+	parts := strings.Split(filepath.ToSlash(cleaned), "/")
+	for i := 0; i+2 < len(parts); i++ {
+		if parts[i] == ".hermes" && parts[i+1] == "profiles" && parts[i+2] != "" {
+			return false
+		}
+	}
+	return true
+}
+
 func baseResult(command string, projectRoot string) Result {
 	return Result{
 		OK:            true,
@@ -827,7 +859,7 @@ func readAndValidate(path string, result *Result) (map[string]string, bool) {
 		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_invalid", "toolchain.yaml must include schema_version or compatibility KAH selection keys", path, "schema_version"))
 		return nil, false
 	}
-	for _, required := range []string{"generated_by", "project", "kas", "kah", "kab", "mar", "evidence_posture"} {
+	for _, required := range []string{"generated_by", "project", "kas", "kah", "operator", "kab", "mar", "evidence_posture"} {
 		if doc["schema_version"] == SchemaVersion && !hasSection(data, required) {
 			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_required_group_missing", "toolchain.yaml is missing required group "+required, path, required))
 			return nil, false
@@ -845,6 +877,9 @@ func readAndValidate(path string, result *Result) (map[string]string, bool) {
 			"kah.binary_path",
 			"kah.project_initialized",
 			"kah.doctor_status",
+			"operator.real_user_home",
+			"operator.env_policy.provider_home_required",
+			"operator.env_policy.disallow_hermes_profile_home",
 			"kab.adoption_stage.numeric",
 			"kab.adoption_stage.canonical",
 			"kab.adoption_stage.stage2_activation",
@@ -868,6 +903,14 @@ func readAndValidate(path string, result *Result) (map[string]string, bool) {
 				status = "<empty>"
 			}
 			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_kah_doctor_not_pass", "stored toolchain metadata reports kah.doctor_status is not PASS: "+status, path, "kah.doctor_status"))
+			return nil, false
+		}
+		if !validateOperatorRealUserHome(doc["operator.real_user_home"]) {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_operator_home_invalid", "operator.real_user_home must be an absolute real-user home and must not be the Hermes profile home", path, "operator.real_user_home"))
+			return nil, false
+		}
+		if !strings.EqualFold(doc["operator.env_policy.provider_home_required"], "true") || !strings.EqualFold(doc["operator.env_policy.disallow_hermes_profile_home"], "true") {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_operator_env_policy_invalid", "operator env policy must require provider HOME and disallow Hermes profile HOME", path, "operator.env_policy"))
 			return nil, false
 		}
 		if doc["kab.adoption_stage.numeric"] != "1" || doc["kab.adoption_stage.canonical"] != "stage1_direct_codex_app_server_baseline" {
@@ -953,6 +996,11 @@ func renderDocument(action string, opts Options, probe probePayload, policy docu
 		`  selection_source: "` + selectionSource + `"`,
 		`  project_initialized: ` + strconv.FormatBool(probe.Project.ProjectInitialized),
 		`  doctor_status: "` + yamlEscape(statusOrUnknown(probe.Doctor.Status)) + `"`,
+		"operator:",
+		`  real_user_home: "` + yamlEscape(operatorRealUserHome()) + `"`,
+		"  env_policy:",
+		"    provider_home_required: true",
+		"    disallow_hermes_profile_home: true",
 		"kab:",
 		"  adoption_stage:",
 		"    numeric: " + strconv.Itoa(policy.stageNumeric),
