@@ -153,6 +153,11 @@ can perform semantic migration.
 `doctor` verifies source pack integrity, installed profile state,
 manifest/checksum consistency, KAH availability/version/capabilities, optional
 project bootstrap/doctor status, and the KAB boundary for the requested lane.
+`toolchain doctor --project-root <path> --json` also reports NEWMAR-009
+`mar_migration` diagnostics for copied project-local KAS `mar.py` and shell
+adapter surfaces. This is report-only migration guidance with
+`no_deletion_without_approval: true` and `live_provider_execution: false`; it
+must not delete local files or execute providers.
 `doctor --project <path> --workflow-graph --json` is a separate read-only
 workflow graph supportability check: it reads KAS compatibility metadata,
 effective KAH version/capabilities/help, and KAH graph validate/explain evidence

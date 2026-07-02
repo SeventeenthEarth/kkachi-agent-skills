@@ -617,6 +617,38 @@ func TestDoctorFailsClosedWhenProjectMARScriptsAreMissing(t *testing.T) {
 	}
 }
 
+func TestNEWMAR009DoctorReportsCopiedMARSurfacesWithoutDeletingThem(t *testing.T) {
+	root := t.TempDir()
+	var calls [][]string
+	init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if !init.OK {
+		t.Fatalf("init failed: %+v", init.Diagnostics)
+	}
+	before := snapshotFiles(t, root)
+
+	result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	after := snapshotFiles(t, root)
+
+	if !reflect.DeepEqual(before, after) {
+		t.Fatalf("doctor must not delete or rewrite copied MAR surfaces: before=%v after=%v", before, after)
+	}
+	if !result.OK {
+		t.Fatalf("doctor should pass while reporting stale migration risk: %+v", result.Diagnostics)
+	}
+	if result.MARMigration.Status != "stale_surfaces_present" || !result.MARMigration.NoDeletionWithoutApproval {
+		t.Fatalf("MAR migration diagnostics = %#v, want stale surfaces with no-deletion policy", result.MARMigration)
+	}
+	if len(result.MARMigration.Surfaces) < 4 {
+		t.Fatalf("MAR migration surfaces = %#v, want copied mar.py and shell adapters", result.MARMigration.Surfaces)
+	}
+	if !strings.Contains(result.MARMigration.NextAction, "NEWMAR-009") || !strings.Contains(result.MARMigration.NextAction, "NEWMAR-008") {
+		t.Fatalf("next action = %q, want NEWMAR-009/NEWMAR-008 migration guidance", result.MARMigration.NextAction)
+	}
+	if !diagnosticCodesContain(result.Diagnostics, "mar_migration_stale_local_surface") {
+		t.Fatalf("diagnostics = %#v, want mar_migration_stale_local_surface warning", result.Diagnostics)
+	}
+}
+
 func assertMaterializedMARScripts(t *testing.T, root string) {
 	t.Helper()
 	for _, rel := range []string{
@@ -1065,4 +1097,13 @@ func firstCode(diagnostics []Diagnostic) string {
 		return ""
 	}
 	return diagnostics[0].Code
+}
+
+func diagnosticCodesContain(diagnostics []Diagnostic, code string) bool {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Code == code {
+			return true
+		}
+	}
+	return false
 }

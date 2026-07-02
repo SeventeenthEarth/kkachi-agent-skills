@@ -62,6 +62,7 @@ type Result struct {
 	ToolchainPath string           `json:"toolchain_path,omitempty"`
 	Wrote         bool             `json:"wrote"`
 	Launchers     []LauncherRecord `json:"launchers,omitempty"`
+	MARMigration  MARMigration     `json:"mar_migration"`
 	Diagnostics   []Diagnostic     `json:"diagnostics"`
 	NextAction    string           `json:"next_action,omitempty"`
 }
@@ -77,6 +78,21 @@ type Diagnostic struct {
 	Message string `json:"message"`
 	Path    string `json:"path,omitempty"`
 	Field   string `json:"field,omitempty"`
+}
+
+type MARMigration struct {
+	Status                    string                `json:"status"`
+	Surfaces                  []MARMigrationSurface `json:"surfaces"`
+	NoDeletionWithoutApproval bool                  `json:"no_deletion_without_approval"`
+	LiveProviderExecution     bool                  `json:"live_provider_execution"`
+	NextAction                string                `json:"next_action"`
+}
+
+type MARMigrationSurface struct {
+	Path     string `json:"path"`
+	Kind     string `json:"kind"`
+	Status   string `json:"status"`
+	Guidance string `json:"guidance"`
 }
 
 type probePayload struct {
@@ -189,6 +205,12 @@ func Doctor(opts Options) Result {
 	if doc["mar.provider_tools.schema_version"] != "" {
 		if ok := verifyProjectMARScripts(opts, &result); !ok {
 			return failResult(result)
+		}
+	}
+	result.MARMigration = diagnoseMARMigration(opts.ProjectRoot)
+	if result.MARMigration.Status == "stale_surfaces_present" {
+		for _, surface := range result.MARMigration.Surfaces {
+			result.Diagnostics = append(result.Diagnostics, diag("warning", "mar_migration_stale_local_surface", surface.Guidance, filepath.Join(opts.ProjectRoot, surface.Path), "mar.migration"))
 		}
 	}
 	if _, ok := runProbe(opts, &result); !ok {
@@ -530,6 +552,44 @@ func verifyProjectMARScripts(opts Options, result *Result) bool {
 		return false
 	}
 	return true
+}
+
+func diagnoseMARMigration(projectRoot string) MARMigration {
+	migration := MARMigration{
+		Status:                    "not_detected",
+		Surfaces:                  []MARMigrationSurface{},
+		NoDeletionWithoutApproval: true,
+		LiveProviderExecution:     false,
+		NextAction:                "No copied local MAR Python runner or shell adapter surfaces were detected. Continue to use reviewed KAS request bundles plus effective KAH MAR capability evidence for NEWMAR work.",
+	}
+	for _, spec := range marScriptSpecs {
+		if !strings.HasPrefix(spec.TargetRel, filepath.Join(".kkachi", "scripts")) {
+			continue
+		}
+		rel := filepath.ToSlash(spec.TargetRel)
+		path := filepath.Join(projectRoot, spec.TargetRel)
+		info, err := os.Stat(path)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		kind := "copied_mar_support_file"
+		if strings.HasSuffix(rel, "mar.py") {
+			kind = "copied_kas_mar_python_runner"
+		} else if strings.HasSuffix(rel, ".sh") {
+			kind = "copied_mar_shell_adapter"
+		}
+		migration.Surfaces = append(migration.Surfaces, MARMigrationSurface{
+			Path:     rel,
+			Kind:     kind,
+			Status:   "stale_migration_risk",
+			Guidance: "NEWMAR-009 report-only diagnostic: keep this copied MAR surface in place until explicit deletion approval; use it as migration evidence before NEWMAR-008 shrinks KAS scripts/mar.py.",
+		})
+	}
+	if len(migration.Surfaces) > 0 {
+		migration.Status = "stale_surfaces_present"
+		migration.NextAction = "NEWMAR-009 diagnostics detected copied local MAR surfaces. Do not delete or execute them by default; record migration guidance and proceed to NEWMAR-008 only after reviewed diagnostics/readback evidence is accepted."
+	}
+	return migration
 }
 
 func RenderHuman(result Result) string {
