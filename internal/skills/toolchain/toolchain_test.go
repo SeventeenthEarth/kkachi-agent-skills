@@ -578,50 +578,26 @@ func TestInitWritesToolchainAtomicallyAfterDeterministicKAHProbe(t *testing.T) {
 		`real_user_home: "` + operatorRealUserHome() + `"`,
 		`provider_home_required: true`,
 		`disallow_hermes_profile_home: true`,
-		filepath.Join(root, ".kkachi", "scripts", "mar_adapters", "mar-zcode.sh"),
-		filepath.Join(root, ".kkachi", "scripts", "mar_adapters", "mar-kimi.sh"),
-		filepath.Join(root, ".kkachi", "scripts", "mar_adapters", "mar-agy.sh"),
-		`adapter_proof_evidence: ".kkachi/mar/provider-toolchain-proof.json"`,
+		`provider_tools:`,
+		`providers: {}`,
 		`no_secrets: true`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("generated toolchain missing %q:\n%s", want, text)
 		}
 	}
-	for _, legacy := range []string{"kah_cli:", "kah_cli_path:"} {
+	for _, legacy := range []string{"kah_cli:", "kah_cli_path:", "scripts/mar.py", "mar_adapters", "adapter_proof_evidence", "shell_probe:"} {
 		if strings.Contains(text, legacy) {
-			t.Fatalf("generated v1 toolchain must not be legacy-only; found %q in:\n%s", legacy, text)
+			t.Fatalf("generated v1 toolchain must not expose legacy local MAR support; found %q in:\n%s", legacy, text)
 		}
 	}
 	if leftovers, _ := filepath.Glob(filepath.Join(root, ".kkachi", ".toolchain.yaml.tmp-*")); len(leftovers) != 0 {
 		t.Fatalf("atomic temp files left behind: %v", leftovers)
 	}
-	assertMaterializedMARScripts(t, root)
+	assertNoMaterializedMARRunners(t, root)
 }
 
-func TestDoctorFailsClosedWhenProjectMARScriptsAreMissing(t *testing.T) {
-	root := t.TempDir()
-	var calls [][]string
-	init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
-	if !init.OK {
-		t.Fatalf("init failed: %+v", init.Diagnostics)
-	}
-	missing := filepath.Join(root, ".kkachi", "scripts", "mar_adapters", "mar-zcode.sh")
-	if err := os.Remove(missing); err != nil {
-		t.Fatal(err)
-	}
-	before := snapshotFiles(t, root)
-	result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
-	after := snapshotFiles(t, root)
-	if !reflect.DeepEqual(before, after) {
-		t.Fatalf("doctor wrote files while checking missing MAR script: before=%v after=%v", before, after)
-	}
-	if result.OK || firstCode(result.Diagnostics) != "mar_script_missing" {
-		t.Fatalf("expected mar_script_missing, got %+v", result)
-	}
-}
-
-func TestNEWMAR009DoctorReportsCopiedMARSurfacesWithoutDeletingThem(t *testing.T) {
+func TestDoctorDoesNotRequireProjectLocalMARRunners(t *testing.T) {
 	root := t.TempDir()
 	var calls [][]string
 	init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
@@ -629,59 +605,101 @@ func TestNEWMAR009DoctorReportsCopiedMARSurfacesWithoutDeletingThem(t *testing.T
 		t.Fatalf("init failed: %+v", init.Diagnostics)
 	}
 	before := snapshotFiles(t, root)
-
 	result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
 	after := snapshotFiles(t, root)
-
 	if !reflect.DeepEqual(before, after) {
-		t.Fatalf("doctor must not delete or rewrite copied MAR surfaces: before=%v after=%v", before, after)
+		t.Fatalf("doctor wrote files while checking KAH-managed MAR posture: before=%v after=%v", before, after)
 	}
 	if !result.OK {
-		t.Fatalf("doctor should pass while reporting stale migration risk: %+v", result.Diagnostics)
+		t.Fatalf("doctor should pass without project-local MAR Python/shell runners: %+v", result.Diagnostics)
 	}
-	if result.MARMigration.Status != "stale_surfaces_present" || !result.MARMigration.NoDeletionWithoutApproval {
-		t.Fatalf("MAR migration diagnostics = %#v, want stale surfaces with no-deletion policy", result.MARMigration)
-	}
-	if len(result.MARMigration.Surfaces) < 4 {
-		t.Fatalf("MAR migration surfaces = %#v, want copied mar.py and shell adapters", result.MARMigration.Surfaces)
-	}
-	if !strings.Contains(result.MARMigration.NextAction, "NEWMAR-009") || !strings.Contains(result.MARMigration.NextAction, "NEWMAR-008") {
-		t.Fatalf("next action = %q, want NEWMAR-009/NEWMAR-008 migration guidance", result.MARMigration.NextAction)
-	}
-	if !diagnosticCodesContain(result.Diagnostics, "mar_migration_stale_local_surface") {
-		t.Fatalf("diagnostics = %#v, want mar_migration_stale_local_surface warning", result.Diagnostics)
+	if result.MARMigration.Status != "not_detected" {
+		t.Fatalf("MAR migration status = %#v, want no legacy surfaces", result.MARMigration)
 	}
 }
 
-func assertMaterializedMARScripts(t *testing.T, root string) {
+func TestV01CLEAN001DoctorFailsClosedWhenCopiedMARSurfacesExist(t *testing.T) {
+	root := t.TempDir()
+	var calls [][]string
+	init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if !init.OK {
+		t.Fatalf("init failed: %+v", init.Diagnostics)
+	}
+	writeLegacyCopiedMARSurface(t, root, filepath.Join(".kkachi", "scripts", "mar.py"))
+	writeLegacyCopiedMARSurface(t, root, filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-zcode.sh"))
+	before := snapshotFiles(t, root)
+
+	result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	after := snapshotFiles(t, root)
+
+	if !reflect.DeepEqual(before, after) {
+		t.Fatalf("doctor must fail closed without deleting or rewriting copied MAR surfaces: before=%v after=%v", before, after)
+	}
+	if result.OK || firstCode(result.Diagnostics) != "mar_legacy_surface_present" {
+		t.Fatalf("doctor should fail closed on copied MAR Python/shell surfaces, got %+v", result)
+	}
+	if result.MARMigration.Status != "legacy_surfaces_present_fail_closed" || !result.MARMigration.NoDeletionWithoutApproval {
+		t.Fatalf("MAR migration diagnostics = %#v, want fail-closed legacy surfaces with no-deletion policy", result.MARMigration)
+	}
+	if len(result.MARMigration.Surfaces) != 2 {
+		t.Fatalf("MAR migration surfaces = %#v, want copied mar.py and one shell adapter", result.MARMigration.Surfaces)
+	}
+	if !strings.Contains(result.MARMigration.NextAction, "V01CLEAN-001") || !strings.Contains(result.MARMigration.NextAction, "KAH MAR") {
+		t.Fatalf("next action = %q, want V01CLEAN-001/KAH MAR fail-closed guidance", result.MARMigration.NextAction)
+	}
+	if !diagnosticCodesContain(result.Diagnostics, "mar_legacy_surface_present") {
+		t.Fatalf("diagnostics = %#v, want mar_legacy_surface_present error", result.Diagnostics)
+	}
+}
+
+func assertNoMaterializedMARRunners(t *testing.T, root string) {
 	t.Helper()
 	for _, rel := range []string{
 		filepath.Join(".kkachi", "scripts", "mar.py"),
 		filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-zcode.sh"),
 		filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-kimi.sh"),
 		filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-agy.sh"),
-		filepath.Join(".kkachi", "registries", "mar-provider-lanes.json"),
-		filepath.Join(".kkachi", "templates", "prompts", "mar", "zcode-glm-5-2-reviewer-request.md.tmpl"),
 	} {
 		path := filepath.Join(root, rel)
-		info, err := os.Stat(path)
-		if err != nil {
-			t.Fatalf("expected materialized MAR script %s: %v", path, err)
-		}
-		if info.IsDir() || info.Size() == 0 {
-			t.Fatalf("materialized MAR script must be a non-empty file: %s", path)
-		}
-		if strings.HasSuffix(path, ".sh") && info.Mode().Perm()&0111 == 0 {
-			t.Fatalf("materialized MAR adapter must be executable: %s mode=%s", path, info.Mode())
+		if _, err := os.Stat(path); err == nil {
+			t.Fatalf("toolchain lifecycle must not materialize legacy local MAR runner surface: %s", path)
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("stat legacy MAR surface %s: %v", path, err)
 		}
 	}
 	proof := filepath.Join(root, ".kkachi", "mar", "provider-toolchain-proof.json")
-	data, err := os.ReadFile(proof)
-	if err != nil {
-		t.Fatalf("expected MAR provider proof %s: %v", proof, err)
+	if _, err := os.Stat(proof); err == nil {
+		t.Fatalf("toolchain lifecycle must not write legacy adapter proof evidence: %s", proof)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat MAR provider proof %s: %v", proof, err)
 	}
-	if !strings.Contains(string(data), `"contains_secrets": false`) || !strings.Contains(string(data), `"metadata_only": true`) {
-		t.Fatalf("MAR provider proof must be non-secret metadata: %s", data)
+}
+
+func legacyMARProviderProofFixture(text string) string {
+	return strings.ReplaceAll(text, "    providers: {}", `    providers:
+      zcode_glm_5_2:
+        resolved_argv: ["scripts/mar_adapters/mar-zcode.sh", "--prompt-file"]
+        command_lane: "zcode"
+        selected_model: "glm-5.2"
+        validated: true
+        adapter_proof_evidence: "local-proof:t-123"`)
+}
+
+func nestedListOnlyMARProviderProofFixture(text string) string {
+	return strings.ReplaceAll(text, "    providers: {}", `    providers:
+      zcode_glm_5_2:
+        adapter_proof_evidence:
+          - "local-proof:t-123"`)
+}
+
+func writeLegacyCopiedMARSurface(t *testing.T, root string, rel string) {
+	t.Helper()
+	path := filepath.Join(root, rel)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("#!/bin/sh\necho legacy local MAR surface\n"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -770,6 +788,7 @@ func TestRefreshUpdatesObservedFactsAndPreservesPolicyFields(t *testing.T) {
 			t.Fatalf("refreshed toolchain missing %q:\n%s", want, updatedText)
 		}
 	}
+	assertNoMaterializedMARRunners(t, root)
 }
 
 func TestImportLegacyWritesStage1ToolchainFromExplicitProfileProject(t *testing.T) {
@@ -794,6 +813,7 @@ func TestImportLegacyWritesStage1ToolchainFromExplicitProfileProject(t *testing.
 			t.Fatalf("imported toolchain missing %q:\n%s", want, text)
 		}
 	}
+	assertNoMaterializedMARRunners(t, root)
 }
 
 func TestImportLegacyFailsClosedOnExistingToolchainConflict(t *testing.T) {
@@ -915,6 +935,7 @@ func TestSetStageStage1RecordsApprovalWithoutKABClaim(t *testing.T) {
 	if strings.Contains(text, "native_codex") || strings.Contains(text, `stage2_activation: true`) {
 		t.Fatalf("Stage 1 metadata must not claim KAB native_codex execution:\n%s", text)
 	}
+	assertNoMaterializedMARRunners(t, root)
 }
 
 func TestSetStageStage2AndStage3FailClosed(t *testing.T) {
@@ -949,7 +970,7 @@ func TestSetStageStage2AndStage3FailClosed(t *testing.T) {
 	}
 }
 
-func TestDoctorAcceptsBoundedNonSecretMARProviderProof(t *testing.T) {
+func TestV01CLEAN001DoctorFailsClosedForNonEmptyMARProviderProof(t *testing.T) {
 	root := t.TempDir()
 	var calls [][]string
 	init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
@@ -957,41 +978,56 @@ func TestDoctorAcceptsBoundedNonSecretMARProviderProof(t *testing.T) {
 		t.Fatalf("init failed: %+v", init.Diagnostics)
 	}
 	path := filepath.Join(root, ".kkachi", "toolchain.yaml")
-	text := strings.ReplaceAll(readFile(t, path), "    providers: {}", `    providers:
-      zcode_glm_5_2:
-        resolved_argv: ["scripts/mar_adapters/mar-zcode.sh", "--prompt-file"]
-        command_lane: "zcode"
-        selected_model: "glm-5.2"
-        validated: true
-        adapter_proof_evidence: "local-proof:t-123"`)
+	text := legacyMARProviderProofFixture(readFile(t, path))
 	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
-	if !result.OK {
-		t.Fatalf("expected bounded non-secret MAR provider proof to validate, got %+v", result.Diagnostics)
+	if result.OK || firstCode(result.Diagnostics) != "toolchain_mar_provider_tools_legacy_surface" {
+		t.Fatalf("expected non-empty local MAR provider proof to fail closed, got %+v", result)
 	}
 }
 
-func TestDoctorFailsClosedForMalformedOrSecretMARProviderProof(t *testing.T) {
+func TestV01CLEAN001DoctorRejectsNestedListOnlyMARProviderProof(t *testing.T) {
+	root := t.TempDir()
+	var calls [][]string
+	init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if !init.OK {
+		t.Fatalf("init failed: %+v", init.Diagnostics)
+	}
+	path := filepath.Join(root, ".kkachi", "toolchain.yaml")
+	text := nestedListOnlyMARProviderProofFixture(readFile(t, path))
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
+	if result.OK || firstCode(result.Diagnostics) != "toolchain_mar_provider_tools_legacy_surface" {
+		t.Fatalf("expected nested/list-only local MAR provider proof to fail closed, got %+v", result)
+	}
+}
+
+func TestV01CLEAN001DoctorRejectsLegacyMARProviderProofVariants(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		mutate func(string) string
-		code   string
 	}{
 		{
 			name: "malformed_boolean",
 			mutate: func(text string) string {
 				return strings.Replace(text, "        validated: true", "        validated: maybe", 1)
 			},
-			code: "toolchain_mar_provider_tools_invalid",
 		},
 		{
 			name: "secret_like_value",
 			mutate: func(text string) string {
-				return strings.Replace(text, "adapter_proof_evidence:", `adapter_proof_evidence: "sk-live-secret" #`, 1)
+				return strings.Replace(text, "adapter_proof_evidence:", `adapter_proof_evidence: "***" #`, 1)
 			},
-			code: "toolchain_secret_detected",
+		},
+		{
+			name: "inline_scalar_provider_marker",
+			mutate: func(text string) string {
+				return strings.Replace(text, "    providers:\n      zcode_glm_5_2:\n        resolved_argv: [\"scripts/mar_adapters/mar-zcode.sh\", \"--prompt-file\"]\n        command_lane: \"zcode\"\n        selected_model: \"glm-5.2\"\n        validated: true\n        adapter_proof_evidence: \"local-proof:t-123\"", `    providers: "legacy-inline-proof"`, 1)
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1002,12 +1038,13 @@ func TestDoctorFailsClosedForMalformedOrSecretMARProviderProof(t *testing.T) {
 				t.Fatalf("init failed: %+v", init.Diagnostics)
 			}
 			path := filepath.Join(root, ".kkachi", "toolchain.yaml")
-			if err := os.WriteFile(path, []byte(tc.mutate(readFile(t, path))), 0o644); err != nil {
+			legacyProviderProof := legacyMARProviderProofFixture(readFile(t, path))
+			if err := os.WriteFile(path, []byte(tc.mutate(legacyProviderProof)), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.0"), Now: fixedNow})
-			if result.OK || firstCode(result.Diagnostics) != tc.code {
-				t.Fatalf("expected %s, got %+v", tc.code, result)
+			if result.OK || firstCode(result.Diagnostics) != "toolchain_mar_provider_tools_legacy_surface" {
+				t.Fatalf("expected legacy provider proof to fail closed before being treated as active support, got %+v", result)
 			}
 		})
 	}

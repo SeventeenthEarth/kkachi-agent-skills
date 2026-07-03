@@ -2,9 +2,7 @@ package toolchain
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"embed"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/install"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/kahrunner"
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/version"
@@ -141,25 +138,12 @@ type documentPolicy struct {
 	providerToolsSchema string
 }
 
-type marScriptSpec struct {
-	SourceRel string
-	TargetRel string
-	Mode      os.FileMode
+var legacyMARRunnerPaths = []string{
+	filepath.Join(".kkachi", "scripts", "mar.py"),
+	filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-zcode.sh"),
+	filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-kimi.sh"),
+	filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-agy.sh"),
 }
-
-var marScriptSpecs = []marScriptSpec{
-	{SourceRel: "scripts/mar.py", TargetRel: filepath.Join(".kkachi", "scripts", "mar.py"), Mode: 0o755},
-	{SourceRel: "scripts/mar_adapters/mar-zcode.sh", TargetRel: filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-zcode.sh"), Mode: 0o755},
-	{SourceRel: "scripts/mar_adapters/mar-kimi.sh", TargetRel: filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-kimi.sh"), Mode: 0o755},
-	{SourceRel: "scripts/mar_adapters/mar-agy.sh", TargetRel: filepath.Join(".kkachi", "scripts", "mar_adapters", "mar-agy.sh"), Mode: 0o755},
-	{SourceRel: "registries/mar-provider-lanes.json", TargetRel: filepath.Join(".kkachi", "registries", "mar-provider-lanes.json"), Mode: 0o644},
-	{SourceRel: "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl", TargetRel: filepath.Join(".kkachi", "templates", "prompts", "mar", "zcode-glm-5-2-reviewer-request.md.tmpl"), Mode: 0o644},
-	{SourceRel: "templates/prompts/mar/kimi-default-reviewer-request.md.tmpl", TargetRel: filepath.Join(".kkachi", "templates", "prompts", "mar", "kimi-default-reviewer-request.md.tmpl"), Mode: 0o644},
-	{SourceRel: "templates/prompts/mar/antigravity-gemini-reviewer-request.md.tmpl", TargetRel: filepath.Join(".kkachi", "templates", "prompts", "mar", "antigravity-gemini-reviewer-request.md.tmpl"), Mode: 0o644},
-	{SourceRel: "templates/prompts/mar/premium-reviewer-request.md.tmpl", TargetRel: filepath.Join(".kkachi", "templates", "prompts", "mar", "premium-reviewer-request.md.tmpl"), Mode: 0o644},
-}
-
-const marProviderProofRel = ".kkachi/mar/provider-toolchain-proof.json"
 
 func Init(opts Options) Result {
 	opts = normalizeOptions(opts)
@@ -169,9 +153,6 @@ func Init(opts Options) Result {
 		return failResult(result)
 	}
 	if ok := validateKAHMARCapability(opts, &result); !ok {
-		return failResult(result)
-	}
-	if ok := materializeProjectMARScripts(opts, &result); !ok {
 		return failResult(result)
 	}
 	policy := defaultPolicy(opts.nowString())
@@ -203,16 +184,12 @@ func Doctor(opts Options) Result {
 	if ok := validateLegacyKAHSelection(doc, &result); !ok {
 		return failResult(result)
 	}
-	if doc["mar.provider_tools.schema_version"] != "" {
-		if ok := verifyProjectMARScripts(opts, &result); !ok {
-			return failResult(result)
-		}
-	}
 	result.MARMigration = diagnoseMARMigration(opts.ProjectRoot)
-	if result.MARMigration.Status == "stale_surfaces_present" {
+	if result.MARMigration.Status == "legacy_surfaces_present_fail_closed" {
 		for _, surface := range result.MARMigration.Surfaces {
-			result.Diagnostics = append(result.Diagnostics, diag("warning", "mar_migration_stale_local_surface", surface.Guidance, filepath.Join(opts.ProjectRoot, surface.Path), "mar.migration"))
+			result.Diagnostics = append(result.Diagnostics, diag("error", "mar_legacy_surface_present", surface.Guidance, filepath.Join(opts.ProjectRoot, surface.Path), "mar.migration"))
 		}
+		return failResult(result)
 	}
 	if _, ok := runProbe(opts, &result); !ok {
 		return failResult(result)
@@ -238,9 +215,6 @@ func Refresh(opts Options) Result {
 		return failResult(result)
 	}
 	if ok := validateKAHMARCapability(opts, &result); !ok {
-		return failResult(result)
-	}
-	if ok := materializeProjectMARScripts(opts, &result); !ok {
 		return failResult(result)
 	}
 	policy := policyFromDocument(doc, opts.nowString())
@@ -287,9 +261,6 @@ func ImportLegacy(opts Options) Result {
 		return failResult(result)
 	}
 	if ok := validateKAHMARCapability(opts, &result); !ok {
-		return failResult(result)
-	}
-	if ok := materializeProjectMARScripts(opts, &result); !ok {
 		return failResult(result)
 	}
 	policy := defaultPolicy(opts.nowString())
@@ -352,9 +323,6 @@ func SetStage(opts Options) Result {
 		return failResult(result)
 	}
 	if ok := validateKAHMARCapability(opts, &result); !ok {
-		return failResult(result)
-	}
-	if ok := materializeProjectMARScripts(opts, &result); !ok {
 		return failResult(result)
 	}
 	policy := policyFromDocument(doc, opts.nowString())
@@ -421,154 +389,17 @@ func InstallLaunchers(opts Options) Result {
 	return result
 }
 
-func findMARScriptSourceRepo() (string, error) {
-	if repo, err := discovery.FindSourceRepo(""); err == nil && hasMARScriptSource(repo) {
-		return repo, nil
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	current, err := filepath.Abs(cwd)
-	if err != nil {
-		return "", err
-	}
-	for {
-		if hasMARScriptSource(current) {
-			return current, nil
-		}
-		parent := filepath.Dir(current)
-		if parent == current {
-			break
-		}
-		current = parent
-	}
-	return "", fmt.Errorf("KAS MAR script source not found from %s", cwd)
-}
-
-func hasMARScriptSource(repo string) bool {
-	for _, spec := range marScriptSpecs {
-		if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(spec.SourceRel))); err != nil {
-			return false
-		}
-	}
-	return true
-}
-
-func materializeProjectMARScripts(opts Options, result *Result) bool {
-	sourceRepo, err := findMARScriptSourceRepo()
-	if err != nil {
-		result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_source_missing", err.Error(), "", "mar.provider_tools"))
-		return false
-	}
-	entries := make(map[string]map[string]any, len(marScriptSpecs))
-	for _, spec := range marScriptSpecs {
-		sourcePath := filepath.Join(sourceRepo, filepath.FromSlash(spec.SourceRel))
-		data, err := os.ReadFile(sourcePath)
-		if err != nil {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_source_missing", err.Error(), sourcePath, "mar.provider_tools"))
-			return false
-		}
-		targetPath := filepath.Join(opts.ProjectRoot, spec.TargetRel)
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_write_failed", err.Error(), filepath.Dir(targetPath), "mar.provider_tools"))
-			return false
-		}
-		if spec.Mode&0111 != 0 {
-			if err := writeExecutableAtomic(targetPath, data); err != nil {
-				result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_write_failed", err.Error(), targetPath, "mar.provider_tools"))
-				return false
-			}
-		} else if err := writeAtomic(targetPath, data); err != nil {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_write_failed", err.Error(), targetPath, "mar.provider_tools"))
-			return false
-		}
-		sum := sha256.Sum256(data)
-		entries[spec.TargetRel] = map[string]any{
-			"source":     spec.SourceRel,
-			"path":       targetPath,
-			"sha256":     hex.EncodeToString(sum[:]),
-			"executable": spec.Mode&0111 != 0,
-		}
-	}
-	proof := map[string]any{
-		"schema_version": "mar.provider_toolchain_proof.v1",
-		"generated_at":   opts.nowString(),
-		"project": map[string]any{
-			"root": opts.ProjectRoot,
-		},
-		"source": map[string]any{
-			"kas_source": sourceRepo,
-			"basis":      "KAS embedded/materialized MAR helper scripts copied into project .kkachi/scripts",
-		},
-		"scripts": entries,
-		"secret_posture": map[string]any{
-			"contains_secrets": false,
-			"metadata_only":    true,
-		},
-	}
-	proofData, err := json.MarshalIndent(proof, "", "  ")
-	if err != nil {
-		result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_proof_write_failed", err.Error(), marProviderProofRel, "mar.provider_tools"))
-		return false
-	}
-	proofData = append(proofData, '\n')
-	if secret := secretDiagnostic(proofData, marProviderProofRel); secret != nil {
-		secret.Code = "mar_script_proof_secret_detected"
-		result.Diagnostics = append(result.Diagnostics, *secret)
-		return false
-	}
-	proofPath := filepath.Join(opts.ProjectRoot, marProviderProofRel)
-	if err := os.MkdirAll(filepath.Dir(proofPath), 0o755); err != nil {
-		result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_proof_write_failed", err.Error(), filepath.Dir(proofPath), "mar.provider_tools"))
-		return false
-	}
-	if err := writeAtomic(proofPath, proofData); err != nil {
-		result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_proof_write_failed", err.Error(), proofPath, "mar.provider_tools"))
-		return false
-	}
-	return true
-}
-
-func verifyProjectMARScripts(opts Options, result *Result) bool {
-	for _, spec := range marScriptSpecs {
-		path := filepath.Join(opts.ProjectRoot, spec.TargetRel)
-		info, err := os.Stat(path)
-		if err != nil {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_missing", err.Error(), path, "mar.provider_tools"))
-			return false
-		}
-		if info.IsDir() {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_invalid", "MAR runtime file must not be a directory", path, "mar.provider_tools"))
-			return false
-		}
-		if spec.Mode&0111 != 0 && info.Mode().Perm()&0111 == 0 {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_invalid", "MAR script must be executable", path, "mar.provider_tools"))
-			return false
-		}
-	}
-	proofPath := filepath.Join(opts.ProjectRoot, marProviderProofRel)
-	if _, err := os.Stat(proofPath); err != nil {
-		result.Diagnostics = append(result.Diagnostics, diag("error", "mar_script_proof_missing", err.Error(), proofPath, "mar.provider_tools"))
-		return false
-	}
-	return true
-}
-
 func diagnoseMARMigration(projectRoot string) MARMigration {
 	migration := MARMigration{
 		Status:                    "not_detected",
 		Surfaces:                  []MARMigrationSurface{},
 		NoDeletionWithoutApproval: true,
 		LiveProviderExecution:     false,
-		NextAction:                "No copied local MAR Python runner or shell adapter surfaces were detected. Continue to use reviewed KAS request bundles plus effective KAH MAR capability evidence for NEWMAR work.",
+		NextAction:                "No copied local MAR Python runner or shell adapter surfaces were detected. Continue to use effective KAH MAR capability evidence; KAS must not materialize local MAR execution wrappers.",
 	}
-	for _, spec := range marScriptSpecs {
-		if !strings.HasPrefix(spec.TargetRel, filepath.Join(".kkachi", "scripts")) {
-			continue
-		}
-		rel := filepath.ToSlash(spec.TargetRel)
-		path := filepath.Join(projectRoot, spec.TargetRel)
+	for _, relPath := range legacyMARRunnerPaths {
+		rel := filepath.ToSlash(relPath)
+		path := filepath.Join(projectRoot, relPath)
 		info, err := os.Stat(path)
 		if err != nil || info.IsDir() {
 			continue
@@ -582,13 +413,13 @@ func diagnoseMARMigration(projectRoot string) MARMigration {
 		migration.Surfaces = append(migration.Surfaces, MARMigrationSurface{
 			Path:     rel,
 			Kind:     kind,
-			Status:   "stale_migration_risk",
-			Guidance: "NEWMAR-009 report-only diagnostic: keep this copied MAR surface in place until explicit deletion approval; use it as migration evidence before NEWMAR-008 shrinks KAS scripts/mar.py.",
+			Status:   "legacy_surface_fail_closed",
+			Guidance: "V01CLEAN-001 fail-closed diagnostic: copied local MAR Python/shell runner surfaces are no longer a supported execution path. Do not execute, refresh, or delete them automatically; remove them only with explicit operator cleanup approval and use effective KAH MAR capability evidence instead.",
 		})
 	}
 	if len(migration.Surfaces) > 0 {
-		migration.Status = "stale_surfaces_present"
-		migration.NextAction = "NEWMAR-009 diagnostics detected copied local MAR surfaces. Do not delete or execute them by default; record migration guidance and proceed to NEWMAR-008 only after reviewed diagnostics/readback evidence is accepted."
+		migration.Status = "legacy_surfaces_present_fail_closed"
+		migration.NextAction = "V01CLEAN-001 detected copied local MAR Python/shell surfaces. KAS must fail closed and route MAR execution through effective KAH MAR evidence; cleanup/removal of existing project files requires explicit operator approval."
 	}
 	return migration
 }
@@ -925,7 +756,7 @@ func readAndValidate(path string, result *Result) (map[string]string, bool) {
 			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_evidence_posture_invalid", "toolchain evidence_posture must preserve no_secrets and fail-closed assertions", path, "evidence_posture"))
 			return nil, false
 		}
-		if !validateMARProviderTools(doc, path, result) {
+		if !validateMARProviderTools(doc, data, path, result) {
 			return nil, false
 		}
 	}
@@ -969,10 +800,6 @@ func renderDocument(action string, opts Options, probe probePayload, policy docu
 	if strings.TrimSpace(opts.Project) != "" {
 		projectID = strings.TrimSpace(opts.Project)
 	}
-	zcodeAdapter := filepath.Join(opts.ProjectRoot, ".kkachi", "scripts", "mar_adapters", "mar-zcode.sh")
-	kimiAdapter := filepath.Join(opts.ProjectRoot, ".kkachi", "scripts", "mar_adapters", "mar-kimi.sh")
-	agyAdapter := filepath.Join(opts.ProjectRoot, ".kkachi", "scripts", "mar_adapters", "mar-agy.sh")
-	proofRel := marProviderProofRel
 	lines := []string{
 		`schema_version: "` + SchemaVersion + `"`,
 		"generated_by:",
@@ -1014,37 +841,10 @@ func renderDocument(action string, opts Options, probe probePayload, policy docu
 		`    required_roles: [` + quoteList(policy.requiredRoles) + `]`,
 		"  provider_tools:",
 		`    schema_version: "` + yamlEscape(policy.providerToolsSchema) + `"`,
-		"    shell_probe:",
-		`      shell: "/bin/zsh"`,
-		`      interactive_probe: true`,
-		`      command: "zsh -ic"`,
-		"    providers:",
-		"      zcode_glm_5_2:",
-		`        command_lane: "zcode"`,
-		"        resolved_argv:",
-		`          - "` + yamlEscape(zcodeAdapter) + `"`,
-		`        selected_model: "glm-5.2"`,
-		`        validated: true`,
-		`        adapter_proof_evidence: "` + yamlEscape(proofRel) + `"`,
-		"      kimi_default:",
-		`        command_lane: "kimi"`,
-		"        resolved_argv:",
-		`          - "` + yamlEscape(kimiAdapter) + `"`,
-		`        selected_model: null`,
-		`        selected_model_required: false`,
-		`        model_selection: "cli_default_latest"`,
-		`        model_selection_note: "Kimi Code CLI uses the authenticated CLI default/latest model; no stable explicit model alias is configured locally."`,
-		`        validated: true`,
-		`        adapter_proof_evidence: "` + yamlEscape(proofRel) + `"`,
-		"      antigravity_gemini:",
-		`        command_lane: "agy"`,
-		"        resolved_argv:",
-		`          - "` + yamlEscape(agyAdapter) + `"`,
-		`        selected_model: "Gemini 3.5 Flash (High)"`,
-		`        selected_model_required: false`,
-		`        validated: true`,
-		`        reason: "adapter_validated"`,
-		`        adapter_proof_evidence: "` + yamlEscape(proofRel) + `"`,
+		"    providers: {}",
+		"    execution_owner: \"KAH\"",
+		"    local_python_shell_wrappers: false",
+		"    legacy_wrapper_policy: \"fail_closed_diagnostic_only\"",
 		"evidence_posture:",
 		"  generated_local_toolchain_state: true",
 		"  no_secrets: true",
@@ -1217,41 +1017,19 @@ func resolveStage(raw string, result *Result) (install.KABAdoptionStage, bool) {
 	return stage, true
 }
 
-func validateMARProviderTools(doc map[string]string, path string, result *Result) bool {
+func validateMARProviderTools(doc map[string]string, data []byte, path string, result *Result) bool {
 	if doc["mar.provider_tools.schema_version"] != "mar.provider_tools.v1" {
 		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_invalid", "mar.provider_tools.schema_version must be mar.provider_tools.v1", path, "mar.provider_tools.schema_version"))
 		return false
 	}
-	if value := doc["mar.provider_tools.providers"]; value != "" && value != "{}" {
-		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_invalid", "mar.provider_tools.providers must be a mapping, not a scalar", path, "mar.provider_tools.providers"))
+	if hasNonEmptyYAMLBlock(data, "mar.provider_tools.providers") {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_legacy_surface", "local MAR provider proof fields are legacy Python/shell wrapper support and are fail-closed in V01CLEAN-001; use effective KAH MAR evidence instead", path, "mar.provider_tools.providers"))
 		return false
 	}
-	allowed := map[string]bool{
-		"resolved_argv": true, "command_lane": true, "selected_model": true, "selected_model_required": true,
-		"model_selection": true, "model_selection_note": true, "validated": true, "version": true,
-		"reason": true, "validation_evidence": true, "adapter_proof_evidence": true,
-	}
-	for key, value := range doc {
+	for key := range doc {
 		const prefix = "mar.provider_tools.providers."
-		if !strings.HasPrefix(key, prefix) {
-			continue
-		}
-		rest := strings.TrimPrefix(key, prefix)
-		parts := strings.Split(rest, ".")
-		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || !allowed[parts[1]] {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_invalid", "mar.provider_tools contains an unsupported provider proof field", path, key))
-			return false
-		}
-		if containsSecretLike(value) {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_secret_detected", "MAR provider proof contains a secret-like value", path, key))
-			return false
-		}
-		if (parts[1] == "validated" || parts[1] == "selected_model_required") && value != "true" && value != "false" {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_invalid", "MAR provider proof boolean fields must be true or false", path, key))
-			return false
-		}
-		if parts[1] == "resolved_argv" && len(splitInlineList(value)) == 0 {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_invalid", "MAR provider resolved_argv must be a non-empty inline string list", path, key))
+		if strings.HasPrefix(key, prefix) {
+			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_mar_provider_tools_legacy_surface", "local MAR provider proof fields are legacy Python/shell wrapper support and are fail-closed in V01CLEAN-001; use effective KAH MAR evidence instead", path, key))
 			return false
 		}
 	}
@@ -1381,6 +1159,54 @@ func hasSection(data []byte, section string) bool {
 		if string(raw) == section+":" {
 			return true
 		}
+	}
+	return false
+}
+
+func hasNonEmptyYAMLBlock(data []byte, section string) bool {
+	var stack []string
+	blockIndent := -1
+	for _, raw := range bytes.Split(data, []byte("\n")) {
+		line := string(raw)
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || trimmed == "---" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		indent := countLeadingSpaces(line)
+		level := indent / 2
+		if blockIndent >= 0 {
+			if indent <= blockIndent {
+				blockIndent = -1
+			} else if !strings.HasPrefix(trimmed, "#") {
+				return true
+			}
+		}
+		if level > len(stack) {
+			continue
+		}
+		stack = stack[:level]
+		if strings.HasPrefix(trimmed, "- ") {
+			continue
+		}
+		key, value, ok := strings.Cut(trimmed, ":")
+		if !ok || strings.TrimSpace(key) == "" {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(stripComment(value))
+		path := strings.Join(append(stack, key), ".")
+		if path != section {
+			if value == "" {
+				stack = append(stack, key)
+			}
+			continue
+		}
+		if value == "" {
+			blockIndent = indent
+			stack = append(stack, key)
+			continue
+		}
+		return value != "{}"
 	}
 	return false
 }
