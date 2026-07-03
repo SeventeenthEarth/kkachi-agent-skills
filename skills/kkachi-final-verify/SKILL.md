@@ -12,7 +12,7 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 ## Core rule
 
-Completion is artifact-backed and Hermes-owned. Do not claim done when required gates, tests, docs decisions, KAH state, KAB evidence, graph capability evidence when graph-managed workflow is selected, `phase-plan.yaml`, or `checklist.md` are incomplete. Final verification must prove every required phase is done, every skipped/not-applicable phase has a reason, feedback rounds follow the active KAS policy, and code-change runs include optimize evidence or an explicit skip reason.
+Completion is artifact-backed and Hermes-owned. Do not claim done when required gates, tests, docs decisions, KAH state, KAB evidence, graph capability evidence when graph-managed workflow is selected, `phase-plan.yaml`, or `checklist.md` are incomplete. Final verification must prove every required phase is done, every skipped/not-applicable phase has a reason, feedback rounds follow the active KAS policy, any KAH `phase-plan-audit.jsonl` reopen/amend records resolve to terminal phase states via `kkachi-agent-helper phase-plan validate <run_id> --final`, and code-change runs include optimize evidence or an explicit skip reason.
 
 For 주군's KAS/Kkachi development pipeline, final verification happens before commit and must also confirm:
 
