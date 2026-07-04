@@ -72,6 +72,15 @@ artifact_ref_contract:
   run_local_only: true
 
 completion_boundary:
-  candidate_status: ultragoal_ready
+  candidate_status: implementation_goal_bundle_ready
+  technical_aliases:
+    - ultragoal_goals_ready
+    - gjc_goal_bundle_ready
+  legacy_status: ultragoal_ready
+  legacy_status_boundary: "Compatibility/readback alias only; not source mutation, implementation diff readiness, verification, review, MAR, waiver, or final acceptance."
   kat_status: kat_evidence_ready
+  reserved_after_executor_loop:
+    - implementation_diff_ready
+    - implementation_candidate_ready
+    - implementation_verified
   not_completion: "Does not approve implementation, tests, review findings, MAR, color review, waiver, or final completion."

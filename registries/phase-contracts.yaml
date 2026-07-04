@@ -258,8 +258,8 @@ gjc_packet_contract:
     - "KAH projects `native_ralplan_input` into GJC 0.7.3 `ralplan --write` flags and must fail closed instead of falling back to `--packet`."
     - "KAH materializes `native_ultragoal_input.brief` as run-local `native_input_ref` evidence and projects it into GJC 0.7.3 `ultragoal create-goals --brief-file <path> --json`; it must fail closed instead of falling back to `--packet`."
     - "No KAB Stage 2/3 activation, live GJC/KAT/KAB invocation, profile/provider/auth/token/gateway/model mutation, install, release, push, hidden fallback, warning-only gate, or GJC self-approval."
-    - "GAJAE-004 async ralplan/callback pilot may emit legacy `ralplan_ready`/callback evidence as candidate/current-compatibility state only; it is not consensus, plan acceptance, implementation approval, or final readiness."
-    - "GAJAE-005 KAT/ultragoal evidence and GAJAE-006 watcher/callback closeout remain factual source-side evidence unless separately approved for final completion, live runtime, or same-thread wake readiness."
+    - "GAJAE-004 async ralplan/callback pilot uses `ralplan_candidate_recorded` as the primary recorded-candidate status; `ralplan_recorded` is a technical/readback alias, while legacy `ralplan_ready`/callback evidence is candidate/current-compatibility state only and is not consensus, plan acceptance, implementation approval, or final readiness."
+    - "GAJAE-005 ultragoal goal-bundle evidence uses `implementation_goal_bundle_ready` as the primary operator-facing status; `ultragoal_goals_ready`/`gjc_goal_bundle_ready` are technical aliases, legacy `ultragoal_ready` is current-helper compatibility only, and GAJAE-006 watcher/callback closeout remains factual source-side evidence unless separately approved for final completion, live runtime, or same-thread wake readiness."
 
 mar_request_bundle_contract:
   contract_version: "newmar002.v1"

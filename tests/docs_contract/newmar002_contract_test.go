@@ -144,6 +144,31 @@ func TestNEWMAR002PositiveFixturesValidate(t *testing.T) {
 	}
 }
 
+func TestNEWMAR002ProviderCorrelationFixturesUseCanonicalGJCGoalBundleStatus(t *testing.T) {
+	fixtures, err := filepath.Glob(filepath.Join(repoRoot(t), "tests/fixtures/mar/newmar002/provider-registry-correlation-*.json"))
+	if err != nil {
+		t.Fatalf("glob provider correlation fixtures: %v", err)
+	}
+	sort.Strings(fixtures)
+	if len(fixtures) == 0 {
+		t.Fatal("expected provider correlation fixtures")
+	}
+	for _, path := range fixtures {
+		rel, err := filepath.Rel(repoRoot(t), path)
+		if err != nil {
+			t.Fatalf("rel fixture path: %v", err)
+		}
+		doc := mustReadJSONObject(t, rel)
+		authorBackendCorrelation, ok := getMap(doc, "author_backend_correlation")
+		if !ok {
+			t.Fatalf("%s: missing author_backend_correlation", rel)
+		}
+		if got := getString(authorBackendCorrelation, "source_candidate_status"); got != "implementation_goal_bundle_ready" {
+			t.Fatalf("%s: source_candidate_status = %q, want implementation_goal_bundle_ready", rel, got)
+		}
+	}
+}
+
 func TestNEWMAR002NegativeFixturesFailClosed(t *testing.T) {
 	requestCases := map[string]string{
 		"tests/fixtures/mar/newmar002/request-bundle-missing-role-matrix.json":                         "missing",

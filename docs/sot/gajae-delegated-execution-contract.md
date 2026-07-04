@@ -31,8 +31,8 @@ GJC is an executor, not an authority source. GJC output becomes a candidate arti
 The later V02FLOW SOT (`docs/sot/v020-gjc-workflow-train-corrections.md`) narrows active v0.2 interpretation of the mapping above:
 
 - `deep-interview` is explicit-request only, not a normal phase for ordinary tasks.
-- Current `ralplan --write` evidence records an artifact unless separate consensus-loop evidence is present; legacy `ralplan_ready` remains candidate evidence only.
-- Current `ultragoal create-goals` evidence is goal-bundle readiness only; it does not prove source mutation, implementation diff readiness, verification, review, MAR, or final acceptance.
+- Current `ralplan --write` evidence records an artifact unless separate consensus-loop evidence is present; active KAS uses `ralplan_candidate_recorded` as the primary candidate/record status, with `ralplan_recorded` as a technical/readback alias and legacy `ralplan_ready` as candidate compatibility evidence only.
+- Current `ultragoal create-goals` evidence is goal-bundle readiness only; active KAS uses `implementation_goal_bundle_ready` as the primary operator-facing status, with `ultragoal_goals_ready` / `gjc_goal_bundle_ready` as technical aliases and legacy `ultragoal_ready` as compatibility evidence only. It does not prove source mutation, implementation diff readiness, verification, review, MAR, or final acceptance.
 - The default train is `plan -> ralplan -> impl`; `ask` is not a normal phase, though real approval/question gates still stop for the required actor.
 - Substantial implementation review uses `color review -> MAR -> 2nd color adoption`; aggregate watchers report state only and do not synthesize Blue decisions or auto-continue.
 
@@ -134,12 +134,19 @@ before consuming GJC status.
 
 ## 5. Gate vocabulary
 
-- `deep-interview_ready`: design/epic candidate exists; not accepted until KAS/Blue accepts it.
-- `ralplan_ready`: task plan candidate exists; not accepted until plan review and plan lock pass.
+Current preferred GJC delegated-execution status vocabulary:
+
+- `deep-interview_ready`: legacy design/epic candidate compatibility status; deep-interview remains explicit-request only and is not accepted until KAS/Blue accepts it.
+- `ralplan_candidate_recorded`: primary current status for a recorded ralplan candidate artifact; not accepted until plan review and plan lock pass.
+- `ralplan_recorded`: technical/readback alias for recorded ralplan candidate evidence.
+- `ralplan_ready`: legacy/current-helper compatibility alias for ralplan candidate evidence; not consensus, plan acceptance, implementation approval, or final readiness.
 - `plan_locked`: accepted plan hash is recorded and future drift requires a plan-conflict report.
-- `ultragoal_ready`: implementation bundle candidate exists; not accepted until verification and review gates pass.
+- `implementation_goal_bundle_ready`: primary current operator-facing status for an ultragoal create-goals bundle; not accepted until executor-loop, verification, and review gates pass.
+- `ultragoal_goals_ready`: technical/backend alias for ultragoal goal-bundle evidence.
+- `gjc_goal_bundle_ready`: technical/backend alias for GJC goal-bundle evidence.
+- `ultragoal_ready`: legacy/current-helper compatibility alias for goal-bundle evidence; not source mutation, implementation diff readiness, verification, review, MAR, waiver, or final acceptance.
 - `kat_evidence_ready`: KAT command evidence exists; does not imply acceptance by itself.
-- `review_fix_candidate_ready`: bounded review/fix candidate evidence exists for accepted findings; it is distinct from ordinary `ultragoal_ready` and does not close findings or approve MAR/color/final gates.
+- `review_fix_candidate_ready`: bounded review/fix candidate evidence exists for accepted findings; it is distinct from ordinary goal-bundle readiness and does not close findings or approve MAR/color/final gates.
 - `callback_delivered`: Kanban/watcher callback evidence exists; does not imply review or completion.
 - `final_accepted`: KAS/Blue final synthesis after required evidence/review gates.
 
@@ -195,7 +202,9 @@ commit, push, install, release, live/default runtime activation, KAB Stage 2/3
 activation, real GJC/KAT execution outside tests/mocks, or
 profile/provider/auth/token/gateway/model mutation.
 
-`ralplan_ready` and `callback_delivered` remain candidate/evidence states only.
+`ralplan_candidate_recorded` is the primary active KAS status for a recorded
+ralplan candidate. `ralplan_recorded` may appear as a technical/readback alias.
+Legacy `ralplan_ready` and `callback_delivered` remain candidate/evidence states only.
 Neither state approves the plan, starts implementation, satisfies color/MAR
 review, or marks final completion. `plan_locked` requires accepted_plan_hash after KAS/Blue/color review
 and must bind that hash to the reviewed candidate plan artifact. Post-lock drift
@@ -210,6 +219,9 @@ authorize commit, push, install, release, live/default runtime activation, KAB
 Stage 2/3 activation, real GJC `ultragoal` invocation, live KAT execution, or
 profile/provider/auth/token/gateway/model mutation.
 
+`implementation_goal_bundle_ready` is the primary active KAS operator-facing
+status for `ultragoal create-goals` output. `ultragoal_goals_ready` and
+`gjc_goal_bundle_ready` may appear as technical/backend aliases. Legacy
 `ultragoal_ready`, `kat_evidence_ready`, and `review_fix_candidate_ready` remain
 candidate/factual evidence states only. They do not approve implementation,
 close findings, satisfy color review, satisfy MAR, approve waivers, or mark
@@ -221,8 +233,10 @@ Review/fix-turn KAT attachment is not required in GAJAE-005 until KAH implements
 a dedicated review-fix command/status path. The `review_fix_turn` packet may
 preserve deferred KAT attachment metadata, but it must not claim that KAH can
 attach KAT evidence to `review_fix_candidate_ready` through the current
-`attach-kat-evidence` path. KAT attachment remains implemented for
-`ultragoal_ready` only unless a later approved KAH task expands the status path.
+`attach-kat-evidence` path. Current helper compatibility may still attach KAT
+evidence to legacy `ultragoal_ready` until a later approved KAH task expands the
+status path; KAS guidance treats the primary goal-bundle status as
+`implementation_goal_bundle_ready`.
 
 ## 8. Shared task sequence
 

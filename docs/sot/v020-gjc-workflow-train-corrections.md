@@ -60,13 +60,13 @@ This records/persists an existing artifact. It does not prove a full Planner / A
 KAS status language should distinguish:
 
 ```text
-ralplan_recorded
-ralplan_candidate_recorded
+ralplan_candidate_recorded   # primary KAS candidate/record status
+ralplan_recorded             # technical/readback alias
 ralplan_consensus_seeded
 ralplan_consensus_complete
 ```
 
-`ralplan_ready` is legacy/current shorthand only. Treat it as candidate plan evidence until KAS/Blue/color plan review accepts and locks it.
+`ralplan_ready` is legacy/current-helper shorthand only. Treat it as candidate plan evidence until KAS/Blue/color plan review accepts and locks it.
 
 ### 2.3 `ultragoal`
 
@@ -81,12 +81,12 @@ That produces a goal bundle / ledger evidence. It does not prove source mutation
 Preferred status language:
 
 ```text
-ultragoal_goals_ready
-implementation_goal_bundle_ready
-gjc_goal_bundle_ready
+implementation_goal_bundle_ready  # primary operator-facing goal-bundle status
+ultragoal_goals_ready             # technical/backend alias
+gjc_goal_bundle_ready             # technical/backend alias
 ```
 
-Reserve `implementation_diff_ready`, `implementation_candidate_ready`, and `implementation_verified` for evidence after an actual executor loop and verification.
+`ultragoal_ready` is legacy/current-helper shorthand only. Reserve `implementation_diff_ready`, `implementation_candidate_ready`, and `implementation_verified` for evidence after an actual executor loop and verification.
 
 ## 3. Missing implementation executor loop
 

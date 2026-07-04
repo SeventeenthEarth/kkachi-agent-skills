@@ -68,5 +68,9 @@ artifact_ref_contract:
   run_local_only: true
 
 completion_boundary:
-  candidate_status: ralplan_ready
+  candidate_status: ralplan_candidate_recorded
+  technical_aliases:
+    - ralplan_recorded
+  legacy_status: ralplan_ready
+  legacy_status_boundary: "Compatibility/readback alias only; not consensus, plan acceptance, implementation approval, or final readiness."
   not_completion: "Does not approve the plan, lock the plan, authorize implementation, or mark final completion."

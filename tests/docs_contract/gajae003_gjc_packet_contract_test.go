@@ -40,7 +40,15 @@ func TestGAJAE003GJCPacketTemplatesExistAndPreserveBoundaries(t *testing.T) {
 
 func TestGAJAE005UltragoalKATEvidenceAndReviewFixBoundaries(t *testing.T) {
 	requireContainsAll(t, "templates/run-artifacts/gjc-ultragoal-packet.yaml.tmpl", []string{
-		"candidate_status: ultragoal_ready",
+		"candidate_status: implementation_goal_bundle_ready",
+		"technical_aliases:",
+		"ultragoal_goals_ready",
+		"gjc_goal_bundle_ready",
+		"legacy_status: ultragoal_ready",
+		"reserved_after_executor_loop:",
+		"implementation_diff_ready",
+		"implementation_candidate_ready",
+		"implementation_verified",
 		"native_ultragoal_input:",
 		"mode: brief_file",
 		"{{ gjc_ultragoal_brief }}",
@@ -89,10 +97,10 @@ func TestGAJAE005UltragoalKATEvidenceAndReviewFixBoundaries(t *testing.T) {
 
 	requireContainsAll(t, "docs/sot/gajae-delegated-execution-contract.md", []string{
 		"`review_fix_candidate_ready`",
+		"`implementation_goal_bundle_ready` is the primary active KAS operator-facing",
 		"`ultragoal_ready`, `kat_evidence_ready`, and `review_fix_candidate_ready` remain",
 		"Review/fix-turn KAT attachment is not required in GAJAE-005 until KAH implements",
-		"KAT attachment remains implemented for",
-		"Missing,",
+		"Current helper compatibility may still attach KAT",
 		"summary ref is the sibling `<summary>.md` file",
 		"malformed, hashless, checksum-mismatched, run-id-mismatched, symlinked",
 		"real GJC `ultragoal` invocation, live KAT execution",
@@ -126,7 +134,10 @@ func TestGAJAE003GJCPacketContractIsRegistered(t *testing.T) {
 func TestGAJAE004AsyncRalplanPilotIsAllowedWithoutBroadeningDeferredScope(t *testing.T) {
 	requireContainsAll(t, "templates/run-artifacts/gjc-ralplan-packet.yaml.tmpl", []string{
 		"GAJAE-004 async ralplan/callback pilot",
-		"candidate_status: ralplan_ready",
+		"candidate_status: ralplan_candidate_recorded",
+		"technical_aliases:",
+		"ralplan_recorded",
+		"legacy_status: ralplan_ready",
 		"plan lock remains pending until KAS/Blue/color plan review acceptance",
 		"GAJAE-005 KAT ultragoal evidence pilot",
 		"GAJAE-006 watcher/callback closeout",
@@ -166,12 +177,13 @@ func TestGAJAE004AsyncRalplanPilotIsAllowedWithoutBroadeningDeferredScope(t *tes
 	requireNotContains(t, "templates/run-artifacts/gjc-callback-contract-packet.yaml.tmpl", []string{"evidence_only_until_GAJAE_004_005_006"})
 
 	requireContainsAll(t, "registries/phase-contracts.yaml", []string{
-		"GAJAE-004 async ralplan/callback pilot may emit legacy `ralplan_ready`/callback evidence as candidate/current-compatibility state only; it is not consensus, plan acceptance, implementation approval, or final readiness.",
-		"GAJAE-005 KAT/ultragoal evidence and GAJAE-006 watcher/callback closeout remain factual source-side evidence unless separately approved for final completion, live runtime, or same-thread wake readiness.",
+		"GAJAE-004 async ralplan/callback pilot uses `ralplan_candidate_recorded` as the primary recorded-candidate status; `ralplan_recorded` is a technical/readback alias, while legacy `ralplan_ready`/callback evidence is candidate/current-compatibility state only and is not consensus, plan acceptance, implementation approval, or final readiness.",
+		"GAJAE-005 ultragoal goal-bundle evidence uses `implementation_goal_bundle_ready` as the primary operator-facing status; `ultragoal_goals_ready`/`gjc_goal_bundle_ready` are technical aliases, legacy `ultragoal_ready` is current-helper compatibility only, and GAJAE-006 watcher/callback closeout remains factual source-side evidence unless separately approved for final completion, live runtime, or same-thread wake readiness.",
 	})
 	requireContainsAll(t, "docs/sot/gajae-delegated-execution-contract.md", []string{
 		"GAJAE-004 source-side pilot",
-		"`ralplan_ready` and `callback_delivered` remain candidate/evidence states only",
+		"`ralplan_candidate_recorded` is the primary active KAS status for a recorded",
+		"Legacy `ralplan_ready` and `callback_delivered` remain candidate/evidence states only",
 		"`plan_locked` requires accepted_plan_hash after KAS/Blue/color review",
 	})
 }

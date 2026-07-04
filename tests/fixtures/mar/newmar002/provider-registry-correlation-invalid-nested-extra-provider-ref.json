@@ -28,7 +28,7 @@
     "backend_family": "gjc",
     "backend_identity": "gjc-ultragoal",
     "correlation_id": "gjc-ultragoal:run-20260629T083412Z-690afd973c74",
-    "source_candidate_status": "ultragoal_ready",
+    "source_candidate_status": "implementation_goal_bundle_ready",
     "source_packet_sha256": "sha256:1212121212121212121212121212121212121212121212121212121212121212"
   },
   "provider_preflight_ref": {
