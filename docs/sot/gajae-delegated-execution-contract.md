@@ -26,6 +26,18 @@ Authority gates     -> KAS/Blue + Red/Orange/Gray + MAR/final gates
 
 GJC is an executor, not an authority source. GJC output becomes a candidate artifact until accepted by the relevant Kkachi gate.
 
+## 1.1. V02FLOW correction overlay
+
+The later V02FLOW SOT (`docs/sot/v020-gjc-workflow-train-corrections.md`) narrows active v0.2 interpretation of the mapping above:
+
+- `deep-interview` is explicit-request only, not a normal phase for ordinary tasks.
+- Current `ralplan --write` evidence records an artifact unless separate consensus-loop evidence is present; legacy `ralplan_ready` remains candidate evidence only.
+- Current `ultragoal create-goals` evidence is goal-bundle readiness only; it does not prove source mutation, implementation diff readiness, verification, review, MAR, or final acceptance.
+- The default train is `plan -> ralplan -> impl`; `ask` is not a normal phase, though real approval/question gates still stop for the required actor.
+- Substantial implementation review uses `color review -> MAR -> 2nd color adoption`; aggregate watchers report state only and do not synthesize Blue decisions or auto-continue.
+
+Read any older GAJAE wording that implies deeper live GJC behavior through this V02FLOW correction overlay.
+
 ## 2. Pilot-verified facts
 
 The pilot evidence listed above plus the 2026-06-27 `/tmp/kkachi-gjc` scratch verification prove the following implementation assumptions and blockers are safe to plan from:
