@@ -17,9 +17,10 @@ workflow_authority:
 
 canonical_spine:
   - plan
-  - ask
+  - ralplan
   - implement
   - enhance_test
+  - ai_slop_cleaner
   - optimize
   - update_docs
   - request_feedback
@@ -41,11 +42,12 @@ role_model:
   planner_backend:
     phases:
       - plan
-      - ask
+      - ralplan
   implementer_backend:
     phases:
       - implement
       - enhance_test
+      - ai_slop_cleaner
       - optimize
       - update_docs
       - handle_feedback
@@ -102,7 +104,7 @@ task_classification_policy:
     - "Simple report/status, investigation/research evidence, and docs-only paths must not inherit implementation, enhance_test, optimize, or broad review loops unless the task contract records a classification change and reason."
   default_spines:
     development_full:
-      phases: [codegraph_refresh, plan, ask, implement, enhance_test, optimize, update_docs, request_feedback, handle_feedback, mar_review, second_color_review, final_verify, improve]
+      phases: [codegraph_refresh, plan, ralplan, implement, enhance_test, ai_slop_cleaner, optimize, update_docs, request_feedback, handle_feedback, mar_review, second_color_review, final_verify, improve]
     research_evidence_light:
       phases: [task_contract, evidence_collection, source_citation, final_verify]
     docs_only_light:
@@ -127,8 +129,10 @@ output_policy:
   artifact_first_detail_path: ".kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md"
   fail_closed_rule: "If a backend cannot write the detailed artifact, report Status: blocked with the artifact-write blocker and do not dump long plans, logs, diffs, files, reviews, or checklists into chat."
   applies_to:
-    - direct_codex_app_server
-    - kab_mediated_backend_lanes
+    - gjc_ralplan_candidate
+    - gjc_ultragoal_executor_loop_candidate
+    - direct_kas_skill
+    - durable_kanban_color_review
 
 evidence_summary_contract:
   phase_packet_template: "templates/run-artifacts/phase-packet.yaml.tmpl"
@@ -254,7 +258,7 @@ gjc_packet_contract:
     - "KAH projects `native_ralplan_input` into GJC 0.7.3 `ralplan --write` flags and must fail closed instead of falling back to `--packet`."
     - "KAH materializes `native_ultragoal_input.brief` as run-local `native_input_ref` evidence and projects it into GJC 0.7.3 `ultragoal create-goals --brief-file <path> --json`; it must fail closed instead of falling back to `--packet`."
     - "No KAB Stage 2/3 activation, live GJC/KAT/KAB invocation, profile/provider/auth/token/gateway/model mutation, install, release, push, hidden fallback, warning-only gate, or GJC self-approval."
-    - "GAJAE-004 async ralplan/callback pilot is allowed only for ralplan_ready and callback evidence."
+    - "GAJAE-004 async ralplan/callback pilot may emit legacy `ralplan_ready`/callback evidence as candidate/current-compatibility state only; it is not consensus, plan acceptance, implementation approval, or final readiness."
     - "GAJAE-005 KAT/ultragoal evidence and GAJAE-006 watcher/callback closeout remain factual source-side evidence unless separately approved for final completion, live runtime, or same-thread wake readiness."
 
 mar_request_bundle_contract:
@@ -572,7 +576,7 @@ kab_usage_policy:
   bridge_evidence: required_when_runtime_completion_or_backend_identity_is_claimed
   khs_code_change: required_when_kab_backed_or_backend_executed
   khs_dev_run: required_when_kab_backed_execution_plan_lifecycle_or_bridge_evidence_is_part_of_contract
-  stage1_direct_codex_app_server_baseline: allowed_when_explicitly_authorized_and_no_kab_codex_runtime_claimed
+  historical_stage1_direct_codex_app_server_baseline: stale_marker_only_not_active_execution_authority
   khs_docs_only: not_required_unless_backend_execution_or_kab_review_transport_needed
   kas_kah_local_exception: "Allowed for scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance when explicitly authorized and recorded; must not claim KAB runtime support."
   kab_later_required_for:
@@ -625,7 +629,7 @@ mar_task_loop_policy:
     - "No automatic source mutation or retry-until-pass without Blue/Red disposition and verification."
 
 implementation_approval_policy:
-  low_risk_default: auto_approve_after_plan_and_ask
+  low_risk_default: auto_approve_after_plan_vet_only_when_policy_and_approval_boundary_allow
   user_notice_required_before_auto_start: true
   explicit_user_approval_required_when:
     - api_change
@@ -636,7 +640,7 @@ implementation_approval_policy:
     - sot_change
     - large_diff_or_broad_file_fanout
     - low_confidence
-    - unresolved_ask_phase_ambiguity
+    - unresolved_approval_boundary_ambiguity
 
 paths:
   A_development_execution:
@@ -655,7 +659,9 @@ paths:
       - prompt_md_when_kab_lane_is_used
       - codegraph_index_or_unavailable_reason
       - plan_fixed_with_required_red_approval_when_project_policy_requires_it
-      - ask_phase_completed
+      - gjc_ralplan_status_json
+      - substantive_ralplan_candidate_evidence_or_recorded_compatibility_acceptance_for_legacy_runs
+      - explicit_bounded_approval_evidence_when_required
   B_discovery_shaping:
     description: "SOT, roadmap trace, acceptance criteria, or implementation handoff is missing or weak."
     code_write_default: forbidden
@@ -696,7 +702,7 @@ phase_plan_contract:
 
 phases:
   plan:
-    intent: "Define the path-appropriate plan before backend execution and create the mandatory run progress checklist."
+    intent: "Define the path-appropriate plan before GJC ralplan candidate evidence and backend execution, then create the mandatory run progress checklist."
     owner_role: planner_backend
     required_inputs:
       - task_contract
@@ -751,7 +757,7 @@ phases:
       mandatory: true
       timing:
         create: "during plan, after plan.plan_text capture and before implementation approval/start"
-        update: "after ask and after every later phase"
+        update: "after explicit approval/decision boundaries when used and after every later phase"
       required_rows:
         - every_canonical_phase
         - feedback_round_1
@@ -778,19 +784,37 @@ phases:
         - "Feedback must run at least once and at most five times; rounds 2..5 are optional continuation rounds only."
         - "Final verification must use checklist.md to prove every required phase has evidence."
     gate: plan_gate
-  ask:
-    intent: "Always ask after plan whether ambiguity, missing decisions, or user choices remain before implementation."
-    owner_role: planner_backend_plus_hermes
-    applicability: required
+  ralplan:
+    intent: "Run GJC ralplan as the required v0.2 plan-stage candidate evidence after plan and before implementation; candidate output is not acceptance authority."
+    owner_role: planner_backend
+    required_inputs:
+      - task_contract
+      - phase_plan
+      - plan.md
+      - checklist.md
+      - acceptance_criteria
     expected_outputs:
-      - ask.md
+      - gjc-ralplan-status.json
+      - gjc-ralplan-artifact.md
+      - ralplan_candidate_evidence
+    rules:
+      - "Ralplan is a default plan-stage step for development runs, not metadata hidden inside plan."
+      - "GJC ralplan output is candidate evidence only; KAS/Blue/color/final gates remain acceptance authority."
+      - "If ralplan is input/receipt-only or lacks substantive planning content, fail closed and repair before implementation."
+    gate: ralplan_gate
+  approval_boundary:
+    intent: "Record explicit bounded approval/decision evidence only when implementation, scope, risk, or operator choice requires it; this is a boundary, not a default normal phase."
+    owner_role: hermes_plus_master_when_needed
+    applicability: conditional_explicit_boundary
+    expected_outputs:
+      - approval.md
       - answered-decisions.md
       - updated_plan_or_phase_plan_when_decisions_change
     rules:
-      - "Ask the planner backend to surface ambiguity or decision needs."
+      - "GJC ralplan may surface ambiguity or decision needs, but candidate output is not authority."
       - "Hermes answers from SOT/project context when safe."
-      - "Ask the master only when Hermes cannot decide safely or user intent must be confirmed."
-      - "If no open questions remain, record that explicitly instead of skipping the phase."
+      - "Ask the master only when Hermes cannot decide safely, user intent must be confirmed, or implementation/scope approval is required."
+      - "If no open questions remain, proceed from ralplan to implementation only when task policy and required approval evidence allow it."
     gate: decision_gate
   implement:
     intent: "Reach the approved desired state in Path A, or produce handoff artifacts only in Path B."
@@ -799,9 +823,10 @@ phases:
       - phase_plan
       - plan.md
       - checklist.md
+      - gjc-ralplan-status.json
       - selected-cli.json
       - prompt.md
-      - ask_phase_completion
+      - explicit_bounded_approval_evidence_when_required
     approval_before_start:
       low_risk: "Hermes may approve/start automatically after notifying the master with intended direction."
       high_risk: "Require explicit master approval."
@@ -828,19 +853,30 @@ phases:
       - "E2E tests must use isolated test environments and must not affect live Hermes, Discord, gateway, auth, or production user state."
       - "Run the selected verification profile/gate command after test enhancement changes before completing this phase."
     gate: test_gate
+  ai_slop_cleaner:
+    intent: "Perform bounded AI slop cleanup after behavior is protected and before structural optimization."
+    owner_role: implementer_backend
+    applicability: conditional_recommended_for_code_change
+    skip_rule: "Code-change runs should run AI slop cleanup when practical; skipping requires explicit reason in phase_plan and checklist.md."
+    expected_outputs:
+      - slop-cleanup-log.md
+      - updated_diff_when_cleanup_is_applied
+      - verification_after_slop_cleanup_when_files_changed
+    rules:
+      - "Remove AI-ish artifacts, noisy abstractions, speculative text, and avoidable verbosity before broader optimization."
+      - "After slop cleanup, run the selected verification profile/gate command before proceeding to broader optimization when files changed."
+    gate: regression_gate
   optimize:
-    intent: "Perform bounded cleanup after behavior is protected: run AI slop cleanup, remove duplication, remove unnecessary abstraction, and simplify or optimize internal algorithms without broad rewrites."
+    intent: "Perform bounded structural optimization after behavior is protected and AI slop cleanup has been considered."
     owner_role: implementer_backend
     applicability: conditional_recommended_for_code_change
     skip_rule: "Code-change runs should run optimize when practical; skipping requires explicit reason in phase_plan and checklist.md."
     expected_outputs:
-      - slop-cleanup-log.md
       - optimize-log.md
       - updated_diff_when_cleanup_is_applied
-      - verification_after_cleanup
+      - verification_after_optimization
     rules:
-      - "Treat AI slop cleanup as an explicit micro-stage before structural optimization when a backend/code actor is used."
-      - "After slop cleanup, run the selected verification profile/gate command before proceeding to broader optimization when files changed."
+      - "Remove duplication, unnecessary abstraction, dead/verbose code, and small algorithmic/structural waste without broad rewrites."
       - "After duplication/abstraction/algorithm optimization, run the selected verification profile/gate command again before completing optimize."
     gate: regression_gate
   update_docs:

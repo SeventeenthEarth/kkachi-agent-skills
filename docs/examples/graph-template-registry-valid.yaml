@@ -26,10 +26,10 @@ phases:
     applicability: required
     owner_role: planner_backend
     evidence_artifact: plan.md
-  - id: ask
+  - id: ralplan
     applicability: required
-    owner_role: planner_backend_plus_hermes
-    evidence_artifact: ask.md
+    owner_role: planner_backend
+    evidence_artifact: gjc-ralplan-status.json
   - id: implement
     applicability: conditional
     condition: development_or_docs_change_required
@@ -49,12 +49,11 @@ phases:
     evidence_artifact: final-report.md
 edges:
   - from: plan
-    to: ask
+    to: ralplan
     type: sequence
-  - from: ask
+  - from: ralplan
     to: implement
-    type: conditional
-    condition: implementation_approved
+    type: sequence
   - from: implement
     to: request_feedback
     type: sequence
@@ -82,7 +81,7 @@ approvals:
   - role: hwangchung
     required_when: implementation_or_docs_mutation
     evidence_required:
-      - ask.md
+      - approval.md
       - plan.md
 feedback_intake:
   policy_key: EXTERNAL_FEEDBACK_INTAKE

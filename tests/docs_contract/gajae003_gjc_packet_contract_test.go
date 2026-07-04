@@ -166,7 +166,7 @@ func TestGAJAE004AsyncRalplanPilotIsAllowedWithoutBroadeningDeferredScope(t *tes
 	requireNotContains(t, "templates/run-artifacts/gjc-callback-contract-packet.yaml.tmpl", []string{"evidence_only_until_GAJAE_004_005_006"})
 
 	requireContainsAll(t, "registries/phase-contracts.yaml", []string{
-		"GAJAE-004 async ralplan/callback pilot is allowed only for ralplan_ready and callback evidence.",
+		"GAJAE-004 async ralplan/callback pilot may emit legacy `ralplan_ready`/callback evidence as candidate/current-compatibility state only; it is not consensus, plan acceptance, implementation approval, or final readiness.",
 		"GAJAE-005 KAT/ultragoal evidence and GAJAE-006 watcher/callback closeout remain factual source-side evidence unless separately approved for final completion, live runtime, or same-thread wake readiness.",
 	})
 	requireContainsAll(t, "docs/sot/gajae-delegated-execution-contract.md", []string{

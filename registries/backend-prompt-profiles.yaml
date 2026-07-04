@@ -4,7 +4,7 @@ purpose: "Backend-specific prompt style profiles used to render KAB prompts from
 output_policy:
   language: english_product_and_backend_output
   applies_to:
-    - direct_codex_app_server
+    - gjc_ralplan_ultragoal_lanes
     - kab_mediated_backend_lanes
   console_schema:
     - "Status: <pass|fail|blocked|in_progress|not_applicable>"
@@ -30,6 +30,13 @@ output_policy:
     - long_reviews
     - exhaustive_checklists
   preserve_commander_reporting: "Hermes/team-member reports to the Korean-speaking operator may remain Korean; backend product output, prompt output, and generated artifacts remain English."
+
+historical_compatibility_lanes:
+  direct_codex_app_server:
+    disabled_by_default: true
+    explicit_selection_required: true
+    active_v02_default_lane: false
+    rationale: "GJC ralplan/ultragoal is the active v0.2 default lane; direct Codex app-server prompt policy is historical compatibility only when explicitly selected and qualified."
 
 profiles:
   claude-stepwise-directive:

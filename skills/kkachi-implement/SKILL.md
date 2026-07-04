@@ -16,21 +16,21 @@ Do not implement from chat-only instruction. Do not claim KAB support unless the
 work is actually KAB-backed. The active v0.2 KAS/KAH development path is:
 KAS owns task contracts/prompt policy, KAH owns deterministic run/gate/evidence
 state, and GJC `ultragoal` may produce implementation-candidate artifacts only
-after the plan/vet and ask/approval gates pass. KAT evidence is
+after the plan/vet gate and explicit approval evidence pass; `ask` is not a default normal phase. KAT evidence is
 mechanical/factual only. KAB runtime/session control is explicit-only and must
 carry current capability plus bridge evidence. Legacy Stage 1/Stage 2/Stage 3
 Codex/KAB adoption wording and direct Codex app-server lanes are historical
 context, not active operator guidance.
 
-For KAS/KAH roadmap-task implementation, the selected GJC/KAB/approved
+For KAS/KAH roadmap-task implementation, the selected GJC `ultragoal`/approved
 implementer lane performs substantive code, test, build, and task-bound docs
-edits only after the required plan-vet and ask approval. Red/Orange plan-vet
+edits only after the required plan-vet and explicit bounded approval. Red/Orange plan-vet
 reviewers and project-Gray documentation/integrity review are resolved by the
 project/team role registry when applicable, not hard-coded to individuals.
 Blue/Red/Orange/Gray inspect, review, approve/reject, route feedback, record
 KAH evidence, and verify. Direct role editing is allowed only when 주군
 explicitly asks for it, when the work is outside the roadmap/KAS+KAH path, or
-when an approved run-local exception records the no-GJC/KAB rationale.
+when an approved run-local exception records the no-GJC/Blue-direct-patch rationale. Implementation evidence must cite GJC `ultragoal`/executor-loop refs (`create-goals -> complete-goals -> execute-goal -> checkpoint -> verify -> repeat`) or that approved exception; missing both fails closed.
 
 If Blue/Red/Orange/Gray color review, project-Gray documentation/integrity
 review, MAR role review, or any later feedback round finds a required change,
@@ -51,8 +51,7 @@ the real user home. In reusable artifacts use `HOME=<real-user-home>`. Do not
 run Git, tests, Codex, KAH/KAB, Hermes, or Kanban commands against a role-profile
 home unless the task explicitly tests profile isolation.
 
-Implementation starts only after `plan`, `ask`, `phase-plan.yaml`, and
-`checklist.md` are complete. If implementation or feedback handling must reopen
+Implementation starts only after `plan`, `phase-plan.yaml`, `checklist.md`, and explicit bounded approval evidence are complete when required. Do not require a default `ask` phase. If implementation or feedback handling must reopen
 or correct a completed/skipped/not_applicable phase, do not edit `phase-plan.yaml` directly and do not use ordinary `phase-plan set` for the corrective change. Use audited KAH phase-plan commands instead:
 `kkachi-agent-helper phase-plan reopen <run_id> <phase-id> --from-status <current> --to-status <target> --reason <text> --evidence-ref .kkachi/runs/<run_id>/<evidence>`
 or

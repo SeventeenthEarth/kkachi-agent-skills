@@ -148,7 +148,7 @@ The minimum/pilot lane may provide `kkachi-agent-skills list/install/doctor/sync
 For a KHS-governed run, KHS should provide or render:
 
 - Task contract: desired state, constraints, non-goals, acceptance criteria, risk class, required capabilities, source refs.
-- Phase skill guidance: the phase-specific rules for plan, ask, implement, enhance-test, optimize, docs-update, external feedback intake, team review, final verify, and improve.
+- Phase skill guidance: the phase-specific rules for plan/ralplan, explicit approval/question boundaries, implement, enhance-test, ai-slop-cleaner, optimize, docs-update, external feedback intake, team review, final verify, and improve.
 - Prompt/command draft: backend-specific prompt and command guidance, preserving backend caveats.
 - Evidence plan: expected KAH artifacts, KAB session evidence, tests, review outputs, report fields, and fail-closed triggers.
 - Report contract: final status, changed files, accepted/rejected/deferred items, evidence paths, remaining risk, and next action.
@@ -199,10 +199,9 @@ KHS must preserve these distinctions:
 - Backend-specific caveats must remain visible in `selected-cli.json`, `capability-check.md`, `prompt.md`, `bridge-events.md`, and the final report.
 - Automated different-tool review is KAB-later unless an effective KAB implementation and evidence path exist.
 
-### 8.1 KAB adoption stages for KAS/KAH development
+### 8.1 Historical KAB adoption-stage compatibility for KAS/KAH development
 
-KAS owns the operating policy for applying KAB to KAS/KAH development runs. KAH and KAB are tools used by that policy: KAH records deterministic run state and gates, while KAB executes and observes backend sessions. The stages below describe KAS maturity, not a change in KAH or KAB ownership.
-
+KAS owns the operating policy for applying KAB to KAS/KAH development runs. KAH and KAB are tools used by that policy: KAH records deterministic run state and gates, while KAB executes and observes backend sessions. The historical stages below describe retained compatibility metadata and old execution-lane provenance; they are not the active v0.2 default, which uses KAS policy plus KAH deterministic evidence with GJC `ralplan`/`ultragoal` candidate artifacts unless a later approved task explicitly selects another lane with current capability evidence.
 | Stage | Name | KAS/KAH development execution lane | Backend choice posture | Evidence posture |
 |---|---|---|---|---|
 | 1 | Direct Codex SDK/app-server baseline | Direct Codex SDK/app-server runner calls handle plan, implementation, feedback fixes, task-bound docs, cleanup, and verification support. The supported Stage 1 control path is KAS Python runner template -> `openai_codex` SDK -> SDK-managed `codex app-server --listen stdio://`; `codex exec` and generic `openai` SDK usage are not valid Stage 1 evidence. | Codex is fixed by the direct lane. | Record direct Codex runner prompt/session/output evidence and a no-KAB-Codex rationale. Do not claim KAB Codex execution evidence. |
@@ -211,27 +210,29 @@ KAS owns the operating policy for applying KAB to KAS/KAH development runs. KAH 
 
 Stage 2 is a transport migration from direct Codex app-server to KAB Codex. Stage 3 is a backend orchestration policy. Do not collapse these stages: proving KAB Codex-first execution is the prerequisite for safely expanding backend selection.
 
-The Stage 1 direct runner contract is detailed by `docs/sot/stage1-direct-codex-sdk-appserver-runner.md`. KAS Stage 1 support means a shared Python runner template at `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` uses `openai_codex` so the SDK starts `codex app-server --listen stdio://` and records direct runner evidence. Raw app-server transports and long-lived daemons are not ordinary Stage 1 KAS guidance; those belong to KAB/wrapper or explicit infrastructure work. When an installed/project marker selects Stage 2, the Stage 1 runner must not be used as a silent fallback.
+The Stage 1 direct runner contract is detailed by `docs/sot/stage1-direct-codex-sdk-appserver-runner.md` for provenance and compatibility. KAS Stage 1 support means a shared Python runner template at `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` uses `openai_codex` so the SDK starts `codex app-server --listen stdio://` and records direct runner evidence when that historical lane is explicitly selected. Raw app-server transports and long-lived daemons are not ordinary Stage 1 KAS guidance; those belong to KAB/wrapper or explicit infrastructure work. When an installed/project marker selects Stage 2, the Stage 1 runner must not be used as a silent fallback.
 
 Fallback posture is fail-closed by default across the KAS/KAH development loop. Codex or KAB-authored plans must surface proposed fallback paths for required plan review, including Blue synthesis plus Red and Orange plan-vet acceptance where policy requires it; Blue, Red, Orange, Gray, and optional MAR review must request removal of unnecessary fallback paths rather than preserve convenience behavior. A fallback is acceptable only when there is no safe direct handling, the fallback is narrowly bounded, evidence-backed, approval-safe, and very small to implement. If avoiding fallback is impossible and the required fallback would add broad code or new policy/state complexity, the run reports options to 주군 instead of quietly implementing it.
 
 MAR review is an independent feedback/review lane. It remains a KAS role-first MAR lane with its existing trigger policy, preflight, prompt-confirmation, watcher/readback, feedback artifact, and post-MAR re-review requirements. The MAR prompt and permission handling must constrain the lane to requirements plus implemented code only: MAR may inspect requirement artifacts, task contracts, plans/checklists, diffs, implemented source, docs, existing test files as implemented code evidence, but must not run tests, linters, builds, installs, package managers, network probes, service starts, or runtime verification commands. Out-of-scope command requests are rejected and recorded; an MAR run that executes a forbidden command fails closed unless 주군 explicitly waives the boundary and records the waiver in KAH/run evidence artifacts. Selecting any provider as a possible Stage 3 implementation backend does not satisfy or replace MAR review, and running MAR review does not imply that provider was the implementation backend.
 
-The active stage is a project/profile operating setting, not just prose in a
-single phase skill. KAS install or project application must choose the stage,
-and an existing project may change stage only through an explicit KAS
-reconfiguration record with preserved evidence. KAH does not need a
-stage-specific graph or gate model because the graph state, run state, events,
-locks, artifact schemas, and gate mechanics are unchanged by the implementation
-backend transport. KAS records the chosen stage in installed/project-specific
+The selected compatibility stage is a project/profile operating setting, not just prose in a
+single phase skill. KAS install or project application may record the historical
+stage for audit/reporting, and an existing project may change stage only through
+an explicit KAS reconfiguration record with preserved evidence. KAH does not need
+a stage-specific graph or gate model because the graph state, run state, events,
+locks, artifact schemas, and gate mechanics are unchanged by legacy transport
+metadata. KAS records any chosen compatibility stage in installed/project-specific
 KAS guidance, preferably as a small project-stage reference under the installed
 umbrella project skill, such as
 `skills/<project>/<project>-kas/references/kab-adoption-stage.md`. KAS may also
 mirror the stage into project backend policy or overlay/reference material when
 project state is initialized through KAH, and must record it in run-local
 task/phase evidence. If the stage is missing or ambiguous, KAS must fail closed
-to Stage 1 behavior: direct Codex evidence may be recorded, but KAB Codex
-execution must not be claimed.
+to legacy Stage 1 claims: direct Codex evidence may be recorded only as
+historical/compatibility evidence, and KAB Codex execution must not be claimed.
+Active v0.2 GJC/KAH execution relies on separate plan/approval/GJC evidence, not
+on the legacy stage marker.
 
 The detailed KAS CLI selector contract lives in `docs/sot/kas-cli-contract.md`.
 That SOT owns numeric/operator UX, non-interactive defaults, canonical stage
@@ -295,7 +296,7 @@ Target phase mapping:
 - backend-select: select KAB backend from capability evidence and policy.
 - prompt-compose: render backend-specific prompt while preserving caveats.
 - phase-state: keep run-local phase status aligned with KAH artifacts.
-- plan and ask: produce plan, identify decisions, and preserve plan evidence before implementation.
+- plan/ralplan and explicit approval/question boundaries: produce candidate plan evidence, identify decisions, and preserve required approval evidence before implementation.
 - implement, enhance-test, optimize, docs-update: execute the work through appropriate backend/session and preserve evidence.
 - request-feedback and handle-feedback: external feedback intake layer, bounded by current policy and capability evidence.
 - review and verify: read-only checks, risk review, and evidence review.

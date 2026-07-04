@@ -115,14 +115,10 @@ templates:
         applicability: required
         owner_role: planner_backend
         evidence_artifact: plan.md
-      - id: vet
+      - id: ralplan
         applicability: required
-        owner_role: hwangchung
-        evidence_artifact: review.md
-      - id: ask
-        applicability: required
-        owner_role: planner_backend_plus_hwangchung
-        evidence_artifact: prompt.md
+        owner_role: planner_backend
+        evidence_artifact: gjc-ralplan-status.json
       - id: implement
         applicability: required
         owner_role: implementer_backend
@@ -185,12 +181,9 @@ templates:
         to: plan
         type: sequence
       - from: plan
-        to: vet
+        to: ralplan
         type: sequence
-      - from: vet
-        to: ask
-        type: sequence
-      - from: ask
+      - from: ralplan
         to: implement
         type: sequence
       - from: implement
@@ -285,9 +278,9 @@ templates:
       init_profile_allowed: false
       kah_graph_alias_authoritative: false
       temp_repo_verification_required: true
-      expected_phase_count: 19
-      expected_edge_count: 18
-      phase_path_note: Mirrors the active kas-default template MAR development spine with graph ids docs, verify, and final; older activity aliases such as update_docs and final_verify are translation-only compatibility names. Custom project workflows remain supportable and must not be replaced without proposal/apply approval evidence.
+      expected_phase_count: 18
+      expected_edge_count: 17
+      phase_path_note: Mirrors the active kas-default template MAR development spine with graph ids docs, verify, and final; explicit approval/question evidence is a boundary, not a default ask phase. Older activity aliases such as update_docs and final_verify are translation-only compatibility names. Custom project workflows remain supportable and must not be replaced without proposal/apply approval evidence.
     evidence_contract:
       canonical_artifact: templates/run-artifacts/graph-evidence.md.tmpl
       run_artifact_path: graph-evidence.md

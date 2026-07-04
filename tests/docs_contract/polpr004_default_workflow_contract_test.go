@@ -15,8 +15,7 @@ var polpr004DefaultPhases = []string{
 	"roadmap",
 	"task-classification",
 	"plan",
-	"vet",
-	"ask",
+	"ralplan",
 	"implement",
 	"enhance-test",
 	"ai-slop-cleaner",
@@ -36,9 +35,8 @@ var polpr004DefaultEdges = []phaseEdge{
 	{"sot", "roadmap"},
 	{"roadmap", "task-classification"},
 	{"task-classification", "plan"},
-	{"plan", "vet"},
-	{"vet", "ask"},
-	{"ask", "implement"},
+	{"plan", "ralplan"},
+	{"ralplan", "implement"},
 	{"implement", "enhance-test"},
 	{"enhance-test", "ai-slop-cleaner"},
 	{"ai-slop-cleaner", "optimize"},
@@ -60,6 +58,38 @@ var polpr004DeferredResiduals = []string{
 type phaseEdge struct {
 	from string
 	to   string
+}
+
+func requireContainsAllInText(t *testing.T, label string, content string, needles []string) {
+	t.Helper()
+	for _, needle := range needles {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("%s missing %q", label, needle)
+		}
+	}
+}
+
+func extractYAMLMapEntryBlock(t *testing.T, content string, marker string) string {
+	t.Helper()
+	start := strings.Index(content, marker)
+	if start == -1 {
+		t.Fatalf("missing YAML map entry marker %q", marker)
+	}
+	lines := strings.Split(content[start:], "\n")
+	markerIndent := len(marker) - len(strings.TrimLeft(marker, " "))
+	block := []string{lines[0]}
+	for _, line := range lines[1:] {
+		if strings.TrimSpace(line) == "" {
+			block = append(block, line)
+			continue
+		}
+		indent := len(line) - len(strings.TrimLeft(line, " "))
+		if indent <= markerIndent {
+			break
+		}
+		block = append(block, line)
+	}
+	return strings.Join(block, "\n")
 }
 
 func TestPOLPR004KASDefaultTemplateAndRegistryStayAligned(t *testing.T) {
@@ -92,6 +122,7 @@ func TestPOLPR004ActiveDefaultWorkflowSurfacesUseMARAndPreserveCustomGraphs(t *t
 		"skills/kkachi-orchestrate/SKILL.md",
 	} {
 		requireContainsAll(t, rel, []string{
+			"ralplan",
 			"enhance-test",
 			"ai-slop-cleaner",
 			"mar-review",
@@ -99,23 +130,142 @@ func TestPOLPR004ActiveDefaultWorkflowSurfacesUseMARAndPreserveCustomGraphs(t *t
 	}
 
 	requireContainsAll(t, "registries/graph-template-registry.yaml", []string{
-		"expected_phase_count: 19",
-		"expected_edge_count: 18",
+		"expected_phase_count: 18",
+		"expected_edge_count: 17",
 		"custom project workflows remain supportable",
+		"explicit approval/question evidence is a boundary, not a default ask phase",
 		"phase_id_translation:",
 		"older phase-contract/skill activity aliases remain translation-only",
 		"run-local phase-plan applicability may still be skipped or not_applicable",
 	})
 	requireContainsAll(t, "docs/sot/phase-orchestration-policy.md", []string{
+		"plan -> ralplan -> implement",
+		"plan-vet remains an acceptance/review gate term",
 		"not a universal forced",
 		"Project-specific `.kkachi-workflow.yaml` composition remains supported",
 		"`final` graph phase",
 		"`final-verify` is only the skill/activity alias",
 	})
 	requireContainsAll(t, "skills/kkachi-orchestrate/SKILL.md", []string{
+		"plan -> ralplan -> implement",
+		"plan-vet remains an acceptance/review gate term",
 		"must not be forced onto custom project workflows",
 		"non-development task classes",
 		"older activity aliases such as `update_docs` and `final_verify` are translation-only compatibility names",
+	})
+	for _, rel := range []string{"docs/sot/phase-orchestration-policy.md", "skills/kkachi-orchestrate/SKILL.md"} {
+		content := readRepoFile(t, rel)
+		for _, stale := range []string{"plan -> vet -> implement", "vet -> implement"} {
+			if strings.Contains(content, stale) {
+				t.Fatalf("%s retains stale default-spine phase ordering %q", rel, stale)
+			}
+		}
+	}
+}
+
+func TestPOLPR004RunArtifactTemplatesDoNotRequireDefaultAsk(t *testing.T) {
+	targets := []string{
+		"templates/run-artifacts/checklist.md.tmpl",
+		"templates/run-artifacts/phase-plan.yaml.tmpl",
+		"templates/run-artifacts/plan.md.tmpl",
+		"templates/run-artifacts/task-contract.yaml.tmpl",
+	}
+	staleRequiredAsk := []string{
+		"phase: ask",
+		"| ask |",
+		"ask.md",
+		"ask_phase_required: true",
+		"plan -> ask",
+		"vet -> ask",
+	}
+	for _, rel := range targets {
+		content := readRepoFile(t, rel)
+		for _, stale := range staleRequiredAsk {
+			if strings.Contains(content, stale) {
+				t.Fatalf("%s still contains required/default ask wording %q", rel, stale)
+			}
+		}
+		requireContainsAll(t, rel, []string{
+			"approval",
+		})
+	}
+}
+
+func TestPOLPR004PhasePlanRoleMappingUsesCorrectedV02Train(t *testing.T) {
+	content := readRepoFile(t, "templates/run-artifacts/phase-plan.yaml.tmpl")
+	plannerBlock := extractYAMLMapEntryBlock(t, content, "  planner_backend:")
+	for _, stale := range []string{"      - ask", "      - request_feedback"} {
+		if strings.Contains(plannerBlock, stale) {
+			t.Fatalf("planner_backend phases still contain default question/feedback phase %q", stale)
+		}
+	}
+	requireContainsAllInText(t, "planner_backend role mapping", plannerBlock, []string{
+		"      - plan",
+		"      - ralplan",
+	})
+
+	implementerBlock := extractYAMLMapEntryBlock(t, content, "  implementer_backend:")
+	requireContainsAllInText(t, "implementer_backend role mapping", implementerBlock, []string{
+		"      - implement",
+		"      - enhance_test",
+		"      - ai_slop_cleaner",
+		"      - optimize",
+		"      - update_docs",
+	})
+	for _, stale := range []string{"      - docs_update", "      - docs", "      - final_verify"} {
+		if strings.Contains(implementerBlock, stale) {
+			t.Fatalf("implementer_backend phases contain stale/non-canonical phase alias %q", stale)
+		}
+	}
+}
+
+func TestPOLPR004PhaseContractsIncludeRalplanInDefaultDevelopmentSurfaces(t *testing.T) {
+	content := readRepoFile(t, "registries/phase-contracts.yaml")
+	requireContainsAllInText(t, "phase-contracts ralplan defaults", content, []string{
+		"canonical_spine:\n  - plan\n  - ralplan\n  - implement",
+		"phases: [codegraph_refresh, plan, ralplan, implement",
+		"  planner_backend:\n    phases:\n      - plan\n      - ralplan",
+		"gjc_ralplan_status_json",
+		"substantive_ralplan_candidate_evidence",
+		"proceed from ralplan to implementation",
+	})
+	for _, stale := range []string{
+		"phases: [codegraph_refresh, plan, implement",
+		"proceed from vet to implementation",
+	} {
+		if strings.Contains(content, stale) {
+			t.Fatalf("phase-contracts retains stale/default-bypassing wording %q", stale)
+		}
+	}
+}
+
+func TestPOLPR004ActiveV02SurfacesDoNotExposeDirectCodexDefaultLane(t *testing.T) {
+	phasePlan := readRepoFile(t, "templates/run-artifacts/phase-plan.yaml.tmpl")
+	for _, stale := range []string{
+		"\nstage1_direct_codex_runner:",
+		"    - direct_codex_app_server",
+	} {
+		if strings.Contains(phasePlan, stale) {
+			t.Fatalf("phase-plan template exposes active/default direct-Codex lane surface %q", stale)
+		}
+	}
+	requireContainsAllInText(t, "phase-plan historical direct-Codex compatibility", phasePlan, []string{
+		"historical_compatibility_lanes:",
+		"direct_codex_app_server:",
+		"disabled_by_default: true",
+		"explicit_selection_required: true",
+		"GJC ralplan/ultragoal is the active v0.2 default lane",
+	})
+
+	backendProfiles := readRepoFile(t, "registries/backend-prompt-profiles.yaml")
+	if strings.Contains(extractYAMLMapEntryBlock(t, backendProfiles, "output_policy:"), "    - direct_codex_app_server") {
+		t.Fatalf("backend prompt output_policy still applies to direct_codex_app_server as an active/default lane")
+	}
+	requireContainsAllInText(t, "backend prompt profile historical direct-Codex compatibility", backendProfiles, []string{
+		"historical_compatibility_lanes:",
+		"direct_codex_app_server:",
+		"disabled_by_default: true",
+		"explicit_selection_required: true",
 	})
 }
 

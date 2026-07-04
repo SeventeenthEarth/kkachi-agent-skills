@@ -27,12 +27,8 @@ phases:
     title: "Plan"
     owner_layer: "khs"
     required: true
-  - id: "vet"
-    title: "Plan Vet"
-    owner_layer: "khs"
-    required: true
-  - id: "ask"
-    title: "Ask / Implementation Authorization"
+  - id: "ralplan"
+    title: "GJC Ralplan"
     owner_layer: "khs"
     required: true
   - id: "implement"
@@ -93,10 +89,8 @@ edges:
   - from: "task-classification"
     to: "plan"
   - from: "plan"
-    to: "vet"
-  - from: "vet"
-    to: "ask"
-  - from: "ask"
+    to: "ralplan"
+  - from: "ralplan"
     to: "implement"
   - from: "implement"
     to: "enhance-test"

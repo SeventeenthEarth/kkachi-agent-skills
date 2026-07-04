@@ -50,7 +50,7 @@ Detailed phase content is artifact-first. Use `.kkachi/runs/<run_id>/artifacts/<
 ## Default phase spine
 
 ```text
-intake -> sot -> roadmap -> task-classification -> plan -> vet -> ask -> implement -> enhance-test -> ai-slop-cleaner -> optimize -> docs -> verify -> review -> request-feedback-1 -> handle-feedback-1 -> mar-review -> second-color-review -> final
+intake -> sot -> roadmap -> task-classification -> plan -> ralplan -> implement -> enhance-test -> ai-slop-cleaner -> optimize -> docs -> verify -> review -> request-feedback-1 -> handle-feedback-1 -> mar-review -> second-color-review -> final; explicit approval/question evidence is recorded at real boundaries, not as a default ask phase, and plan-vet remains an acceptance/review gate term rather than a normal phase node
 ```
 
 This full spine is the default/base graph only for no-input `development` tasks. It must not be forced onto custom project workflows or non-development task classes. Its graph phase ids are `docs`, `verify`, and `final`; older activity aliases such as `update_docs` and `final_verify` are translation-only compatibility names. Path B replaces production code implementation with shaping, SOT, roadmap, acceptance, and handoff artifacts until Path A gates pass.
@@ -61,7 +61,7 @@ This full spine is the default/base graph only for no-input `development` tasks.
 - All terminal commands for an active KAS/KAH run must execute with the real user home, not a Hermes role/profile home. Use `HOME=<real-user-home> ...` in reusable prompts/artifacts, including Git, tests, KAH/KAB/Hermes/Kanban commands, and Codex probes.
 - KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. The default v0.2 KAS/KAH path uses KAS policy, KAH evidence, approved GJC candidate artifacts, and KAT factual evidence only. Do not substitute historical Stage/Codex app-server evidence for active KAB, implementation evidence, or capability-gated backend selection among eligible KAB backends.
 - Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when that lane is explicitly authorized and recorded; do not claim KAB runtime support in those cases.
-- `ask`, `request-feedback-1`, `handle-feedback-1`, `mar-review`, and the `final` graph phase are mandatory in the default/base KHS development graph unless a recorded policy decision says otherwise; `final-verify` is only the skill/activity alias where older phase-contract wording still requires it. `ai-slop-cleaner` and `optimize` are conditional but strongly recommended for code-change runs, and skipping either requires a reason.
+- `request-feedback-1`, `handle-feedback-1`, `mar-review`, and the `final` graph phase are mandatory in the default/base KHS development graph unless a recorded policy decision says otherwise; explicit approval/question evidence is a boundary, not a default `ask` phase. `final-verify` is only the skill/activity alias where older phase-contract wording still requires it. `ai-slop-cleaner` and `optimize` are conditional but strongly recommended for code-change runs, and skipping either requires a reason.
 - Feedback runs at least once and at most five rounds. Round 1 is the normal first color review/feedback round. Rounds 2..5 are optional continuation rounds, and each requested feedback round must have a matching handle-feedback round.
 - Classified KAS/KAH development runs must enter `workflow-trigger` through `--workflow-managed` with preserved `workflow-route` evidence before backend dispatch; selector, explicit, or custom-packet bypasses are not valid substitutes for the strict route-backed path.
 - STRICT workflow-managed runs must follow route -> trigger -> ready -> start -> work -> required outputs -> complete. Treat KAH node start failure, stale `expected_start_revision`, missing required outputs, KAH node complete failure, missing `workflow_phase_projection_validation`, or phase-plan/checklist projection failure as blockers, not warnings; do not continue by skill order, phase-plan text, manual direct KAH state writes, fallback workflow, fallback backend, or fallback agent.
@@ -71,7 +71,7 @@ See `references/run-operating-policy.md` for the active v0.2 lane ownership rule
 
 ## Implementation approval policy
 
-After plan and ask are complete, Hermes may start low-risk implementation automatically after notifying the master of the intended direction. Require explicit master approval before implementation when the run touches API, DB/schema/migration, security/auth/secrets, dependencies, architecture, SOT, large diff/broad fanout, low confidence, or unresolved ask-phase ambiguity.
+After plan/`ralplan` candidate evidence and required plan-vet acceptance are complete, Hermes may start low-risk implementation automatically only when policy and approval-boundary evidence allow it. Require explicit master approval before implementation when the run touches API, DB/schema/migration, security/auth/secrets, dependencies, architecture, SOT, large diff/broad fanout, low confidence, or unresolved approval-boundary ambiguity.
 
 ## Required responsibilities
 

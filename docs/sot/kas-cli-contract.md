@@ -421,16 +421,16 @@ KAB: minimum CLI에는 필요 없음. 코드 변경/백엔드 실행 KAS run에�
 
 Scope:
 
-- The stage selector applies to KAS/KAH development project packs or project-specific KAS overlays that need to record whether future KAS/KAH implementation work uses Stage 1 direct Codex app-server or Stage 2 KAB Codex-first execution.
-- The selector does not make the minimum CLI a KAB runner and does not authorize Stage 2 migration by itself. It records the operating policy that later KAS runs must obey.
-- Stage 3 backend-selected execution is intentionally not exposed by this CLI selector until a separate SOT/roadmap task authorizes it.
+- The stage selector is retained as historical/profile-overlay compatibility metadata for older project-specific KAS packs. V02FLOW active v0.2 KAS/KAH development does not use Stage 1/Stage 2/Codex markers as execution authority.
+- The selector does not make the minimum CLI a KAB runner, does not authorize Stage 2 migration, and does not authorize direct Codex execution by itself. It records legacy operating-policy metadata that later KAS runs must treat through current V02FLOW capability and approval evidence.
+- Stage 3 backend-selected execution is intentionally not exposed by this CLI selector until a separate SOT/roadmap task authorizes it with current capability evidence.
 
 Canonical stage values:
 
 | Numeric choice | Canonical value | Meaning | Current exposure |
 |---|---|---|---|
-| `1` | `stage1_direct_codex_app_server_baseline` | KAS/KAH development continues through the direct Codex app-server lane and records no-KAB-Codex rationale. | default and selectable |
-| `2` | `stage2_kab_codex_first` | KAS/KAH development replaces direct Codex calls with KAB `native_codex` while preserving the same KAS/KAH phase and review structure. | selectable only after operator chooses it |
+| `1` | `stage1_direct_codex_app_server_baseline` | Historical direct Codex app-server compatibility marker; active v0.2 KAS/KAH development must not treat it as execution authority without a later explicit compatibility approval and evidence. | default and selectable for legacy metadata only |
+| `2` | `stage2_kab_codex_first` | Historical KAB Codex-first compatibility marker; active v0.2 KAS/KAH development must not treat it as KAB activation without current bridge/capability evidence and approval. | selectable only after operator chooses it |
 | `3` | `stage3_kab_backend_selected` | KAS/KAH development selects among eligible KAB backends after capability and policy gates. | reserved; not shown or accepted by this selector |
 
 Flags:

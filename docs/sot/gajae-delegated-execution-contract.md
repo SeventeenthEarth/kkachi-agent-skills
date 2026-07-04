@@ -58,7 +58,7 @@ The pilot evidence listed above plus the 2026-06-27 `/tmp/kkachi-gjc` scratch ve
 ### KAS owns
 
 - Korean source-command preservation and English operational briefs for GJC packets.
-- SOT envelope, acceptance criteria, non-goals, forbidden changes, stop/ask gates, and fail-closed fallback policy.
+- SOT envelope, acceptance criteria, non-goals, forbidden changes, stop/approval/question gates, and fail-closed fallback policy.
 - GJC packet templates for `deep-interview`, `ralplan`, `ultragoal`, review/fix turns, and completion callbacks.
 - Plan review, plan revision requests, plan lock, and plan-conflict handling.
 - Color review, MAR disposition, final gate synthesis, and user-facing completion reports.
@@ -124,8 +124,9 @@ or `native_ultragoal_input`; KAH validates its path and hash mechanically and
 uses it only as GJC invocation input, not as approval evidence. `artifact_refs` are GJC candidate output evidence:
 run-local artifact paths plus hashes emitted by GJC and preserved by KAH. KAH validates packet and artifact references mechanically only; it does not parse packet policy, choose fallback behavior, approve plans, adjudicate review/MAR, or decide final acceptance.
 
-Packets must encode stop/ask gates, plan-lock expectations where applicable, no
-hidden fallback, no warning-only final gates, no GJC self-approval, and
+Packets must encode stop/approval/question gates, plan-lock expectations where
+applicable, no hidden fallback, no warning-only final gates, no GJC
+self-approval, and
 KAS/Blue/color/MAR/final authority boundaries. Missing, stale, cross-run,
 unreadable, non-regular, or checksum-mismatched `packet_ref` evidence fails
 closed and requires regenerating or repairing the run-local packet evidence
@@ -188,7 +189,7 @@ Watchers and callbacks must not approve plans, summarize raw logs with an LLM, d
 ### GAJAE-004 source-side pilot
 
 GAJAE-004 may update source-side KAS templates and KAH helper behavior for the
-async `ralplan` / callback / plan-lock pilot after explicit ask/apply approval.
+async `ralplan` / callback / plan-lock pilot after explicit approval/apply evidence.
 This authorization is bounded to source, tests, and docs. It does not authorize
 commit, push, install, release, live/default runtime activation, KAB Stage 2/3
 activation, real GJC/KAT execution outside tests/mocks, or
@@ -203,8 +204,8 @@ requires a plan-conflict report before continuation.
 ### GAJAE-005 source-side pilot
 
 GAJAE-005 may update source-side KAS templates and KAH helper behavior for the
-async `ultragoal` / KAT attachment / review-fix pilot after explicit ask/apply
-approval. This authorization is bounded to source, tests, and docs. It does not
+async `ultragoal` / KAT attachment / review-fix pilot after explicit
+approval/apply evidence. This authorization is bounded to source, tests, and docs. It does not
 authorize commit, push, install, release, live/default runtime activation, KAB
 Stage 2/3 activation, real GJC `ultragoal` invocation, live KAT execution, or
 profile/provider/auth/token/gateway/model mutation.

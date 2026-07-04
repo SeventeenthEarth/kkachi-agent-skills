@@ -291,7 +291,7 @@ The master confirmed:
 19. Documentation must describe Standard Mode first, then Light Mode reductions.
 20. KHS is a Hermes prompt/process skill pack, not the deterministic state ledger and not the bridge control plane.
 21. Task contracts are AI-neutral. Backend prompts are rendered artifacts derived from task contracts, phase contracts, project overlays, selected backend capability snapshots, and backend prompt profiles.
-22. The master's canonical delivery spine is `plan -> ask -> implement -> enhance test -> optimize -> update docs -> request feedback -> handle feedback`, with Path A and Path B changing what each phase is allowed to do.
+22. The current v0.2 delivery spine is `plan -> ralplan -> implement -> enhance test -> ai slop cleaner -> optimize -> update docs -> request feedback -> handle feedback`, with explicit approval/question evidence recorded at real boundaries instead of a mandatory normal `ask` phase.
 23. User backend preference is a ranking input after capability and project-policy gates pass; it must not override a required capability mismatch.
 24. Self-improvement lands project-local first, then promotes to shared KHS only after repeated evidence and skill QA.
 
@@ -819,7 +819,7 @@ Before Kkachi grows into many skills, define these standards first:
 
 8. **Phase skill templates**
    - start with a small reusable set: `kkachi-task-contract`, `kkachi-backend-select`, `kkachi-prompt-compose`, `kkachi-phase-state`, `kkachi-plan`, `kkachi-implement`, `kkachi-verify`, `kkachi-improve`
-   - expand to the full master's spine: `plan`, `ask`, `implement`, `enhance-test`, `optimize`, `update-docs`, `request-feedback`, and `handle-feedback`
+   - expand to the full current spine: `plan`, `ralplan`, `implement`, `enhance-test`, `ai-slop-cleaner`, `optimize`, `update-docs`, `request-feedback`, and `handle-feedback`
 
 9. **Red-team gates**
    - risk review before design finalization

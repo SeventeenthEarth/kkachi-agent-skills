@@ -30,13 +30,15 @@ roles:
     session_id: "{{ planner_session_id }}"
     phases:
       - plan
-      - ask
+      - ralplan
+    approval_boundary_note: "Explicit approval/question evidence is recorded at real approval boundaries only; ask is not a default planner phase."
   implementer_backend:
     backend: "{{ implementer_backend }}"
     session_id: "{{ implementer_session_id }}"
     phases:
       - implement
       - enhance_test
+      - ai_slop_cleaner
       - optimize
       - update_docs
       - handle_feedback
@@ -69,24 +71,29 @@ kab_usage:
   rationale: "{{ kab_usage_rationale }}"
   no_kab_exception: "{{ no_kab_exception_reason }}"
 
-stage1_direct_codex_runner:
-  template_path: "templates/runners/direct-codex-sdk-appserver-runner.py.tmpl"
-  sdk_app_server_mode: "openai_codex -> codex app-server --listen stdio://"
-  rendered_runner_path: "{{ stage1_direct_codex_rendered_runner_path }}"
-  metadata_path: "{{ stage1_direct_codex_metadata_path }}"
-  output_path: "{{ stage1_direct_codex_output_path }}"
-  thread_id: "{{ stage1_direct_codex_thread_id }}"
-  no_kab_codex_rationale: "{{ stage1_direct_codex_no_kab_rationale }}"
-  forbidden_as_stage1_evidence:
-    - codex exec
-    - generic openai Python SDK
-    - raw ws/unix/rest app-server transport
-    - KAB native_codex session evidence
+historical_compatibility_lanes:
+  direct_codex_app_server:
+    disabled_by_default: true
+    explicit_selection_required: true
+    active_v02_default_lane: false
+    rationale: "GJC ralplan/ultragoal is the active v0.2 default lane; direct Codex app-server material is historical compatibility only when explicitly selected and qualified."
+    template_path: "templates/runners/direct-codex-sdk-appserver-runner.py.tmpl"
+    sdk_app_server_mode: "openai_codex -> codex app-server --listen stdio://"
+    rendered_runner_path: "{{ stage1_direct_codex_rendered_runner_path }}"
+    metadata_path: "{{ stage1_direct_codex_metadata_path }}"
+    output_path: "{{ stage1_direct_codex_output_path }}"
+    thread_id: "{{ stage1_direct_codex_thread_id }}"
+    no_kab_codex_rationale: "{{ stage1_direct_codex_no_kab_rationale }}"
+    forbidden_as_stage1_evidence:
+      - codex exec
+      - generic openai Python SDK
+      - raw ws/unix/rest app-server transport
+      - KAB native_codex session evidence
 
 output_policy:
   language: english_product_and_backend_output
   applies_to:
-    - direct_codex_app_server
+    - gjc_ralplan_ultragoal_lanes
     - kab_mediated_backend_lanes
   compact_console_schema:
     - "Status: <pass|fail|blocked|in_progress|not_applicable>"
@@ -280,16 +287,28 @@ phases:
       - backend-plan-artifact-when_backend_used
     check: "kkachi-agent-helper gate check {{ run_id }} plan --json"
     skip_reason: ""
-  - phase: ask
+  - phase: ralplan
     applicability: required
     state: pending
-    owner_role: planner_backend_plus_hermes
+    owner_role: planner_backend
     backend_or_session: "{{ planner_session_id }}"
     evidence:
-      - ask.md
-      - answered-decisions.md
-    check: "No unresolved decision blocker before implement."
+      - gjc-ralplan-status.json
+      - gjc-ralplan-artifact.md
+      - ralplan_candidate_evidence
+    check: "GJC ralplan candidate evidence exists and is substantive; candidate output is not plan acceptance or implementation approval."
     skip_reason: ""
+  - phase: approval_boundary
+    applicability: conditional_explicit_approval_or_question_only
+    state: pending
+    owner_role: hermes_plus_master
+    backend_or_session: "{{ planner_session_id }}"
+    evidence:
+      - approval.md
+      - answered-decisions.md
+      - plan.md#Decision Clarifications
+    check: "Not a default phase. If implementation approval or an unresolved question is required, evidence must be recorded before implement; otherwise record not_applicable with reason."
+    skip_reason: "{{ approval_boundary_skip_reason }}"
   - phase: implement
     applicability: "{{ implement_applicability }}"
     state: pending
@@ -314,18 +333,27 @@ phases:
       - make-test-after-test-enhancement
     check: "Unit, integration, and e2e coverage considered; focused regression coverage added or no-change reason recorded; aggregate verification passes after changes."
     skip_reason: "{{ enhance_test_skip_reason }}"
-  - phase: optimize
+  - phase: ai_slop_cleaner
     applicability: conditional_recommended_for_code_change
     state: pending
     owner_role: implementer_backend
     backend_or_session: "{{ implementer_session_id }}"
     evidence:
       - slop-cleanup-log.md
-      - optimize-log.md
       - make-test-after-slop-cleanup
+      - verification_after_slop_cleanup
+    check: "AI slop, noisy abstractions, speculative text, and avoidable verbosity considered; aggregate verification passes after cleanup changes."
+    skip_reason: "{{ ai_slop_cleaner_skip_reason }}"
+  - phase: optimize
+    applicability: conditional_recommended_for_code_change
+    state: pending
+    owner_role: implementer_backend
+    backend_or_session: "{{ implementer_session_id }}"
+    evidence:
+      - optimize-log.md
       - make-test-after-optimization
-      - verification_after_cleanup
-    check: "AI slop, duplication, unnecessary abstraction, and algorithmic/structural waste considered; aggregate verification passes after cleanup/optimization changes."
+      - verification_after_optimization
+    check: "Duplication, unnecessary abstraction, and algorithmic/structural waste considered; aggregate verification passes after optimization changes."
     skip_reason: "{{ optimize_skip_reason }}"
   - phase: update_docs
     applicability: conditional

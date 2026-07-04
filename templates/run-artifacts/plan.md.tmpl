@@ -51,13 +51,14 @@ Expected seed shape inside `plan.plan_text`:
 ## KHS Checklist Seed
 
 - [ ] phase: plan | evidence: plan.md, checklist.md, acceptance-criteria.md | check: KAH plan gate
-- [ ] phase: ask | evidence: ask.md or plan.md#Decision Clarifications | check: no unresolved blocker
+- [ ] phase: ralplan | evidence: gjc-ralplan-status.json, gjc-ralplan-artifact.md | check: substantive GJC ralplan candidate evidence before implementation
+- [ ] boundary: approval/question evidence | evidence: approval.md, answered-decisions.md, or plan.md#Decision Clarifications when required | check: not a default phase; fail closed if required approval/question evidence is missing
 - [ ] phase: implement | evidence: diff.patch, impl-log.md, cli-output.md | check: implementation matches approved scope
 ```
 
 ## Decision Clarifications
 
-Record ask-phase clarification here or link to `ask.md` / `answered-decisions.md` if present.
+Record explicit approval/question-boundary clarification here or link to `approval.md` / `answered-decisions.md` if present. Do not model `ask` as a default normal phase.
 
 - Open questions:
 - Hermes answers:

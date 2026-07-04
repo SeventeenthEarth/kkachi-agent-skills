@@ -58,9 +58,9 @@ User-confirmed orchestration policy:
 - The master selects the target roadmap task id or task item for each KHS run.
 - KAS/KHS treats `.kkachi-workflow.yaml` as project workflow graph only when backed by KAH graph evidence; `phase-plan.yaml` is run-local execution state/evidence. KAH `work_path`, `work_mode`, and `execution_mode` are helper classification metadata only.
 - Hermes is manager, risk approval router, and final verifier; KAB backend roles do substantive plan/code/docs/feedback work only for KAB-backed phases.
-- KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. Stage 1 direct Codex app-server baseline work remains a no-KAB-Codex lane until Stage 2 KAB Codex-first execution is explicitly selected and evidenced.
+- KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. Historical Stage 1/Stage 2 Codex/KAB lanes are not active v0.2 guidance unless a later task explicitly selects them with current capability evidence.
 - Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when authorized and recorded, but must not claim KAB runtime support.
-- `ask`, feedback round 1, matching feedback handling, and final verification are mandatory.
+- Explicit approval/question evidence is recorded at real boundaries; `ask` is not a mandatory normal phase. Feedback round 1, matching feedback handling, and final verification remain mandatory when the active run contract requires them.
 - Feedback may run up to five rounds: round 1 is required when external feedback is in the run contract, and rounds 2..5 are optional continuation rounds. `optimize` is strongly recommended for code changes and requires a skip reason when omitted.
 
 ## Task and prompt model

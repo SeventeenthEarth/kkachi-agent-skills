@@ -22,7 +22,7 @@ This reference expands the backend observation and startup details in `../SKILL.
 - `phase-plan.yaml`
 - `plan.md`
 - `checklist.md`
-- `ask.md` or explicit no-unresolved-decisions record
+- explicit bounded approval/question evidence when required (`approval.md`, `answered-decisions.md`, or `plan.md#Decision Clarifications`)
 - `selected-cli.json`
 - `capability-check.md`
 - `prompt.md`

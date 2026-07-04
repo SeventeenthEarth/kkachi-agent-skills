@@ -22,10 +22,10 @@ loop under KAS/KAH control:
 
 - **deep-interview** is explicit-only epic/design clarification, not a normal
   task step.
-- **ralplan** produces candidate plan artifacts for KAS/Blue/color review and
-  ask gating; it does not authorize implementation.
-- **ultragoal** produces implementation-candidate artifacts only after the
-  approved ask gate; it is not review, MAR, final acceptance, commit, install,
+- **ralplan** produces candidate plan artifacts for KAS/Blue/color review.
+  It does not authorize implementation, and `ask` is not a default normal phase; only explicit approval/question evidence gates implementation.
+- **ultragoal** produces implementation-candidate artifacts only after
+  explicit bounded implementation approval; it is not review, MAR, final acceptance, commit, install,
   or runtime activation.
 
 KAH records deterministic run/gate/evidence state. KAT is factual/mechanical

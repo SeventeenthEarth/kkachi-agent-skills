@@ -291,8 +291,11 @@ reliable node ids, KAS records an informational diagnostic and still fails
 closed later for any KAH-ready node without a matching contract.
 
 Dispatch packets must preserve `direct_kah_state_write:false` and include
-`completion_authority: kah_only`. Stage 1 direct Codex SDK/app-server evidence
-must be reported separately from KAB `native_codex` evidence with
+`completion_authority: kah_only`. Active v0.2 KAS development node contracts use
+GJC `ralplan` candidate evidence and GJC `ultragoal`/executor-loop candidate
+evidence after bounded approval. Historical Stage 1 direct Codex SDK/app-server
+evidence, when separately selected by an older compatibility surface, must be
+reported separately from KAB `native_codex` evidence with
 `stage1_direct_codex_is_kab_native_codex:false`.
 
 ## Trigger skill posture

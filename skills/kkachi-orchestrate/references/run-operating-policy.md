@@ -30,7 +30,7 @@ This reference expands the operating-policy bullets in `../SKILL.md`.
 - Capture Blue self-review plus durable Red/Orange/Gray role-review evidence, or mark the review phase `not_applicable` with a concrete reason only for pure read-only/direct command runs where no durable project artifact changed.
 - `delegate_task`, temporary subagents, and ad hoc advisor notes are pre-review analysis only. They do not substitute for official color review, MAR role coverage, project-Gray documentation/integrity review, or KAH evidence.
 - For async review fan-in, attach the watcher as a mechanical observer only. If direct Kanban tools are absent, use the durable Hermes Kanban CLI surface before declaring review unavailable.
-- Logical backend roles are planner (`plan`, `ask`), implementer (`implement`, `enhance-test`, `ai-slop-cleaner`, `optimize`, `docs-update`, `handle-feedback`), and feedback (`request-feedback`). They may map to the same or different physical backends.
+- Logical backend roles are planner (`plan`, `ralplan` candidate planning), implementer (`implement`, `enhance-test`, `ai-slop-cleaner`, `optimize`, `docs-update`, `handle-feedback`), and feedback (`request-feedback`). Explicit approval/question evidence is a boundary, not a default `ask` phase. They may map to the same or different physical backends.
 
 ## MAR review policy
 

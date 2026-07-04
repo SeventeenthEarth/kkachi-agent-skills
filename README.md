@@ -50,8 +50,9 @@ planner/executor only, never acceptance authority:
 2. **Ralplan** — produce plan artifacts for KAS/Blue/color review; completion
    does not authorize implementation.
 3. **Ultragoal** — produce approved implementation-candidate artifacts after an
-   ask/approval gate; completion still requires KAS/KAH verification, official
-   color review, MAR applicability/coverage, and final Blue synthesis.
+   explicit bounded approval boundary; completion still requires KAS/KAH
+   verification, official color review, MAR applicability/coverage, and final
+   Blue synthesis.
 
 KAT records mechanical test/status/summary/raw-log evidence only. KAB remains a
 separate runtime/session-control lane and is not the default KAS/KAH v0.2
@@ -298,7 +299,7 @@ orchestrate
   -> codegraph-refresh(index, or init -i when first initialization is due)
   -> backend-select
   -> prompt-compose
-  -> plan / ask / required Red plan approval when project policy requires it
+  -> plan / ralplan candidate evidence / explicit approval boundary when project policy requires it
   -> implement / selected verification profile or gate
   -> enhance-test(unit, integration, e2e) / selected verification profile or gate
   -> AI slop cleanup / selected verification profile or gate

@@ -29,14 +29,14 @@ This document records the current user-confirmed KHS behavior for software-devel
 - Hermes is manager, risk approval router, final verifier, and Korean reporter.
 - Hermes does not normally author production code inside a KHS run.
 - KHS defines three logical backend roles:
-  - planner: `plan`, `ask`
+  - planner: `plan`, `ralplan` candidate planning
   - implementer: `implement`, `enhance-test`, `ai-slop-cleaner`, `optimize`, `docs-update`, `handle-feedback`
   - feedback: `request-feedback`
 - These logical roles may map to one physical KAB backend/session or to different backends according to project policy, user preference, Hermes judgment, and capability evidence.
 
 ## KAB usage
 
-- KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. Stage 1 direct Codex app-server baseline work remains a no-KAB-Codex lane until Stage 2 KAB Codex-first execution is explicitly selected and evidenced.
+- KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. The active v0.2 KAS/KAH default is KAS policy plus KAH deterministic evidence with GJC `ralplan`/`ultragoal` candidate artifacts; historical Stage 1/Stage 2 Codex/KAB lanes require a later explicit selection with current capability evidence.
 - KAB-backed code-change and development runs must preserve selected backend identity, runtime evidence, and bridge completion evidence.
 - Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when the master or roadmap authorizes that lane.
 - No-KAB KAS/KAH-local work must record the rationale in `phase-plan.yaml`, `docs-update.md`, and the final report, and must not claim KAB runtime support.
@@ -46,7 +46,7 @@ This document records the current user-confirmed KHS behavior for software-devel
 The active default/base development workflow graph is:
 
 ```text
-intake -> sot -> roadmap -> task-classification -> plan -> vet -> ask -> implement -> enhance-test -> ai-slop-cleaner -> optimize -> docs -> verify -> review -> request-feedback-1 -> handle-feedback-1 -> mar-review -> second-color-review -> final
+intake -> sot -> roadmap -> task-classification -> plan -> ralplan -> implement -> enhance-test -> ai-slop-cleaner -> optimize -> docs -> verify -> review -> request-feedback-1 -> handle-feedback-1 -> mar-review -> second-color-review -> final (explicit approval/question evidence is a boundary, not the default `ask` phase; plan-vet remains an acceptance/review gate term, not a normal phase node)
 ```
 
 This is the no-input/default KAS development template, not a universal forced
@@ -58,15 +58,18 @@ and `final_verify` are explicit translation-only compatibility names, not
 pending reconciliation work, graph fallback authority, or names that rename the
 active default graph phases.
 
-Mandatory for every KHS run:
+Mandatory for every default KHS development run:
 
 - `plan`
-- `ask`
 - `request-feedback-1`
 - `handle-feedback-1`
 - `mar-review`
 - `final` graph phase; `final-verify` is only the skill/activity alias where
   older phase-contract wording still requires it
+
+Explicit approval/question evidence is mandatory only when a real approval
+boundary or unresolved decision exists. It is not modeled as the default `ask`
+phase in the v0.2 KAS/KAH development spine.
 
 Required graph rows are required in the default/base template path. Run-local
 phase applicability can still be marked skipped or not-applicable with concrete
@@ -79,13 +82,14 @@ universal graph shape onto every run.
 - KHS captures `plan.plan_text` into `plan.md` before implementation approval/start.
 - KHS/Hermes parses the seed, applies `registries/phase-contracts.yaml`, and writes the normalized progress tracker to `checklist.md`.
 - KAB does not own the normalized checklist.
-- `checklist.md` is updated after `ask` and after every later phase.
+- `checklist.md` is updated after explicit approval/question boundaries when present and after every later phase.
 
-## Ask phase
+## Approval / question boundary
 
-- `ask` always runs after `plan`.
-- If no question remains, record that explicitly instead of skipping the phase.
-- Ask the master only when Hermes cannot decide safely from SOT/project docs or when user intent must be confirmed.
+- `ask` is not a default normal phase after `plan`.
+- If implementation approval is required, record explicit bounded approval evidence before `implement`.
+- If no question remains and no approval boundary applies, record the boundary as not applicable instead of creating a required `ask` phase.
+- Ask the master only when Hermes cannot decide safely from SOT/project docs, when user intent must be confirmed, or when the next step requires explicit approval.
 
 ## Implementation approval
 
@@ -99,16 +103,17 @@ Hermes may auto-start low-risk work after notifying the master. Explicit master 
 - SOT changes
 - large diffs or broad file fanout
 - low confidence
-- unresolved ask-phase ambiguity
+- unresolved approval-boundary ambiguity
 
 ## KAS/KAH roadmap policy review governance
 
 For active KAS/KAH roadmap policy, workflow, template, test, or shared skill
-mirror work, implementation starts only after the backend-authored plan has
-Blue synthesis plus Red and Orange plan-vet acceptance. Red/Orange reviewers
-and Gray documentation/integrity review are resolved through the project/team
-role registry when applicable, not hard-coded to individuals. Any requested plan
-change returns to the same selected planner lane before implementation.
+mirror work, implementation starts only after selected plan/`ralplan` candidate
+evidence has Blue synthesis plus required color plan-vet acceptance. Red/Orange
+reviewers and Gray documentation/integrity review are resolved through the
+project/team role registry when applicable, not hard-coded to individuals. Any
+requested plan change returns to the same selected planner lane before
+implementation.
 
 Official review evidence is limited to recorded color review, MAR role review,
 project-Gray review, KAH artifacts, and accepted run evidence. `delegate_task`
