@@ -28,11 +28,11 @@ The prior profile-skill-local `kas-project-state.yaml` and `kab-adoption-stage.m
 
 ## 2. Ownership boundaries
 
-- KAS owns the `.kkachi/toolchain.yaml` schema, validation, generation, refresh, Stage 1/2/3 semantics, MAR provider policy integration, legacy import rules, and fail-closed behavior.
+- KAS owns the `.kkachi/toolchain.yaml` schema, validation, generation, refresh, v0.2 execution-posture metadata, MAR provider policy integration, legacy import diagnostics, and fail-closed behavior.
 - KAH owns deterministic helper facts exposed by a read-only probe command. KAH does not choose KAS policy, KAB stage, MAR roles/providers, or KAS upstream baselines.
 - KAB remains backend runtime/session evidence. KAB live session ids, stream state, and backend runtime state are not stored as toolchain SOT fields.
 - `.kkachi/runs/<run_id>/` owns per-run snapshots, KAB session evidence, Codex thread evidence, MAR attempt artifacts, and gate evidence.
-- No task in this SOT authorizes auth/token/gateway/provider/model mutation, installed profile mutation, push, release, KAB Stage 2 activation, or live runtime changes.
+- No task in this SOT authorizes auth/token/gateway/provider/model mutation, installed profile mutation, push, release, KAB activation, or live runtime changes.
 
 ## 3. Logical task / physical commit rule
 
@@ -103,7 +103,7 @@ Additional fields are allowed only when they are deterministic, non-secret, loca
 - Codex app-server thread ids as project toolchain policy;
 - MAR raw output or complete provider attempt payloads;
 - mutable KAH run/gate/event state;
-- broad fallback settings that allow unsupported Stage 2, alternate providers, or direct backend substitution without explicit approval evidence.
+- broad fallback settings that allow unsupported KAB activation, alternate providers, or direct backend substitution without explicit approval evidence.
 
 Per-run artifacts may snapshot the generated toolchain and store runtime evidence under `.kkachi/runs/<run_id>/...`.
 
@@ -125,17 +125,17 @@ Behavior rules:
 1. `init` creates `.kkachi/` if needed, gathers KAS facts, calls the KAH read-only probe, and writes `.kkachi/toolchain.yaml` atomically.
 2. `doctor` validates schema, stage, KAS/KAH facts, MAR provider proof shape, no-secret rules, and KAH probe availability without writing.
 3. `refresh` updates observed facts only; it must not silently change stage, approval evidence, or policy fields.
-4. `import-legacy` reads profile-skill-local `kas-project-state.yaml` and `kab-adoption-stage.md` for migration from explicit `--profile` and `--project` inputs. Missing, invalid, ambiguous, or conflicting legacy facts fail closed. Existing `.kkachi/toolchain.yaml` content is never silently overwritten.
-5. `set-stage` is the only KAS-owned ordinary path for changing the KAB adoption stage and requires approval evidence. Stage 1 may be recorded without claiming KAB execution. Stage 2 requires deterministic KAB `native_codex` capability proof before use; when that proof surface is unavailable, KAS must fail closed with a stable diagnostic. Stage 3 is reserved and unauthorized.
+4. `import-legacy` reads profile-skill-local `kas-project-state.yaml` and `kab-adoption-stage.md` only as bounded stale-state diagnostics from explicit `--profile` and `--project` inputs. Missing, invalid, ambiguous, or conflicting legacy facts fail closed. Existing `.kkachi/toolchain.yaml` content is never silently overwritten, and legacy facts do not become compatibility or migration authority.
+5. `set-stage` is retained only for historical toolchain records. Active v0.2 KAS/KAH work records explicit execution posture instead: KAS/KAH/GJC/KAT by default, and KAB only when a task explicitly selects it with current capability evidence. Legacy Stage markers must not authorize direct Codex, KAB `native_codex`, or backend-selected execution.
 6. `install-launchers` installs embedded KAS-owned `kkachi-agent-skills-toolchain` and `kkachi-agent-helper-toolchain` wrappers into `--bin-dir` or the default user `~/.local/bin`. The wrappers read only the nested `kkachi.toolchain.v1` schema, resolve effective KAS/KAH binary paths, expose `--toolchain-status`, and fail closed on missing, malformed, unsupported, non-executable, or version-mismatched metadata. They do not accept legacy top-level launcher metadata as compatibility input.
 
-## 7. Stage and MAR semantics
+## 7. Execution posture and MAR semantics
 
-Stage semantics remain unchanged:
+Active v0.2 toolchain semantics:
 
-- Stage 1 is direct Codex SDK/app-server baseline and must not claim KAB Codex execution.
-- Stage 2 is KAB Codex-first through `native_codex`; direct Codex fallback is break-glass only and requires recorded approval, rationale, and scope.
-- Stage 3 remains reserved until separately authorized.
+- KAS/KAH/GJC/KAT is the default source-side execution posture: KAS owns policy/contracts, KAH owns deterministic evidence, GJC produces candidate artifacts only when approved, and KAT supplies factual evidence only.
+- KAB runtime/session control is explicit-only and requires current capability plus bridge evidence.
+- Historical Stage 1/Stage 2/Stage 3 metadata may be preserved for stale-state diagnostics only; it does not authorize active direct Codex, `native_codex`, backend-selected execution, fallback, warning-only behavior, or migration paths.
 
 MAR semantics remain role-first and fail-closed. Provider availability, prompt rendering, or dispatch success is not review completion. Toolchain provider proof only records bounded, non-secret provider command/model/proof metadata and cannot replace per-run MAR attempt artifacts, Blue disposition, Red adjudication, or KAH MAR gates. Malformed or secret-like provider proof fails the toolchain doctor.
 
@@ -168,7 +168,7 @@ TOLMR does not authorize:
 
 - broad profile skill rewrite or profile installation;
 - automatic KAH/KAS binary installation or update;
-- KAB Stage 2 activation beyond explicit stage setting and capability evidence;
+- KAB activation beyond explicit task approval and capability evidence;
 - KAB changes unless existing Stage 2 preflight surfaces prove insufficient;
 - provider/auth/gateway/model mutation;
 - warning-only degraded toolchain behavior;

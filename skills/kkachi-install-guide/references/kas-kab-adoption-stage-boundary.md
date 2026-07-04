@@ -1,81 +1,20 @@
-# KAS KAB adoption stage boundary
+# KAS KAB adoption stage boundary — historical record
 
-Use this reference when installing or changing a project-specific KAS suite and the project must declare whether it runs as Stage 1, Stage 2, or Stage 3. After reading the boundary, use `kas-kab-adoption-stage-runbook.md` for the concrete Stage 1 and Stage 2 evidence checklist.
+> V01CLEAN status: historical/deprecated. Retained for stale-stage audit provenance only; not active v0.2 install/profile guidance, migration authority, fallback authorization, or KAB activation evidence.
 
-## Ownership
+This reference preserves the old Stage 1/2/3 adoption vocabulary only so stale installed-profile records and historical reviews can be interpreted. It is not a current installation procedure, runbook, suite layout rule, backend selector, or fallback policy.
 
-KAS owns the adoption-stage policy. KAH does not need to interpret the stage semantically: graph state, run state, events, locks, artifacts, schemas, and gates use the same helper mechanics across all stages.
+Historical terms that may appear in old artifacts:
 
-KAB owns backend execution and observation evidence when Stage 2 or Stage 3 uses bridge-backed execution. MAR remains the default review lane and is not replaced by the implementation-stage setting.
+- Stage 1 / `stage1_direct_codex_app_server_baseline`: old direct Codex SDK/app-server baseline wording.
+- Stage 2 / `stage2_kab_codex_first`: old KAB Codex-first via `native_codex` wording.
+- Stage 3 / `stage3_kab_backend_selected`: old reserved/backend-selected wording.
 
-## Preferred installed-profile record
+Active v0.2 boundary:
 
-For project-specific KAS installations, record the active stage inside the installed Hermes profile skill suite, not in the target project repository.
+- KAS owns policy and skills; KAH owns deterministic run/event/artifact/gate evidence.
+- GJC artifacts are candidate planner/executor evidence only; KAS/Blue/color/MAR/final gates remain authority.
+- KAT evidence is factual/mechanical only.
+- KAB is explicit-only: no historical Stage marker, no direct Codex/app-server transcript, and no `native_codex` mention authorizes KAB-backed execution without a current approved task, capability check, selected backend evidence, and bridge evidence.
 
-Preferred layout:
-
-```text
-~/.hermes/profiles/<profile>/skills/<project-name>/<project-name>-kas/SKILL.md
-~/.hermes/profiles/<profile>/skills/<project-name>/<project-name>-kas/references/kab-adoption-stage.md
-```
-
-For current split projects this means examples such as:
-
-```text
-~/.hermes/profiles/hwangchung/skills/kan-plugin/kan-plugin-kas/references/kab-adoption-stage.md
-~/.hermes/profiles/hwangchung/skills/kan-control/kan-control-kas/references/kab-adoption-stage.md
-```
-
-The umbrella project KAS skill should explicitly say to read `references/kab-adoption-stage.md` before selecting planner/implementer lanes.
-It should then apply the canonical runbook at
-`skills/kkachi-install-guide/references/kas-kab-adoption-stage-runbook.md`
-instead of duplicating stage evidence rules in every phase skill.
-
-## Stage record shape
-
-Keep the file human-readable and grep-friendly. Recommended contents:
-
-```yaml
-kas_kab_adoption_stage: stage2_kab_codex_first
-allowed_implementation_backends:
-  - codex
-stage_owner: KAS
-kah_semantics: unchanged_graph_run_artifact_gates
-mar_review: default_role_first_review_lane
-changed_from: stage1_direct_codex_app_server_baseline
-changed_reason: "KAB native_codex execution is ready for this project"
-evidence_required:
-  - selected_cli_json_when_kab_backed
-  - capability_check_md_when_kab_backed
-  - bridge_events_md_when_kab_backed
-  - direct_codex_no_kab_rationale_when_stage1
-```
-
-Use one of these stage values:
-
-- `stage1_direct_codex_app_server_baseline`
-- `stage2_kab_codex_first`
-- `stage3_kab_backend_selected`
-
-## When to touch KAH project state
-
-Do not run `kkachi-agent-helper project init --force` merely because the KAS stage changed in the installed profile skill suite. Use KAH reconfiguration only when project-local KAH overlay/backend-policy state must also be rewritten for durability, multi-operator visibility, or project-local policy mirroring.
-
-If KAH project state is rewritten, preserve:
-
-- previous stage
-- new stage
-- reason for change
-- exact KAH command and `--force` use
-- `project doctor --json` result
-- next-run task/phase evidence proving the selected lane
-
-## Fail-closed rule
-
-If the stage marker is missing, invalid, or ambiguous, KAS must fail closed to Stage 1 behavior. Direct Codex evidence may be recorded, but KAB Codex execution must not be claimed unless Stage 2 or Stage 3 is explicitly selected and evidenced.
-
-## Runbook pointer
-
-The detailed operator checklist for marker readback, Stage 1 direct Codex
-evidence, Stage 2 KAB `native_codex` evidence, and break-glass handling lives in
-`kas-kab-adoption-stage-runbook.md`.
+If an old marker is found, classify it as stale historical provenance or a cleanup target. Do not fail closed to Stage 1 behavior; fail closed to no backend/KAB claim until current approval and evidence exist.

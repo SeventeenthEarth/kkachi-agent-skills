@@ -1,7 +1,7 @@
 ---
 name: kkachi-plan
 description: Produce or validate a Kkachi plan from SOT basis, roadmap trace, task contract, acceptance criteria, constraints, non-goals, backend lane requirements, and verification strategy.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Plan
@@ -16,15 +16,39 @@ Plan from durable authority, not chat-only instruction. Path A plans prepare imp
 
 ## 주군 development-pipeline preference
 
-When 주군 asks to run KAS/Kkachi development work and the task is classified as `development`, treat the preferred default as a Codex-led plan-first loop, with the transport determined by the current KAS KAB adoption stage:
+When 주군 asks to run KAS/Kkachi development work and the task is classified as
+`development`, treat the preferred v0.2 default as a GJC delegated plan-first
+loop under KAS/KAH control:
 
-- **Stage 1:** direct Codex SDK/app-server planner through `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl`; the runner imports `openai_codex` and lets the SDK start `codex app-server --listen stdio://`, with direct Codex evidence and no-KAB-Codex rationale. Do not use `codex exec` or generic `openai` SDK evidence. Do not pass an explicit `--model` by default; use the configured Codex account default model. For plan-only turns, pass reasoning effort `high` and record any lower-effort exception in the run artifacts. A KAS/KAH task should use one Codex thread across its plan/revision/implementation/feedback turns by resuming the recorded `thread_id`; start a new thread for the next task. This thread continuity is task-bound and is not Discord-session-bound.
-- **Stage 2:** KAB Codex-first planner through `native_codex`; this replaces direct Codex app-server calls without changing the KAS/KAH phase or review scenario.
-- **Stage 3:** KAB backend-selected planner after backend selection chooses an eligible backend from task requirements, project policy, capability evidence, and user preference after gates.
+- **deep-interview** is explicit-only epic/design clarification, not a normal
+  task step.
+- **ralplan** produces candidate plan artifacts for KAS/Blue/color review and
+  ask gating; it does not authorize implementation.
+- **ultragoal** produces implementation-candidate artifacts only after the
+  approved ask gate; it is not review, MAR, final acceptance, commit, install,
+  or runtime activation.
 
-MAR review is independent of these planning stages. It remains the default KAS review lane and does not change the plan/implementation backend.
+KAH records deterministic run/gate/evidence state. KAT is factual/mechanical
+evidence only. KAB runtime/session control is out of the default v0.2 path and
+requires explicit KAB selection with current capability and bridge evidence.
+Legacy Stage 1/Stage 2/Stage 3 Codex/KAB adoption wording is historical/stale
+and must not be used as active guidance.
 
-Plan drafts for active KAS/KAH roadmap policy, workflow, template, test, or shared skill mirror work must include a fallback audit note before Blue+Red+Orange plan review. Resolve Red/Orange plan-vet reviewers from the project/team role registry when applicable. Ask the planner to identify any fallback paths it proposes, remove unnecessary fallback behavior, and prefer fail-closed handling when capability, evidence, approval, or safe state is missing. Allow a fallback only when no safe direct handling exists, the fallback is tightly bounded/evidenced, and the required code/docs delta is genuinely small. If the only viable fallback would add broad code, new state machinery, or unclear policy, stop and report options to 주군 instead of letting the planner quietly add it.
+MAR review is independent of the candidate planning/implementation lane. It
+remains the default KAS review lane when applicable and does not change the
+plan/implementation authority.
+
+Plan drafts for active KAS/KAH roadmap policy, workflow, template, test, or
+shared skill mirror work must include a fallback audit note before Blue plus
+Red/Orange/Gray plan review. Resolve reviewers from the project/team role
+registry when applicable. Ask the planner to identify any fallback paths it
+proposes, remove unnecessary fallback behavior, and prefer fail-closed handling
+when capability, evidence, approval, or safe state is missing. Allow a fallback
+only when no safe direct handling exists, the fallback is tightly
+bounded/evidenced, and the required code/docs delta is genuinely small. If the
+only viable fallback would add broad code, new state machinery, or unclear
+policy, stop and report options to 주군 instead of letting the planner quietly
+add it.
 
 For DESIGN Teal work, plans must carry `project_has_teal_lane`,
 `ui_ux_change`, derived `teal_required`, and `teal_skip_reason` for false
@@ -44,9 +68,9 @@ Render planner prompts so every command example uses the real user home, for exa
 
 Record deviations in `phase-plan.yaml`, `checklist.md`, and the final report instead of silently using a lighter path. For `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`, use the selected light spine from `task-contract.yaml`; do not manufacture implementation/test/optimize phases unless the classification changes to `development`.
 
-Planner product output for both Stage 1 direct Codex SDK/app-server runner and KAB-mediated lanes must be English and compact: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Write detailed planning content to `plan.md` and, when backend-authored phase detail is needed, `.kkachi/runs/<run_id>/artifacts/plan/backend-plan.md` or the equivalent requested phase artifact. If the artifact cannot be written, report `Status: blocked` with the artifact-write blocker and do not dump full plans into chat.
+Planner product output for v0.2 GJC candidate artifacts or any explicitly selected KAB lane must be English and compact: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Write detailed planning content to `plan.md` and, when backend-authored phase detail is needed, `.kkachi/runs/<run_id>/artifacts/plan/backend-plan.md` or the equivalent requested phase artifact. If the artifact cannot be written, report `Status: blocked` with the artifact-write blocker and do not dump full plans into chat.
 
-See `references/planner-lane-and-capture.md` for the full Stage 1/2/3 plan-first loop, fallback-audit capture prompt, KAB plan capture rule, and backend timing details. See `references/checklist-normalization.md` for the mandatory `checklist.md` transform rules.
+See `references/planner-lane-and-capture.md` for retained historical details; for current v0.2 KAS/KAH tasks, use the GJC `ralplan` candidate path plus fallback-audit capture and KAH evidence rules. See `references/checklist-normalization.md` for the mandatory `checklist.md` transform rules.
 
 ## Inputs
 

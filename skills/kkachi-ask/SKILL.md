@@ -1,7 +1,7 @@
 ---
 name: kkachi-ask
 description: Capture unresolved decisions or blockers in a Kkachi run and convert answers into updated task, plan, or shaping artifacts before implementation proceeds.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Ask

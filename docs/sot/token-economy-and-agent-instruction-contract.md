@@ -28,7 +28,7 @@ The selected work plan is:
 11. KAH PR 1: mechanical token-economy / English-output / project KAS lifecycle evidence gates.
 12. KAH PR 2: mechanical verification-profile, evidence-summary, review-bundle, watcher, and change-aware verification gates.
 
-The same KAS contract must apply to direct Codex app-server lanes and KAB-mediated backend lanes. KAB must stay a connection interface; KAS owns prompt/policy semantics; KAH validates only mechanically checkable evidence.
+The same KAS contract applies to v0.2 GJC candidate lanes and any explicitly selected KAB-mediated backend lane. KAB must stay a connection interface; KAS owns prompt/policy semantics; KAH validates only mechanically checkable evidence.
 
 ## 2. Problem statement
 
@@ -61,7 +61,7 @@ All KAS-generated prompt templates, backend prompts, CLI help text, human CLI ou
 
 Korean may appear only in external evidence copied from an operator conversation, pre-existing project content, or an explicitly named proper noun that the source project requires. KAS must not generate Korean prose in prompts or console output.
 
-This language rule applies to direct Codex app-server lanes and KAB-mediated backend lanes. Chat reports from a Hermes team member to 주군 are outside this product-output contract.
+This language rule applies to v0.2 GJC candidate lanes and any explicitly selected KAB-mediated backend lane. Chat reports from a Hermes team member to 주군 are outside this product-output contract.
 
 ### 4.2 English compact console output contract
 

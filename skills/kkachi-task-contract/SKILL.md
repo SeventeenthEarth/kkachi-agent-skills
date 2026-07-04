@@ -1,7 +1,7 @@
 ---
 name: kkachi-task-contract
 description: Build an AI-neutral Kkachi task contract from the master's request, project overlay, Path A/B classification, phase contract, SOT basis, constraints, non-goals, required capabilities, and verification evidence.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Task Contract
@@ -14,7 +14,7 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 The task contract is backend-neutral. Do not include Claude, Codex, Gemini, GLM, or OpenCode prompt style in acceptance criteria, constraints, or non-goals.
 
-Task contracts must record output-policy and phase-gating facts without turning them into backend style. Use the registry aliases `simple_report`/`simple_command_report`, `investigation`/`research_evidence`, `review`/`collaboration_review`, and `docs_only`/`docs_only`; non-development classes must include skipped-phase reasons for implementation, enhance-test, optimize, and broad review loops unless classification changes. Record that Stage 1 direct Codex SDK/app-server runner and KAB-mediated backend product output is English, compact (`Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, `Next action requested`), and artifact-first, with detailed phase paths such as `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md`. When Stage 1 is selected, the contract must point to `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` (`openai_codex` -> SDK-managed `codex app-server --listen stdio://`) and reject `codex exec`, generic `openai` SDK output, raw app-server transport, or KAB `native_codex` evidence as Stage 1 proof.
+Task contracts must record output-policy and phase-gating facts without turning them into backend style. Use the registry aliases `simple_report`/`simple_command_report`, `investigation`/`research_evidence`, `review`/`collaboration_review`, and `docs_only`/`docs_only`; non-development classes must include skipped-phase reasons for implementation, enhance-test, optimize, and broad review loops unless classification changes. Record that active v0.2 GJC delegated lane output and any explicitly approved KAB-mediated backend product output are English, compact (`Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, `Next action requested`), and artifact-first, with detailed phase paths such as `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md`. Historical Stage/direct-Codex/native_codex wording is not valid implementation, KAB, or proof authority; reject it unless a later approved explicit KAB task supplies current capability and bridge evidence.
 
 For DESIGN Teal policy, task contracts must record `project_has_teal_lane`,
 `ui_ux_change`, derived `teal_required`, and `teal_skip_reason` when either
@@ -61,3 +61,8 @@ fields. Ordinary color review, MAR, backend evidence, or helper notes must not s
 ## Gate
 
 PASS only when the contract is explicit enough for backend selection and prompt composition, and when the task class justifies the selected phase spine. BLOCKED when desired state, authority, acceptance criteria, classification, or non-goals require a master decision.
+
+
+## V01CLEAN active-baseline note
+
+Any legacy Stage 1/Stage 2/Stage 3, direct Codex app-server, or KAB `native_codex` wording retained in this file is historical context only unless a later approved task explicitly selects KAB with current capability evidence. The active KAS/KAH v0.2 path is KAS policy + KAH deterministic evidence + approved GJC candidate artifacts, with KAT factual evidence only.

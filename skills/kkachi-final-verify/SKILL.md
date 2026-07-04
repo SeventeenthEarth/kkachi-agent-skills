@@ -1,7 +1,7 @@
 ---
 name: kkachi-final-verify
 description: Check that all Kkachi gates, artifacts, verification evidence, docs decisions, feedback handling, and final report requirements are complete before reporting to the master.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Final Verify
@@ -21,7 +21,7 @@ For 주군's KAS/Kkachi development pipeline, final verification happens before 
 - Implementation, test-enhance, AI-slop-cleaner, optimize, and docs-affecting passes each have evidence for the selected verification profile/gate after the final relevant change, or an explicit `not_applicable`/blocker reason. Do not assume a global `make test`; final verification must preserve the selected profile/gate id, command, timeout, applicability, status, exit code, duration, log path, log checksum, bounded failure excerpt, and deterministic failure extractor posture.
 - Docs under `docs/` and the roadmap were updated, or a no-change/no-roadmap-update artifact explains why.
 - Blue completed a first review and any actionable fixes were routed back to the selected implementer lane or responsible shaping/docs lane.
-- Plan authorship and substantive repository mutations followed the selected implementer lane: Stage 1 direct Codex SDK/app-server runner through `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` (`openai_codex` -> `codex app-server --listen stdio://`), Stage 2 KAB Codex-first through `native_codex`, or Stage 3 selected KAB backend produced the plan draft/revisions and applied code/test/build/task-doc changes, while Blue/Red/Orange/Gray only supervised/reviewed/verified unless a 주군-approved direct-role exception is recorded. Stage 1 final evidence must not rely on `codex exec`, generic `openai` SDK output, raw app-server transport, or KAB `native_codex` evidence.
+- Plan authorship and substantive repository mutations followed the selected v0.2 lane: approved GJC candidate/fix artifacts by default, or an explicitly selected KAB lane with current capability and bridge evidence. Blue/Red/Orange/Gray only supervised/reviewed/verified unless a 주군-approved direct-role exception is recorded. Historical Stage/Codex evidence must not be used as active final evidence unless a later approved task explicitly selects and evidences that lane.
 - Required Blue+Red+Orange plan vet evidence exists before implementation start, with Red/Orange reviewers resolved from the project/team role registry when applicable, including verdicts and any `REQUEST_CHANGES` loop routed back through the selected planner lane. Color-review, project-Gray, and MAR requested changes were routed back through the selected implementer lane for mutation, with Blue synthesis/approval and post-change verification evidence.
 - Plan review, first color review, and any later feedback/review round recorded fallback audit when the plan or diff could introduce fallback behavior. Unnecessary fallback paths were removed or converted to fail-closed handling, and any retained fallback has a bounded/evidenced/small-delta rationale or an explicit 주군 decision path.
 - DESIGN Teal policy evidence, when present, records `project_has_teal_lane`, `ui_ux_change`, derived `teal_required`, and `teal_skip_reason` for false inputs. If Teal is required, final verification must find separate `DESIGN_PLAN_GATE` evidence before implementation authorization and `DESIGN_FIDELITY_REVIEW` evidence before final acceptance, or bounded waiver fields with approval ref, scope, and expiry. Ordinary color review, project-Gray, MAR, backend evidence, or helper notes must not substitute for a required Teal verdict.
@@ -43,7 +43,7 @@ For KAB-backed phases, final evidence must include the selected bridge observati
 
 Final verification must reject any run where the only bridge proof is `send` success.
 
-Final product output from generated backend/report artifacts must be English and compact for Stage 1 direct Codex SDK/app-server runner and KAB-mediated lanes: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Detailed final evidence belongs in `final-report.md` or `.kkachi/runs/<run_id>/artifacts/final-verify/backend-final-verify.md`; if the detailed artifact cannot be written, report `Status: blocked` with the artifact-write blocker instead of dumping full logs, diffs, plans, files, reviews, or checklists into chat. The separate commander-facing Korean report to 주군 may summarize those English artifacts.
+Final product output from generated backend/report artifacts must be English and compact for v0.2 GJC candidate artifacts and any explicitly selected KAB lane: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Detailed final evidence belongs in `final-report.md` or `.kkachi/runs/<run_id>/artifacts/final-verify/backend-final-verify.md`; if the detailed artifact cannot be written, report `Status: blocked` with the artifact-write blocker instead of dumping full logs, diffs, plans, files, reviews, or checklists into chat. The separate commander-facing Korean report to 주군 may summarize those English artifacts.
 
 Final verification must also reject graph-managed workflow claims when the run lacks effective-binary evidence for `kkachi-agent-helper graph`, lacks `graph validate/explain` evidence for the graph file used, uses `kah graph` as if it were implemented, or describes manual `.kkachi-workflow.yaml` edits as graph repair. Missing graph capability is acceptable only when `graph-evidence.md` and the final report record a gap and state that the run used run-local phase evidence only.
 
@@ -73,3 +73,8 @@ Final verification must also confirm selected backend caveats were handled:
 - MAR evidence and any required post-change Blue/Red/Orange/Gray re-review are required for implementation tasks and for any other workflow where MAR or another later feedback round changed the work
 
 See `references/review-readiness-and-final-gate.md` for the late-gate artifact checklist, final gate freshness rule, and close/abort sequence.
+
+
+## V01CLEAN active-baseline note
+
+Any legacy Stage 1/Stage 2/Stage 3, direct Codex app-server, or KAB `native_codex` wording retained in this file is historical context only unless a later approved task explicitly selects KAB with current capability evidence. The active KAS/KAH v0.2 path is KAS policy + KAH deterministic evidence + approved GJC candidate artifacts, with KAT factual evidence only.

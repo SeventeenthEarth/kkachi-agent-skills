@@ -1,7 +1,7 @@
 ---
 name: kkachi-request-feedback
 description: Prepare an independent feedback request for a Kkachi run, separate from red-team review, with clear scope, artifacts, questions, and read-only boundaries.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Request Feedback

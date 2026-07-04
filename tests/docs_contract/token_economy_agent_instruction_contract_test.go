@@ -25,7 +25,7 @@ func TestTokenEconomyAgentInstructionSOTDefinesCoreContract(t *testing.T) {
 		"KAS PR 5: approved lifecycle writes, update apply, and uninstall with vault backup",
 		"KAS PR 6: skill slimming and reference split for high-token KAS guidance surfaces",
 		"KAH PR 1: mechanical token-economy / English-output / project KAS lifecycle evidence gates",
-		"The same KAS contract must apply to direct Codex app-server lanes and KAB-mediated backend lanes",
+		"The same KAS contract applies to v0.2 GJC candidate lanes and any explicitly selected KAB-mediated backend lane",
 		"KAB must stay a connection interface",
 		"KAS owns prompt/policy semantics",
 		"KAH validates only mechanically checkable evidence",
@@ -36,7 +36,7 @@ func TestTokenEconomyAgentInstructionSOTRequiresEnglishKASSurfaces(t *testing.T)
 	requireContainsAll(t, tokenEconomyAgentInstructionSOT, []string{
 		"All KAS-generated prompt templates, backend prompts, CLI help text, human CLI output, console summaries, report schemas, and artifact templates must be English by default.",
 		"KAS must not generate Korean prose in prompts or console output.",
-		"This language rule applies to direct Codex app-server lanes and KAB-mediated backend lanes.",
+		"This language rule applies to v0.2 GJC candidate lanes and any explicitly selected KAB-mediated backend lane.",
 		"Chat reports from a Hermes team member to 주군 are outside this product-output contract.",
 	})
 }

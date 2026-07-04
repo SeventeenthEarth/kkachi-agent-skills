@@ -1,7 +1,7 @@
 ---
 name: kkachi-install-guide
 description: Install and verify Kkachi ecosystem components (KAS, KAH, KAB) on the local system, then explain how to initialize a target project through KAH project init.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Install Guide
@@ -52,7 +52,7 @@ Before starting, identify:
 - Bun required for the KAB OpenCode TypeScript plugin build
 - Rust/Cargo required for the KAB Codex wrapper build
 - backend CLI availability: `claude`, `glm`, `codex`, `opencode`, `gemini` as needed for selected KAB lanes
-- KAS KAB adoption stage for the target project/profile: `stage1_direct_codex_app_server_baseline`, `stage2_kab_codex_first`, or `stage3_kab_backend_selected`; read `references/kas-kab-adoption-stage-runbook.md` before reporting evidence expectations
+- active v0.2 posture for the target project/profile: KAS/KAH/GJC/KAT by default, with KAB selected only by explicit task approval and current capability evidence; legacy Stage markers are historical and must not be reported as active install guidance
 - network access: GitHub, Go module proxy, Bun/TypeScript package resolution when dependencies are missing
 - existing installations: check `kkachi-agent-helper` and `kkachi-agent-bridge` binaries
 
@@ -185,22 +185,22 @@ kkachi-agent-helper project init \
   --docs-map-todo-dir <path> \
   --docs-map-spec-dir <path> \
   --test-commands "<command1>,<command2>" \
-  --backend-policy "stage=<stage1_direct_codex_app_server_baseline|stage2_kab_codex_first|stage3_kab_backend_selected>; allowed=<allowed-backends>" \
+  --backend-policy "posture=kas_kah_gjc_kat; kab=explicit_only; allowed=<allowed-backends>" \
   --execution-mode <mode> \
   --sot-policy <policy> \
   --json
 ```
 
 Use `--force` only for non-destructive reconfiguration of existing KAH bootstrap files.
-Changing the KAS KAB adoption stage is a KAS policy change, not a KAH graph/state
-semantic change. Report the current stage, target stage, reason, and evidence
-plan first. Use `project init ... --force` only when the persisted KAH project
-overlay/backend-policy must be rewritten; otherwise record the new stage in the
-installed/project-specific KAS guidance and next run's task/phase evidence. KAH
-does not need to interpret the stage beyond carrying the backend-policy text and
-project overlay/reference state. Missing or ambiguous stage selection fails
-closed to Stage 1 direct Codex SDK/app-server runner baseline behavior; do not claim KAB
-Codex execution unless Stage 2 or Stage 3 is explicitly selected and evidenced.
+Changing the active KAS/KAH execution posture is a KAS policy change, not a KAH
+graph/state semantic change. Report the current posture, target posture, reason,
+and evidence plan first. Use `project init ... --force` only when the persisted
+KAH project overlay/backend-policy must be rewritten; otherwise record the
+posture in installed/project-specific KAS guidance and the next run's task/phase
+evidence. KAH does not need to interpret the posture beyond carrying the
+backend-policy text and project overlay/reference state. Missing or ambiguous
+posture fails closed to v0.2 KAS/KAH/GJC/KAT baseline behavior; do not claim KAB
+Codex execution unless a KAB lane is explicitly selected and evidenced.
 
 After project init, update repository ignores for local runtime/tool state before verification:
 
@@ -260,7 +260,7 @@ When 주군 asks to apply or update KAS for a specific project, distinguish thre
 - **KAS source repository**: `kkachi-agent-skills/skills/...` for local development, or the embedded `kkachi-agent-skills` binary source when installed via `go install`. Update the repository source when promoting the installed/profile-local learning back into canonical KAS.
 - **Project repository state**: `<project>/.kkachi/`, `<project>/.kkachi-workflow.yaml`, project docs/config. Do not create `<project>/skills/` as a stand-in for KAS unless the user explicitly asks for a project-local Hermes skill package.
 
-The preferred place for the active KAS KAB adoption stage is the installed
+The preferred place for the active v0.2 execution posture is the installed
 project-specific KAS suite, for example
 `~/.hermes/profiles/hwangchung/skills/kan-plugin/kan-plugin-kas/references/kab-adoption-stage.md`
 or
@@ -274,9 +274,7 @@ Pitfall: phrases like “apply to the kan-plugin KAS first, promote to KAS later
 
 Reference: `references/kas-kab-adoption-stage-boundary.md` captures the Stage
 1/2/3 marker pattern, preferred installed-profile location, and KAH boundary.
-Reference: `references/kas-kab-adoption-stage-runbook.md` captures the Stage 1
-direct Codex SDK/app-server runner evidence posture, Stage 2 KAB `native_codex` evidence posture, and
-break-glass handling. Do not duplicate the full runbook in phase skills; point
+Reference: `references/kas-kab-adoption-stage-runbook.md` is historical after V01CLEAN. Use it only as provenance when auditing stale Stage markers; do not duplicate it in active phase skills. Point
 operators to the marker plus this reference.
 
 ## Report format
@@ -289,7 +287,7 @@ Report to master in Korean:
 - KAH (helper): ✅ v0.x.x / ❌ 미설치 (자동 설치 시도: 성공/실패)
 - KAB (bridge+plugins): ✅ 설치됨 / ❌ 미설치 (bridge/opencode/codex 빌드 상태 포함)
 - 프로젝트 적용: KAH project init 실행 준비됨 / 추가 정보 필요
-- KAS KAB adoption stage: Stage 1 / Stage 2 / Stage 3 선택됨 또는 변경 필요
+- KAS/KAH v0.2 execution posture: GJC/KAT baseline 확인 또는 explicit KAB selection evidence 필요
 - Project-suite role matrix: Blue / Red / Orange / Gray 적용·검증 상태, Teal 포함/제외 사유
 
 다음 단계:
@@ -314,3 +312,8 @@ After each install run, record in `improvement-note.md`:
 - Environment-specific issues
 - Missing prerequisites not caught early
 - Suggested script/check improvements
+
+
+## V01CLEAN active-baseline note
+
+Any legacy Stage 1/Stage 2/Stage 3, direct Codex app-server, or KAB `native_codex` wording retained in this file is historical context only unless a later approved task explicitly selects KAB with current capability evidence. The active KAS/KAH v0.2 path is KAS policy + KAH deterministic evidence + approved GJC candidate artifacts, with KAT factual evidence only.

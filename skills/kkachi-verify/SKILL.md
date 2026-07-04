@@ -1,7 +1,7 @@
 ---
 name: kkachi-verify
 description: Run or record verification for a Kkachi task, including exact commands, results, failure classification, integration coherence checks, and final test verdict.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Verify
@@ -21,7 +21,7 @@ For KAB-backed work, do not treat `send` success as completion. Completion evide
 
 If stream evidence is used, record that retained events are bridge-owned public events and may not be durable across daemon restart.
 
-Verification product output must be English and compact for Stage 1 direct Codex SDK/app-server runner and KAB-mediated lanes: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Stage 1 verification evidence uses `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` (`openai_codex` -> SDK-managed `codex app-server --listen stdio://`) and must not use `codex exec`, generic `openai` SDK output, raw app-server transport, or KAB `native_codex` evidence as Stage 1 proof. Detailed verification logs and findings belong in `verification.md`, `test-log.md`, or `.kkachi/runs/<run_id>/artifacts/verify/backend-verify.md`. If the detailed artifact cannot be written, report `Status: blocked` with the artifact-write blocker; do not paste full logs, diffs, files, reviews, or exhaustive checklists into chat.
+Verification product output must be English and compact for v0.2 GJC candidate artifacts and any explicitly selected KAB lane: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Do not use historical Stage/Codex app-server evidence as an active verification path unless a later approved task explicitly selects and evidences that lane. Detailed verification logs and findings belong in `verification.md`, `test-log.md`, or `.kkachi/runs/<run_id>/artifacts/verify/backend-verify.md`. If the detailed artifact cannot be written, report `Status: blocked` with the artifact-write blocker; do not paste full logs, diffs, files, reviews, or exhaustive checklists into chat.
 
 ## KASREL provenance/dependency evidence gate
 
@@ -29,7 +29,7 @@ Apply the shared KASREL-004 evidence gate in `docs/sot/kasrel-hermes-v016-proven
 
 Backend-specific verification requirements:
 
-- Codex stream evidence must use Kkachi-stable wrapper-derived public event kinds, not raw Codex app-server messages.
+- Explicitly selected KAB Codex stream evidence must use Kkachi-stable wrapper-derived public event kinds, not raw Codex app-server messages.
 - Gemini plan-mode verification must prove explicit approved-plan start when implementation followed plan approval.
 - OpenCode readiness must not count rendered `<tool_call>question` assistant text as question-flow evidence; only real upstream API/SSE question events count.
 - GLM verification after reject must inspect `response_fidelity_warning` before trusting the assistant text.
@@ -41,3 +41,8 @@ Backend-specific verification requirements:
 - updated `phase-plan.yaml` and `checklist.md` rows
 - integration coherence notes
 - KAH gate event, when supported
+
+
+## V01CLEAN active-baseline note
+
+Any legacy Stage 1/Stage 2/Stage 3, direct Codex app-server, or KAB `native_codex` wording retained in this file is historical context only unless a later approved task explicitly selects KAB with current capability evidence. The active KAS/KAH v0.2 path is KAS policy + KAH deterministic evidence + approved GJC candidate artifacts, with KAT factual evidence only.

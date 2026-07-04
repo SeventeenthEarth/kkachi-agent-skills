@@ -1,7 +1,7 @@
 ---
 name: kkachi-agent-skills-overlay-refresh
 description: Use when refreshing a project overlay after kkachi-agent-skills changes; preserve legacy overlay temporarily, rebuild from the current template, semantically port only durable project-specific rules, then remove the legacy archive after verification.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # kkachi-agent-skills Overlay Refresh
@@ -76,7 +76,7 @@ When copying the active overlay to the temporary legacy archive, mark it clearly
 ---
 name: <project>-overlay-legacy
 description: Legacy archive for temporary kkachi-agent-skills overlay refresh comparison. Do not load for active work.
-version: 0.1.0
+version: 0.2.0
 metadata:
   kas:
     kind: project_overlay_legacy

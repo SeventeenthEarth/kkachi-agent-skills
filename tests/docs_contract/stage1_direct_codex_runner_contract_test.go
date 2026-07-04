@@ -53,45 +53,29 @@ func TestStage1DirectCodexRunnerGuidanceWiredIntoSkillsAndTemplates(t *testing.T
 		"skills/kkachi-verify/SKILL.md",
 		"skills/kkachi-docs-update/SKILL.md",
 		"skills/kkachi-final-verify/SKILL.md",
-		"skills/kkachi-orchestrate/references/run-operating-policy.md",
-		"skills/kkachi-orchestrate/references/orchestration-responsibilities.md",
-		"skills/kkachi-plan/references/planner-lane-and-capture.md",
-		"skills/kkachi-install-guide/references/kas-kab-adoption-stage-runbook.md",
-		"templates/run-artifacts/phase-plan.yaml.tmpl",
-		"templates/run-artifacts/prompt.md.tmpl",
-		"templates/run-artifacts/selected-cli.json.tmpl",
 	} {
 		requireContainsAll(t, rel, []string{
-			"templates/runners/direct-codex-sdk-appserver-runner.py.tmpl",
-			"openai_codex",
-			"codex app-server --listen stdio://",
+			"v0.2",
+			"GJC",
+			"KAB",
 		})
 	}
-	requireContainsAll(t, "skills/kkachi-implement/SKILL.md", []string{
-		"Hermes-tracked background runner with completion notification and bounded polling/watch evidence",
-		"Foreground calls are acceptable for short preflight and bounded plan-only/review turns only",
-		"Use reasoning effort `medium` for non-plan Stage 1 turns by default",
-		"Do not bind Codex continuity to the Discord/Hermes chat session",
-	})
 	requireContainsAll(t, "skills/kkachi-plan/SKILL.md", []string{
-		"For plan-only turns, pass reasoning effort `high`",
-		"This thread continuity is task-bound and is not Discord-session-bound",
+		"Legacy Stage 1/Stage 2/Stage 3 Codex/KAB adoption wording is historical/stale",
+		"GJC `ralplan` candidate path",
 	})
-	requireContainsAll(t, "skills/kkachi-prompt-compose/SKILL.md", []string{
-		"use reasoning effort `high` for plan-only turns",
-		"use `medium` for non-plan implementation/feedback/cleanup/verification-support turns",
-		"resume the task's recorded `thread_id`",
+	requireContainsAll(t, "skills/kkachi-implement/SKILL.md", []string{
+		"Legacy Stage 1/Stage 2/Stage 3",
+		"not active operator guidance",
+		"GJC `ultragoal` may produce implementation-candidate artifacts",
 	})
 }
 
 func TestStage1DirectCodexRunnerRegisteredInDocsAndRoadmap(t *testing.T) {
 	requireContainsAll(t, "docs/README.md", []string{
 		"sot/stage1-direct-codex-sdk-appserver-runner.md",
-		"openai_codex",
-		"codex app-server --listen stdio://",
-		"codex exec",
-		"generic `openai` SDK",
-		"Python runner template",
+		"Deprecated after V01CLEAN",
+		"not active v0.2 operator guidance",
 	})
 	readme := readRepoFile(t, "docs/README.md")
 	if strings.Contains(readme, "future Python runner template") {
@@ -106,10 +90,9 @@ func TestStage1DirectCodexRunnerRegisteredInDocsAndRoadmap(t *testing.T) {
 		"CODEXSDK-001",
 		"CODEXSDK-002",
 		"CODEXSDK-003",
-		"templates/runners/direct-codex-sdk-appserver-runner.py.tmpl",
-		"openai_codex",
-		"codex app-server --listen stdio://",
-		"No profile mutation",
+		"historical Stage 1 direct Codex SDK/app-server runner support",
+		"V01CLEAN status: historical/deprecated",
+		"not active v0.2 operator guidance",
 	})
 
 	requireContainsAll(t, "docs/sot/khs-architecture-and-integration.md", []string{

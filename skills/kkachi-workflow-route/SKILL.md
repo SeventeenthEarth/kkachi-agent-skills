@@ -1,7 +1,7 @@
 ---
 name: kkachi-workflow-route
 description: Route already-classified Kkachi tasks to one standard bundle without KAH calls.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Workflow Route

@@ -4,13 +4,12 @@ This reference expands the operating-policy bullets in `../SKILL.md`.
 
 ## Lane ownership and mutation policy
 
-- The selected implementer lane drafts and revises the substantive implementation plan and performs code, test, build, and task-bound docs mutations:
-  - Stage 1 direct Codex SDK/app-server runner via `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` (`openai_codex` -> `codex app-server --listen stdio://`), not `codex exec` or generic `openai` SDK
-  - Stage 2 KAB Codex-first through `native_codex`
-  - Stage 3 selected eligible KAB backend
-- Stage 1 Codex continuity is task-scoped: one task uses one recorded Codex `thread_id` across plan, implementation, feedback, cleanup, and verification-support turns when safe; the next task starts a new thread. Plan-only turns use effort `high`; non-plan turns use effort `medium`; deviations require artifacted rationale. This is not bound to the Discord/Hermes chat session, and the app-server subprocess may remain invocation-scoped.
+- The selected v0.2 implementer lane drafts/revises the substantive implementation plan and performs code, test, build, and task-bound docs mutations only after approval:
+  - default: approved GJC candidate/fix artifacts under KAH evidence;
+  - optional: explicitly selected KAB lane with current capability and bridge evidence.
+- Historical Stage/direct-Codex continuity notes are non-operative in v0.2. The active default path records GJC/KAH/KAT candidate/evidence refs under the run, and any KAB-backed lane must be explicitly selected with current capability and bridge evidence before execution. Do not use a Codex thread id, direct app-server process, historical Stage marker, or `native_codex` wording as active implementation/KAB proof.
 - Blue/Red/Orange/Gray supervise, review, record evidence, ask/answer, and verify. They must not directly author the plan or patch repository artifacts as a substitute for the selected implementer unless 주군 explicitly asks for direct role editing or the work is outside the roadmap/KAS+KAH path.
-- Record any exception and its no-Codex/backend rationale in KAH artifacts and the final report.
+- Record any explicit KAB exception, no-KAB rationale, or executor-lane deviation in KAH artifacts and the final report.
 
 ## Plan-vet loop
 

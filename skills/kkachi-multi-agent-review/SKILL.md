@@ -1,7 +1,7 @@
 ---
 name: kkachi-multi-agent-review
 description: MAR request/render/trigger facade for KAS/Kkachi.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Multi-Agent Review

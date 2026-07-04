@@ -1,20 +1,17 @@
-# KAS KAB Adoption Stage Marker
+# KAS KAB Adoption Stage Marker — historical record
 
-This compatibility reference preserves the canonical installed-project marker path named by `../SKILL.md`.
+> V01CLEAN status: historical/deprecated. Retained for stale-stage audit provenance only; not active v0.2 install/profile guidance, migration authority, fallback authorization, or KAB activation evidence.
 
-Use this file shape for an installed project-specific KAS suite such as:
+This file records the old installed-project marker shape so reviewers can recognize and retire stale surfaces. It is not a current operator runbook and must not be copied into new project suites as active guidance.
 
-- `~/.hermes/profiles/<profile>/skills/<project>/<project>-kas/references/kab-adoption-stage.md`
+Historical marker values that may appear in old profiles:
 
-It records the selected KAS/KAH development operating stage for that installed project suite:
+- `stage1_direct_codex_app_server_baseline`
+- `stage2_kab_codex_first`
+- `stage3_kab_backend_selected`
 
-- Stage 1: direct Codex SDK/app-server runner baseline
-- Stage 2: KAB Codex-first via `native_codex`
-- Stage 3: reserved/backend-selected only when separately authorized
+Active v0.2 posture:
 
-This marker is operating-policy guidance only. It does not activate Stage 2 by itself and is not KAB execution evidence.
-
-For the authoritative boundary and evidence details, read:
-
-- `kas-kab-adoption-stage-boundary.md`
-- `kas-kab-adoption-stage-runbook.md`
+- Default KAS/KAH work uses KAS policy, KAH deterministic evidence, approved GJC candidate artifacts, and KAT factual evidence when applicable.
+- KAB runtime/session control is explicit-only and requires current task approval, capability checks, selected backend evidence, and bridge evidence.
+- Missing, invalid, or ambiguous marker files do not authorize a fallback lane or direct Codex execution claim.

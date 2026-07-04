@@ -85,7 +85,7 @@ func TestToken002PhaseSkillsCarryPolicyWithoutRemovingKoreanCommanderReports(t *
 		requireContainsAll(t, rel, token002CompactSchema)
 		requireContainsAll(t, rel, []string{
 			".kkachi/runs/<run_id>/artifacts",
-			"Stage 1 direct Codex",
+			"v0.2",
 		})
 	}
 

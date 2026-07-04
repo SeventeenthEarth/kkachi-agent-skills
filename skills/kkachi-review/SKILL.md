@@ -1,7 +1,7 @@
 ---
 name: kkachi-review
 description: Run a Kkachi review phase against task contract, plan, selected backend evidence, rendered prompt, diff, tests, docs impact, and bridge evidence.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Review

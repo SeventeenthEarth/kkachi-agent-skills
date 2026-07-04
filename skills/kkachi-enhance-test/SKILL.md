@@ -1,7 +1,7 @@
 ---
 name: kkachi-enhance-test
 description: Analyze and improve test coverage for a Kkachi task after implementation or during shaping, preserving targeted regression rationale and verification evidence.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Enhance Test

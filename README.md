@@ -3,25 +3,22 @@
 Kkachi Agent Skills (KAS; repository now `kkachi-agent-skills`, historically `kkachi-hermes-skills` / KHS) is the Hermes Agent skill/process pack for running
 Kkachi software-development workflows.
 
-KHS does not own project state and does not replace KAB runtime control.
+KHS does not own project state and does not replace KAH or KAB runtime control.
 It teaches Hermes Agent how to classify a task, prepare an AI-neutral task
 contract, call KAH for deterministic run state, and preserve evidence for
-review, verification, documentation, and self-improvement. When a run needs
-backend execution, automated review-by-different-tool transport, KAB plan
-lifecycle, or bridge evidence, KHS must select a KAB backend lane, render the
-backend-specific prompt, call KAB, and preserve KAB runtime evidence.
+review, verification, documentation, and self-improvement. In the v0.2 active
+path, KAS owns the workflow/prompt/contract layer, KAH owns deterministic
+run/gate/evidence state, and GJC may produce candidate deep-interview,
+`ralplan`, or `ultragoal` artifacts through KAH wrappers. KAT evidence is
+mechanical/factual only. KAB runtime/session control is used only when a later
+approved task explicitly selects a KAB-backed lane and preserves bridge evidence.
 
-GAJAE GJC delegated execution is a separate KAS/KAH-planned delegation lane:
-GJC produces candidate design, plan, and implementation artifacts through the
-KAH wrapper while KAB remains non-primary unless a later approved task
-explicitly selects KAB runtime/session control.
-
-Maturity note: KAS v0.2.0 carries the current release-default version on top of the v0.1.9 release-default snapshot, the v0.1.8 release-target snapshot, the v0.1.7 TOLMR local toolchain metadata, stage policy, and rollout-readiness evidence, the v0.1.6 STRICT workflow evidence alignment and MARTL MAR task-loop execution surfaces, the v0.1.5 MAR role-first multi-agent review lane, and the v0.1.4 WFLOW task-DAG workflow release lane. It remains an
-early skill/process pack rather than a final polished product, but KAH graph,
-configurable-feedback, and workflow catalog promotion substrates are capability-evidenced. Real Hermes/Kkachi
-runs should mature KAS through captured evidence, project overlays, prompt/phase
-skill references, reusable scripts, and the existing `kkachi-improve` /
-improvement-promotion rules.
+Maturity note: KAS v0.2.0 is the current active release-default version. Older
+v0.1.x snapshots remain historical release context only; they are not active
+operator, migration, compatibility, fallback, warning-only, or profile-suite
+paths. Real Hermes/Kkachi runs should mature KAS through captured evidence,
+project overlays, prompt/phase skill references, reusable scripts, and the
+existing `kkachi-improve` / improvement-promotion rules.
 
 ## Current Lane Split
 
@@ -41,15 +38,32 @@ KHS now keeps two lanes distinct:
    - Scope: KHS-governed backend-executed runs, automated review-by-different-tool transport, KAB plan lifecycle, and bridge evidence.
    - Authority: existing KHS+KAH+KAB path remains required when the run is KAB-backed or claims backend runtime evidence. Scoped CLIMVP/GRAPHMVP/KAS docs or CLI work may proceed without KAB only when the lane is explicitly KAS/KAH-local and records that no KAB runtime support is claimed.
 
-## KAB Adoption Stages for KAS/KAH Development
+## v0.2 KAS/KAH/GJC Development Delegation
 
-KAS owns the operating policy for how KAH evidence and KAB backend execution are used. KAH remains the deterministic state/evidence/gate tool, and KAB remains the backend runtime/control tool. The KAS adoption model is staged so the user-facing workflow can stay stable while the execution transport matures:
+KAS owns the operating policy for how KAH evidence, GJC candidate execution,
+KAT factual test evidence, color review, MAR, and final gates are used. KAH
+remains the deterministic state/evidence/gate tool. GJC is a candidate
+planner/executor only, never acceptance authority:
 
-1. **Stage 1 — Direct Codex app-server baseline.** KAS/KAH development tasks use the direct Codex app-server lane for plan, implementation, feedback fixes, docs updates, cleanup, and verification support. MAR supplies the default independent review lane and records provider/toolchain evidence separately. Stage 1 records direct Codex evidence and must not claim KAB Codex execution evidence.
-2. **Stage 2 — KAB Codex-first execution.** KAS/KAH keeps the same planning, implementation, review, and verification scenario, but replaces direct Codex app-server calls with KAB-backed Codex execution through the `native_codex` adapter. Backend choice is intentionally not broadened in this stage: Codex remains the default implementation/planning backend, while KAB supplies bridge session, plan lifecycle, retained event/watch/read/status, and backend evidence.
-3. **Stage 3 — KAB backend-selected execution.** After Stage 2 is proven, KAS may select among eligible KAB backends such as Codex, Claude, and GLM according to task requirements, project policy, compatibility evidence, and user preference after capability gates. This is a backend-selection maturity step, not a change to KAH or KAB ownership.
+1. **Deep interview** — use only for explicitly approved epic/design
+   clarification.
+2. **Ralplan** — produce plan artifacts for KAS/Blue/color review; completion
+   does not authorize implementation.
+3. **Ultragoal** — produce approved implementation-candidate artifacts after an
+   ask/approval gate; completion still requires KAS/KAH verification, official
+   color review, MAR applicability/coverage, and final Blue synthesis.
 
-MAR review is independent of these stages. It is the default KAS role-first feedback lane, uses validated provider/toolchain evidence, and does not change the selected plan or implementation backend. Required roles are `logic`, `security`, `arch`, `cve`, and `test_adequacy`; unresolved required role coverage fails closed.
+KAT records mechanical test/status/summary/raw-log evidence only. KAB remains a
+separate runtime/session-control lane and is not the default KAS/KAH v0.2
+development path unless a task explicitly selects it with current capability
+and bridge evidence. Legacy Stage 1/Stage 2/Stage 3 Codex/KAB adoption wording
+is historical/stale and must not be used as active project guidance.
+
+MAR review is independent of the implementation candidate lane. It is the
+default KAS role-first feedback lane when applicable, uses validated provider
+and toolchain evidence, and does not change plan/implementation authority.
+Required roles are `logic`, `security`, `arch`, `cve`, and `test_adequacy`;
+unresolved required role coverage fails closed.
 
 ## Components
 
@@ -263,8 +277,7 @@ verification is not mandatory for profile-scoped skill install/injection,
 `list`, `doctor`, `sync`, or `proposal` planning. That scoped lane must still
 report that KAB is required before KAB-backed execution, automated
 review-by-different-tool transport, KAB plan lifecycle, or bridge evidence are
-claimed. The current P1/kan-plugin lane may use Hermes direct Codex app-server
-through KAS/KAH with no KAB runtime claim until KAB implementation is ready.
+claimed. Current KAS/KAH-local lanes use KAS contracts, KAH evidence, and approved GJC candidate artifacts when needed, with no KAB runtime claim unless KAB is explicitly selected and evidenced.
 
 If the master says "apply KHS to this project directory", Hermes should not
 manually create ad hoc state files. Hermes should run KAH `project init` in the
@@ -400,37 +413,22 @@ Use `--force` only for non-destructive reconfiguration of existing KAH project
 bootstrap files. KAH preserves runs, artifacts, events, and gate history during
 that reconfiguration.
 
-### KAB adoption stage at install/reconfigure time
+### v0.2 project execution posture at install/reconfigure time
 
-Project application must select a KAS KAB adoption stage before the first
-Kkachi-governed run. The selected stage controls which planner/implementer
-lane the shared KAS phase skills use:
+Project application records the active v0.2 posture before the first
+Kkachi-governed run: KAS policy and prompt contracts, KAH deterministic
+run/gate/evidence state, GJC candidate `deep-interview`/`ralplan`/`ultragoal`
+only when approved, and KAT factual evidence only. KAB is not selected by
+default. If a project needs KAB runtime/session control, that task must name the
+KAB lane explicitly, pass current capability and compatibility gates, and
+preserve bridge evidence in the run artifacts.
 
-- `stage1_direct_codex_app_server_baseline` — direct Codex app-server baseline;
-  record no-KAB-Codex rationale for plan/implementation/fix/docs lanes.
-- `stage2_kab_codex_first` — KAB Codex-first through `native_codex`; do not
-  broaden implementation backend selection beyond Codex.
-- `stage3_kab_backend_selected` — KAB backend selection among eligible backends
-  after project policy and capability gates.
-
-KAH does not need to interpret these stages semantically: graph state, run
-state, gates, events, and artifact validation remain the same helper mechanics
-across all three stages. KAS owns the stage policy and records the selected
-stage in the installed/project-specific KAS guidance first. Preferred installed
-markers live under the project skill suite, such as
-`skills/kan-plugin/kan-plugin-kas/references/kab-adoption-stage.md` or
-`skills/kan-control/kan-control-kas/references/kab-adoption-stage.md`, with the
-umbrella project skill pointing to that reference. Mirror the stage into the
-project's backend policy or generated project overlay/reference only when KAH
-project state is being initialized or project-local persistence is needed, and
-include the selected stage in every run's task contract or phase-plan evidence.
-Existing projects change stage through an explicit KAS reconfiguration record;
-use `kkachi-agent-helper project init ... --force` only when the persisted KAH
-project overlay/backend-policy must be rewritten, preserve the old stage and
-reason in the report, then rerun `project doctor` and the next-run backend/stage
-evidence checks. Missing or ambiguous stage selection fails closed to Stage 1
-semantics: no KAB Codex execution claim is allowed unless Stage 2 or Stage 3 is
-explicitly selected and evidenced.
+KAH does not interpret KAS policy semantically: graph state, run state, gates,
+events, and artifact validation remain helper mechanics. KAS owns the active
+workflow policy and records it in project-specific KAS guidance first. Missing,
+ambiguous, or stale legacy Stage 1/Stage 2/Stage 3 markers fail closed to
+"no KAB runtime claim"; they do not authorize direct Codex, KAB `native_codex`,
+or backend-selected execution.
 
 After initialization, create and run Kkachi work through KAH artifacts and gates:
 
@@ -448,7 +446,7 @@ For the user-confirmed phase behavior, see `docs/sot/phase-orchestration-policy.
 
 ## Backend Selection
 
-Hermes must select KAB backend lanes from evidence, not vague preference.
+KAB backend selection is explicit-only in the v0.2 KAS/KAH path. Hermes must select KAB backend lanes from evidence, not vague preference, and must not treat legacy Stage markers or direct Codex wording as active authorization.
 
 Use:
 
@@ -463,7 +461,7 @@ required capability, project policy, or compatibility matrix caveats.
 
 ## KAB Execution Evidence
 
-KAB prompt dispatch has two supported observation styles:
+This section applies only to explicitly approved KAB-backed work. KAB prompt dispatch has two supported observation styles:
 
 ```text
 cli_loop:

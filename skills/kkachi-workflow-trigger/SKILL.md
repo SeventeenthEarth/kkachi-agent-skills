@@ -1,7 +1,7 @@
 ---
 name: kkachi-workflow-trigger
 description: Render dispatch packets for explicit or selector-matched KAH task-DAG workflows.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Workflow Trigger

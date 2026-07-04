@@ -1,7 +1,7 @@
 ---
 name: kkachi-improve
 description: Capture Kkachi self-improvement candidates from real run evidence and decide whether they belong in run artifacts, project overlay, prompt profile, phase skill reference, script, or shared KHS.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Improve

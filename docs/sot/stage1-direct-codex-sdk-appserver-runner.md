@@ -1,10 +1,13 @@
 # Stage 1 direct Codex SDK app-server runner SOT
 
+> V01CLEAN status: historical/deprecated. This document is retained as provenance for earlier CODEXSDK decisions only. It is not active KAS/KAH v0.2 operator guidance, migration authority, fallback authorization, or KAB activation evidence. Current work uses KAS policy + KAH deterministic evidence + approved GJC candidate artifacts, with KAT factual evidence only; KAB runtime/session control requires explicit task approval and current bridge evidence.
+
+
 Date: 2026-06-10
 Owner: KAS workflow/policy layer
 Confirming role: Blue draft pending Red, Orange, and Gray review
-Status: candidate SOT plus local runner-template draft for Stage 1 direct Codex SDK/app-server runner support; pending review/final gates before completion claim
-Authority level: source-of-truth candidate for the Stage 1 direct Codex runner contract after confirmation
+Status: historical/deprecated after V01CLEAN; retained as CODEXSDK provenance only
+Authority level: historical provenance; not active v0.2 operator guidance
 Scope: KAS Stage 1 direct Codex runner semantics, template contract, evidence requirements, and KAB boundary for `kkachi-hermes-skills`
 Related docs:
 - `docs/README.md`

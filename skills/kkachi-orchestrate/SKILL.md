@@ -1,7 +1,7 @@
 ---
 name: kkachi-orchestrate
 description: Coordinate an explicit KHS/Kkachi software run by selecting Path A or Path B, choosing phase order, invoking KHS prompt/process skills, using KAH for state, using KAB for backend delivery when needed, and reporting to the master in Korean.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Orchestrate
@@ -20,7 +20,7 @@ For state investigation that leads to spec or roadmap work, use `research_eviden
 
 ## Core rule
 
-Orchestration chooses phases and gates; it does not bypass phase contracts. KHS has two workflow layers: `.kkachi-workflow.yaml` is project-level graph state only after capability-checked `kkachi-agent-helper graph` evidence, while `.kkachi/runs/<run_id>/phase-plan.yaml` is run-local execution state/evidence. KAH is mandatory once KHS is triggered because KAH owns deterministic state, artifacts, events, locks, schemas, diagnostics, gates, and graph validation/apply mechanics, but KAH `work_path`, `work_mode`, and `execution_mode` are helper classification metadata rather than phase authority. KAB-backed work additionally requires task contract, backend selection, capability check, rendered prompt, and bridge evidence. KAS/KAH development adopts KAB in stages: Stage 1 is the authorized direct Codex SDK/app-server baseline through `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` (`openai_codex` -> `codex app-server --listen stdio://`) with direct evidence and no KAB Codex claim; Stage 2 is KAB Codex-first execution through `native_codex`; Stage 3 is KAB backend-selected execution among eligible backends after capability/policy gates.
+Orchestration chooses phases and gates; it does not bypass phase contracts. KHS has two workflow layers: `.kkachi-workflow.yaml` is project-level graph state only after capability-checked `kkachi-agent-helper graph` evidence, while `.kkachi/runs/<run_id>/phase-plan.yaml` is run-local execution state/evidence. KAH is mandatory once KHS is triggered because KAH owns deterministic state, artifacts, events, locks, schemas, diagnostics, gates, and graph validation/apply mechanics, but KAH `work_path`, `work_mode`, and `execution_mode` are helper classification metadata rather than phase authority. The active v0.2 default path is KAS policy plus KAH deterministic evidence, approved GJC candidate artifacts, and KAT factual evidence when applicable. KAB-backed work is explicit-only: it requires current task approval, task contract, backend selection, capability check, rendered prompt, bridge evidence, and no reliance on historical Stage/direct-Codex/native_codex adoption markers.
 
 Hermes is manager/orchestrator/final verifier, not the default code author. KAB backend roles perform substantive planning, implementation, docs, feedback, and feedback handling during KAB-backed KHS phases. Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when explicitly authorized and recorded, but must not claim backend execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence. Simple direct Hermes fixes are outside KHS unless the master explicitly keeps the task inside KHS.
 
@@ -43,7 +43,7 @@ Record the classification reason and every skipped phase reason. Do not silently
 
 ## Output policy
 
-KHS product output for generated prompts, backend reports, console schemas, and run artifacts is English for both Stage 1 direct Codex SDK/app-server runner and KAB-mediated lanes. Commander chat reports to 주군 may remain Korean, but backend prompt/product output must preserve the compact schema: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`.
+KHS product output for generated prompts, executor reports, console schemas, and run artifacts is English for the active v0.2 KAS/KAH/GJC/KAT path and for any explicitly approved KAB-mediated lane. Commander chat reports to 주군 may remain Korean, but backend prompt/product output must preserve the compact schema for explicit KAB lanes, and executor prompt/product output must preserve the same compact schema for v0.2 GJC/KAH/KAT work: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`.
 
 Detailed phase content is artifact-first. Use `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md` or the concrete requested phase artifact for plans, logs, diffs, reviews, findings, and file excerpts. If that artifact cannot be written, report a compact `Status: blocked` artifact-write blocker and do not dump the full detail into chat.
 
@@ -59,7 +59,7 @@ This full spine is the default/base graph only for no-input `development` tasks.
 
 - The master selects the roadmap task id or task item for each KHS run; do not auto-pick the next task by default.
 - All terminal commands for an active KAS/KAH run must execute with the real user home, not a Hermes role/profile home. Use `HOME=<real-user-home> ...` in reusable prompts/artifacts, including Git, tests, KAH/KAB/Hermes/Kanban commands, and Codex probes.
-- KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. Stage 1 direct Codex SDK/app-server work uses `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` and is a no-KAB-Codex lane unless the task explicitly selects KAB Codex; do not substitute `codex exec` or generic `openai` SDK evidence. Stage 2 replaces that direct Codex transport with KAB Codex-first execution; Stage 3 enables capability-gated backend selection among eligible KAB backends.
+- KAB is required only when KAB-backed execution, automated review-by-different-tool transport, KAB plan lifecycle, or bridge evidence is part of the contract. The default v0.2 KAS/KAH path uses KAS policy, KAH evidence, approved GJC candidate artifacts, and KAT factual evidence only. Do not substitute historical Stage/Codex app-server evidence for active KAB, implementation evidence, or capability-gated backend selection among eligible KAB backends.
 - Scoped KAS/KAH-local CLIMVP, GRAPHMVP, and docs-only maintenance may proceed without KAB when that lane is explicitly authorized and recorded; do not claim KAB runtime support in those cases.
 - `ask`, `request-feedback-1`, `handle-feedback-1`, `mar-review`, and the `final` graph phase are mandatory in the default/base KHS development graph unless a recorded policy decision says otherwise; `final-verify` is only the skill/activity alias where older phase-contract wording still requires it. `ai-slop-cleaner` and `optimize` are conditional but strongly recommended for code-change runs, and skipping either requires a reason.
 - Feedback runs at least once and at most five rounds. Round 1 is the normal first color review/feedback round. Rounds 2..5 are optional continuation rounds, and each requested feedback round must have a matching handle-feedback round.
@@ -67,7 +67,7 @@ This full spine is the default/base graph only for no-input `development` tasks.
 - STRICT workflow-managed runs must follow route -> trigger -> ready -> start -> work -> required outputs -> complete. Treat KAH node start failure, stale `expected_start_revision`, missing required outputs, KAH node complete failure, missing `workflow_phase_projection_validation`, or phase-plan/checklist projection failure as blockers, not warnings; do not continue by skill order, phase-plan text, manual direct KAH state writes, fallback workflow, fallback backend, or fallback agent.
 - MAR review is required for `development` / implementation tasks after first color review and feedback handling, unless the master explicitly waives or replaces MAR before start and the decision is recorded in KAH/run evidence artifacts. MAR is a role-first independent review lane for `logic`, `security`, `arch`, `cve`, and `test_adequacy`; unresolved required role coverage fails closed. For non-implementation durable-change runs, run MAR when the master explicitly requests independent review, a project-local approved workflow declares it required, or a recorded high-risk policy gate opts in.
 
-See `references/run-operating-policy.md` for the full Stage 1/2/3 lane ownership rules, required plan-vet loop, fallback-audit expectations, and the MAR review details.
+See `references/run-operating-policy.md` for the active v0.2 lane ownership rules, required plan-vet loop, fallback-audit expectations, explicit-only KAB boundary, and MAR review details.
 
 ## Implementation approval policy
 

@@ -1,7 +1,7 @@
 ---
 name: kkachi-workflow-promote
 description: Propose explicit promotion from a WFLOW-008 run-local workflow bundle to project-local workflow artifacts.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # kkachi-workflow-promote

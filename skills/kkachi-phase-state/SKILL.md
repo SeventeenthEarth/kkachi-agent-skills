@@ -1,7 +1,7 @@
 ---
 name: kkachi-phase-state
 description: Define and enforce the current KAH run, artifact, event, gate, schema, diagnostics, lock, phase-plan, and approval command sequence for Kkachi phases.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Phase State

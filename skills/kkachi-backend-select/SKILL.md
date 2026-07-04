@@ -1,24 +1,24 @@
 ---
 name: kkachi-backend-select
 description: Select a KAB backend lane from task requirements, project policy, capability evidence, compatibility matrix, user preference, and backend prompt profile rules, then produce selected-cli.json and capability-check.md.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Kkachi Backend Select
 
-Use this skill after `task-contract.yaml` exists and before composing any KAB prompt. Do not use it for Stage 1 direct Codex SDK/app-server runner baseline work unless the run explicitly selects KAB or claims bridge evidence.
+Use this skill after `task-contract.yaml` exists and before composing any KAB prompt. Do not use it for the default v0.2 KAS/KAH/GJC path, docs-only work, or KAT mechanical evidence unless the run explicitly selects KAB or claims bridge evidence.
 
 Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an explicit master request has selected KHS/Kkachi for the work. Do not trigger it for ordinary direct Hermes edits, quick one-file fixes, typo/config patches, or read-only explanations unless the master explicitly asks for KHS/Kkachi or delegates the work to a KHS-using commander such as 조운 or 마초.
 
 ## Core rule
 
-Capability and project-policy gates run before user preference. Preference ranks eligible KAB backends; it cannot make an ineligible backend safe. If KAB runtime is not implemented/ready for the project, select the explicit Stage 1 no-KAB-Codex direct Codex SDK/app-server runner baseline lane outside this KAB backend-selection skill and record the runner metadata/no-KAB-Codex rationale in task/phase artifacts.
+Capability and project-policy gates run before user preference. Preference ranks eligible KAB backends; it cannot make an ineligible backend safe. In the v0.2 KAS/KAH path, GJC candidate execution and KAT factual evidence are not KAB backend choices and are not selected here. If KAB runtime is not explicitly selected and evidenced, render backend evidence as not applicable and fail closed on any KAB runtime claim.
 
-Apply KAS's KAB adoption stage before broad backend selection:
+Apply explicit KAB selection before broad backend selection:
 
-- **Stage 1 — Direct Codex SDK/app-server runner baseline:** do not use this skill for the direct Codex lane unless the run separately selects KAB execution or claims bridge evidence. Record `templates/runners/direct-codex-sdk-appserver-runner.py.tmpl` evidence (`openai_codex` -> SDK-managed `codex app-server --listen stdio://`) and no-KAB-Codex rationale instead; do not use `codex exec`, generic `openai` SDK output, raw app-server transport, or KAB `native_codex` evidence as Stage 1 proof.
-- **Stage 2 — KAB Codex-first execution:** select Codex through KAB (`backend_type=codex`, `adapter_type=native_codex`) by default for KAS/KAH plan/implementation/fix/docs lanes. Do not broaden to Claude/GLM implementation backend selection in Stage 2 unless 주군 explicitly assigns a Stage 3 backend-selection experiment. MAR remains the default review lane and does not change implementation backend selection.
-- **Stage 3 — KAB backend-selected execution:** select among eligible KAB backends such as Codex, Claude, and GLM according to capability evidence, project policy, task requirements, and user preference after gates.
+- KAB is available only when the task names a KAB-backed lane, current capability evidence passes, and bridge evidence will be preserved.
+- Legacy Stage 1/Stage 2/Stage 3 Codex/KAB adoption markers are historical/stale and do not authorize direct Codex app-server, KAB `native_codex`, or backend-selected execution.
+- MAR remains a separate review lane and does not change implementation backend selection.
 
 ## Inputs
 
@@ -51,7 +51,7 @@ Backend JSON status safety: KHS owns orchestration guidance and backend selectio
 
 - Gemini is a supported KAB backend when project policy permits it. For first-class KHS consumption, prefer retained `/api/stream` observation with `/api/events` plus `read`/`status`/`wait` reconciliation.
 - OpenCode is supported, but question flow is only API/SSE-routed for real upstream `question.asked` events. Do not select it when verified live CLI question production is a hard task requirement.
-- Codex is wrapper/API-driven through `native_codex`; selected evidence must not depend on raw Codex app-server events.
+- Codex through KAB is wrapper/API-driven through `native_codex` only when KAB is explicitly selected; selected evidence must not depend on raw Codex app-server events.
 - For Gemini and OpenCode plan lanes, record that explicit post-approval start is required.
 - For supervised approval tasks, record backend-specific permission preconditions such as Claude default mode, GLM no `--yolo`, Codex managed args, OpenCode `opencode_permission_mode: ask`, and Gemini direct shell disabled.
 
