@@ -28,6 +28,8 @@ Default review order for KAS/KAH runs:
 8. Treat `delegate_task`, temporary subagents, and ad hoc advisor notes as pre-review analysis only; they do not count as official color review, project-Gray documentation/integrity review, MAR role coverage, Teal verdict evidence, or KAH evidence.
 9. Synthesize every finding as reflected, rejected, deferred, or blocked with evidence. Do not treat a vague summary as sufficient review evidence.
 
+V02FLOW-007 review-train/watcher boundary: for substantial development work, preserve `first color review -> mandatory MAR -> second color adoption/review -> Blue disposition`. A color-round aggregate watcher is state-report-only; it must not perform Blue synthesis, fake `진행해`, auto-continue, waive lanes, mutate source, or substitute temporary subagents and delegate_task for official authority. temporary subagents and delegate_task do not count as official color review, MAR role coverage, or Blue synthesis.
+
 ## KASREL provenance/dependency evidence gate
 
 Apply the shared KASREL-004 evidence gate in `docs/sot/kasrel-hermes-v016-provenance-contract.md` before this skill claims install health, readiness, release compatibility, orchestration safety, review PASS, verification PASS, or final completion for KAS skills. The local claim must directly cite current non-secret KASREL evidence fields as applicable: `provenance_contract_version`, `source_class_evidence`, `dependency_audit`, `skill_dependencies`, `command_surface_dependencies`, `deleted_bundle_reference`, and `deleted_bundle_diagnostics`. Missing, ambiguous, or stale provenance/dependency evidence fails closed; deleted-bundle references remain cleanup/blocking diagnostics, not fallback lookup or substitution authority.

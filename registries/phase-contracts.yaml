@@ -30,6 +30,14 @@ canonical_spine:
   - final_verify
   - improve
 
+review_train_authority:
+  v02flow007: "V02FLOW-007 review-train authority"
+  sequence: "first_color_review -> request_feedback_1 -> handle_feedback_1 -> mar_review -> second_color_review -> final_verify"
+  operator_summary: "first color review -> mandatory MAR -> second color adoption/review -> Blue disposition"
+  watcher_rule: "aggregate watchers are state-report-only and cannot perform Blue synthesis, fake proceed, auto-continue, waive lanes, or mutate source"
+  substitution_rule: "temporary subagents and delegate_task do not count as official color review, MAR role coverage, project-Gray review, or Blue synthesis"
+  waiver_rule: "development-task MAR may be skipped only by explicit task-specific approval recorded before the MAR gate"
+
 role_model:
   hermes:
     responsibility:

@@ -106,6 +106,8 @@ Allowed exceptions require explicit recorded evidence, such as 주군-approved B
 
 ## 4. Review train and watcher policy
 
+V02FLOW-007 review-train and aggregate-watcher policy: substantial development work must preserve `first color review -> mandatory MAR -> second color adoption/review -> Blue disposition` as distinct authority gates. In fully expanded operator terms this means first official Red/Orange/Gray color review plus dependent Blue synthesis, mandatory MAR for development work unless an explicit task-specific waiver is recorded before the MAR gate, and second official Red/Orange/Gray color adoption/review plus dependent Blue final disposition.
+
 For substantial KAS/KAH implementation work, review proceeds:
 
 ```text
@@ -130,9 +132,9 @@ one aggregate watcher for a color round:
   optionally watches KAH review/run status
 ```
 
-A full train may use one aggregate watcher for first color review and one aggregate watcher for 2nd color adoption. MAR may use its own provider/status watcher if async.
+A full train may use one aggregate watcher for first color review and one aggregate watcher for 2nd color adoption. MAR may use its own provider/status watcher if async. Each one aggregate watcher per color round is state-report-only.
 
-The watcher must report all-done or blocked states only. It must not perform Blue synthesis, inject a fake `진행해`, auto-trigger continuation, waive lanes, mutate source, commit, push, or change runtime/auth/provider/gateway/profile state.
+The watcher must report all-done or blocked states only. It must not perform Blue synthesis, inject or fake `진행해`, auto-trigger continuation, waive lanes, mutate source, substitute temporary subagents or self-approval for official review, commit, push, install, release, or change runtime/auth/provider/gateway/profile/model state.
 
 ## 5. Planned implementation split
 

@@ -31,6 +31,8 @@ For 주군's KAS/Kkachi development pipeline, final verification happens before 
 - Red/Orange/Gray first color review evidence is captured when the KAS/KAH run changed durable repository artifacts, workflow state, docs, or release/commit evidence, even if the task was not classified as implementation. Pure read-only/no-durable-change runs may mark this not applicable only with a concrete reason.
 - The repo remains review-ready and uncommitted until 주군 receives the report and approves commit.
 
+V02FLOW-007 review-train/watcher boundary: for substantial development work, final/pre-commit verification must find `first color review -> mandatory MAR -> second color adoption/review -> Blue disposition`. A color-round aggregate watcher is state-report-only; it must not perform Blue synthesis, fake `진행해`, auto-continue, waive lanes, mutate source, or substitute temporary subagents and delegate_task for official authority. temporary subagents and delegate_task do not count as official color review, MAR role coverage, or Blue synthesis.
+
 Before declaring teammate review unavailable or blocked, check the durable Hermes Kanban CLI surface. See `references/review-readiness-and-final-gate.md` for the Kanban readiness commands, bridge observation-path evidence, final gate freshness rules, and commit-approval sequence.
 
 Before reporting to the master for commit consideration, verify the repo is in review-ready uncommitted state unless the master has already approved commit. The final report must separate changed files, test evidence, KAH gate evidence, role-review evidence, risks, and the exact approval needed for install/commit.

@@ -24,6 +24,8 @@ MAR is the default independent review lane for `development` / implementation ta
 
 `delegate_task`, temporary subagents, and ad hoc advisor notes may inform the request but do not count as official color review, MAR role coverage, project-Gray review, or KAH evidence. For asynchronous Red/Orange/Gray review, use the watcher only as a mechanical observer and fall back to the durable Hermes Kanban CLI surface when direct Kanban tools are absent.
 
+V02FLOW-007 review-train/watcher boundary: for substantial development work, preserve `first color review -> mandatory MAR -> second color adoption/review -> Blue disposition`. A color-round aggregate watcher is state-report-only; it must not perform Blue synthesis, fake `진행해`, auto-continue, waive lanes, mutate source, or substitute temporary subagents and delegate_task for official authority. temporary subagents and delegate_task do not count as official color review, MAR role coverage, or Blue synthesis.
+
 See `references/mar-review-lane.md` for the KAS MAR role coverage, provider-preflight, merge-pack, disposition, and cleanup sequence.
 
 ## Outputs
