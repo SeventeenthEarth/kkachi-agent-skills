@@ -90,11 +90,17 @@ gjc_goal_bundle_ready             # technical/backend alias
 
 ## 3. Missing implementation executor loop
 
-A real delegated implementation loop must include at least:
+A real delegated implementation loop must include the V02FLOW-005 executor-loop policy:
 
 ```text
-create-goals -> complete-goals -> execute-goal -> checkpoint -> verify -> repeat
+create-goals -> complete-goals -> execute-goal -> checkpoint -> verify -> repeat-or-terminate
 ```
+
+`complete-goals` freezes the selected goal bundle only; it is not implementation completion, implementation acceptance, verification, MAR, second-color, final, or commit readiness.
+
+`goal_bundle.status`, `goal_bundle.goals[].status`, and `executor_candidate.candidate_status` must reject `accepted`.
+
+A top-level packet `status: accepted`, if retained, is a derived/read-only post-final-gate alias of the dedicated gated `acceptance` object only.
 
 KAS must not silently fill the missing loop by letting Blue patch source directly. Default boundary:
 
@@ -102,7 +108,7 @@ KAS must not silently fill the missing loop by letting Blue patch source directl
 Blue commands and verifies. Executor implements.
 ```
 
-Allowed exceptions require explicit recorded evidence, such as 주군-approved Blue direct patch, emergency hotfix, docs-only/trivial correction, or an approved backend-unavailable exception. These exceptions do not authorize live/runtime/auth/provider/gateway/profile mutation, commit, push, release, install, or scope expansion.
+Allowed exceptions require explicit recorded evidence, such as 주군-approved Blue direct patch, emergency hotfix, docs-only/trivial correction, or an approved backend-unavailable exception. Blue direct patch exception records must include reason, scope, why executor loop was not used, changed-surface refs, verification required, review required, MAR required, final gate required, and waiver ref. These exceptions do not authorize live/runtime/auth/provider/gateway/profile mutation, commit, push, release, install, or scope expansion.
 
 ## 4. Review train and watcher policy
 
@@ -142,7 +148,7 @@ Recommended logical sets: 4.
 
 1. Workflow/stage contract migration: remove `ask` as a normal step, normalize `plan -> ralplan -> impl`, and encode the corrected impl/review train.
 2. GJC adapter/status semantics: deep-interview explicit-only/stale `--packet`, ralplan record-only versus consensus, ultragoal goal-bundle readiness.
-3. Ultragoal executor loop: add/describe `create-goals -> complete-goals -> execute -> checkpoint -> verify -> repeat`, and prevent Blue direct patching from silently filling implementation gaps.
+3. Ultragoal executor loop: add/describe `create-goals -> complete-goals -> execute-goal -> checkpoint -> verify -> repeat-or-terminate`, and prevent Blue direct patching from silently filling implementation gaps.
 4. Review train + aggregated watcher: color review -> MAR -> 2nd color adoption, one aggregated watcher per color round, no auto Blue synthesis.
 
 Physical repo work should normally be 8 PR candidates: a KAS contract/guidance side and a KAH helper/evidence side for each logical set. Avoid compressing to 3 or fewer PRs.

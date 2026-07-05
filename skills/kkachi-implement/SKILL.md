@@ -30,7 +30,7 @@ project/team role registry when applicable, not hard-coded to individuals.
 Blue/Red/Orange/Gray inspect, review, approve/reject, route feedback, record
 KAH evidence, and verify. Direct role editing is allowed only when 주군
 explicitly asks for it, when the work is outside the roadmap/KAS+KAH path, or
-when an approved run-local exception records the no-GJC/Blue-direct-patch rationale. Implementation evidence must cite GJC `ultragoal`/executor-loop refs (`create-goals -> complete-goals -> execute-goal -> checkpoint -> verify -> repeat`) or that approved exception; missing both fails closed.
+when an approved run-local exception records the no-GJC/Blue-direct-patch rationale. Implementation evidence must cite GJC `ultragoal`/executor-loop refs (`create-goals -> complete-goals -> execute-goal -> checkpoint -> verify -> repeat-or-terminate`) or that approved exception; missing both fails closed.
 
 If Blue/Red/Orange/Gray color review, project-Gray documentation/integrity
 review, MAR role review, or any later feedback round finds a required change,

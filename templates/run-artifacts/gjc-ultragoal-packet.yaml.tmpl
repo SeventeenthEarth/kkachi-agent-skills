@@ -45,6 +45,31 @@ native_ultragoal_input:
     {{ gjc_ultragoal_brief }}
   projection_rule: "KAH must materialize this brief as run-local native_input_ref evidence and invoke GJC 0.7.3 as `ultragoal create-goals --brief-file <native_input_ref.path> --json`; KAH must not pass the packet path as `--packet`."
 
+executor_loop_contract:
+  loop_sequence:
+    - create-goals
+    - complete-goals
+    - execute-goal
+    - checkpoint
+    - verify
+    - repeat-or-terminate
+  complete_goals_boundary: "Freezes the selected goal bundle only; not implementation completion, implementation acceptance, verification, MAR, second-color, final, or commit readiness."
+  accepted_forbidden_in_pre_final_statuses:
+    - goal_bundle.status
+    - goal_bundle.goals[].status
+    - executor_candidate.candidate_status
+  top_level_accepted_rule: derived_read_only_post_final_gate_alias_only
+  blue_direct_patch_exception_record:
+    reason: required
+    scope: required
+    why_executor_loop_was_not_used: required
+    changed_surface_refs: required
+    verification_required: true
+    review_required: true
+    mar_required: true
+    final_gate_required: true
+    waiver_ref: required
+
 forbidden_scope:
   - KAB Stage 2/3 activation
   - real async GJC ultragoal invocation except the explicitly approved bounded GAJAE-008 native GJC smoke
