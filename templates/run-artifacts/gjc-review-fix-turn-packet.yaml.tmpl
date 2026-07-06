@@ -40,6 +40,42 @@ plan_lock:
 fallback_policy: none_fail_closed
 no_gjc_self_approval: true
 
+remediation_prompt_contract:
+  canonical_phase_aliases_ref: registries/phase-contracts.yaml#v02flow009_implementer_phase_dispatch_contract
+  supported_gjc_lane: "selected GJC `ultragoal` executor lane"
+  accepted_scope_ref: required
+  ralplan_artifact_ref: required
+  ralplan_artifact_sha256: required
+  blue_plan_lock_or_implementation_approval_ref: required
+  selected_ultragoal_session_ref: required_at_dispatch_time
+  selected_ultragoal_goal_ref: required_at_dispatch_time
+  finding_bundle:
+    finding_id: required
+    source_lane: required
+    severity_or_blocker_state: required
+    blue_disposition: required
+    accepted_scope_ref: required
+    required_reopened_or_amended_phases: required_when_terminal_phase_touched
+    audited_reopen_or_amend_evidence_ref: required_when_terminal_phase_touched
+    refreshed_verification: required
+    focused_re_review_or_mar_refresh_handoff_ref: required
+  fail_closed_on:
+    - missing_kah_v02flow010_capability_readback
+    - missing_or_stale_ralplan_ref
+    - missing_ralplan_hash
+    - missing_blue_plan_lock_or_implementation_approval_ref
+    - missing_accepted_scope_ref
+    - missing_ultragoal_session_or_goal_ref_at_dispatch_time
+    - unsafe_or_out_of_run_ref
+    - checksum_mismatch_or_unsafe_checksum
+    - stale_or_absent_verification
+    - native_gjc_ai_slop_cleaner_or_remove_ai_slop_request
+    - kab_dispatch_success_as_completion_evidence
+    - blue_or_color_source_patch_fallback_without_recorded_exception
+  negative_boundaries:
+    - "KAB dispatch success is dispatch evidence only, not completion evidence."
+    - "Blue/color source-patch fallback is forbidden unless a recorded exception exists."
+    - "KAT evidence is mechanical/factual only."
 forbidden_scope:
   - unreviewed scope expansion
   - KAB Stage 2/3 activation
@@ -50,6 +86,7 @@ forbidden_scope:
   - GJC self-approval
   - GAJAE-004 async callback pilot
   - GAJAE-006 watcher/callback closeout
+  - native GJC `ai-slop-cleaner` or `remove-ai-slop` command requests; route remediation through the selected ultragoal executor phase brief instead
 
 expected_outputs:
   - artifact_kind: candidate_review_fix_evidence

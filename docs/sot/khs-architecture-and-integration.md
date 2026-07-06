@@ -364,10 +364,10 @@ KHS target workflow should support these phases or roadmap states, with current 
 |---|---|---|
 | planning | create task contract, phase plan, evidence plan, and plan.md | active seed behavior |
 | vetting | review plan/risk/acceptance before implementation | known gap / roadmap state |
-| implementation | apply accepted plan through backend/session evidence | full execution-runtime requires KAB |
-| enhance-test | add or improve targeted tests where useful | active seed behavior |
-| remove-ai-slop / optimize | bounded cleanup after behavior is protected | active seed behavior under `optimize` |
-| update-docs | update durable docs or record no-docs decision | active seed behavior |
+| implementation | apply accepted plan through selected implementer-lane evidence | active v0.2 default is approved GJC `ultragoal` candidate evidence; KAB remains explicit-only |
+| enhance-test | add or improve targeted tests where useful | active v0.2 implementer-lane phase |
+| ai-slop-cleaner / optimize | bounded cleanup after behavior is protected | `ai-slop-cleaner` is a KAS phase brief through the selected GJC executor lane; no native `remove-ai-slop` command is active |
+| docs-update | update durable docs or record no-docs decision | active v0.2 implementer-lane phase when task-bound docs mutation is approved |
 | external-feedback-intake | ingest external/different-tool or user-supplied feedback, triage, handle, record accepted/rejected/deferred | MVP is user-supplied `feedback.md`; automation is KAB-later |
 | team-review | KHC role review after implementation/feedback evidence | required gate for non-trivial conclusions; not collapsed with external feedback |
 | ready-for-commit | technical readiness, final report, PR title/summary, user approval status | target / roadmap state |

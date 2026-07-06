@@ -1,6 +1,6 @@
 ---
 name: kkachi-implement
-description: Drive the implementation phase through a selected KAB backend lane using prompt.md, then capture CLI output, diff evidence, implementation notes, and bridge events.
+description: Drive the implementation phase through the selected GJC ultragoal executor lane or an explicitly approved KAB lane, then capture prompt, diff, verification, and deterministic evidence.
 version: 0.2.0
 ---
 
@@ -31,6 +31,8 @@ Blue/Red/Orange/Gray inspect, review, approve/reject, route feedback, record
 KAH evidence, and verify. Direct role editing is allowed only when 주군
 explicitly asks for it, when the work is outside the roadmap/KAS+KAH path, or
 when an approved run-local exception records the no-GJC/Blue-direct-patch rationale. Implementation evidence must cite GJC `ultragoal`/executor-loop refs (`create-goals -> complete-goals -> execute-goal -> checkpoint -> verify -> repeat-or-terminate`) or that approved exception; missing both fails closed.
+
+V02FLOW-009 routes `impl` mutation through the selected GJC `ultragoal` executor lane by default after bounded approval. Phase briefs for `impl` must include task/run id, approved scope, accepted-scope ref, ralplan artifact ref/hash, Blue plan-lock or implementation approval ref, selected ultragoal session/goal refs when available and required at dispatch time, changed-surface bounds, preservation locks, non-goals, expected evidence, verification commands, and stop/block conditions. Unknown or ambiguous aliases, unsupported dispatch shape, missing KAH V02FLOW-010 capability/readback, stale or missing ralplan/approval/scope refs, unsafe/out-of-run refs or checksums, stale/absent verification, KAB dispatch success as completion evidence, and native GJC `ai-slop-cleaner` or `remove-ai-slop` requests fail closed. KAB dispatch success is dispatch evidence only, not completion evidence. Blue/color source-patch fallback is forbidden unless a recorded exception exists. KAT evidence is mechanical/factual only.
 
 If Blue/Red/Orange/Gray color review, project-Gray documentation/integrity
 review, MAR role review, or any later feedback round finds a required change,

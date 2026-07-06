@@ -14,6 +14,8 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 Test work scales with risk, but code-changing KHS runs must explicitly assess unit, integration, and e2e coverage for the changed behavior. Add focused regression coverage where practical. If skipped, `phase-plan.yaml` and `checklist.md` must record why no test enhancement is useful or feasible.
 
+V02FLOW-009 routes `test-enhance` mutation through the selected GJC `ultragoal` executor lane by default after bounded approval. The phase brief must carry accepted-scope, ralplan/hash, Blue approval, changed-surface bounds, preservation locks, focused regression expectations, and selected ultragoal session/goal refs required at dispatch time. Missing KAH V02FLOW-010 capability/readback, unsupported aliases, stale evidence, or a request for native GJC `ai-slop-cleaner` or `remove-ai-slop` must fail closed rather than falling back to Blue/color edits.
+
 Expected test lane meanings:
 
 - `test-prepare`: lint, vet, formatting, guardrails, generation checks, and other pre-test validation.

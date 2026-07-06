@@ -70,6 +70,72 @@ executor_loop_contract:
     final_gate_required: true
     waiver_ref: required
 
+phase_brief_contract:
+  canonical_phase_aliases_ref: registries/phase-contracts.yaml#v02flow009_implementer_phase_dispatch_contract
+  phase_id_required: true
+  supported_gjc_lane: "selected GJC `ultragoal` executor lane"
+  required_fields:
+    task_id: required
+    run_id: required
+    approved_scope: required
+    approved_scope_ref: required
+    accepted_scope_ref: required
+    ralplan_artifact_ref: required
+    ralplan_artifact_sha256: required
+    blue_plan_lock_or_implementation_approval_ref: required
+    selected_ultragoal_session_ref: required_at_dispatch_time
+    selected_ultragoal_goal_ref: required_at_dispatch_time
+    changed_surface_bounds: required
+    preservation_locks: required
+    non_goals: required
+    expected_evidence: required
+    verification_commands: required
+    stop_block_conditions: required
+  fail_closed_on:
+    - unknown_phase_id_or_alias
+    - ambiguous_alias
+    - unsupported_dispatch_shape
+    - missing_kah_v02flow010_capability_readback
+    - missing_or_stale_ralplan_ref
+    - missing_ralplan_hash
+    - missing_blue_plan_lock_or_implementation_approval_ref
+    - missing_accepted_scope_ref
+    - missing_ultragoal_session_or_goal_ref_at_dispatch_time
+    - unsafe_or_out_of_run_ref
+    - checksum_mismatch_or_unsafe_checksum
+    - stale_or_absent_verification
+    - native_gjc_ai_slop_cleaner_or_remove_ai_slop_request
+    - kab_dispatch_success_as_completion_evidence
+    - blue_or_color_source_patch_fallback_without_recorded_exception
+  negative_boundaries:
+    - "KAB dispatch success is dispatch evidence only, not completion evidence."
+    - "Blue/color source-patch fallback is forbidden unless a recorded exception exists."
+    - "KAT evidence is mechanical/factual only."
+
+ai_slop_cleaner_phase_contract:
+  behavior_lock: required
+  cleanup_plan: required_before_editing
+  slop_classification: required_before_editing
+  deletion_first: true
+  one_smell_at_a_time: true
+  verification: required_after_each_changed_surface
+  closeout_evidence:
+    - slop-cleanup-log.md
+    - changed_files
+    - simplifications
+    - behavior_lock_refs
+    - verification_refs
+    - remaining_risks
+  smell_classes:
+    - duplicate_logic
+    - dead_code
+    - needless_wrappers_or_abstractions
+    - boundary_leaks
+    - weak_regression_coverage
+    - over_explaining_comments
+    - speculative_branches
+    - ungrounded_generated_prose
+    - ui_design_defaults_when_task_has_ui_surface
 forbidden_scope:
   - KAB Stage 2/3 activation
   - real async GJC ultragoal invocation except the explicitly approved bounded GAJAE-008 native GJC smoke
@@ -80,6 +146,7 @@ forbidden_scope:
   - warning-only verification gates
   - GAJAE-004 async callback pilot
   - GAJAE-006 watcher/callback closeout
+  - native GJC `ai-slop-cleaner` or `remove-ai-slop` command requests; use the KAS phase brief through ultragoal executor lane instead
 
 expected_outputs:
   - artifact_kind: candidate_ultragoal_bundle

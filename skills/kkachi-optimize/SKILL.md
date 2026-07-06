@@ -19,6 +19,8 @@ Do not optimize before behavior is anchored. For code-change KHS runs, optimize 
 
 Do not merge these into an unverified broad rewrite. Keep cleanup narrow, reversible, and tied to the approved task. Skipping optimize or either micro-stage requires an explicit reason in `phase-plan.yaml` and `checklist.md`.
 
+V02FLOW-009 routes `ai-slop-cleaner` and `optimize` mutation through the selected GJC `ultragoal` executor lane by default after bounded approval. `ai-slop-cleaner` is a KAS phase brief, not a native GJC `ai-slop-cleaner` or `remove-ai-slop` command; requests for those native surfaces fail closed. Missing KAH V02FLOW-010 capability/readback, unknown aliases, missing ralplan/hash, missing Blue approval, stale verification, or unsafe refs also fail closed instead of falling back to Blue/color patching.
+
 ## Outputs
 
 - `slop-cleanup-log.md`
