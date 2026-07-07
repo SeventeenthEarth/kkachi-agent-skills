@@ -23,7 +23,64 @@ This file is not a general wishlist. It is the canonical KAS-side ledger for non
 - `rejected`: Blue later rejects the item as no longer valid, with rationale/ref.
 - `stale`: the item is superseded by another task/SOT or no longer applies, with rationale/ref.
 
+Lifecycle status is one of: open, converted_to_task, resolved, rejected, stale. Waiver is authority evidence, not lifecycle status.
+
 Every entry must record created date, owner, last-reviewed date, status-change evidence, and terminal evidence/rationale before leaving `open` or `converted_to_task`.
+
+## Compact entry checklist
+
+Use this checklist before pasting or accepting an entry. The full template below remains canonical, but soldiers should keep each field short and point to artifacts instead of writing mini-reports.
+
+1. **Eligibility:** Blocking current task: false is mandatory for every deferred entry. Blocker finding handling: fix_now_or_hold_current_task.
+2. **Decision:** Blue disposition must be `defer_followup`; Blue disposition ref: required; N/A is invalid. Additional approval/ref can supplement but cannot replace the Blue ref.
+3. **Lifecycle:** Status uses only `open`, `converted_to_task`, `resolved`, `rejected`, or `stale`; waiver is authority evidence, not lifecycle status.
+4. **Hashes:** Logical/readback status hash: the KAS/KAH semantic readback hash for the ledger status; Byte-level ledger file SHA: the file checksum of `docs/deferred-feedback.md`. Record both separately when available.
+5. **Refs:** Source finding ref: exact review/MAR/Gray/Blue/user source. Final-report reciprocal ref: final report or Blue synthesis that links this deferred id. Converted task ref: concrete follow-up card/roadmap row once converted, otherwise `N/A while open`.
+
+### Compact example
+
+```md
+## DEFER-V02FLOW-011-001 — compact ledger examples
+
+- Status: open
+- Created: 2026-07-07
+- Owner lane: KAS
+- Last reviewed: 2026-07-07
+- Status changed by/ref: N/A for new open entry
+- Originating task: V02FLOW-011 / run-...
+- Source phase: first-color-review
+- Source lane/reviewer: Orange
+- Source ref: t_example / artifact path
+- Finding summary:
+  - Template wording is operator-usable but could be shorter.
+- Why it matters:
+  - Long entries slow soldier closeout.
+- Blocking current task: false
+- Why not fixed now:
+  - Better with next task after current accepted scope closes.
+- Defer reason: better_with_next_task
+- Proposed fix:
+  - Add shorter examples in the next docs cleanup task.
+- Suggested follow-up task: TBD
+- Converted task ref: N/A while open
+- Conversion date: N/A
+- Converted by/ref: N/A
+- Deferred ID copied into task: N/A
+- Target repo/files:
+  - kkachi-hermes-skills/docs/deferred-feedback.md
+- Required gate when resumed:
+  - docs-contract, color review, final gate as applicable
+- Carried-forward gates: same as required gate unless Blue narrows them
+- Final-report ref(s): run final report or Blue synthesis ref that links DEFER-V02FLOW-011-001
+- Blue disposition: defer_followup
+- Blue disposition ref: t_blue_synthesis_or_event_ref
+- Additional approval/ref: N/A when not applicable
+- Logical/readback status hash: sha256:<semantic-status-hash or N/A before KAH V02FLOW-012>
+- Byte-level ledger file SHA: sha256:<file-sha or N/A before readback>
+- Source finding ref: t_example / artifact path
+- Final-report reciprocal ref: final-report.md#deferred-feedback
+- Terminal evidence/rationale: required when status is resolved/rejected/stale
+```
 
 ## Entry template
 
@@ -61,8 +118,12 @@ Every entry must record created date, owner, last-reviewed date, status-change e
 - Carried-forward gates: <same as required gate, or explicit narrowed gate set with Blue ref>
 - Final-report ref(s): <run/task final report, Blue synthesis, or final closeout ref that links this entry>
 - Blue disposition: defer_followup
-- Blue disposition ref: <non-empty Blue synthesis/card/event/final-disposition ref>
+- Blue disposition ref: <non-empty Blue synthesis/card/event/final-disposition ref; N/A is invalid>
 - Additional approval/ref: <주군/reviewer gate ref, or N/A only when not applicable; never replaces Blue disposition ref>
+- Logical/readback status hash: sha256:<semantic-status-hash or N/A before KAH V02FLOW-012>
+- Byte-level ledger file SHA: sha256:<file-sha or N/A before readback>
+- Source finding ref: <exact source review/MAR/Gray/Blue/user card, artifact, line, or event ref>
+- Final-report reciprocal ref: <final report or Blue synthesis anchor that links this deferred id>
 - Terminal evidence/rationale: <required when status is resolved/rejected/stale>
 ```
 
