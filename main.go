@@ -8,7 +8,7 @@ import (
 	"github.com/SeventeenthEarth/kkachi-agent-skills/internal/skills/discovery"
 )
 
-//go:embed skills skill-pack.yaml templates registries scripts
+//go:embed skills skill-pack.yaml templates registries
 var embeddedSource embed.FS
 
 func main() {

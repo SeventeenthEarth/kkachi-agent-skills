@@ -2,24 +2,24 @@
 
 Date: 2026-06-17
 Owner: KAS policy and skill layer
-Status: candidate repository promotion SOT; local skill/script/provider-run surfaces implemented in source; MAR-006 KAH CLI binary selection implemented for KAS doctor/workflow surfaces
+Status: candidate repository promotion SOT; pre-v0.2.1 legacy Python MAR is OFF/HOLD in current v0.2.1 source; MAR-006 KAH CLI binary selection implemented for KAS doctor/workflow surfaces
 Authority level: KAS planning authority for MAR promotion from accepted Obsidian output SOT; not installed skill behavior or runtime activation
 Source SOT: `/Users/draccoon/Workspace/Hermes/17thHermes/40_outputs/projects/kkachi/2026-06-16-kkachi-multi-agent-review-mar-sot.md`
 Paired KAH planning SOT: KAH `docs/sot/multi-agent-review-evidence-gates.md`
-Scope: KAS MAR policy, skill, prompt templates, reviewer matrix, premium escalation rules, and script ownership
-NEWMAR marker: `docs/sot/mar-execution-realignment.md` supersedes this document only for the long-term provider-execution ownership line after `NEWMAR-001` updates/stale-marks active docs. Current source behavior and historical `MAR-004..006` evidence remain valid for the pre-NEWMAR KAS runner path until reviewed replacement tasks land.
+Scope: KAS MAR policy, skill, prompt templates, reviewer matrix, premium escalation rules, request-bundle/provider-policy declarations, and KAH execution boundary
+NEWMAR marker: `docs/sot/mar-execution-realignment.md` supersedes this document for provider-execution ownership. Current v0.2.1 KAS source keeps provider policy and request/disposition guidance only; pre-v0.2.1 legacy Python MAR is OFF/HOLD until reviewed Go/KAH MAR lands. Historical `MAR-004..006` evidence remains lineage, not an active runtime surface.
 
 ## Purpose
 
 Kkachi Multi-Agent Review (MAR) is the planned lightweight KAS-local review lane for routine Kkachi development review. It collects specialized AI reviewer outputs, preserves full evidence through KAH artifacts, and returns a compact merge pack plus Blue disposition path. MAR is advisory evidence; Blue disposition and conditional Red adjudication remain the authority.
 
-This repository document promotes the accepted output SOT into KAS planning authority. Current source evidence covers the `kkachi-multi-agent-review` scaffold, local `scripts/mar.py` fixture/mock/read-only surfaces, provider-run fail-closed surfaces, and role-first registry/script work implemented in source. It does not claim that KAH gates or installed runtime behavior exist until the follow-up implementation tasks complete with evidence.
+This repository document promotes the accepted output SOT into KAS planning authority. Current source evidence covers the `kkachi-multi-agent-review` scaffold, provider-policy registry, prompt templates, request/disposition guidance, and KAH execution boundary. KAS no longer ships the pre-v0.2.1 legacy Python MAR script or shell adapters; KAH `mar` owns reviewed provider execution and evidence once the Go/KAH MAR surface lands with evidence.
 
 ## Canonical operating rule
 
 ```text
 Blue runs MAR by default.
-KAS defines the skill and script.
+KAS defines the skill, request contract, and provider policy.
 KAH preserves evidence.
 Red adjudicates only when risk, conflict, or workflow gates require it.
 Codex and Claude require explicit 주군 approval unless pre-authorized.
@@ -68,9 +68,8 @@ KAS owns:
 - MAR policy and reviewer selection rules;
 - prompt templates and reviewer role matrix;
 - premium escalation policy;
-- bundled `scripts/mar.py` request/render/validate/readback/`kah-trigger` facade;
-- KAS compatibility schemas and fixture/merge-pack readback rules, not healthy
-  provider process control;
+- request-bundle, prompt-template, role/provider-policy, and Blue disposition guidance;
+- pre-v0.2.1 legacy Python MAR is OFF/HOLD; no bundled script or shell adapter is active in current source;
 - Blue disposition template guidance.
 - selecting which `kkachi-agent-helper` binary its own doctor,
   workflow-create, workflow-promote, workflow-trigger, and graphsync /
@@ -113,28 +112,25 @@ Required MAR roles are:
 5. `test_adequacy` — test and verification adequacy against the task contract
    and acceptance criteria.
 
-Each required role has a declared primary and secondary provider candidate in
+Each required role has declared provider-candidate policy in
 `registries/mar-provider-lanes.json` (`schema_version: mar.role_lanes.v1`). The
-current default is `zcode_glm_5_2` primary and `kimi_default` secondary for every
-required role. `kimi_default` uses the authenticated Kimi Code CLI default/latest
-model (`selected_model: null`, `selected_model_required: false`) with
-`--output-format stream-json --prompt {prompt_text}` so MAR can parse the
-assistant content deterministically. It may become primary only when a task
-records role-specific evidence that the Kimi default/latest lane is materially
-better for that role.
-`antigravity_gemini` remains explicit provider metadata, but it is non-default
-and not required for clean coverage until selected-model and health evidence are
-fixed.
+registry is a portable KAS policy readback source for required roles,
+role-to-provider candidates, provider metadata, validation posture, and
+provider-failure reason vocabulary. It is role-first and declares
+`execution_owner: KAH`; it must not carry KAS-owned executable, shell-adapter,
+or argv fields.
 
-`scripts/mar.py role-lanes` is the stdlib readback surface for required roles,
-role-to-provider candidates, provider metadata, validation posture, toolchain
-overlay evidence, and provider-failure reason vocabulary. `scripts/mar.py
-provider-lanes` remains a compatibility alias for readback only; the registry is
-role-first. `scripts/mar.py kah-trigger` renders the KAH `mar start` command
-without executing provider CLIs and fails closed on absolute or parent-traversal
-request refs. `scripts/mar.py provider-attempt` is a deprecated compatibility
-facade for pre-NEWMAR evidence paths and must not be used as the healthy
-execution path.
+Current default policy keeps `zcode_glm_5_2` as primary and `kimi_default` as
+secondary for every required role, but KAS does not define the runtime argv for
+those providers. Kimi default/latest selection, ZCode invocation, Antigravity
+health/model selection, provider preflight, raw-output capture, parsing,
+status vocabulary enforcement, and mutation guards belong to reviewed KAH `mar`
+execution and its evidence artifacts. `antigravity_gemini` remains explicit
+non-default provider metadata and is not required for clean coverage until
+KAH-owned selected-model and health evidence are fixed.
+
+Pre-v0.2.1 legacy Python MAR is OFF/HOLD and must not be used as role coverage
+or as the healthy execution path.
 
 ## Historical MAR-004 provider-run contract
 
@@ -221,7 +217,7 @@ evidence exists.
 MAR dogfood evidence must run beside the still-active review workflow before
 broad wording claims MAR has replaced legacy review or team color review
 requirements. Dogfood evidence must include at least one representative KAS/KAH
-diff, role/provider-attempt artifacts, compact merge pack, Blue disposition, and
+diff, KAH MAR role-attempt artifacts, compact merge pack, Blue disposition, and
 Red adjudication when any trigger fires.
 
 ## Coverage and status semantics

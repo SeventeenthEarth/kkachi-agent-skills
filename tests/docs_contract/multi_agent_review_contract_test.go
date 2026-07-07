@@ -111,7 +111,7 @@ func TestMultiAgentReviewSOTDefinesRoleFirstFailureDecisionPolicy(t *testing.T) 
 		"test_adequacy",
 		"registries/mar-provider-lanes.json",
 		"mar.role_lanes.v1",
-		"scripts/mar.py role-lanes",
+		"KAH `mar` owns reviewed provider execution",
 		"zcode_glm_5_2",
 		"kimi_default",
 		"unresolved_required_roles",

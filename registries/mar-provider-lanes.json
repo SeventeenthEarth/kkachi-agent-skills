@@ -1,5 +1,7 @@
 {
   "schema_version": "mar.role_lanes.v1",
+  "runtime_posture": "kas_policy_only_kah_execution_required",
+  "legacy_python_mar_status": "off_hold_until_go_kah_mar_v0_2_1",
   "required_roles": [
     "logic",
     "security",
@@ -65,14 +67,11 @@
   "providers": {
     "zcode_glm_5_2": {
       "command_lane": "zcode",
-      "executable": "scripts/mar_adapters/mar-zcode.sh",
-      "adapter_script": "scripts/mar_adapters/mar-zcode.sh",
+      "execution_owner": "KAH",
+      "provider_binding_source": "kah_toolchain_provider_registry",
+      "no_kas_provider_execution": true,
       "selected_model": "glm-5.2",
       "prompt_template": "templates/prompts/mar/zcode-glm-5-2-reviewer-request.md.tmpl",
-      "command_args": [
-        "--prompt-file",
-        "{prompt_path}"
-      ],
       "timeout_seconds": 1800,
       "validated": false,
       "validation_required_before_success_coverage": true,
@@ -80,14 +79,11 @@
     },
     "kimi_default": {
       "command_lane": "kimi",
-      "executable": "scripts/mar_adapters/mar-kimi.sh",
-      "adapter_script": "scripts/mar_adapters/mar-kimi.sh",
+      "execution_owner": "KAH",
+      "provider_binding_source": "kah_toolchain_provider_registry",
+      "no_kas_provider_execution": true,
       "selected_model": null,
       "prompt_template": "templates/prompts/mar/kimi-default-reviewer-request.md.tmpl",
-      "command_args": [
-        "--prompt-file",
-        "{prompt_path}"
-      ],
       "timeout_seconds": 120,
       "validated": false,
       "validation_required_before_success_coverage": true,
@@ -98,14 +94,11 @@
     },
     "antigravity_gemini": {
       "command_lane": "agy",
-      "executable": "scripts/mar_adapters/mar-agy.sh",
-      "adapter_script": "scripts/mar_adapters/mar-agy.sh",
+      "execution_owner": "KAH",
+      "provider_binding_source": "kah_toolchain_provider_registry",
+      "no_kas_provider_execution": true,
       "selected_model": "Gemini 3.5 Flash (High)",
       "prompt_template": "templates/prompts/mar/antigravity-gemini-reviewer-request.md.tmpl",
-      "command_args": [
-        "--prompt-file",
-        "{prompt_path}"
-      ],
       "timeout_seconds": 120,
       "validated": false,
       "validation_required_before_success_coverage": true,

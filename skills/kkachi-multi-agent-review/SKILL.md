@@ -14,9 +14,7 @@ MAR-002 does not execute providers; that no-provider boundary remains preserved.
 
 KAS is now the MAR contract and trigger facade. It defines the role matrix,
 provider-policy declarations, request-bundle refs/checksums, prompt/input refs,
-retry/waiver/escalation policy, and Blue disposition template. It may render a
-KAH `mar start` command through `scripts/mar.py kah-trigger`, but it must not
-own healthy provider execution. Reviewed provider process control, async role
+retry/waiver/escalation policy, and Blue disposition template. It does not ship or call the legacy Python `scripts/mar.py`; pre-v0.2.1 legacy Python MAR is OFF/HOLD until reviewed Go/KAH MAR lands. KAS may render request bundles or KAH-native trigger metadata, but it must not own healthy provider execution. Reviewed provider process control, async role
 attempts, primary/secondary queueing, provider HOME injection, raw-output
 capture, merge/status evidence, and KAH gate artifacts belong to KAH `mar`.
 
@@ -36,8 +34,7 @@ KAH NEWMAR-003+ may consume only reviewed NEWMAR-002 schema/capability evidence,
 - Use KAS MAR surfaces for request/render/trigger/readback/disposition only.
 - Do not execute reviewers or providers from this skill or from KAS `scripts/mar.py`
   as the future healthy path; KAH `mar` owns reviewed provider execution.
-- Treat KAS `provider-attempt` as a deprecated compatibility facade that must
-  fail closed with KAH execution required, not as role coverage.
+- Treat historical KAS `provider-attempt` evidence as pre-v0.2.1 legacy Python MAR only; the active v0.2.1 source posture is OFF/HOLD and not role coverage.
 - Do not treat provider dispatch success, provider availability, rendered
   prompt creation, or unresolved required role coverage as completion evidence.
 - Do not activate KAB as a default MAR path.
@@ -58,9 +55,7 @@ KAH NEWMAR-003+ may consume only reviewed NEWMAR-002 schema/capability evidence,
    be safe repo-relative paths, not absolute or parent-traversal paths.
 3. Read effective KAH `mar` capability/status evidence before presenting the
    trigger as usable.
-4. Render the KAH command with `scripts/mar.py kah-trigger --request <request>`
-   or the equivalent KAH wrapper; unsafe request refs fail closed and provider
-   CLIs must not run from KAS.
+4. Use reviewed KAH-native `mar` trigger/status evidence when available; until Go/KAH MAR lands, pre-v0.2.1 legacy Python MAR is OFF/HOLD. Unsafe request refs fail closed and provider CLIs must not run from KAS.
 5. Read KAH `mar status` / gate artifacts and write Blue disposition from those
    evidence refs. If KAH evidence is missing, stale, degraded, or inconsistent,
    hold fail-closed and route Red adjudication when required.
