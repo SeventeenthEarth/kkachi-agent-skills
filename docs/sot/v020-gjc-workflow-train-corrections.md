@@ -3,7 +3,7 @@
 Date: 2026-07-04
 Owner: KAS workflow/policy layer
 Confirming role: Hwangchung / 황충, Kkachi Blue commander
-Status: planning SOT / implementation not authorized by this document alone
+Status: planning SOT / V02FLOW-013..018 v0.2.1 remediation train added; implementation and release remain separately gated by task evidence
 Authority level: KAS-side planning authority for v0.2 workflow-stage, GJC status semantics, implementation executor-loop, implementer-owned mutation phases, review-feedback remediation, review train, and watcher policy corrections
 Scope: `kkachi-agent-skills` source docs, registries, templates, and skills; paired KAH companion SOT is `kkachi-agent-helper/docs/sot/v020-gjc-workflow-train-corrections.md`
 Related docs: `docs/roadmap.md`, `docs/sot/gajae-delegated-execution-contract.md`, `docs/sot/task-dag-workflow-contract.md`, `docs/sot/strict-workflow-execution-contract.md`, `docs/sot/mar-task-loop-contract.md`, KAH `docs/sot/gajae-gjc-wrapper-evidence.md`, KAH `docs/sot/v020-gjc-workflow-train-corrections.md`
@@ -201,7 +201,36 @@ Recommended logical sets: 6.
 5. GJC-owned implementer and remediation phases: KAS V02FLOW-009 defines phase prompt/packet contracts for `impl`, `test-enhance`, `ai-slop-cleaner`, `optimize`, `docs-update`, and `handle-feedback-*`; KAH V02FLOW-010 materializes and records execution/remediation evidence through the GJC executor loop.
 6. Deferred review/MAR feedback ledger: KAS V02FLOW-011 defines the `deferred_feedback` docs-map field, `docs/deferred-feedback.md` template, no-blocker-defer policy, provenance fields, and final-report linkage; KAH V02FLOW-012 validates/readbacks the ledger and prevents hidden blocker deferral.
 
-Physical repo work should normally be 12 PR candidates: a KAS contract/guidance side and a KAH helper/evidence side for each logical set. Avoid compressing to 3 or fewer PRs.
+V02FLOW-001..012 used paired KAS/KAH physical source slices for the six logical corrections. For the v0.2.1 continuation, use the task ids `V02FLOW-013` through `V02FLOW-018` as the operational labels rather than PR1/PR2-style labels.
+
+### 5.1 V02FLOW-013..018 v0.2.1 remediation train
+
+The V02FLOW completion audit on 2026-07-08 confirmed that V02FLOW-001..012 established the correction contracts and readback surfaces, but also found one release-critical semantic gap: current `start-ultragoal`/`ultragoal create-goals` proves goal-bundle readiness only. It must not be treated as source mutation, diff readiness, verification, review, MAR, final, commit, install, or release readiness.
+
+V02FLOW therefore continues through six focused v0.2.1 tasks:
+
+| Task ID | Primary owner | Purpose | Required boundary |
+|---|---|---|---|
+| V02FLOW-013 | KAS | Correct KAS contract/guidance/tests so goal-bundle readiness cannot close implementation and all mutation-capable phases require executor-loop evidence. | MAR remains standing-waived until official v0.2.1 Go/KAH MAR readiness; no provider-MAR claim. |
+| V02FLOW-014 | KAH | Implement or fail-closed the real ultragoal executor-loop driver/evidence path that produces diff/checkpoint/verification evidence instead of stopping at `create-goals`. | Large full-development slice; real-user HOME and JSON-only output must be proved. |
+| V02FLOW-015 | KAS+KAH | Prove `impl`, `test-enhance`, `ai-slop-cleaner`, `optimize`, and `docs-update` through e2e/fixture evidence and negative goal-bundle-only tests. | Cross-repo verification; no phase can close from goal-bundle evidence alone. |
+| V02FLOW-016 | KAH+KAS | Capture capability, HOME, deferred-feedback, legacy-MAR rejection, standing-waiver, and second-color-N/A proof. | Do not execute or claim provider MAR before the official v0.2.1 MAR path. |
+| V02FLOW-017 | KAS-led review | Run official Red/Orange/Gray review plus Blue synthesis for V02FLOW-013..016 correction evidence. | Temporary agents or `delegate_task` are not official color review. |
+| V02FLOW-018 | KAS+KAH | Assemble the v0.2.1 source release-readiness package after 013..017: fresh tests, roadmap/SOT alignment, capability/HOME/deferred evidence, waiver statement, and release notes/readiness. | V02FLOW-018 is readiness packaging only; release/tag/push/install/runtime/provider/auth/profile/gateway/model changes still require explicit separate approval. |
+
+After V02FLOW-018, the intended operator path is to submit the v0.2.1 release-readiness package for separate 주군 publication approval and move additional polish/hardening into post-release tasks rather than expanding this remediation train indefinitely.
+
+### 5.2 V02FLOW-013 executor-loop completion status hierarchy
+
+V02FLOW-013 defines the KAS status hierarchy that separates goal-bundle readiness from implementation completion:
+
+- `implementation_goal_bundle_ready: goal bundle only; never sufficient for implementation completion`. This status may be emitted when `ultragoal create-goals` / `start-ultragoal` has produced a candidate goal bundle, but it is not source mutation, diff readiness, verification, review, MAR, final, commit, install, or release readiness.
+- `implementation_diff_ready: executor-loop source diff, checkpoint, and checksum evidence is present`. This status may be used only after the selected executor loop has produced changed source refs or an explicit no-change rationale, diff refs, checkpoint ref/status, and checksum evidence; verification may still be pending.
+- `implementation_verified: executor-loop diff, checkpoint, HOME, checksum, termination, and verification-output evidence passed`. This status requires post-change verification output refs and a terminal executor-loop result, and it still does not bypass color review, MAR applicability/waiver, final gate, commit, install, runtime, or publication approval.
+
+Required executor-loop evidence fields: changed_source_refs, diff_refs, checkpoint_ref, checkpoint_status, verification_output_refs, checksums, termination_reason, HOME, no_authority_boundaries.
+
+The implementer-owned mutation phases `impl`, `test-enhance`, `ai-slop-cleaner`, `optimize`, and `docs-update` must not complete from goal-bundle-only evidence. Their KAS prompt/packet/registry surfaces must require `implementation_diff_ready` or `implementation_verified` evidence, or fail closed with an explicit unsupported-capability or approved direct-edit exception. `implementation_goal_bundle_ready is goal-bundle-only and never sufficient for implementation completion` is the shared wording reviewers should use when auditing these phases.
 
 ## 6. Verification expectations
 
@@ -211,9 +240,10 @@ Every implementation task must:
 - keep KAH behavior claims tied to the KAH companion repo evidence;
 - run the touched repo's `docs/kkachi-docs-map.yaml` `test_commands` after any code-modifying step;
 - preserve Red/Orange/Gray review, MAR, and post-MAR second color adoption as separate gates unless a documented waiver is approved;
+- until official v0.2.1 Go/KAH MAR readiness, record MAR as standing-waived per run, do not claim provider execution, and mark post-MAR second-color adoption not applicable when the closeout is waiver-only;
 - preserve KAT as factual/mechanical evidence only;
 - preserve KAB runtime/session control as explicit-only.
 
 ## 7. Deferrals
 
-This SOT does not authorize implementation, commit, push, install, release, live/runtime activation, KAB activation, provider/auth/token/gateway/model/profile mutation, automatic Blue synthesis, auto-continue, watcher-launched source mutation, or review-lane waiver.
+This SOT does not authorize implementation, commit, push, install, tag/release publication before V02FLOW-018 closeout or at any time without separate 주군 approval, live/runtime activation, KAB activation, provider/auth/token/gateway/model/profile mutation, automatic Blue synthesis, auto-continue, watcher-launched source mutation, review-lane waiver, or provider-MAR execution claims before the official v0.2.1 Go/KAH MAR path is ready. V02FLOW-018 is release closeout/readiness packaging only; actual release publication still requires separate approval.
