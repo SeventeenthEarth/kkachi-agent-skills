@@ -21,6 +21,8 @@ Do not merge these into an unverified broad rewrite. Keep cleanup narrow, revers
 
 V02FLOW-009 routes `ai-slop-cleaner` and `optimize` mutation through the selected GJC `ultragoal` executor lane by default after bounded approval. `ai-slop-cleaner` is a KAS phase brief, not a native GJC `ai-slop-cleaner` or `remove-ai-slop` command; requests for those native surfaces fail closed. Missing KAH V02FLOW-010 capability/readback, unknown aliases, missing ralplan/hash, missing Blue approval, stale verification, or unsafe refs also fail closed instead of falling back to Blue/color patching.
 
+V02FLOW-013 tightens `ai-slop-cleaner` and `optimize` closeout: `implementation_goal_bundle_ready is goal-bundle-only and never sufficient for implementation completion`. `implementation_diff_ready` and `implementation_verified` require executor-loop evidence fields before either mutation-capable phase can close: `changed_source_refs`, `diff_refs`, `checkpoint_ref`, `checkpoint_status`, `verification_output_refs`, `checksums`, `termination_reason`, `HOME`, and `no_authority_boundaries`. Goal-bundle-only evidence, stale verification, or missing executor-loop refs must fail closed.
+
 ## Outputs
 
 - `slop-cleanup-log.md`

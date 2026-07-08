@@ -3,7 +3,7 @@
 Date: 2026-07-04
 Owner: KAS workflow/policy layer
 Confirming role: Hwangchung / 황충, Kkachi Blue commander
-Status: planning SOT / V02FLOW-013..018 v0.2.1 remediation train added; implementation and release remain separately gated by task evidence
+Status: source-side SOT; V02FLOW-013 executor-loop contract correction accepted source-side; V02FLOW-014..018 v0.2.1 remediation/release train remains separately gated by task evidence
 Authority level: KAS-side planning authority for v0.2 workflow-stage, GJC status semantics, implementation executor-loop, implementer-owned mutation phases, review-feedback remediation, review train, and watcher policy corrections
 Scope: `kkachi-agent-skills` source docs, registries, templates, and skills; paired KAH companion SOT is `kkachi-agent-helper/docs/sot/v020-gjc-workflow-train-corrections.md`
 Related docs: `docs/roadmap.md`, `docs/sot/gajae-delegated-execution-contract.md`, `docs/sot/task-dag-workflow-contract.md`, `docs/sot/strict-workflow-execution-contract.md`, `docs/sot/mar-task-loop-contract.md`, KAH `docs/sot/gajae-gjc-wrapper-evidence.md`, KAH `docs/sot/v020-gjc-workflow-train-corrections.md`

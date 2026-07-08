@@ -1,4 +1,8 @@
 version: kas-task-dag-workflow-registry/v1
+# V02FLOW-013 executor-loop completion contract:
+# implementation_goal_bundle_ready is goal-bundle-only and never sufficient for implementation completion.
+# implementation_diff_ready and implementation_verified require executor-loop evidence fields:
+# changed_source_refs, diff_refs, checkpoint_ref, checkpoint_status, verification_output_refs, checksums, termination_reason, HOME, no_authority_boundaries.
 workflows:
   - workflow_id: development_full
     workflow_path: .kkachi/workflows/development_full.yaml
@@ -125,7 +129,7 @@ node_contracts:
     owner_role: implementer_backend
     execution_lane: gjc_ultragoal_executor_loop_candidate
     required_inputs: [diff.patch, impl-log.md]
-    expected_artifacts: [test-plan.md, test-log.md]
+    expected_artifacts: [test-plan.md, test-log.md, ultragoal-executor-loop-evidence.md]
     prompt_ref: skills/kkachi-enhance-test/SKILL.md
     approval_required: true
     fallback_policy: none_fail_closed
@@ -138,7 +142,7 @@ node_contracts:
     owner_role: implementer_backend
     execution_lane: gjc_ultragoal_executor_loop_candidate
     required_inputs: [diff.patch, test-log.md]
-    expected_artifacts: [slop-cleanup-log.md]
+    expected_artifacts: [slop-cleanup-log.md, ultragoal-executor-loop-evidence.md]
     prompt_ref: skills/kkachi-optimize/SKILL.md
     approval_required: true
     fallback_policy: none_fail_closed
@@ -151,7 +155,7 @@ node_contracts:
     owner_role: implementer_backend
     execution_lane: gjc_ultragoal_executor_loop_candidate
     required_inputs: [diff.patch, test-log.md, slop-cleanup-log.md]
-    expected_artifacts: [optimize-log.md]
+    expected_artifacts: [optimize-log.md, ultragoal-executor-loop-evidence.md]
     prompt_ref: skills/kkachi-optimize/SKILL.md
     approval_required: true
     fallback_policy: none_fail_closed
@@ -164,7 +168,7 @@ node_contracts:
     owner_role: implementer_backend
     execution_lane: gjc_ultragoal_executor_loop_candidate
     required_inputs: [diff.patch, optimize-log.md]
-    expected_artifacts: [docs-update.md]
+    expected_artifacts: [docs-update.md, ultragoal-executor-loop-evidence.md]
     prompt_ref: skills/kkachi-docs-update/SKILL.md
     approval_required: true
     fallback_policy: none_fail_closed
@@ -190,7 +194,7 @@ node_contracts:
     owner_role: implementer_backend
     execution_lane: gjc_ultragoal_executor_loop_candidate
     required_inputs: [feedback-1.md]
-    expected_artifacts: [feedback-triage-1.md, handle-feedback-1.md, post-feedback-verification.md]
+    expected_artifacts: [feedback-triage-1.md, handle-feedback-1.md, post-feedback-verification.md, ultragoal-executor-loop-evidence.md]
     prompt_ref: skills/kkachi-handle-feedback/SKILL.md
     approval_required: true
     fallback_policy: none_fail_closed

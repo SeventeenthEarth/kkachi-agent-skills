@@ -28,6 +28,8 @@ loop under KAS/KAH control:
   explicit bounded implementation approval; it is not review, MAR, final acceptance, commit, install,
   or runtime activation.
 
+V02FLOW-013 planning must preserve the implementation completion status hierarchy: `implementation_goal_bundle_ready is goal-bundle-only and never sufficient for implementation completion`; `implementation_diff_ready` requires executor-loop source diff/checkpoint/checksum evidence; and `implementation_verified` requires passed verification output after that executor loop. Plans for `impl`, `test-enhance`, `ai-slop-cleaner`, `optimize`, and `docs-update` must name required evidence fields `changed_source_refs`, `diff_refs`, `checkpoint_ref`, `checkpoint_status`, `verification_output_refs`, `checksums`, `termination_reason`, `HOME`, and `no_authority_boundaries`.
+
 KAH records deterministic run/gate/evidence state. KAT is factual/mechanical
 evidence only. KAB runtime/session control is out of the default v0.2 path and
 requires explicit KAB selection with current capability and bridge evidence.
