@@ -3,7 +3,7 @@
 Date: 2026-07-04
 Owner: KAS workflow/policy layer
 Confirming role: Hwangchung / 황충, Kkachi Blue commander
-Status: source-side SOT; V02FLOW-013 executor-loop contract correction accepted source-side; V02FLOW-014 KAH executor-loop driver/fail-closed evidence accepted source-side with final gate PASS for `run-20260708T014514Z-832321c87e08`; V02FLOW-015..018 v0.2.1 remediation/release train remains separately gated by task evidence
+Status: source-side SOT; V02FLOW-013 executor-loop contract correction accepted source-side; V02FLOW-014 KAH executor-loop driver/fail-closed evidence accepted source-side with final gate PASS for `run-20260708T014514Z-832321c87e08`; V02FLOW-015 cross-repo fixture/e2e proof is source-side aligned; V02FLOW-016..018 v0.2.1 remediation/release train remains separately gated by task evidence
 Authority level: KAS-side planning authority for v0.2 workflow-stage, GJC status semantics, implementation executor-loop, implementer-owned mutation phases, review-feedback remediation, review train, and watcher policy corrections
 Scope: `kkachi-agent-skills` source docs, registries, templates, and skills; paired KAH companion SOT is `kkachi-agent-helper/docs/sot/v020-gjc-workflow-train-corrections.md`
 Related docs: `docs/roadmap.md`, `docs/sot/gajae-delegated-execution-contract.md`, `docs/sot/task-dag-workflow-contract.md`, `docs/sot/strict-workflow-execution-contract.md`, `docs/sot/mar-task-loop-contract.md`, KAH `docs/sot/gajae-gjc-wrapper-evidence.md`, KAH `docs/sot/v020-gjc-workflow-train-corrections.md`
@@ -231,6 +231,14 @@ V02FLOW-013 defines the KAS status hierarchy that separates goal-bundle readines
 Required executor-loop evidence fields: changed_source_refs, diff_refs, checkpoint_ref, checkpoint_status, verification_output_refs, checksums, termination_reason, HOME, no_authority_boundaries.
 
 The implementer-owned mutation phases `impl`, `test-enhance`, `ai-slop-cleaner`, `optimize`, and `docs-update` must not complete from goal-bundle-only evidence. Their KAS prompt/packet/registry surfaces must require `implementation_diff_ready` or `implementation_verified` evidence, or fail closed with an explicit unsupported-capability or approved direct-edit exception. `implementation_goal_bundle_ready is goal-bundle-only and never sufficient for implementation completion` is the shared wording reviewers should use when auditing these phases.
+
+### 5.3 V02FLOW-015 mutation-phase fixture/e2e proof
+
+V02FLOW-015 extends the status hierarchy into explicit per-phase proof for `impl`, `test-enhance`, `ai-slop-cleaner`, `optimize`, and `docs-update`. For these mutation-capable phases, completion evidence must name the selected executor lane `gjc_ultragoal_executor_loop_candidate`, the requested phase id, the canonical phase id, argv/process refs, real-user `HOME`, cwd, timestamps, exit code, changed-file refs, non-empty diff refs, checkpoint ref/status/timestamp, verification command/status/output refs, checksums, repeat/termination reason, and candidate-only authority boundaries.
+
+Known workflow-projection aliases must map to the same executor-loop requirement instead of bypassing it: `impl`/`implement`, `test-enhance`/`test_enhance`/`enhance-test`/`enhance_test`, `ai-slop-cleaner`/`ai_slop_cleaner`/`slop_cleanup`, and `docs-update`/`docs_update`/`update_docs`/`docs`.
+
+Goal-bundle-only evidence, existence-only workflow projection, missing selected lane, missing HOME/cwd/process/timestamps/exit evidence, missing changed refs, empty diff refs, missing checkpoint, missing verification output, missing SHA256/checksum integrity, stale run/ref/checksum/timestamp/artifact refs, unsupported-capability warning-only behavior, or GJC/KAT/Blue/MAR/review/final authority overclaim must fail closed. `docs-update` remains mutation-capable in this train; a no-change rationale does not substitute for required executor-loop evidence and non-empty diff refs for these five phases.
 
 ## 6. Verification expectations
 
