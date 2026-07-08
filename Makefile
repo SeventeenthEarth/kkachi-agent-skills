@@ -57,7 +57,7 @@ install-toolchain: build
 
 push-tag: build
 	@set -e; \
-	LOCAL_VER="v$$(./$(BIN_DIR)/$(BINARY) --version | awk '{print $$NF}')"; \
+	LOCAL_VER="$$(./$(BIN_DIR)/$(BINARY) --version | awk '{print "v" substr($$NF, 1 + ($$NF ~ /^v/))}')"; \
 	echo ">> local binary version: $$LOCAL_VER"; \
 	if ! git rev-parse -q --verify "refs/tags/$$LOCAL_VER" >/dev/null; then \
 		echo "ERROR: local tag $$LOCAL_VER not found. Create it first:  git tag $$LOCAL_VER"; \

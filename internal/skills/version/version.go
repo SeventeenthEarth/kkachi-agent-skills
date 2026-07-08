@@ -11,20 +11,18 @@ const (
 )
 
 type Info struct {
-	OK            bool   `json:"ok"`
-	Command       string `json:"command"`
-	CLIVersion    string `json:"cli_version"`
-	ModulePath    string `json:"module_path"`
-	ModuleVersion string `json:"module_version"`
-	GitCommit     string `json:"git_commit"`
-	Dirty         bool   `json:"dirty"`
+	Name          string `json:"name"`
+	Version       string `json:"version"`
+	ModulePath    string `json:"-"`
+	ModuleVersion string `json:"-"`
+	GitCommit     string `json:"-"`
+	Dirty         bool   `json:"-"`
 }
 
 func Current() Info {
 	info := Info{
-		OK:            true,
-		Command:       "version",
-		CLIVersion:    CLIVersion,
+		Name:          CommandName,
+		Version:       CLIVersion,
 		ModulePath:    "github.com/SeventeenthEarth/kkachi-agent-skills",
 		ModuleVersion: "(devel)",
 		GitCommit:     "",
@@ -52,5 +50,5 @@ func Current() Info {
 }
 
 func Human() string {
-	return fmt.Sprintf("%s %s", CommandName, CLIVersion)
+	return fmt.Sprintf("%s v%s", CommandName, CLIVersion)
 }

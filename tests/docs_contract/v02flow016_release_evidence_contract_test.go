@@ -40,8 +40,8 @@ func TestV02FLOW018SourceReleaseReadinessPackage(t *testing.T) {
 	requireContainsAll(t, "docs/v02flow-018-source-release-readiness.md", []string{
 		"source release-readiness package",
 		"source-side accepted with carries",
-		"kkachi-agent-skills 0.2.1",
-		"kkachi-agent-helper 0.2.1",
+		"kkachi-agent-skills v0.2.1",
+		"kkachi-agent-helper v0.2.1",
 		"gjc_executor_loop_evidence=true",
 		"diagnostics_deferred_feedback=true",
 		"mar_legacy_rejection_diagnostics=true",

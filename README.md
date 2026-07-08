@@ -119,8 +119,7 @@ kkachi-agent-skills uninstall --profile <profile> --project <project> --apply dr
 ```
 
 `--version` / `version` prints the CLI release before any profile or source-repo
-discovery. `version --json` also reports Go build metadata such as module version,
-VCS revision, and dirty-state evidence when available from the binary.
+discovery. `--version --json` / `version --json` emits only `name` and `version`.
 
 `toolchain install-launchers` installs KAS-owned embedded local wrappers
 `kkachi-agent-skills-toolchain` and `kkachi-agent-helper-toolchain` into

@@ -731,7 +731,7 @@ func TestRootVersionExitsZeroAndPrintsVersion(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := strings.TrimSpace(stdout.String())
-			if out != "kkachi-agent-skills 0.2.1" {
+			if out != "kkachi-agent-skills v0.2.1" {
 				t.Fatalf("unexpected version output: %q", out)
 			}
 			if stderr.Len() != 0 {
@@ -741,24 +741,25 @@ func TestRootVersionExitsZeroAndPrintsVersion(t *testing.T) {
 	}
 }
 
-func TestVersionJSONIncludesBuildMetadata(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	code := Main([]string{"version", "--json"}, &stdout, &stderr, nil)
-	if code != 0 {
-		t.Fatalf("code=%d stderr=%s", code, stderr.String())
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if payload["ok"] != true || payload["command"] != "version" || payload["cli_version"] != "0.2.1" {
-		t.Fatalf("unexpected version payload: %+v", payload)
-	}
-	if payload["module_path"] == "" || payload["module_version"] == "" || payload["git_commit"] == nil || payload["dirty"] == nil {
-		t.Fatalf("version payload missing build metadata: %+v", payload)
-	}
-	if stderr.Len() != 0 {
-		t.Fatalf("expected version JSON on stdout only, got stderr=%q", stderr.String())
+func TestVersionJSONIncludesNameAndVersionOnly(t *testing.T) {
+	for _, args := range [][]string{{"version", "--json"}, {"--version", "--json"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := Main(args, &stdout, &stderr, nil)
+			if code != 0 {
+				t.Fatalf("code=%d stderr=%s", code, stderr.String())
+			}
+			var payload map[string]string
+			if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+				t.Fatal(err)
+			}
+			if len(payload) != 2 || payload["name"] != "kkachi-agent-skills" || payload["version"] != "0.2.1" {
+				t.Fatalf("unexpected version payload: %+v", payload)
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("expected version JSON on stdout only, got stderr=%q", stderr.String())
+			}
+		})
 	}
 }
 

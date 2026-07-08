@@ -256,8 +256,8 @@ V02FLOW-018 assembles the source-side v0.2.1 readiness package after the accepte
 
 Minimum V02FLOW-018 evidence:
 
-- KAS source-default version reads back as `kkachi-agent-skills 0.2.1` from the root CLI and the `kkachi-hermes-skills` compatibility entrypoint.
-- KAH source-default version reads back as `kkachi-agent-helper 0.2.1` through `--version` and `version --json`.
+- KAS source-default version reads back as `kkachi-agent-skills v0.2.1` from the root CLI and the `kkachi-hermes-skills` compatibility entrypoint.
+- KAH source-default version reads back as `kkachi-agent-helper v0.2.1` through `--version`, and `version --json` emits only `name` and `version`.
 - Effective KAH `capabilities --json` continues to expose `gjc_executor_loop_evidence=true`, `diagnostics_deferred_feedback=true`, `mar_legacy_rejection_diagnostics=true`, `mar_provider_adapter_safety=true`, and `mar_migration_diagnostics=false`.
 - Deferred-feedback diagnostics are reported precisely: a zero-entry live ledger can pass when the source contract and tests cover required fields; it must not be described as non-empty live disposition evidence.
 - The V02FLOW-017 packet-local blank KAH SOT excerpt is either regenerated in the V02FLOW-018 evidence packet or explicitly noted as a nonblocking extraction gap; the live KAH SOT remains the authority.

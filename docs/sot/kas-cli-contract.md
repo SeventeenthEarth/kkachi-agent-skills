@@ -368,7 +368,7 @@ All commands should support:
 Rules:
 
 - `--version` and `version` must not require source-repo discovery, profile access, KAH state, or KAB runtime availability.
-- `version --json` must include stable `ok`, `command`, `cli_version`, `module_path`, `module_version`, `git_commit`, and `dirty` fields. Build metadata may be empty or `(devel)` when Go does not provide VCS/module data for a local development binary.
+- `--version --json` and `version --json` must include only stable `name` and `version` fields.
 - `--profile-root` is for tests/harness and must be rejected in normal production use unless paired with an explicit test/harness mode or documented environment guard.
 - Human output must be Korean-friendly in summaries, but JSON field names stay stable English.
 - JSON output must include `ok`, `command`, `source_repo`, `target_profile` when applicable, `changed_paths` when applicable, `diagnostics`, and `next_action`.

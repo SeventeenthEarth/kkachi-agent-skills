@@ -18,9 +18,9 @@ This package assembles source-side readiness evidence for a future v0.2.1 public
 
 ## Source-default version readiness
 
-- KAS root CLI must read back `kkachi-agent-skills 0.2.1`.
-- KAS compatibility entrypoint `cmd/kkachi-hermes-skills` must read back `kkachi-agent-skills 0.2.1`.
-- KAH root/helper CLI must read back `kkachi-agent-helper 0.2.1` through `--version` and `version --json`.
+- KAS root CLI must read back `kkachi-agent-skills v0.2.1`.
+- KAS compatibility entrypoint `cmd/kkachi-hermes-skills` must read back `kkachi-agent-skills v0.2.1`.
+- KAH root/helper CLI must read back `kkachi-agent-helper v0.2.1` through `--version`; `version --json` emits only `name` and `version`.
 - KAH release notes for v0.2.1 remain draft/readiness notes until publication approval.
 
 ## Required evidence for review
