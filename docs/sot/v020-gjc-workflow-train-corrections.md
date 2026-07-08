@@ -3,7 +3,7 @@
 Date: 2026-07-04
 Owner: KAS workflow/policy layer
 Confirming role: Hwangchung / 황충, Kkachi Blue commander
-Status: source-side SOT; V02FLOW-013 executor-loop contract correction accepted source-side; V02FLOW-014 KAH executor-loop driver/fail-closed evidence accepted source-side with final gate PASS for `run-20260708T014514Z-832321c87e08`; V02FLOW-015 cross-repo fixture/e2e proof is source-side aligned; V02FLOW-016 capability/HOME/deferred-feedback/MAR-waiver proof is source-side aligned; V02FLOW-017..018 v0.2.1 review/release train remains separately gated by task evidence
+Status: source-side SOT; V02FLOW-013 executor-loop contract correction accepted source-side; V02FLOW-014 KAH executor-loop driver/fail-closed evidence accepted source-side with final gate PASS for `run-20260708T014514Z-832321c87e08`; V02FLOW-015 cross-repo fixture/e2e proof is source-side accepted; V02FLOW-016 capability/HOME/deferred-feedback/MAR-waiver proof is source-side accepted; V02FLOW-017 train-level review accepted V02FLOW-013..016 with nonblocking carries; V02FLOW-018 v0.2.1 source release-readiness package is accepted source-side with carries after official review/focused remediation/Blue synthesis and remains pending separate publication approval
 Authority level: KAS-side planning authority for v0.2 workflow-stage, GJC status semantics, implementation executor-loop, implementer-owned mutation phases, review-feedback remediation, review train, and watcher policy corrections
 Scope: `kkachi-agent-skills` source docs, registries, templates, and skills; paired KAH companion SOT is `kkachi-agent-helper/docs/sot/v020-gjc-workflow-train-corrections.md`
 Related docs: `docs/roadmap.md`, `docs/sot/gajae-delegated-execution-contract.md`, `docs/sot/task-dag-workflow-contract.md`, `docs/sot/strict-workflow-execution-contract.md`, `docs/sot/mar-task-loop-contract.md`, KAH `docs/sot/gajae-gjc-wrapper-evidence.md`, KAH `docs/sot/v020-gjc-workflow-train-corrections.md`
@@ -249,6 +249,19 @@ Real-user HOME proof is mandatory for both terminal/GJC execution and any future
 Deferred-feedback proof must include `diagnostics deferred-feedback --json` readback for `docs/kkachi-docs-map.yaml` `deferred_feedback: "docs/deferred-feedback.md"`, ledger path/hash, entry counts, blocker-defer rejection, non-empty Blue disposition refs, distinct logical/readback status hash vs byte-level ledger SHA, and final-report hidden-open checks.
 
 Until the official v0.2.1 Go/KAH MAR path is ready, legacy Python MAR remains OFF/HOLD and must be proven only as absent/rejected input: KAS source must not restore `scripts/mar.py` or `scripts/mar_adapters/*.sh`; KAH diagnostics may report copied local MAR surfaces only as `rejected_input` with `live_provider_execution=false`. V02FLOW-016 does not run provider MAR. Development-task MAR is closed only through the standing MAR waiver evidence for this interim window, and waiver-only closeout makes post-MAR second-color adoption N/A because there is no provider MAR result to adopt.
+
+### 5.5 V02FLOW-018 source release-readiness package
+
+V02FLOW-018 assembles the source-side v0.2.1 readiness package after the accepted V02FLOW-013..017 train. The package is readiness evidence only: it may update source-default versions, release notes, roadmaps, SOT rows, README pointers, and evidence manifests, but it does not authorize publication, push/tag/release, install, runtime activation, provider execution, or provider/auth/profile/gateway/model mutation.
+
+Minimum V02FLOW-018 evidence:
+
+- KAS source-default version reads back as `kkachi-agent-skills 0.2.1` from the root CLI and the `kkachi-hermes-skills` compatibility entrypoint.
+- KAH source-default version reads back as `kkachi-agent-helper 0.2.1` through `--version` and `version --json`.
+- Effective KAH `capabilities --json` continues to expose `gjc_executor_loop_evidence=true`, `diagnostics_deferred_feedback=true`, `mar_legacy_rejection_diagnostics=true`, `mar_provider_adapter_safety=true`, and `mar_migration_diagnostics=false`.
+- Deferred-feedback diagnostics are reported precisely: a zero-entry live ledger can pass when the source contract and tests cover required fields; it must not be described as non-empty live disposition evidence.
+- The V02FLOW-017 packet-local blank KAH SOT excerpt is either regenerated in the V02FLOW-018 evidence packet or explicitly noted as a nonblocking extraction gap; the live KAH SOT remains the authority.
+- Release notes/readiness docs must say that Provider MAR was not executed by V02FLOW-018 and that standing-waiver/no-provider-MAR/waiver-only second-color N/A remain in force until official v0.2.1 Go/KAH MAR readiness.
 
 ## 6. Verification expectations
 

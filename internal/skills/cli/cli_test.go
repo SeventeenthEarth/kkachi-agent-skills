@@ -731,7 +731,7 @@ func TestRootVersionExitsZeroAndPrintsVersion(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := strings.TrimSpace(stdout.String())
-			if out != "kkachi-agent-skills 0.2.0" {
+			if out != "kkachi-agent-skills 0.2.1" {
 				t.Fatalf("unexpected version output: %q", out)
 			}
 			if stderr.Len() != 0 {
@@ -751,7 +751,7 @@ func TestVersionJSONIncludesBuildMetadata(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload["ok"] != true || payload["command"] != "version" || payload["cli_version"] != "0.2.0" {
+	if payload["ok"] != true || payload["command"] != "version" || payload["cli_version"] != "0.2.1" {
 		t.Fatalf("unexpected version payload: %+v", payload)
 	}
 	if payload["module_path"] == "" || payload["module_version"] == "" || payload["git_commit"] == nil || payload["dirty"] == nil {
@@ -1592,7 +1592,7 @@ func TestDoctorWorkflowGraphJSONAndFlagValidation(t *testing.T) {
 	if payload["ok"] != true || payload["command"] != "doctor" || payload["mode"] != "workflow_graph_doctor" || payload["no_write"] != true || payload["status"] != "pass" {
 		t.Fatalf("unexpected workflow graph doctor payload: %+v", payload)
 	}
-	if payload["kas"].(map[string]any)["cli_version"] != "0.2.0" || payload["kah"].(map[string]any)["graph_help_state"] != "ok" {
+	if payload["kas"].(map[string]any)["cli_version"] != "0.2.1" || payload["kah"].(map[string]any)["graph_help_state"] != "ok" {
 		t.Fatalf("missing KAS/KAH evidence: %+v", payload)
 	}
 	for _, raw := range payload["kah"].(map[string]any)["compatibility_flags"].([]any) {
