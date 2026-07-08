@@ -56,6 +56,7 @@ KAH NEWMAR-003+ may consume only reviewed NEWMAR-002 schema/capability evidence,
 3. Read effective KAH `mar` capability/status evidence before presenting the
    trigger as usable.
 4. Use reviewed KAH-native `mar` trigger/status evidence when available; until Go/KAH MAR lands, pre-v0.2.1 legacy Python MAR is OFF/HOLD. Unsafe request refs fail closed and provider CLIs must not run from KAS.
+   V02FLOW-016 adds the release-evidence boundary: KAH `mar` provider execution must use `toolchain.operator.real_user_home`, legacy MAR is absent/rejected-input evidence only, do not claim provider MAR execution before official v0.2.1 readiness, and waiver-only closeout makes post-MAR second-color adoption N/A.
 5. Read KAH `mar status` / gate artifacts and write Blue disposition from those
    evidence refs. If KAH evidence is missing, stale, degraded, or inconsistent,
    hold fail-closed and route Red adjudication when required.

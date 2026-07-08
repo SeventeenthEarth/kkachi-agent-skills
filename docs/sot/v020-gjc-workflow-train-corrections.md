@@ -3,7 +3,7 @@
 Date: 2026-07-04
 Owner: KAS workflow/policy layer
 Confirming role: Hwangchung / 황충, Kkachi Blue commander
-Status: source-side SOT; V02FLOW-013 executor-loop contract correction accepted source-side; V02FLOW-014 KAH executor-loop driver/fail-closed evidence accepted source-side with final gate PASS for `run-20260708T014514Z-832321c87e08`; V02FLOW-015 cross-repo fixture/e2e proof is source-side aligned; V02FLOW-016..018 v0.2.1 remediation/release train remains separately gated by task evidence
+Status: source-side SOT; V02FLOW-013 executor-loop contract correction accepted source-side; V02FLOW-014 KAH executor-loop driver/fail-closed evidence accepted source-side with final gate PASS for `run-20260708T014514Z-832321c87e08`; V02FLOW-015 cross-repo fixture/e2e proof is source-side aligned; V02FLOW-016 capability/HOME/deferred-feedback/MAR-waiver proof is source-side aligned; V02FLOW-017..018 v0.2.1 review/release train remains separately gated by task evidence
 Authority level: KAS-side planning authority for v0.2 workflow-stage, GJC status semantics, implementation executor-loop, implementer-owned mutation phases, review-feedback remediation, review train, and watcher policy corrections
 Scope: `kkachi-agent-skills` source docs, registries, templates, and skills; paired KAH companion SOT is `kkachi-agent-helper/docs/sot/v020-gjc-workflow-train-corrections.md`
 Related docs: `docs/roadmap.md`, `docs/sot/gajae-delegated-execution-contract.md`, `docs/sot/task-dag-workflow-contract.md`, `docs/sot/strict-workflow-execution-contract.md`, `docs/sot/mar-task-loop-contract.md`, KAH `docs/sot/gajae-gjc-wrapper-evidence.md`, KAH `docs/sot/v020-gjc-workflow-train-corrections.md`
@@ -239,6 +239,16 @@ V02FLOW-015 extends the status hierarchy into explicit per-phase proof for `impl
 Known workflow-projection aliases must map to the same executor-loop requirement instead of bypassing it: `impl`/`implement`, `test-enhance`/`test_enhance`/`enhance-test`/`enhance_test`, `ai-slop-cleaner`/`ai_slop_cleaner`/`slop_cleanup`, and `docs-update`/`docs_update`/`update_docs`/`docs`.
 
 Goal-bundle-only evidence, existence-only workflow projection, missing selected lane, missing HOME/cwd/process/timestamps/exit evidence, missing changed refs, empty diff refs, missing checkpoint, missing verification output, missing SHA256/checksum integrity, stale run/ref/checksum/timestamp/artifact refs, unsupported-capability warning-only behavior, or GJC/KAT/Blue/MAR/review/final authority overclaim must fail closed. `docs-update` remains mutation-capable in this train; a no-change rationale does not substitute for required executor-loop evidence and non-empty diff refs for these five phases.
+
+### 5.4 V02FLOW-016 release-evidence proof
+
+V02FLOW-016 turns the release-evidence slice into explicit source-side proof requirements. Before V02FLOW-018 release-readiness packaging, KAS/KAH evidence must capture the effective helper `capabilities --json` output and verify at least `gjc_executor_loop_evidence=true`, `diagnostics_deferred_feedback=true`, `mar_legacy_rejection_diagnostics=true`, `mar_provider_adapter_safety=true`, and `mar_migration_diagnostics=false` from the binary actually selected for the run.
+
+Real-user HOME proof is mandatory for both terminal/GJC execution and any future provider process execution. KAH GJC evidence must show `HOME=/Users/draccoon`; KAH MAR provider execution evidence must show `toolchain.operator.real_user_home` as the HOME source and reject Hermes profile homes such as `.hermes/profiles/...`. Missing HOME proof, ambient Hermes-profile HOME, warning-only HOME diagnostics, or source-checkout-only capability claims without effective-binary readback fail closed.
+
+Deferred-feedback proof must include `diagnostics deferred-feedback --json` readback for `docs/kkachi-docs-map.yaml` `deferred_feedback: "docs/deferred-feedback.md"`, ledger path/hash, entry counts, blocker-defer rejection, non-empty Blue disposition refs, distinct logical/readback status hash vs byte-level ledger SHA, and final-report hidden-open checks.
+
+Until the official v0.2.1 Go/KAH MAR path is ready, legacy Python MAR remains OFF/HOLD and must be proven only as absent/rejected input: KAS source must not restore `scripts/mar.py` or `scripts/mar_adapters/*.sh`; KAH diagnostics may report copied local MAR surfaces only as `rejected_input` with `live_provider_execution=false`. V02FLOW-016 does not run provider MAR. Development-task MAR is closed only through the standing MAR waiver evidence for this interim window, and waiver-only closeout makes post-MAR second-color adoption N/A because there is no provider MAR result to adopt.
 
 ## 6. Verification expectations
 
