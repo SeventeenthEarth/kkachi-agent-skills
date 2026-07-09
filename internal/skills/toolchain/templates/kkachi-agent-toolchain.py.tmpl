@@ -8,8 +8,8 @@ import sys
 from pathlib import Path
 
 TOOLCHAIN_SCHEMA_V1 = "kkachi.toolchain.v1"
-TOOL_NAMES = {"kas": "kkachi-agent-skills-toolchain", "kah": "kkachi-agent-helper-toolchain"}
-BIN_NAMES = {"kas": "kkachi-agent-skills", "kah": "kkachi-agent-helper"}
+TOOL_NAMES = {"kas": "kkachi-agent-skills-toolchain", "kah": "kkachi-agent-helper-toolchain", "kat": "kkachi-agent-tester-toolchain"}
+BIN_NAMES = {"kas": "kkachi-agent-skills", "kah": "kkachi-agent-helper", "kat": "kkachi-agent-tester"}
 SEMVER_RE = re.compile(r"^v?(\d+\.\d+\.\d+)$")
 SEMVER_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9._-])v?(\d+\.\d+\.\d+)(?![A-Za-z0-9._-])")
 KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -157,22 +157,28 @@ def select_toolchain(config: Path) -> dict:
     schema = values.get("schema_version", "").strip()
     if schema != TOOLCHAIN_SCHEMA_V1:
         fail(f"missing or unsupported schema_version {schema!r} in {config}; expected {TOOLCHAIN_SCHEMA_V1}")
-    for field in ("kas.cli_version", "kah.cli_version", "kah.binary_path"):
+    for field in ("kas.cli_version", "kah.cli_version", "kah.binary_path", "kat.cli_version", "kat.binary_path"):
         if not values.get(field, "").strip():
             fail(f"missing required {field} in {config}")
     kas_version = normalize_version(values["kas.cli_version"], "kas.cli_version")
     kah_version = normalize_version(values["kah.cli_version"], "kah.cli_version")
+    kat_version = normalize_version(values["kat.cli_version"], "kat.cli_version")
     kah_bin = Path(values["kah.binary_path"].strip()).expanduser()
+    kat_bin = Path(values["kat.binary_path"].strip()).expanduser()
     if not kah_bin.is_absolute():
         fail(f"kah.binary_path must be absolute in {config}")
+    if not kat_bin.is_absolute():
+        fail(f"kat.binary_path must be absolute in {config}")
     return {
         "schema_version": schema,
         "config": str(config),
         "toolchain_root": str(toolchain_root),
         "kas_cli_version": kas_version,
         "kah_cli_version": kah_version,
+        "kat_cli_version": kat_version,
         "kas_bin": str(toolchain_root / "kas" / kas_version / "bin" / BIN_NAMES["kas"]),
         "kah_bin": str(kah_bin),
+        "kat_bin": str(kat_bin),
     }
 
 
@@ -229,9 +235,9 @@ def assert_kah_mar_capability(kah_bin: Path) -> None:
     if missing:
         fail(f"KAH MAR command group missing required subcommands: {', '.join(missing)}")
     flags = payload.get("compatibility_flags") or {}
-    for flag in ("mar_command_group", "mar_request_validation", "mar_no_provider_blocked_receipt", "mar_wait_timeout", "mar_cancel_safety"):
+    for flag in ("mar_command_group", "mar_request_validation", "mar_no_provider_blocked_receipt", "mar_wait_timeout", "mar_cancel_safety", "kat_toolchain_probe", "kat_toolchain_evidence_binding"):
         if flags.get(flag) is not True:
-            fail(f"KAH missing required MAR compatibility flag: {flag}")
+            fail(f"KAH missing required compatibility flag: {flag}")
     actual = flags.get("mar_capability_version")
     if actual != REQUIRED_MAR_CAPABILITY_VERSION:
         fail(f"KAH MAR capability version mismatch: expected {REQUIRED_MAR_CAPABILITY_VERSION}, got {actual!r}")
@@ -243,17 +249,20 @@ def resolve(project_root: Path) -> dict:
     meta["project_root"] = str(project_root)
     kas_bin = require_executable(meta["kas_bin"], "KAS")
     kah_bin = require_executable(meta["kah_bin"], "KAH")
+    kat_bin = require_executable(meta["kat_bin"], "KAT")
     meta["kas_version_output"] = assert_version(kas_bin, meta["kas_cli_version"], "KAS")
     meta["kah_version_output"] = assert_version(kah_bin, meta["kah_cli_version"], "KAH")
+    meta["kat_version_output"] = assert_version(kat_bin, meta["kat_cli_version"], "KAT")
     assert_kah_mar_capability(kah_bin)
     return meta
 
 
 def print_status(meta: dict) -> None:
-    for key in ("project_root", "config", "schema_version", "toolchain_root", "kas_cli_version", "kah_cli_version", "kas_bin", "kah_bin"):
+    for key in ("project_root", "config", "schema_version", "toolchain_root", "kas_cli_version", "kah_cli_version", "kat_cli_version", "kas_bin", "kah_bin", "kat_bin"):
         print(f"{key}={meta[key]}")
     print(f"kas_version_output={meta['kas_version_output']}")
     print(f"kah_version_output={meta['kah_version_output']}")
+    print(f"kat_version_output={meta['kat_version_output']}")
 
 
 def main(argv: list) -> int:
@@ -266,12 +275,17 @@ def main(argv: list) -> int:
     env["KKACHI_PROJECT_ROOT"] = str(project_root)
     env["KKACHI_EFFECTIVE_KAS_BIN"] = meta["kas_bin"]
     env["KKACHI_EFFECTIVE_KAH_BIN"] = meta["kah_bin"]
+    env["KKACHI_EFFECTIVE_KAT_BIN"] = meta["kat_bin"]
     env["KKACHI_KAH_BIN"] = meta["kah_bin"]
+    env["KKACHI_KAT_BIN"] = meta["kat_bin"]
     kah_dir = str(Path(meta["kah_bin"]).parent)
-    env["PATH"] = kah_dir + os.pathsep + env.get("PATH", "")
+    kat_dir = str(Path(meta["kat_bin"]).parent)
+    env["PATH"] = kah_dir + os.pathsep + kat_dir + os.pathsep + env.get("PATH", "")
     if KIND == "kas":
         os.execvpe(meta["kas_bin"], [meta["kas_bin"], *argv], env)
-    os.execvpe(meta["kah_bin"], [meta["kah_bin"], *argv], env)
+    if KIND == "kah":
+        os.execvpe(meta["kah_bin"], [meta["kah_bin"], *argv], env)
+    os.execvpe(meta["kat_bin"], [meta["kat_bin"], *argv], env)
     return 127
 
 

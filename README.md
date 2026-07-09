@@ -13,8 +13,9 @@ run/gate/evidence state, and GJC may produce candidate deep-interview,
 mechanical/factual only. KAB runtime/session control is used only when a later
 approved task explicitly selects a KAB-backed lane and preserves bridge evidence.
 
-Maturity note: KAS v0.2.1 is the current source release-readiness candidate version. Older
-v0.2.0/v0.1.x snapshots remain historical release context only; they are not active
+Maturity note: KAS v0.2.2 is the current source development target after the
+v0.2.1 release-readiness baseline. Older v0.2.1/v0.2.0/v0.1.x snapshots remain
+historical release context only; they are not active
 operator, migration, compatibility, fallback, warning-only, or profile-suite
 paths. Real Hermes/Kkachi runs should mature KAS through captured evidence,
 project overlays, prompt/phase skill references, reusable scripts, and the
@@ -122,11 +123,15 @@ kkachi-agent-skills uninstall --profile <profile> --project <project> --apply dr
 discovery. `--version --json` / `version --json` emits only `name` and `version`.
 
 `toolchain install-launchers` installs KAS-owned embedded local wrappers
-`kkachi-agent-skills-toolchain` and `kkachi-agent-helper-toolchain` into
-`--bin-dir` or the default user `~/.local/bin`. The wrappers read only
-`.kkachi/toolchain.yaml` schema `kkachi.toolchain.v1`, resolve effective KAS/KAH
-binaries, print paths and versions with `--toolchain-status`, and fail closed on
-missing, malformed, unsupported, non-executable, or version-mismatched metadata.
+`kkachi-agent-skills-toolchain`, `kkachi-agent-helper-toolchain`, and
+`kkachi-agent-tester-toolchain` into `--bin-dir` or the default user
+`~/.local/bin`. The wrappers read only `.kkachi/toolchain.yaml` schema
+`kkachi.toolchain.v1`, resolve effective KAS/KAH/KAT binaries, export the
+selected KAH/KAT paths for downstream commands, print paths and versions with
+`--toolchain-status`, and fail closed on missing, malformed, unsupported,
+non-executable, or version-mismatched metadata. KAT launcher evidence remains
+mechanical/factual only and does not grant review, MAR, or final acceptance
+authority.
 
 `list` discovers source KAS packs from `skills/`, reports direct-layout packs
 as category `core`, supports future `skills/<category>/<skill>/SKILL.md`

@@ -26,6 +26,8 @@ const (
 	kahProbeSchema               = "kah.toolchain_probe.v1"
 	kahCapabilitiesSchema        = "0.1"
 	requiredMARCapabilityVersion = "mar.validation-only.v1"
+	requiredKATCLIVersion        = "0.1.3"
+	katBinaryName                = "kkachi-agent-tester"
 )
 
 //go:embed templates/kkachi-agent-toolchain.py.tmpl
@@ -104,6 +106,15 @@ type probePayload struct {
 		Version    string `json:"version"`
 		BinaryPath string `json:"binary_path"`
 	} `json:"kah"`
+	KAT struct {
+		Status        string   `json:"status"`
+		Available     bool     `json:"available"`
+		VersionSource string   `json:"version_source"`
+		CLIVersion    string   `json:"cli_version"`
+		BinaryPath    string   `json:"binary_path"`
+		VersionOutput string   `json:"version_output"`
+		ReasonCodes   []string `json:"reason_codes"`
+	} `json:"kat"`
 	Project struct {
 		Root               string `json:"root"`
 		KKachiDir          string `json:"kkachi_dir"`
@@ -177,7 +188,7 @@ func Init(opts Options) Result {
 func Doctor(opts Options) Result {
 	opts = normalizeOptions(opts)
 	result := baseResult("toolchain doctor", opts.ProjectRoot)
-	doc, ok := readAndValidate(result.ToolchainPath, &result)
+	doc, ok := readAndValidate(result.ToolchainPath, &result, true)
 	if !ok {
 		return failResult(result)
 	}
@@ -191,7 +202,11 @@ func Doctor(opts Options) Result {
 		}
 		return failResult(result)
 	}
-	if _, ok := runProbe(opts, &result); !ok {
+	probe, ok := runProbe(opts, &result)
+	if !ok {
+		return failResult(result)
+	}
+	if !validateProbeKATProof(doc, probe, result.ToolchainPath, &result) {
 		return failResult(result)
 	}
 	if ok := validateKAHMARCapability(opts, &result); !ok {
@@ -203,7 +218,7 @@ func Doctor(opts Options) Result {
 func Refresh(opts Options) Result {
 	opts = normalizeOptions(opts)
 	result := baseResult("toolchain refresh", opts.ProjectRoot)
-	doc, ok := readAndValidate(result.ToolchainPath, &result)
+	doc, ok := readAndValidate(result.ToolchainPath, &result, false)
 	if !ok {
 		return failResult(result)
 	}
@@ -244,7 +259,7 @@ func ImportLegacy(opts Options) Result {
 		return failResult(result)
 	}
 	if _, err := os.Stat(result.ToolchainPath); err == nil {
-		if _, ok := readAndValidate(result.ToolchainPath, &result); ok {
+		if _, ok := readAndValidate(result.ToolchainPath, &result, true); ok {
 			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_import_existing_toolchain_conflict", "existing .kkachi/toolchain.yaml is present; legacy import will not overwrite it", result.ToolchainPath, ""))
 		}
 		return failResult(result)
@@ -290,7 +305,7 @@ func ImportLegacy(opts Options) Result {
 func SetStage(opts Options) Result {
 	opts = normalizeOptions(opts)
 	result := baseResult("toolchain set-stage", opts.ProjectRoot)
-	doc, ok := readAndValidate(result.ToolchainPath, &result)
+	doc, ok := readAndValidate(result.ToolchainPath, &result, false)
 	if !ok {
 		return failResult(result)
 	}
@@ -375,6 +390,7 @@ func InstallLaunchers(opts Options) Result {
 	}{
 		{kind: "kas", name: "kkachi-agent-skills-toolchain"},
 		{kind: "kah", name: "kkachi-agent-helper-toolchain"},
+		{kind: "kat", name: "kkachi-agent-tester-toolchain"},
 	} {
 		content := strings.ReplaceAll(string(templateData), `{{KIND}}`, launcher.kind)
 		path := filepath.Join(absBinDir, launcher.name)
@@ -634,10 +650,14 @@ func validateKAHMARCapability(opts Options, result *Result) bool {
 			return false
 		}
 	}
-	for _, flag := range []string{"mar_command_group", "mar_request_validation", "mar_no_provider_blocked_receipt", "mar_wait_timeout", "mar_cancel_safety"} {
+	for _, flag := range []string{"mar_command_group", "mar_request_validation", "mar_no_provider_blocked_receipt", "mar_wait_timeout", "mar_cancel_safety", "kat_toolchain_probe", "kat_toolchain_evidence_binding"} {
 		value, ok := payload.CompatibilityFlags[flag]
 		if !ok || value != true {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "kah_mar_capability_missing", "effective KAH binary is missing required MAR compatibility flag "+flag, "", "compatibility_flags."+flag))
+			code := "kah_mar_capability_missing"
+			if strings.HasPrefix(flag, "kat_") {
+				code = "kah_kat_capability_missing"
+			}
+			result.Diagnostics = append(result.Diagnostics, diag("error", code, "effective KAH binary is missing required compatibility flag "+flag, "", "compatibility_flags."+flag))
 			return false
 		}
 	}
@@ -663,7 +683,7 @@ func containsString(values []string, want string) bool {
 	return false
 }
 
-func readAndValidate(path string, result *Result) (map[string]string, bool) {
+func readAndValidate(path string, result *Result, requireKAT bool) (map[string]string, bool) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		code := "toolchain_missing"
@@ -690,14 +710,18 @@ func readAndValidate(path string, result *Result) (map[string]string, bool) {
 		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_invalid", "toolchain.yaml must include schema_version or compatibility KAH selection keys", path, "schema_version"))
 		return nil, false
 	}
-	for _, required := range []string{"generated_by", "project", "kas", "kah", "operator", "kab", "mar", "evidence_posture"} {
-		if doc["schema_version"] == SchemaVersion && !hasSection(data, required) {
-			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_required_group_missing", "toolchain.yaml is missing required group "+required, path, required))
-			return nil, false
-		}
-	}
 	if doc["schema_version"] == SchemaVersion {
-		for _, required := range []string{
+		requiredGroups := []string{"generated_by", "project", "kas", "kah", "operator", "kab", "mar", "evidence_posture"}
+		if requireKAT {
+			requiredGroups = append(requiredGroups, "kat")
+		}
+		for _, required := range requiredGroups {
+			if !hasSection(data, required) {
+				result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_required_group_missing", "toolchain.yaml is missing required group "+required, path, required))
+				return nil, false
+			}
+		}
+		requiredFields := []string{
 			"generated_by.kas_cli_version",
 			"generated_by.kah_cli_version",
 			"generated_by.generated_at",
@@ -718,11 +742,23 @@ func readAndValidate(path string, result *Result) (map[string]string, bool) {
 			"mar.provider_tools.schema_version",
 			"evidence_posture.no_secrets",
 			"evidence_posture.missing_or_invalid_fails_closed",
-		} {
+		}
+		if requireKAT {
+			requiredFields = append(requiredFields,
+				"kat.cli_version",
+				"kat.binary_path",
+				"kat.selection_source",
+				"kat.evidence_role",
+			)
+		}
+		for _, required := range requiredFields {
 			if strings.TrimSpace(doc[required]) == "" {
 				result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_required_field_missing", "toolchain.yaml is missing required field "+required, path, required))
 				return nil, false
 			}
+		}
+		if requireKAT && !validateStoredKATMetadata(doc, path, result) {
+			return nil, false
 		}
 		if !strings.EqualFold(strings.TrimSpace(doc["kah.project_initialized"]), "true") {
 			result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_kah_project_uninitialized", "stored toolchain metadata reports kah.project_initialized is not true", path, "kah.project_initialized"))
@@ -788,6 +824,77 @@ func validateLegacyKAHSelection(doc map[string]string, result *Result) bool {
 	return true
 }
 
+func validateStoredKATMetadata(doc map[string]string, path string, result *Result) bool {
+	if !semverPattern.MatchString(strings.TrimSpace(doc["kat.cli_version"])) {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_kat_cli_version_invalid", "kat.cli_version must be an exact semver token", path, "kat.cli_version"))
+		return false
+	}
+	if !filepath.IsAbs(strings.TrimSpace(doc["kat.binary_path"])) {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_kat_binary_path_invalid", "kat.binary_path must be absolute", path, "kat.binary_path"))
+		return false
+	}
+	if containsSecretLike(doc["kat.binary_path"]) || containsSecretLike(doc["kat.cli_version"]) {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_secret_detected", "kat metadata contains a secret-like value", path, "kat"))
+		return false
+	}
+	if doc["kat.evidence_role"] != "factual_test_evidence" {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "toolchain_kat_evidence_role_invalid", "kat.evidence_role must be factual_test_evidence", path, "kat.evidence_role"))
+		return false
+	}
+	return true
+}
+
+func validateProbeKATProof(doc map[string]string, probe probePayload, path string, result *Result) bool {
+	if doc["schema_version"] != SchemaVersion || strings.TrimSpace(doc["kat.cli_version"]) == "" {
+		return true
+	}
+	if !isPassStatus(probe.KAT.Status) || !probe.KAT.Available {
+		message := "KAH probe did not report selected KAT toolchain proof as PASS"
+		if len(probe.KAT.ReasonCodes) > 0 {
+			message += ": " + strings.Join(probe.KAT.ReasonCodes, ",")
+		}
+		result.Diagnostics = append(result.Diagnostics, diag("error", "kah_probe_kat_not_pass", message, path, "kat"))
+		return false
+	}
+	if normalizeSemver(doc["kat.cli_version"]) != normalizeSemver(probe.KAT.CLIVersion) {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "kah_probe_kat_version_mismatch", "KAH probe KAT cli_version does not match stored kat.cli_version", path, "kat.cli_version"))
+		return false
+	}
+	if filepath.Clean(probe.KAT.BinaryPath) != filepath.Clean(doc["kat.binary_path"]) {
+		result.Diagnostics = append(result.Diagnostics, diag("error", "kah_probe_kat_binary_mismatch", "KAH probe KAT binary_path does not match stored kat.binary_path", path, "kat.binary_path"))
+		return false
+	}
+	return true
+}
+
+func normalizeSemver(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.TrimPrefix(value, "v")
+	return value
+}
+
+func defaultKATBinaryPath() string {
+	if explicit := strings.TrimSpace(os.Getenv("KKACHI_KAT_BIN")); explicit != "" {
+		return filepath.Clean(explicit)
+	}
+	root := strings.TrimSpace(os.Getenv("KKACHI_TOOLCHAIN_ROOT"))
+	if root == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = "."
+		}
+		root = filepath.Join(home, ".local", "kkachi", "toolchains")
+	}
+	return filepath.Join(root, "kat", "v"+requiredKATCLIVersion, "bin", katBinaryName)
+}
+
+func katSelectionSource() string {
+	if strings.TrimSpace(os.Getenv("KKACHI_KAT_BIN")) != "" {
+		return "KKACHI_KAT_BIN"
+	}
+	return "kat.cli_version"
+}
+
 func renderDocument(action string, opts Options, probe probePayload, policy documentPolicy) string {
 	info := version.Current()
 	commit := info.GitCommit
@@ -805,6 +912,7 @@ func renderDocument(action string, opts Options, probe probePayload, policy docu
 		"generated_by:",
 		`  kas_cli_version: "` + version.CLIVersion + `"`,
 		`  kah_cli_version: "` + probe.KAH.Version + `"`,
+		`  kat_cli_version: "` + requiredKATCLIVersion + `"`,
 		`  generated_at: "` + opts.nowString() + `"`,
 		`  generator: "kkachi-agent-skills toolchain ` + action + `"`,
 		"project:",
@@ -823,6 +931,11 @@ func renderDocument(action string, opts Options, probe probePayload, policy docu
 		`  selection_source: "` + selectionSource + `"`,
 		`  project_initialized: ` + strconv.FormatBool(probe.Project.ProjectInitialized),
 		`  doctor_status: "` + yamlEscape(statusOrUnknown(probe.Doctor.Status)) + `"`,
+		"kat:",
+		`  cli_version: "` + requiredKATCLIVersion + `"`,
+		`  binary_path: "` + yamlEscape(defaultKATBinaryPath()) + `"`,
+		`  selection_source: "` + yamlEscape(katSelectionSource()) + `"`,
+		`  evidence_role: "factual_test_evidence"`,
 		"operator:",
 		`  real_user_home: "` + yamlEscape(operatorRealUserHome()) + `"`,
 		"  env_policy:",

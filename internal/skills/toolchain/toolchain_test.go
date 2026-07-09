@@ -70,6 +70,8 @@ func fakeCapabilitiesPayload() map[string]any {
 			"mar_wait_timeout":                true,
 			"mar_cancel_safety":               true,
 			"mar_capability_version":          requiredMARCapabilityVersion,
+			"kat_toolchain_probe":             true,
+			"kat_toolchain_evidence_binding":  true,
 		},
 	}
 }
@@ -85,6 +87,15 @@ func fakeProbePayload(workDir string, version string) map[string]any {
 		"kah": map[string]any{
 			"version":     version,
 			"binary_path": filepath.Join(workDir, ".kkachi", "bin", "kkachi-agent-helper"),
+		},
+		"kat": map[string]any{
+			"status":         "PASS",
+			"available":      true,
+			"version_source": "kat.cli_version",
+			"cli_version":    "v0.1.3",
+			"binary_path":    defaultKATBinaryPath(),
+			"version_output": "kkachi-agent-tester v0.1.3",
+			"reason_codes":   []any{},
 		},
 		"project": map[string]any{
 			"root":                   workDir,
@@ -372,6 +383,129 @@ func TestDoctorFailsClosedForStage2ActivationInStage1Metadata(t *testing.T) {
 	}
 }
 
+func TestDoctorFailsClosedForMissingOrInvalidStoredKATMetadataAndDoesNotWrite(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		replace func(string) string
+		code    string
+	}{
+		{
+			name: "missing_kat_section",
+			replace: func(text string) string {
+				start := strings.Index(text, "kat:\n")
+				end := strings.Index(text, "operator:\n")
+				if start < 0 || end < 0 || end <= start {
+					return text
+				}
+				return text[:start] + text[end:]
+			},
+			code: "toolchain_required_group_missing",
+		},
+		{
+			name: "invalid_kat_version",
+			replace: func(text string) string {
+				return strings.ReplaceAll(text, `kat:
+  cli_version: "0.1.3"`, `kat:
+  cli_version: "not-a-version"`)
+			},
+			code: "toolchain_kat_cli_version_invalid",
+		},
+		{
+			name: "relative_kat_binary",
+			replace: func(text string) string {
+				return strings.ReplaceAll(text, `  binary_path: "`+expectedDefaultKATBinaryPathForTest()+`"`, `  binary_path: "bin/kkachi-agent-tester"`)
+			},
+			code: "toolchain_kat_binary_path_invalid",
+		},
+		{
+			name: "invalid_kat_evidence_role",
+			replace: func(text string) string {
+				return strings.ReplaceAll(text, `  evidence_role: "factual_test_evidence"`, `  evidence_role: "review_authority"`)
+			},
+			code: "toolchain_kat_evidence_role_invalid",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			var calls [][]string
+			init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.2"), Now: fixedNow})
+			if !init.OK {
+				t.Fatalf("init failed: %+v", init.Diagnostics)
+			}
+			path := filepath.Join(root, ".kkachi", "toolchain.yaml")
+			original := readFile(t, path)
+			modified := tc.replace(original)
+			if modified == original {
+				t.Fatalf("test fixture did not modify toolchain metadata")
+			}
+			if err := os.WriteFile(path, []byte(modified), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.2"), Now: fixedNow})
+			if result.OK || firstCode(result.Diagnostics) != tc.code {
+				t.Fatalf("expected %s, got %+v", tc.code, result)
+			}
+			if after := readFile(t, path); after != modified {
+				t.Fatalf("doctor wrote toolchain metadata:\nbefore:\n%s\nafter:\n%s", modified, after)
+			}
+		})
+	}
+}
+
+func TestDoctorFailsClosedWhenKAHProbeKATProofIsNotPassOrMismatched(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(map[string]any)
+		code   string
+	}{
+		{
+			name: "kat_not_pass",
+			mutate: func(payload map[string]any) {
+				kat := payload["kat"].(map[string]any)
+				kat["status"] = "FAIL"
+				kat["available"] = false
+				kat["reason_codes"] = []any{"kat_binary_identity_mismatch"}
+			},
+			code: "kah_probe_kat_not_pass",
+		},
+		{
+			name: "kat_version_mismatch",
+			mutate: func(payload map[string]any) {
+				kat := payload["kat"].(map[string]any)
+				kat["cli_version"] = "v0.1.2"
+				kat["version_output"] = "kkachi-agent-tester v0.1.2"
+			},
+			code: "kah_probe_kat_version_mismatch",
+		},
+		{
+			name: "kat_binary_mismatch",
+			mutate: func(payload map[string]any) {
+				kat := payload["kat"].(map[string]any)
+				kat["binary_path"] = filepath.Join("/tmp", "unexpected", "kkachi-agent-tester")
+			},
+			code: "kah_probe_kat_binary_mismatch",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			var calls [][]string
+			init := Init(Options{ProjectRoot: root, Runner: fakeProbeRunner(t, &calls, "0.2.2"), Now: fixedNow})
+			if !init.OK {
+				t.Fatalf("init failed: %+v", init.Diagnostics)
+			}
+			path := filepath.Join(root, ".kkachi", "toolchain.yaml")
+			before := readFile(t, path)
+			result := Doctor(Options{ProjectRoot: root, Runner: fakeProbeRunnerWith(t, &calls, tc.mutate), Now: fixedNow})
+			if result.OK || firstCode(result.Diagnostics) != tc.code {
+				t.Fatalf("expected %s, got %+v", tc.code, result)
+			}
+			if after := readFile(t, path); after != before {
+				t.Fatalf("doctor wrote toolchain metadata:\nbefore:\n%s\nafter:\n%s", before, after)
+			}
+		})
+	}
+}
+
 func TestDoctorFailsClosedForUnhealthyStoredV1KAHMetadataAndDoesNotWrite(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -421,16 +555,16 @@ func TestDoctorFailsClosedForUnhealthyStoredV1KAHMetadataAndDoesNotWrite(t *test
 	}
 }
 
-func TestInstallLaunchersWritesEmbeddedV1OnlyWrappers(t *testing.T) {
+func TestInstallLaunchersWritesEmbeddedV1KASKAHKATWrappers(t *testing.T) {
 	binDir := t.TempDir()
 	result := InstallLaunchers(Options{LauncherBinDir: binDir})
 	if !result.OK || !result.Wrote {
 		t.Fatalf("install-launchers failed: %+v", result)
 	}
-	if len(result.Launchers) != 2 {
-		t.Fatalf("expected two launcher records, got %+v", result.Launchers)
+	if len(result.Launchers) != 3 {
+		t.Fatalf("expected three launcher records, got %+v", result.Launchers)
 	}
-	for _, name := range []string{"kkachi-agent-skills-toolchain", "kkachi-agent-helper-toolchain"} {
+	for _, name := range []string{"kkachi-agent-skills-toolchain", "kkachi-agent-helper-toolchain", "kkachi-agent-tester-toolchain"} {
 		path := filepath.Join(binDir, name)
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -444,7 +578,7 @@ func TestInstallLaunchersWritesEmbeddedV1OnlyWrappers(t *testing.T) {
 			t.Fatalf("launcher %s is not executable: %v", name, info.Mode().Perm())
 		}
 		text := string(data)
-		for _, want := range []string{"kkachi.toolchain.v1", "kas.cli_version", "kah.cli_version", "kah.binary_path", "--toolchain-status"} {
+		for _, want := range []string{"kkachi.toolchain.v1", "kas.cli_version", "kah.cli_version", "kah.binary_path", "kat.cli_version", "kat.binary_path", "--toolchain-status"} {
 			if !strings.Contains(text, want) {
 				t.Fatalf("launcher %s missing %q:\n%s", name, want, text)
 			}
@@ -480,9 +614,11 @@ func TestGeneratedLaunchersResolveV1MetadataAndFailClosed(t *testing.T) {
 	toolchainRoot := t.TempDir()
 	kasBin := filepath.Join(toolchainRoot, "kas", "v0.1.9", "bin", "kkachi-agent-skills")
 	kahBin := filepath.Join(toolchainRoot, "kah", "v0.1.14", "bin", "kkachi-agent-helper")
+	katBin := filepath.Join(toolchainRoot, "kat", "v0.1.3", "bin", "kkachi-agent-tester")
 	writeFakeVersionBinary(t, kasBin, "kkachi-agent-skills 0.1.9")
 	writeFakeVersionBinary(t, kahBin, "kkachi-agent-helper 0.1.14")
-	writeLauncherToolchain(t, projectRoot, "0.1.9", "0.1.14", kahBin)
+	writeFakeVersionBinary(t, katBin, "kkachi-agent-tester 0.1.3")
+	writeLauncherToolchain(t, projectRoot, "0.1.9", "0.1.14", kahBin, "0.1.3", katBin)
 
 	status := exec.Command(filepath.Join(binDir, "kkachi-agent-skills-toolchain"), "--toolchain-status")
 	status.Dir = projectRoot
@@ -491,7 +627,7 @@ func TestGeneratedLaunchersResolveV1MetadataAndFailClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("status failed: %v\n%s", err, string(output))
 	}
-	for _, want := range []string{"schema_version=kkachi.toolchain.v1", "kas_cli_version=v0.1.9", "kah_cli_version=v0.1.14", "kas_version_output=kkachi-agent-skills 0.1.9", "kah_version_output=kkachi-agent-helper 0.1.14"} {
+	for _, want := range []string{"schema_version=kkachi.toolchain.v1", "kas_cli_version=v0.1.9", "kah_cli_version=v0.1.14", "kat_cli_version=v0.1.3", "kas_version_output=kkachi-agent-skills 0.1.9", "kah_version_output=kkachi-agent-helper 0.1.14", "kat_version_output=kkachi-agent-tester 0.1.3"} {
 		if !strings.Contains(string(output), want) {
 			t.Fatalf("status output missing %q:\n%s", want, string(output))
 		}
@@ -506,7 +642,7 @@ func TestGeneratedLaunchersResolveV1MetadataAndFailClosed(t *testing.T) {
 		t.Fatalf("expected legacy metadata to fail closed, err=%v output=%s", err, string(legacyOutput))
 	}
 
-	writeLauncherToolchain(t, projectRoot, "0.1.9", "0.1.15", kahBin)
+	writeLauncherToolchain(t, projectRoot, "0.1.9", "0.1.15", kahBin, "0.1.3", katBin)
 	mismatch := exec.Command(filepath.Join(binDir, "kkachi-agent-skills-toolchain"), "--toolchain-status")
 	mismatch.Dir = projectRoot
 	mismatch.Env = append(os.Environ(), "KKACHI_TOOLCHAIN_ROOT="+toolchainRoot)
@@ -527,7 +663,7 @@ case "$1" in
   capabilities)
     if [ "$2" = "--json" ]; then
       cat <<'JSON'
-{"capabilities_schema_version":"0.1","command_groups":[{"name":"mar","status":"supported","subcommands":["start","status","validate","wait","cancel"]}],"compatibility_flags":{"mar_command_group":true,"mar_request_validation":true,"mar_no_provider_blocked_receipt":true,"mar_wait_timeout":true,"mar_cancel_safety":true,"mar_capability_version":"mar.validation-only.v1"}}
+{"capabilities_schema_version":"0.1","command_groups":[{"name":"mar","status":"supported","subcommands":["start","status","validate","wait","cancel"]}],"compatibility_flags":{"mar_command_group":true,"mar_request_validation":true,"mar_no_provider_blocked_receipt":true,"mar_wait_timeout":true,"mar_cancel_safety":true,"mar_capability_version":"mar.validation-only.v1","kat_toolchain_probe":true,"kat_toolchain_evidence_binding":true}}
 JSON
     else
       echo unexpected >&2; exit 9
@@ -540,9 +676,9 @@ esac
 	}
 }
 
-func writeLauncherToolchain(t *testing.T, projectRoot string, kasVersion string, kahVersion string, kahBin string) {
+func writeLauncherToolchain(t *testing.T, projectRoot string, kasVersion string, kahVersion string, kahBin string, katVersion string, katBin string) {
 	t.Helper()
-	content := "schema_version: \"kkachi.toolchain.v1\"\nkas:\n  cli_version: \"" + kasVersion + "\"\nkah:\n  cli_version: \"" + kahVersion + "\"\n  binary_path: \"" + kahBin + "\"\n"
+	content := "schema_version: \"kkachi.toolchain.v1\"\nkas:\n  cli_version: \"" + kasVersion + "\"\nkah:\n  cli_version: \"" + kahVersion + "\"\n  binary_path: \"" + kahBin + "\"\nkat:\n  cli_version: \"" + katVersion + "\"\n  binary_path: \"" + katBin + "\"\n"
 	writeFile(t, filepath.Join(projectRoot, ".kkachi", "toolchain.yaml"), content)
 }
 
@@ -551,6 +687,18 @@ func writeFile(t *testing.T, path string, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func expectedDefaultKATBinaryPathForTest() string {
+	root := os.Getenv("KKACHI_TOOLCHAIN_ROOT")
+	if root == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			home = "."
+		}
+		root = filepath.Join(home, ".local", "kkachi", "toolchains")
+	}
+	return filepath.Join(root, "kat", "v0.1.3", "bin", "kkachi-agent-tester")
 }
 
 func TestInitWritesToolchainAtomicallyAfterDeterministicKAHProbe(t *testing.T) {
@@ -580,6 +728,9 @@ func TestInitWritesToolchainAtomicallyAfterDeterministicKAHProbe(t *testing.T) {
 		`disallow_hermes_profile_home: true`,
 		`provider_tools:`,
 		`providers: {}`,
+		`kat_cli_version: "0.1.3"`,
+		`kat:`,
+		`evidence_role: "factual_test_evidence"`,
 		`no_secrets: true`,
 	} {
 		if !strings.Contains(text, want) {
@@ -778,6 +929,7 @@ func TestRefreshUpdatesObservedFactsAndPreservesPolicyFields(t *testing.T) {
 	for _, want := range []string{
 		`generator: "kkachi-agent-skills toolchain refresh"`,
 		`kah_cli_version: "0.3.0"`,
+		`kat_cli_version: "0.1.3"`,
 		`selected_at: "approved-time"`,
 		`approval_evidence: "ticket-123"`,
 		`schema_version: "mar.role_lanes.v1"`,

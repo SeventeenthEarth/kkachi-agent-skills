@@ -657,10 +657,10 @@ func TestToolchainInstallLaunchersCLIWritesEmbeddedWrappers(t *testing.T) {
 		t.Fatalf("unexpected payload: %+v", payload)
 	}
 	launchers, ok := payload["launchers"].([]any)
-	if !ok || len(launchers) != 2 {
-		t.Fatalf("expected two launchers: %+v", payload)
+	if !ok || len(launchers) != 3 {
+		t.Fatalf("expected three launchers: %+v", payload)
 	}
-	for _, name := range []string{"kkachi-agent-skills-toolchain", "kkachi-agent-helper-toolchain"} {
+	for _, name := range []string{"kkachi-agent-skills-toolchain", "kkachi-agent-helper-toolchain", "kkachi-agent-tester-toolchain"} {
 		path := filepath.Join(binDir, name)
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -731,7 +731,7 @@ func TestRootVersionExitsZeroAndPrintsVersion(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := strings.TrimSpace(stdout.String())
-			if out != "kkachi-agent-skills v0.2.1" {
+			if out != "kkachi-agent-skills v0.2.2" {
 				t.Fatalf("unexpected version output: %q", out)
 			}
 			if stderr.Len() != 0 {
@@ -753,7 +753,7 @@ func TestVersionJSONIncludesNameAndVersionOnly(t *testing.T) {
 			if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
 				t.Fatal(err)
 			}
-			if len(payload) != 2 || payload["name"] != "kkachi-agent-skills" || payload["version"] != "0.2.1" {
+			if len(payload) != 2 || payload["name"] != "kkachi-agent-skills" || payload["version"] != "0.2.2" {
 				t.Fatalf("unexpected version payload: %+v", payload)
 			}
 			if stderr.Len() != 0 {
@@ -1593,7 +1593,7 @@ func TestDoctorWorkflowGraphJSONAndFlagValidation(t *testing.T) {
 	if payload["ok"] != true || payload["command"] != "doctor" || payload["mode"] != "workflow_graph_doctor" || payload["no_write"] != true || payload["status"] != "pass" {
 		t.Fatalf("unexpected workflow graph doctor payload: %+v", payload)
 	}
-	if payload["kas"].(map[string]any)["cli_version"] != "0.2.1" || payload["kah"].(map[string]any)["graph_help_state"] != "ok" {
+	if payload["kas"].(map[string]any)["cli_version"] != "0.2.2" || payload["kah"].(map[string]any)["graph_help_state"] != "ok" {
 		t.Fatalf("missing KAS/KAH evidence: %+v", payload)
 	}
 	for _, raw := range payload["kah"].(map[string]any)["compatibility_flags"].([]any) {
