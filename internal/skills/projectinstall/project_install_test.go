@@ -259,6 +259,55 @@ func TestBuildDryRunProjectsOnlySelectedRoleSkills(t *testing.T) {
 	}
 }
 
+func TestBuildDryRunProjectsOptionalTealDesignReviewerRole(t *testing.T) {
+	repo := makeProjectInstallRepo(t, map[string]string{
+		"kkachi-design-review":  "---\nname: kkachi-design-review\n---\n# kkachi-design-review\n",
+		"kkachi-review":         "---\nname: kkachi-review\n---\n# kkachi-review\n",
+		"kkachi-implement":      "---\nname: kkachi-implement\n---\n# kkachi-implement\n",
+		"kkachi-backend-select": "---\nname: kkachi-backend-select\n---\n# kkachi-backend-select\n",
+		"kkachi-docs-update":    "---\nname: kkachi-docs-update\n---\n# kkachi-docs-update\n",
+		"kkachi-final-verify":   "---\nname: kkachi-final-verify\n---\n# kkachi-final-verify\n",
+	})
+	profileRoot := filepath.Join(t.TempDir(), "profile")
+
+	result, err := BuildDryRun(repo, Options{Profile: "goong", Project: "doksuri-server", SuiteRole: "teal_design_reviewer", SourcePack: VirtualSourcePackID, ProfileRoot: profileRoot, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK {
+		t.Fatalf("expected ok optional Teal design reviewer dry-run, got diagnostics=%+v conflicts=%+v", result.Diagnostics, result.Conflicts)
+	}
+	if result.SuiteMode != SuiteModeRoleSubset || result.RoleLabel != "Teal optional UI/UX design reviewer subset" {
+		t.Fatalf("unexpected Teal role evidence: %+v", result)
+	}
+	if len(result.PlannedSkills) != 0 || len(result.SelectedSkills) != 2 || len(result.ExcludedSkills) != 4 {
+		t.Fatalf("unexpected Teal plugin-mode role projection counts: planned=%+v selected=%+v excluded=%+v", result.PlannedSkills, result.SelectedSkills, result.ExcludedSkills)
+	}
+	selected := map[string]bool{}
+	for _, skill := range result.SelectedSkills {
+		selected[skill.SourceSkill] = true
+	}
+	if !selected["kkachi-design-review"] || !selected["kkachi-review"] {
+		t.Fatalf("Teal role must select design review plus ordinary review context, got %+v", result.SelectedSkills)
+	}
+	for _, wantExcluded := range []string{"kkachi-implement", "kkachi-backend-select", "kkachi-docs-update", "kkachi-final-verify"} {
+		found := false
+		for _, excluded := range result.ExcludedSkills {
+			if excluded.SourceSkill == wantExcluded && excluded.Reason == "outside_suite_role" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("Teal out-of-role skill %s missing outside_suite_role exclusion: %+v", wantExcluded, result.ExcludedSkills)
+		}
+	}
+	manifestSuite := result.PlannedManifest["project_suites"].([]map[string]any)[0]
+	if manifestSuite["suite_role"] != "teal_design_reviewer" || manifestSuite["suite_mode"] != SuiteModeRoleSubset || manifestSuite["drift_policy"] != "role_subset_expected" {
+		t.Fatalf("planned manifest missing Teal role vocabulary: %+v", manifestSuite)
+	}
+}
+
 func TestBuildDryRunRoleRegistryFailClosedCases(t *testing.T) {
 	repo := makeProjectInstallRepo(t, map[string]string{
 		"kkachi-review": "---\nname: kkachi-review\n---\n# kkachi-review\n",
@@ -702,6 +751,21 @@ roles:
     forbidden_source_skills:
       - kkachi-implement
       - kkachi-docs-update
+  teal_design_reviewer:
+    display_label: "Teal optional UI/UX design reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-design-review
+      - kkachi-review
+    optional_source_skills: []
+    forbidden_source_skills:
+      - kkachi-implement
+      - kkachi-backend-select
+      - kkachi-prompt-compose
+      - kkachi-optimize
+      - kkachi-orchestrate
+      - kkachi-docs-update
+      - kkachi-final-verify
 `
 	if err := os.MkdirAll(filepath.Join(repo, "registries"), 0o755); err != nil {
 		t.Fatal(err)

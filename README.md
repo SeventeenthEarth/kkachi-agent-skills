@@ -13,8 +13,8 @@ run/gate/evidence state, and GJC may produce candidate deep-interview,
 mechanical/factual only. KAB runtime/session control is used only when a later
 approved task explicitly selects a KAB-backed lane and preserves bridge evidence.
 
-Maturity note: KAS v0.2.3 is the current source development target after the
-v0.2.1 release-readiness baseline. Older v0.2.1/v0.2.0/v0.1.x snapshots remain
+Maturity note: KAS v0.2.4 is the current source development target after the
+v0.2.1 release-readiness baseline. Older KAS v0.2.3/v0.2.1/v0.2.0/v0.1.x snapshots remain
 historical release context only; they are not active
 operator, migration, compatibility, fallback, warning-only, or profile-suite
 paths. Real Hermes/Kkachi runs should mature KAS through captured evidence,

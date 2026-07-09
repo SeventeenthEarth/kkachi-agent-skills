@@ -274,7 +274,7 @@ func runPublicProjectInstall(repo string, profile string, project string, source
 		return emitError(stderr, "project_install_planner_failed", err.Error(), "install", jsonOutput, "")
 	}
 	result.Command = "install"
-	if result.DryRun {
+	if result.DryRun && result.OK {
 		result.NextAction = "Review install --project dry-run evidence; no files were written. Apply with install --profile " + profile + " --project " + project + " --suite-role " + suiteRole + " --apply " + result.ApprovalRequest.EvidenceRef + "; use doctor --project-suite after approved writes."
 	}
 	return emitResult(stdout, stderr, result.OK, jsonOutput, result, func() string {

@@ -731,7 +731,7 @@ func TestRootVersionExitsZeroAndPrintsVersion(t *testing.T) {
 				t.Fatalf("code=%d stderr=%s", code, stderr.String())
 			}
 			out := strings.TrimSpace(stdout.String())
-			if out != "kkachi-agent-skills v0.2.3" {
+			if out != "kkachi-agent-skills v0.2.4" {
 				t.Fatalf("unexpected version output: %q", out)
 			}
 			if stderr.Len() != 0 {
@@ -753,7 +753,7 @@ func TestVersionJSONIncludesNameAndVersionOnly(t *testing.T) {
 			if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
 				t.Fatal(err)
 			}
-			if len(payload) != 2 || payload["name"] != "kkachi-agent-skills" || payload["version"] != "0.2.3" {
+			if len(payload) != 2 || payload["name"] != "kkachi-agent-skills" || payload["version"] != "0.2.4" {
 				t.Fatalf("unexpected version payload: %+v", payload)
 			}
 			if stderr.Len() != 0 {
@@ -1593,7 +1593,7 @@ func TestDoctorWorkflowGraphJSONAndFlagValidation(t *testing.T) {
 	if payload["ok"] != true || payload["command"] != "doctor" || payload["mode"] != "workflow_graph_doctor" || payload["no_write"] != true || payload["status"] != "pass" {
 		t.Fatalf("unexpected workflow graph doctor payload: %+v", payload)
 	}
-	if payload["kas"].(map[string]any)["cli_version"] != "0.2.3" || payload["kah"].(map[string]any)["graph_help_state"] != "ok" {
+	if payload["kas"].(map[string]any)["cli_version"] != "0.2.4" || payload["kah"].(map[string]any)["graph_help_state"] != "ok" {
 		t.Fatalf("missing KAS/KAH evidence: %+v", payload)
 	}
 	for _, raw := range payload["kah"].(map[string]any)["compatibility_flags"].([]any) {
@@ -1835,6 +1835,27 @@ func TestInstallProjectPublicSuiteRoleSurfaceAndMissingRegistry(t *testing.T) {
 	approval := payload["approval_request"].(map[string]any)
 	if approval["hash_includes_role_fields"] != true {
 		t.Fatalf("approval hash must advertise role-field composition: %+v", approval)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Main([]string{"install", "--repo", repo, "--profile", "kwanwoo", "--project", "doksuri-server", "--suite-role", "teal_reviewer", "--dry-run", "--profile-root", profileRoot, "--json"}, &stdout, &stderr, env)
+	if code != 2 {
+		t.Fatalf("expected unknown suite role exit 2, got %d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var unknownPayload map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &unknownPayload); err != nil {
+		t.Fatal(err)
+	}
+	if unknownPayload["ok"] != false {
+		t.Fatalf("expected ok:false unknown-role payload: %+v", unknownPayload)
+	}
+	unknownNext, _ := unknownPayload["next_action"].(string)
+	if strings.Contains(unknownNext, "--apply") || strings.Contains(unknownNext, "dry-run:sha256:") {
+		t.Fatalf("unknown-role next action must not offer apply command: %q", unknownNext)
+	}
+	if !strings.Contains(unknownNext, "registered suite role") && !strings.Contains(unknownNext, "Rerun") {
+		t.Fatalf("unknown-role next action should guide rerun with a registered role: %q", unknownNext)
 	}
 
 	if err := os.Remove(filepath.Join(repo, filepath.FromSlash(projectinstall.RoleRegistryPath))); err != nil {

@@ -1,0 +1,6 @@
+version: kas-plugin-role-manifest/v1
+role: teal
+description: Optional Teal UI/UX design reviewer KAS base subset.
+skills:
+  - kkachi-design-review
+  - kkachi-review

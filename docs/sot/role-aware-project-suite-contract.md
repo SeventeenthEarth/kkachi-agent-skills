@@ -21,10 +21,12 @@ The immediate policy is:
 
 1. Blue commander profile may hold the full project KAS suite.
 2. Red, Orange, and Gray profiles must receive only the skills required for the nodes/roles they perform.
-3. A profile-local overlay saying "do not use implement" is not sufficient when the unauthorized skill is still installed and discoverable.
-4. KAS doctor must treat the selected role subset as the authority for that profile; missing unselected skills are not errors, and extra out-of-role skills are diagnostics.
-5. Approved repair/prune must exist before cleaning existing over-installed role profiles.
-6. Local KAS/KAH DAGSM/WFLOW development must not rely on over-installed Red/Orange/Gray profile suites as the normal operating baseline.
+3. Teal is optional and is not part of the mandatory Blue/Red/Orange/Gray project-suite baseline. Teal workflow gates are required only when `project_has_teal_lane && ui_ux_change` is true.
+4. Installing a Teal role suite must not make non-UI Kkachi source work Teal-required; non-UI work still records deterministic skip evidence.
+5. A profile-local overlay saying "do not use implement" is not sufficient when the unauthorized skill is still installed and discoverable.
+6. KAS doctor must treat the selected role subset as the authority for that profile; missing unselected skills are not errors, and extra out-of-role skills are diagnostics.
+7. Approved repair/prune must exist before cleaning existing over-installed role profiles.
+8. Local KAS/KAH DAGSM/WFLOW development must not rely on over-installed Red/Orange/Gray/Teal profile suites as the normal operating baseline.
 
 ## 2. Problem statement
 
@@ -54,12 +56,13 @@ KAS must support at least these suite roles for project-specific installed suite
 
 | `suite_role` | Intended profile | Required selected skills | Notes |
 |---|---|---|---|
-| `blue_commander` | 황충 / Blue commander | full project suite from `skill-pack.yaml` | This is the current 18-skill behavior, but it must be explicit rather than assumed for every profile. Human output should label it as Blue commander / full project suite. |
+| `blue_commander` | 황충 / Blue commander | full project suite from `skill-pack.yaml` | This is the current full-source-suite behavior, but it must be explicit rather than assumed for every profile. Human output should label it as Blue commander / full project suite. |
 | `red_reviewer` | 하후연 / Red reviewer | review and verification-focused project skills | Initial minimal set: `<project>-review`, `<project>-verify`. No implement/backend-select/prompt-compose/optimize/orchestrate. Human output should label it as Red safety/fail-closed reviewer subset. |
 | `orange_pm_reviewer` | 여몽 / Orange PM/operator-value reviewer | operator-value review and assigned final acceptance support | Initial minimal set: `<project>-review`; optionally `<project>-final-verify` only when Orange is assigned an operator-value final gate. Human output should label it as Orange operator-value reviewer subset. |
 | `gray_scribe` | 진궁 / Gray scribe | evidence/docs integrity review and assigned final-gate evidence support | Initial minimal set: `<project>-review`, `<project>-final-verify`; `final-verify` here means evidence/final-gate support when assigned, not broad final approval authority. A future Gray-specific evidence-integrity skill is preferred over reusing docs-update as a write-capable scribe surface. |
+| `teal_design_reviewer` | Goong / Teal lead or project-registered Teal designer | optional UI/UX design review when the project has a Teal lane and the task has UI/UX scope | Initial minimal set: `<project>-design-review`, `<project>-review`. This role supplies `DESIGN_PLAN_GATE` and `DESIGN_FIDELITY_REVIEW` evidence only when `teal_required=true`; it is not part of the mandatory non-UI Kkachi source-work baseline. |
 
-The selected skill list is a policy projection, not a recommendation. A role subset install must not install non-selected phase skills unless the operator explicitly selects a different role or an approved custom role. Stable JSON values stay English (`blue_commander`, `red_reviewer`, `orange_pm_reviewer`, `gray_scribe`), while human output must include an operator-readable role summary so 주군 can inspect dry-runs without decoding enum names.
+The selected skill list is a policy projection, not a recommendation. A role subset install must not install non-selected phase skills unless the operator explicitly selects a different role or an approved custom role. Stable JSON values stay English (`blue_commander`, `red_reviewer`, `orange_pm_reviewer`, `gray_scribe`, `teal_design_reviewer`), while human output must include an operator-readable role summary so 주군 can inspect dry-runs without decoding enum names.
 
 ## 5. Registry requirements
 
@@ -116,6 +119,20 @@ roles:
     future_preferred_skills:
       - kkachi-evidence-review
       - kkachi-scribe-review
+  teal_design_reviewer:
+    display_label: "Teal optional UI/UX design reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-design-review
+      - kkachi-review
+    forbidden_source_skills:
+      - kkachi-implement
+      - kkachi-backend-select
+      - kkachi-prompt-compose
+      - kkachi-optimize
+      - kkachi-orchestrate
+      - kkachi-docs-update
+      - kkachi-final-verify
 ```
 
 Skill source ids must resolve against the same source pack inventory used by `kas-default-project-suite`. Explicit `forbidden_source_skills` lists document high-risk out-of-role skills; every source skill not selected by the role remains excluded even if it is not repeated in the forbidden list.
@@ -291,7 +308,7 @@ Before KAS claims role-aware project suite support:
 - The role registry is machine-readable at `registries/project-suite-roles.yaml`, documented, checksum-bound, and covered by tests.
 - Install dry-run/apply hash-binds role selection, selected/excluded skills, role registry checksum, source suite checksum, changed paths, conflicts/diagnostics, no-write evidence, and fails closed for unknown/unregistered roles.
 - Manifest entries distinguish `suite_mode: full` and `suite_mode: role_subset`, preserve stable `suite_role` JSON values, and expose operator-readable role labels in human output.
-- Doctor treats missing unselected skills as healthy for role subsets and flags out-of-role extras for Red/Orange/Gray.
+- Doctor treats missing unselected skills as healthy for role subsets and flags out-of-role extras for Red/Orange/Gray and optional `teal_design_reviewer` suites.
 - Repair/prune is dry-run-first, approval-hash-bound, backup-backed, manifest-tracked, no-spillover-scanned, and reports recovery instructions before any apply.
 - Existing KAH development color profiles can be moved from the over-installed transition state to a healthy role-subset or explicit no-suite state with evidence.
-- Red/Orange/Gray review gates have no unresolved blockers for role safety, operator clarity, and evidence trace.
+- Red/Orange/Gray review gates, plus Teal review when a UI/UX Teal lane is in scope, have no unresolved blockers for role safety, operator clarity, and evidence trace.

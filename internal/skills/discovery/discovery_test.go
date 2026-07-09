@@ -597,6 +597,7 @@ func TestCommittedPluginPackageAndRoleManifestsConsistent(t *testing.T) {
 	assertStringSlice(t, roleSkills["red"], []string{"kkachi-review", "kkachi-verify"})
 	assertStringSlice(t, roleSkills["orange"], []string{"kkachi-review"})
 	assertStringSlice(t, roleSkills["gray"], []string{"kkachi-final-verify", "kkachi-review"})
+	assertStringSlice(t, roleSkills["teal"], []string{"kkachi-design-review", "kkachi-review"})
 }
 
 func writePluginRoleFixture(t *testing.T, repo string) {

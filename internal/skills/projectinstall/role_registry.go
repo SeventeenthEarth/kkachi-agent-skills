@@ -167,7 +167,7 @@ func resolveProjectSuiteRole(sourceRepo string, suiteRole string, packs []discov
 	conflicts := []Conflict{}
 	diagnostics := []discovery.Diagnostic{}
 	if strings.TrimSpace(suiteRole) == "" {
-		c := conflict("suite_role_required", project, "", "", "project suite install requires explicit --suite-role; role is never inferred from profile name", "Rerun with --suite-role blue_commander, red_reviewer, orange_pm_reviewer, or gray_scribe.")
+		c := conflict("suite_role_required", project, "", "", "project suite install requires explicit --suite-role; role is never inferred from profile name", "Rerun with --suite-role blue_commander, red_reviewer, orange_pm_reviewer, gray_scribe, or teal_design_reviewer when Teal applies.")
 		return registryEvidence, projectSuiteRole{}, nil, nil, nil, []Conflict{c}, []discovery.Diagnostic{{Level: "error", Code: c.Condition, Message: c.Message}}
 	}
 	registry, err := loadProjectSuiteRoleRegistry(sourceRepo)

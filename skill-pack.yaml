@@ -12,6 +12,7 @@ roles:
   red: roles/red.yaml
   orange: roles/orange.yaml
   gray: roles/gray.yaml
+  teal: roles/teal.yaml
 guides:
   - kkachi-install-guide
   - kas-project-overlay-guide
@@ -31,6 +32,7 @@ skills:
   - kkachi-optimize
   - kkachi-review
   - kkachi-multi-agent-review
+  - kkachi-design-review
   - kkachi-verify
   - kkachi-workflow-create
   - kkachi-workflow-promote

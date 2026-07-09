@@ -7,7 +7,7 @@ import (
 
 const (
 	CommandName = "kkachi-agent-skills"
-	CLIVersion  = "0.2.3"
+	CLIVersion  = "0.2.4"
 )
 
 type Info struct {

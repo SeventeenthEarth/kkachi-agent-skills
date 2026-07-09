@@ -11,6 +11,8 @@ This document registers the KAS-owned side of the `DESIGN` epic. The epic promot
 
 KAS owns workflow policy, trigger semantics, role contracts, node contracts, selector/materializer behavior, skill guidance, and agent-facing expectations. KAS does not own KAH schema/gate validation, and KAS must not substitute Blue, Red, Orange, Gray, MAR, backend agents, or temporary helpers for official Teal verdicts when Teal is required.
 
+KAS v0.2.4 adds source-side Teal role installation support for the optional `teal_design_reviewer` suite role. Teal role installation support is KAS-owned: the role manifest, `kkachi-design-review` skill, project-suite registry entry, and CLI install/doctor/repair projection belong to KAS. KAH design-evidence validation does not need to change for Teal role-suite installation because KAH already validates deterministic `design-evidence.json` shape, skip/waiver fields, and required evidence refs without selecting Teal owners or judging design quality.
+
 DESIGN-003 implements the KAS selector/materializer portion. `workflow-route` derives and records `teal_required` from explicit `project_has_teal_lane` and `ui_ux_change` facts, and `workflow-trigger` route-backed materialization inserts design gates only for `teal_required=true`. KAH schema and gate enforcement remain DESIGN-004 and DESIGN-005.
 
 DESIGN-006 records cross-repo compatibility examples in `docs/examples/design006-teal-compatibility-scenarios.json`. The golden cases are `kkachi_non_ui_skip`, `kkachi_teal_lane_non_ui_skip`, `sudal_ui_required`, and `doksuri_ui_required`; KAS owns the declarations and expected materialized Teal nodes, while KAH readback proves the same declarations satisfy or fail the deterministic `design-evidence` gate.

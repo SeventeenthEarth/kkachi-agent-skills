@@ -747,6 +747,9 @@ func finalize(result *Result) {
 	if !result.OK {
 		result.ApprovalRequest.Required = false
 		result.NextAction = "Resolve project-suite conflicts and rerun dry-run; approved install fails closed until the current plan is ok:true."
+		if len(result.Conflicts) > 0 && strings.TrimSpace(result.Conflicts[0].NextAction) != "" {
+			result.NextAction += " First conflict next action: " + result.Conflicts[0].NextAction
+		}
 	}
 }
 

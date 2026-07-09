@@ -58,3 +58,20 @@ roles:
     future_preferred_skills:
       - kkachi-evidence-review
       - kkachi-scribe-review
+  teal_design_reviewer:
+    source: skill-pack.yaml
+    display_label: "Teal optional UI/UX design reviewer subset"
+    selection_mode: explicit_source_subset
+    required_source_skills:
+      - kkachi-design-review
+      - kkachi-review
+    least_privilege_default: optional_ui_ux_design_review_only
+    optional_source_skills: []
+    forbidden_source_skills:
+      - kkachi-implement
+      - kkachi-backend-select
+      - kkachi-prompt-compose
+      - kkachi-optimize
+      - kkachi-orchestrate
+      - kkachi-docs-update
+      - kkachi-final-verify

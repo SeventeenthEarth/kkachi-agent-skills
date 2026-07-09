@@ -95,10 +95,11 @@ The initial role projection follows the current Kkachi color boundaries.
 
 | Color role | Example profile | Initial KAS plugin base selection | Boundary |
 |---|---|---|---|
-| Blue commander | `hwangchung` | full KAS phase/operation set, currently 23 KAS base skills | May plan, orchestrate, authorize implementation, request review, verify, and synthesize evidence within KAS/KAO authority. |
+| Blue commander | `hwangchung` | full KAS phase/operation set, currently 24 KAS base skills | May plan, orchestrate, authorize implementation, request review, verify, and synthesize evidence within KAS/KAO authority. |
 | Red reviewer | `hahuyeon` | `review`, `verify` | Safety, fail-closed, risk, evidence sufficiency, deterministic/runtime risk review. No implementation or backend-routing authority by skill presence. |
 | Orange PM reviewer | `yeomong` | `review` | Operator value, scope, workflow clarity, acceptance criteria, report readability, approval/recovery clarity. No implementation or backend-routing authority by skill presence. |
 | Gray scribe | `jingung` | `review`, `final-verify` | Decision trace, evidence paths, stale/candidate/accepted/runtime-approved distinctions, final-gate evidence support. `final-verify` does not replace Blue final authority. |
+| Teal design reviewer | `goong` or project-registered Teal designer | `design-review`, `review` | Optional UI/UX design review only when project/task facts make Teal required. Not part of the mandatory Blue/Red/Orange/Gray non-UI baseline and no implementation/backend-routing authority by skill presence. |
 
 KAH companion skills may have analogous color subsets, but this SOT owns KAS first. KAH mirror behavior must be updated through the KAH repo or a recorded KAS/KAH companion task rather than silently assuming this KAS SOT mutates KAH distribution.
 
