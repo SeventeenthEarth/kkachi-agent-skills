@@ -505,6 +505,25 @@ GAJAE deferrals unless separately approved: KAB Stage 2/3 activation, provider/a
 
 V02FLOW deferrals unless separately approved: implementation beyond the bounded task, commit, push, install, release publication before V02FLOW-018 closeout or at any time without separate 주군 approval, live/runtime activation, KAB activation, provider/auth/token/gateway/model/profile mutation, watcher-launched source mutation, automatic Blue synthesis, auto-continue, review-lane waiver, or treating MAR provider execution as verified before the v0.2.1 official Go/KAH MAR path is ready. V02FLOW-018 is readiness packaging only, not publication authorization.
 
+### EPIC: TWAKE — async dispatch return-path evidence and thread wake policy
+
+> Goal: make Blue-dispatched asynchronous Kkachi work return actionable status to the active operator context, preferably the current Discord thread, by requiring notifier/watcher return-path evidence for plan-vet, color review, MAR, second-color adoption/review, GJC long-running dispatches, and blocked-condition probes.
+>
+> Source of truth: `docs/sot/thread-wake-return-path-contract.md`. Paired KAH companion SOT: KAH `docs/sot/thread-wake-return-path-evidence.md`.
+>
+> Target release/readiness shape: KAH side completes as `v0.2.3`; KAS side completes as `v0.2.5`. TWAKE is source readiness only until separate 주군 approval covers commit, push, tag/release, install, runtime activation, Discord delivery changes, or provider/auth/profile/gateway/model mutation.
+>
+> Split rule: KAH owns deterministic return-path evidence, capability readback, fail-closed validation, watcher/callback readback, and final/phase diagnostics. KAS owns dispatch policy, phase-skill requirements, Blue disposition, and final acceptance. KAT remains factual status/log evidence only.
+
+| Task ID | Owner | Title | Status | Acceptance criteria | Evidence and review gates |
+|---|---|---|---|---|---|
+| TWAKE-001 | KAH | Return-path evidence schema and capability substrate | Planned | Define and implement or source-document `twake.return_path.v1` for required async dispatches, including origin/thread metadata, notification method/id, watched condition, terminal-only and Blue-action-required flags, no-authority boundaries, safe artifact refs, and `async_dispatch_return_path_evidence=true` capability readback. | KAH docs/spec/compatibility updates, positive/negative validation tests, `make test-prepare`, relevant unit tests, and Red/Orange/Gray/Blue review. No Discord delivery, runtime/profile/provider/auth mutation, release, install, push, or KAS policy ownership. |
+| TWAKE-002 | KAH | Return-path fail-closed gates for watcher/MAR/GJC closeout | Planned | Integrate return-path validation with review watcher-output, MAR watcher/callback, GJC long-running status/callback, phase/final diagnostics, and duplicate-terminal silence so missing watcher/subscription/origin evidence cannot close a required async dispatch cleanly. | KAH source tests for missing watcher id, missing origin/thread metadata, same-thread overclaim, missing terminal-only policy, no-wake explicit state, and compact Blue-action-required terminal reports; official review and final gate before closeout. |
+| TWAKE-003 | KAS | Blue dispatch return-path policy and phase-skill guidance | Planned | Update KAS orchestration, plan, review/request-feedback, GJC packet/template guidance, and final-verify rules so Blue dispatches plan-vet, color review, MAR, second-color, GJC long-running work, and blocked-condition probes only with return-path evidence or explicit blocked/no-wake evidence. | KAS docs/skills/templates/tests, effective KAH capability-check wording for `async_dispatch_return_path_evidence=true`, color review, MAR applicability/waiver handling as required, and KAH companion evidence refs. |
+| TWAKE-004 | KAS-led closeout | TWAKE cross-repo source-readiness closeout | Planned | Align KAS/KAH roadmaps, docs maps, SOTs, release-readiness notes, and final verification so KAS `v0.2.5` and KAH `v0.2.3` source readiness reflect the completed TWAKE train. | Cross-repo KAS/KAH verification, official Red/Orange/Gray review, Blue synthesis, final gates, and explicit publication/install/runtime boundary statement. |
+
+TWAKE deferrals unless separately approved: implementation beyond the bounded tasks, commit, push, tag/release publication, install, live/runtime activation, KAB activation, provider/auth/token/gateway/model/profile mutation, Discord gateway/runtime delivery changes, watcher-launched source mutation, automatic Blue synthesis, auto-continue, review-lane waiver, or treating notifier/watcher output as plan/review/MAR/final acceptance.
+
 ## Deferred / non-MVP work
 
 - KAS write-capable sync behavior after KASUPD dry-run/state/semantic-port evidence, approval, recovery spec, and Red/operator review.
