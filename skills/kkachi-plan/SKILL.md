@@ -16,6 +16,8 @@ Plan from durable authority, not chat-only instruction. Path A plans prepare imp
 
 ## 주군 development-pipeline preference
 
+For KAS/KAH/KAT repository self-development, do not dogfood this KAS/KAH/GJC pipeline by default. 황충 should do main development directly, then route the result through official color review and fixes/re-review. Use the KAS/KAH/GJC pipeline for these repos only when 주군 explicitly selects it for the run.
+
 When 주군 asks to run KAS/Kkachi development work and the task is classified as
 `development`, treat the preferred v0.2 default as a GJC delegated plan-first
 loop under KAS/KAH control:
@@ -71,6 +73,8 @@ Render planner prompts so every command example uses the real user home, for exa
 Record deviations in `phase-plan.yaml`, `checklist.md`, and the final report instead of silently using a lighter path. For `research_evidence`, `docs_only`, `simple_command_report`, `bootstrap_config`, or `collaboration_review`, use the selected light spine from `task-contract.yaml`; do not manufacture implementation/test/optimize phases unless the classification changes to `development`.
 
 Planner product output for v0.2 GJC candidate artifacts or any explicitly selected KAB lane must be English and compact: `Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, and `Next action requested`. Write detailed planning content to `plan.md` and, when backend-authored phase detail is needed, `.kkachi/runs/<run_id>/artifacts/plan/backend-plan.md` or the equivalent requested phase artifact. If the artifact cannot be written, report `Status: blocked` with the artifact-write blocker and do not dump full plans into chat.
+
+Plan-stage reports to 주군 must also follow `docs/sot/stage-report-contract.md`: summarize how the documented plan will be realized, whether the original plan was followed or changed, what Red/Orange/Gray/Blue plan-vet feedback changed, which verification strategy will prove the implementation, and whether implementation remains held for approval. Do not report only `plan stage done` or the list of plan artifact files.
 
 See `references/planner-lane-and-capture.md` for retained historical details; for current v0.2 KAS/KAH tasks, use the GJC `ralplan` candidate path plus fallback-audit capture and KAH evidence rules. See `references/checklist-normalization.md` for the mandatory `checklist.md` transform rules.
 

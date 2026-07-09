@@ -22,6 +22,8 @@ carry current capability plus bridge evidence. Legacy Stage 1/Stage 2/Stage 3
 Codex/KAB adoption wording and direct Codex app-server lanes are historical
 context, not active operator guidance.
 
+KAS/KAH/KAT repository self-development is a standing exception to this dogfood path unless 주군 explicitly reselects it. For KAS, KAH, or KAT source/skill improvements, 황충 performs the main implementation directly, then routes the result through official color review and fixes/re-review. Preserve tests, evidence, color review, and release/commit approval boundaries.
+
 For KAS/KAH roadmap-task implementation, the selected GJC `ultragoal`/approved
 implementer lane performs substantive code, test, build, and task-bound docs
 edits only after the required plan-vet and explicit bounded approval. Red/Orange plan-vet
@@ -49,6 +51,8 @@ and file excerpts go to `.kkachi/runs/<run_id>/artifacts/implement/backend-imple
 or the concrete requested phase artifact. If the artifact cannot be written,
 report `Status: blocked` with the artifact-write blocker and do not dump full
 plans, logs, diffs, files, reviews, or checklists into chat.
+
+Implementation-stage reports to 주군 must follow `docs/sot/stage-report-contract.md`: describe old behavior vs new behavior, whether the accepted plan was applied as written or meaningfully changed, the changed surfaces grouped by purpose, whether `impl`, `test-enhance`, `ai-slop-cleaner`, `optimize`, and `docs-update` ran or were not applicable, the KAH/KAT/selected test results, and any remaining risk or approval boundary.
 
 All terminal commands issued or requested during implementation must run with
 the real user home. In reusable artifacts use `HOME=<real-user-home>`. Do not

@@ -22,13 +22,13 @@ Use this template for 주군-facing Kkachi/KAS reports before asking for commit 
 
 5. `1차 Blue/Red/Orange/Gray 리뷰 및 개선`
    - List reviewer/card ids and verdicts.
-   - Summarize requested changes/improvement points and how they were applied or deferred.
+   - Summarize requested changes/improvement points and how they were applied or deferred. For every deferred item, state what was deferred, why it was safe or necessary to defer now, and the owning future gate/task.
    - This section is required for KAS/KAH runs with durable repo/artifact changes, even when the task is not implementation.
 
 6. `MAR Review 및 개선`
    - For implementation tasks, include MAR role-coverage evidence or an explicit 주군 waiver/blocker recorded in KAH/run evidence artifacts. For non-implementation tasks, state whether MAR was requested/declared/run, or mark `해당 없음` with the reason when MAR was not part of the active policy.
    - When MAR ran, include run id, provider toolchain/preflight evidence, required role coverage for `logic`, `security`, `arch`, `cve`, and `test_adequacy`, primary/secondary provider attempts, bounded raw-output artifact paths, merge pack path, Blue disposition path, and verdict.
-   - Summarize MAR findings by severity and disposition: fixed/deferred/rejected.
+   - Summarize MAR findings by severity and disposition: fixed/deferred/rejected. For deferred MAR findings, include the short what/why/future-owner reason.
    - If provider availability, prompt rendering, or dispatch success is the only evidence, keep the gate failed or blocked unless 주군 gave an explicit waiver recorded in KAH/run evidence artifacts.
 
 7. `재리뷰 및 개선 확인`
@@ -46,5 +46,5 @@ Use this template for 주군-facing Kkachi/KAS reports before asking for commit 
 
 - Do not ask for commit approval until all required sections are present or explicitly marked not applicable.
 - Prefer evidence handles: KAH artifact path, Kanban card id, KAB session id, command name, or gate report.
-- Do not hide deferred review findings. Mark them as `deferred` with the owning future gate/task.
+- Do not hide deferred review findings. Mark them as `deferred` with the owning future gate/task and a short reason for why the current closeout can safely defer it.
 - Keep report source of truth aligned with `final-report.md` and KAH events.

@@ -13,7 +13,7 @@ run/gate/evidence state, and GJC may produce candidate deep-interview,
 mechanical/factual only. KAB runtime/session control is used only when a later
 approved task explicitly selects a KAB-backed lane and preserves bridge evidence.
 
-Maturity note: KAS v0.2.2 is the current source development target after the
+Maturity note: KAS v0.2.3 is the current source development target after the
 v0.2.1 release-readiness baseline. Older v0.2.1/v0.2.0/v0.1.x snapshots remain
 historical release context only; they are not active
 operator, migration, compatibility, fallback, warning-only, or profile-suite
@@ -41,6 +41,13 @@ KHS now keeps two lanes distinct:
 
 ## v0.2 KAS/KAH/GJC Development Delegation
 
+KAS/KAH/KAT repository self-development is an explicit exception to the older
+dogfood default: do not run KAS/KAH/KAT development through KAS/KAH/KAT
+workflows unless 주군 explicitly selects that mode for the run. 황충 performs
+main development directly, then routes the result through official color review
+and fixes/re-review. This exception does not waive tests, color review,
+commit/release approval, or fail-closed blocker handling.
+
 KAS owns the operating policy for how KAH evidence, GJC candidate execution,
 KAT factual test evidence, color review, MAR, and final gates are used. KAH
 remains the deterministic state/evidence/gate tool. GJC is a candidate
@@ -66,6 +73,12 @@ default KAS role-first feedback lane when applicable, uses validated provider
 and toolchain evidence, and does not change plan/implementation authority.
 Required roles are `logic`, `security`, `arch`, `cve`, and `test_adequacy`;
 unresolved required role coverage fails closed.
+
+Stage reports are governed by `docs/sot/stage-report-contract.md`: task
+classification, plan completion, implementation completion, and review closeout
+reports must explain the functional change, old behavior/reason, plan drift,
+test/phase coverage, review feedback, and remaining approval boundary instead of
+only listing files or saying a stage completed.
 
 ## Components
 

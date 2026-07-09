@@ -14,6 +14,8 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 Review findings must be grounded in current artifacts, current diff, or reproducible evidence. Reviews must respect `phase-plan.yaml` as the workflow SOT and call out any missing checklist/evidence row instead of silently accepting incomplete phases.
 
+Review-stage reports to 주군 must follow `docs/sot/stage-report-contract.md`: summarize Red/Orange/Gray/Blue verdicts, the core issue each color found or did not find, MAR status/role coverage/findings or waiver/N/A reason, second-color adoption status, what fixes were made from review feedback, which verification was rerun, and whether the result is release-ready, install-ready, commit-ready, or still held. If any feedback is deferred, briefly state what was deferred, why it was safe or necessary to defer now, and which future gate/task owns it. Do not report only that review cards completed.
+
 For project-Gray documentation/integrity review, explicitly verify roadmap/task status rows and status values against accepted evidence, review gates, and commits. If a completed task still says `Planned`, `In Progress`, or `In Review`, or an incomplete task says `Completed`, record it as a traceability finding and request a status-value update before closeout.
 
 Default review order for KAS/KAH runs:

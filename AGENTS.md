@@ -145,6 +145,12 @@ When KHS is triggered:
 Final reports should be concise and evidence-backed. Include:
 
 - Changed files.
+- Functional change: what behavior, skill guidance, or operator workflow changed
+  and what old behavior/problem made it necessary.
+- Stage-specific substance for task classification, plan, implementation, and
+  review closeout. Follow `docs/sot/stage-report-contract.md`: report document
+  direction, plan drift, color-vet changes, before/after behavior, test/phase
+  coverage, color/MAR/second-color feedback, and the remaining approval boundary.
 - Simplifications made or avoided.
 - Verification performed.
 - Remaining risks or known gaps.

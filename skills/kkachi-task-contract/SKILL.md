@@ -14,6 +14,8 @@ Trigger boundary: use this phase skill only after `kkachi-orchestrate` or an exp
 
 The task contract is backend-neutral. Do not include Claude, Codex, Gemini, GLM, or OpenCode prompt style in acceptance criteria, constraints, or non-goals.
 
+For KAS/KAH/KAT repository self-development, do not select the KAS/KAH/KAT dogfood workflow by default. Record the direct 황충-development + official color review path unless 주군 explicitly selects KAS/KAH/KAT dogfooding for that run. This exception changes execution routing only; it does not waive tests, review, commit/release approval, or fail-closed blocker handling.
+
 Task contracts must record output-policy and phase-gating facts without turning them into backend style. Use the registry aliases `simple_report`/`simple_command_report`, `investigation`/`research_evidence`, `review`/`collaboration_review`, and `docs_only`/`docs_only`; non-development classes must include skipped-phase reasons for implementation, enhance-test, optimize, and broad review loops unless classification changes. Record that active v0.2 GJC delegated lane output and any explicitly approved KAB-mediated backend product output are English, compact (`Status`, `Summary`, `Files`, `Verification`, `Risks/blockers`, `Detailed artifact`, `Next action requested`), and artifact-first, with detailed phase paths such as `.kkachi/runs/<run_id>/artifacts/<phase>/backend-<phase>.md`. Historical Stage/direct-Codex/native_codex wording is not valid implementation, KAB, or proof authority; reject it unless a later approved explicit KAB task supplies current capability and bridge evidence.
 
 For V02FLOW-009 development contracts, encode the selected GJC `ultragoal` executor lane as the default mutation owner after bounded approval for `impl`, `test-enhance`, `ai-slop-cleaner`, `optimize`, `docs-update`, and `handle-feedback-*`. Record accepted-scope refs, ralplan artifact/hash, Blue approval refs, changed-surface bounds, preservation locks, non-goals, verification commands, stop/block conditions, and the KAH V02FLOW-010 capability/readback requirement. Unknown/ambiguous aliases, unsafe refs, stale verification, and native GJC `ai-slop-cleaner` or `remove-ai-slop` requests must fail closed in the task contract.
@@ -37,6 +39,10 @@ fields. Ordinary color review, MAR, backend evidence, or helper notes must not s
 - roadmap trace or not-applicable reason
 - acceptance criteria source
 - user backend preference, if provided
+
+## Stage report contract
+
+Task-classification reports to 주군 must be short but semantically useful. They must state the feature/change identity, the old behavior or missing report content that made the work necessary, the document/SOT/request direction for the work, the selected task class/route and why it fits, and the non-scope/gates that remain held. Do not report only that `task-contract.yaml` or a KAH phase was written. The canonical reporting SOT is `docs/sot/stage-report-contract.md`.
 
 ## Flow
 
