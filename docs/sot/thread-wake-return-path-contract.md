@@ -3,7 +3,7 @@
 Date: 2026-07-10
 Owner: KAS workflow/policy layer
 Confirming role: Hwangchung / 황충, Kkachi Blue commander
-Status: planning SOT for TWAKE-001..004; no implementation, helper behavior, release, install, runtime activation, Discord delivery, provider execution, profile mutation, or auth/provider/gateway/model change is authorized by this document alone
+Status: source-readiness SOT for TWAKE-001..004; TWAKE-001 and TWAKE-002 are implemented source-side in KAH, TWAKE-003 is implemented source-side in KAS, and TWAKE-004 is source-side complete with local closeout commits recorded; push/release decisions remain separate; no release, install, runtime activation, Discord delivery, provider execution, profile mutation, or auth/provider/gateway/model change is authorized by this document alone
 Authority level: KAS-side planning authority for Blue async-dispatch return-path policy, watcher/notifier requirements, and final verification expectations
 Scope: `kkachi-agent-skills` source docs, skills, templates, registries, final-verification guidance, and roadmap records for target KAS `v0.2.5`
 Paired KAH companion SOT: KAH `docs/sot/thread-wake-return-path-evidence.md`
@@ -80,6 +80,13 @@ Missing watcher/subscription id, missing origin/thread metadata for a same-threa
 | TWAKE-002 | KAH | KAH `v0.2.3` | Integrate return-path validation with review watcher-output, MAR watcher/callback, GJC long-running dispatch/status, and final/phase diagnostics. | Missing return-path evidence cannot close cleanly when KAS declared it required. |
 | TWAKE-003 | KAS | KAS `v0.2.5` | Update KAS phase skills/templates/final guidance so Blue dispatches plan-vet, color review, MAR, second-color, and GJC long-running work only with return-path evidence or an explicit no-wake/blocked state. | KAS must capability-check effective KAH before relying on the evidence surface. |
 | TWAKE-004 | KAS-led closeout | KAS `v0.2.5` + KAH `v0.2.3` | Align roadmaps/docs, run official review, and prepare source-readiness evidence for the TWAKE train. | Readiness only; publication, push/tag/install/runtime/provider/auth/profile/gateway/model changes need separate approval. |
+
+## 5.1 TWAKE-004 closeout carries
+
+- KAH commits `5111647` and `5866c32` are source-side KAH evidence for TWAKE-001 and TWAKE-002. KAS commits `45b0e60` and `5e63e2e` are source-side KAS evidence for TWAKE-001/TWAKE-003 guidance. These commits are not release, install, runtime, Discord delivery, provider execution, or effective-binary activation evidence by themselves.
+- TWAKE-004 does not add a new release-note draft by default. Roadmap, SOT, README, compatibility, docs-map, and verification evidence are the closeout surfaces unless a later review finds that a draft release-readiness note is required.
+- Kanban cards are routing, return-path, and team-member review evidence only. They do not access zcode/kimi/agy providers and must not be cited as MAR provider evidence. If a later TWAKE gate requires MAR, use KAH `mar` / provider-attempt artifacts using the declared KAS provider lanes or preserve an explicit 주군 waiver.
+- `.kkachi/scripts/` copied legacy MAR sidecars were removed locally from the KAS and KAH repos before this closeout and must not be recreated as an operator path.
 
 ## 6. Verification expectations
 

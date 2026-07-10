@@ -13,14 +13,23 @@ run/gate/evidence state, and GJC may produce candidate deep-interview,
 mechanical/factual only. KAB runtime/session control is used only when a later
 approved task explicitly selects a KAB-backed lane and preserves bridge evidence.
 
-Maturity note: KAS v0.2.4 is the current source development target after the
-v0.2.1 release-readiness baseline; the TWAKE return-path evidence train targets
-KAS v0.2.5 source readiness paired with KAH v0.2.3. Older KAS v0.2.3/v0.2.1/v0.2.0/v0.1.x snapshots remain
+Maturity note: KAS v0.2.5 is the current TWAKE source-readiness closeout package
+after the v0.2.1 release-readiness baseline; it is paired with KAH v0.2.3
+return-path evidence source readiness. Older KAS v0.2.4/v0.2.3/v0.2.1/v0.2.0/v0.1.x snapshots remain
 historical release context only; they are not active
 operator, migration, compatibility, fallback, warning-only, or profile-suite
 paths. Real Hermes/Kkachi runs should mature KAS through captured evidence,
 project overlays, prompt/phase skill references, reusable scripts, and the
 existing `kkachi-improve` / improvement-promotion rules.
+
+TWAKE source readiness is source-only. It does not imply tagged release,
+install, runtime activation, Discord delivery, provider execution, KAB
+activation, or auth/provider/profile/gateway/model mutation. Kanban review cards
+remain routing and return-path evidence only; Kkachi MAR provider coverage must
+come from KAH `mar` / provider-attempt artifacts using the declared zcode/kimi/agy
+lanes or an explicit 주군 waiver. The earlier KAS v0.2.3 stage-report contract
+remains active for task classification, plan, implementation, and review-stage
+reports.
 
 ## Current Lane Split
 
