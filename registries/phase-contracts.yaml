@@ -38,6 +38,16 @@ review_train_authority:
   substitution_rule: "temporary subagents and delegate_task do not count as official color review, MAR role coverage, project-Gray review, or Blue synthesis"
   waiver_rule: "development-task MAR may be skipped only by explicit task-specific approval recorded before the MAR gate"
 
+return_path_policy:
+  twake003: "TWAKE-003 return-path policy"
+  dispatch_classes_summary: "plan_vet, color_review, mar_review, second_color_review, gjc_long_running, blocked_condition_probe"
+  kah_capability_readback_required:
+    - async_dispatch_return_path_evidence=true
+    - async_dispatch_return_path_final_gate=true
+  clean_closeout_rule: "missing return-path evidence blocks clean closeout"
+  degraded_state_rule: "blocked/degraded/no_wake_claim requires an operator-readable recovery hint"
+  authority_rule: "watcher/notifier output is state-report-only and never review, MAR, waiver, Blue synthesis, or final acceptance authority"
+
 role_model:
   hermes:
     responsibility:

@@ -26,6 +26,10 @@ MAR is the default independent review lane for `development` / implementation ta
 
 V02FLOW-007 review-train/watcher boundary: for substantial development work, preserve `first color review -> mandatory MAR -> second color adoption/review -> Blue disposition`. A color-round aggregate watcher is state-report-only; it must not perform Blue synthesis, fake `진행해`, auto-continue, waive lanes, mutate source, or substitute temporary subagents and delegate_task for official authority. temporary subagents and delegate_task do not count as official color review, MAR role coverage, or Blue synthesis.
 
+## TWAKE-003 return-path policy
+
+Feedback requests that dispatch async plan-vet, color review, MAR, second-color review, GJC long-running work, or blocked-condition probes must require a Blue return path or explicit degraded/no-wake evidence. Check effective KAH capability readback for `async_dispatch_return_path_evidence=true` and `async_dispatch_return_path_final_gate=true` before claiming KAH-backed return-path support. If reviewer fan-out lacks watcher/subscription/callback/origin evidence, record `blocked/degraded/no_wake_claim` with an operator-readable recovery hint and do not present the round as cleanly controllable. Required watcher reports must be terminal-only Blue-action-required output. watcher/notifier output is state-report-only and never review, MAR, waiver, Blue synthesis, or final acceptance authority.
+
 See `references/mar-review-lane.md` for the KAS MAR role coverage, provider-preflight, merge-pack, disposition, and cleanup sequence.
 
 ## Outputs

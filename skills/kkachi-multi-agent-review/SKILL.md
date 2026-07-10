@@ -74,6 +74,10 @@ MAR disposition is fail-closed. Supported terminal statuses are:
 
 `DEGRADED`, `FAILED`, and `BLOCKED` are never clean review completion claims.
 
+## TWAKE-003 return-path policy
+
+MAR request/trigger/status guidance must preserve a Blue return path for async role fan-out and provider-status waiting. Before claiming KAH-backed MAR callback/watcher wake support, check effective KAH capability readback for `async_dispatch_return_path_evidence=true` and `async_dispatch_return_path_final_gate=true`. If the effective helper lacks those capabilities, or MAR status lacks watcher/subscription/callback/origin evidence, record `blocked/degraded/no_wake_claim` with an operator-readable recovery hint rather than a clean same-thread wake claim. Required watcher reports must be terminal-only Blue-action-required output. watcher/notifier output is state-report-only and never review, MAR, waiver, Blue synthesis, or final acceptance authority.
+
 ## Red Adjudication
 
 Red adjudication triggers include blocker findings, high-risk findings,

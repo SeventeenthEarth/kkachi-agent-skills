@@ -8,6 +8,7 @@ __pycache__/
 
 .kkachi/
 .gjc/
+.hermes/
 .codegraph/
 .kkachi-workflow.yaml
 .omc/

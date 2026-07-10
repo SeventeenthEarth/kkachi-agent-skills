@@ -70,6 +70,7 @@ Missing watcher/subscription id, missing origin/thread metadata for a same-threa
 - Watchers must stay silent for unchanged/nonterminal state and emit only compact Blue-action-required terminal/actionable reports.
 - Watchers must not fake `진행해`, auto-continue, approve plans, satisfy color review, satisfy MAR, waive lanes, mutate source, commit, push, install, release, or change runtime/auth/provider/gateway/profile/model settings.
 - If return-path delivery is unavailable, the correct state is `blocked`, `degraded`, or `no_wake_claim` with an explicit recovery hint; never imply same-thread wake readiness without proof.
+- TWAKE-003 KAS consumer guidance must normalize the return-path vocabulary as `blocked`, `degraded`, or `no_wake_claim`, each with an operator-readable recovery hint, so source guidance, templates, and final verification cannot treat a no-wake state as clean same-thread notification.
 
 ## 5. TWAKE task sequence
 

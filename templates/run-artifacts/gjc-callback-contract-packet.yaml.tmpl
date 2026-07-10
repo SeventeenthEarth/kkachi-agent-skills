@@ -21,6 +21,20 @@ authority_boundaries:
   kah_role: "KAH validates packet_ref and artifact_refs mechanically only."
   no_acceptance_by_gjc: true
 
+async_return_path:
+  required_for_blue_dispatch: true
+  schema_version: twake.return_path.v1
+  required_capabilities:
+    - async_dispatch_return_path_evidence
+    - async_dispatch_return_path_final_gate
+  acceptable_states: [proven, blocked, degraded, no_wake_claim]
+  fail_closed_on_missing_watcher_or_origin: true
+  terminal_only: true
+  blue_action_required_output: true
+  no_authority: true
+  recovery_hint: "{{ return_path_recovery_hint_or_blocked_reason }}"
+  recovery_hint_required_for_no_wake: true
+
 stop_ask_gates:
   ask_required_when:
     - "notification target or origin metadata is missing for a claimed wake path"

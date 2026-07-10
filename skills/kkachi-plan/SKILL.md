@@ -54,6 +54,10 @@ only viable fallback would add broad code, new state machinery, or unclear
 policy, stop and report options to 주군 instead of letting the planner quietly
 add it.
 
+## TWAKE-003 return-path policy
+
+Plans for Blue-dispatched async work such as plan-vet, color review, MAR, second-color review, GJC long-running dispatches, and blocked-condition probes must include return-path evidence requirements or an explicit no-wake/blocked state. Require effective KAH capability readback for `async_dispatch_return_path_evidence=true` and `async_dispatch_return_path_final_gate=true` before planning any same-thread wake readiness claim. If the effective binary lacks those capabilities, or watcher/subscription/callback/origin evidence is unavailable, the plan must preserve `blocked/degraded/no_wake_claim` with an operator-readable recovery hint. Required watcher reports must be terminal-only Blue-action-required output. watcher/notifier output is state-report-only and never review, MAR, waiver, Blue synthesis, or final acceptance authority.
+
 For DESIGN Teal work, plans must carry `project_has_teal_lane`,
 `ui_ux_change`, derived `teal_required`, and `teal_skip_reason` for false
 inputs. `DESIGN_PLAN_GATE` is required before implementation authorization
