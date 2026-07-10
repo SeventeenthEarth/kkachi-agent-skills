@@ -7,7 +7,7 @@ import (
 
 func TestV024OptionalTealRoleSupportIsDocumentedAndPackaged(t *testing.T) {
 	requireContainsAll(t, "internal/skills/version/version.go", []string{
-		`CLIVersion  = "0.2.4"`,
+		`CLIVersion  = "0.2.5"`,
 	})
 	requireContainsAll(t, "skill-pack.yaml", []string{
 		"teal: roles/teal.yaml",

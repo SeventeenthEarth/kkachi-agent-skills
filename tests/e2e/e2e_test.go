@@ -66,7 +66,19 @@ func TestRootInstalledBinaryVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("root binary --version failed: %v\n%s", err, out)
 	}
-	if strings.TrimSpace(string(out)) != "kkachi-agent-skills v0.2.4" {
+	if strings.TrimSpace(string(out)) != "kkachi-agent-skills v0.2.5" {
+		t.Fatalf("unexpected --version output: %q", out)
+	}
+}
+
+func TestCommandInstalledBinaryVersion(t *testing.T) {
+	binary := buildBinary(t)
+	cmd := exec.Command(binary, "--version")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("command binary --version failed: %v\n%s", err, out)
+	}
+	if strings.TrimSpace(string(out)) != "kkachi-agent-skills v0.2.5" {
 		t.Fatalf("unexpected --version output: %q", out)
 	}
 }
